@@ -64,8 +64,19 @@ func ParseFile(path string) ([]Symbol, error) {
 				continue
 			}
 
+			kind := SymbolKind("")
+
 			_, ok = typeSpec.Type.(*ast.StructType)
-			if !ok {
+			if ok {
+				kind = SymbolKindStruct
+			}
+
+			_, ok = typeSpec.Type.(*ast.InterfaceType)
+			if ok {
+				kind = SymbolKindInterface
+			}
+
+			if kind == "" {
 				continue
 			}
 
@@ -73,7 +84,7 @@ func ParseFile(path string) ([]Symbol, error) {
 
 			symbols = append(symbols, Symbol{
 				Name: typeSpec.Name.Name,
-				Kind: SymbolKindStruct,
+				Kind: kind,
 				Position: Position{
 					File: pos.Filename,
 					Line: pos.Line,

@@ -145,3 +145,36 @@ func (s UserService) Create() {
 		t.Fatalf("expected UserService receiver, got %s", method.Receiver)
 	}
 }
+
+func TestParseFileFindsInterface(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "service.go")
+
+	err := os.WriteFile(path, []byte(`
+package auth
+
+type UserRepository interface {
+	Save() error
+}
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	symbols, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(symbols) != 1 {
+		t.Fatalf("expected 1 symbol, got %d", len(symbols))
+	}
+
+	if symbols[0].Name != "UserRepository" {
+		t.Fatalf("expected UserRepository, got %s", symbols[0].Name)
+	}
+
+	if symbols[0].Kind != SymbolKindInterface {
+		t.Fatalf("expected interface kind, got %s", symbols[0].Kind)
+	}
+}

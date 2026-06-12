@@ -2,29 +2,84 @@
 
 GoSherpa helps you explore and understand Go codebases.
 
-It provides fast access to symbol relationships, call paths, package dependencies and change impact across a repository.
+It provides fast access to symbols, references, package relationships, and eventually call paths, dependency analysis, and impact discovery across a repository.
 
 ## Why?
 
 As Go projects grow, answering simple questions becomes harder:
 
-* Where is this function used?
-* Which packages depend on this one?
-* What implements this interface?
-* Which tests are affected by a change?
-* What code paths lead here?
+- Where is this function used?
+- Where is this type defined?
+- Which packages depend on this one?
+- What implements this interface?
+- Which tests are affected by a change?
+- What code paths lead here?
 
-GoSherpa helps answer these questions without manually jumping through files.
+GoSherpa helps answer these questions without manually jumping through dozens of files.
 
-## Features
+## Current Features
+
+### List Symbols
+
+Explore all discovered symbols in a repository.
+
+```bash
+gosherpa symbols
+```
+
+Example output:
+
+```text
+📦 STRUCTS
+  Symbol                               internal/sherpa/symbol.go:17
+  Position                             internal/sherpa/symbol.go:12
+
+⚙️ FUNCTIONS
+  ParseFile                            internal/sherpa/parse.go:9
+  FindGoFiles                          internal/sherpa/scan.go:8
+```
 
 ### Symbol Lookup
 
-Find definitions, references and implementations.
+Find a symbol and show where it is defined.
 
 ```bash
-gosherpa symbol UserService
+gosherpa symbol ParseFile
 ```
+
+Example:
+
+```text
+Name: ParseFile
+Kind: function
+File: internal/sherpa/parse.go
+Line: 9
+```
+
+### Reference Search
+
+Find references to a symbol across the repository.
+
+```bash
+gosherpa refs ParseFile
+```
+
+Example:
+
+```text
+🔍 REFERENCES
+
+ParseFile
+
+  internal/sherpa/repository.go:12
+  internal/sherpa/reference.go:41
+
+Found 4 references
+```
+
+## Roadmap
+
+Planned features:
 
 ### Call Paths
 
@@ -53,7 +108,7 @@ gosherpa impact internal/auth/session.go
 
 ### Test Discovery
 
-Find tests related to packages, types and functions.
+Find tests related to packages, types, and functions.
 
 ```bash
 gosherpa tests UserService.Create
@@ -62,23 +117,31 @@ gosherpa tests UserService.Create
 ## Example
 
 ```bash
-gosherpa index .
-gosherpa symbol UserService
-gosherpa callers UserService.Create
-gosherpa impact ./internal/auth
+gosherpa symbols
+gosherpa symbol ParseFile
+gosherpa refs ParseFile
 ```
 
 ## Status
 
-Early development.
+Early MVP.
 
-Current focus:
+Implemented:
 
-* Repository indexing
-* Symbol relationships
-* Call graph analysis
-* Dependency analysis
-* Test discovery
+- Repository scanning
+- Go file discovery
+- Struct discovery
+- Interface discovery
+- Function discovery
+- Method discovery
+- Symbol lookup
+- Reference lookup
+
+In progress:
+
+- Better reference analysis
+- Dependency analysis
+- Call graph analysis
 
 ## Philosophy
 
