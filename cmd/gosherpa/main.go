@@ -81,6 +81,21 @@ func main() {
 		}
 
 		sherpa.PrintPackageDependencies(deps)
+	case "callees":
+		if len(os.Args) < 3 {
+			fmt.Println("usage: gosherpa callees <function-or-method>")
+			return
+		}
+
+		target := os.Args[2]
+
+		result, err := sherpa.FindCallees(".", target)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+
+		sherpa.PrintCallees(result)
 	default:
 		fmt.Println("unknown command:", command)
 		printUsage()
@@ -95,4 +110,5 @@ func printUsage() {
 	fmt.Println("  symbol <name>")
 	fmt.Println("  refs <name>")
 	fmt.Println("  deps <package>")
+	fmt.Println("  callees <function-or-method>")
 }

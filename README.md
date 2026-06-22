@@ -85,17 +85,28 @@ Show imports and local packages that depend on a package.
 gosherpa deps ./internal/sherpa
 ```
 
+### Callees
+
+Show direct syntactic calls made inside a function or method.
+
+```bash
+gosherpa callees ParseFile
+gosherpa callees Server.Start
+```
+
+This is an AST-based MVP. It does not perform semantic type analysis, so builtins and type conversions may appear as callees.
+
 ## Roadmap
 
 Planned features:
 
 ### Call Paths
 
-Inspect incoming and outgoing function calls.
+Planned follow-ups:
 
 ```bash
 gosherpa callers UserService.Create
-gosherpa callees UserService.Create
+gosherpa paths UserService.Create Handler.ServeHTTP
 ```
 
 ### Impact Analysis
@@ -121,6 +132,7 @@ gosherpa symbols
 gosherpa symbol ParseFile
 gosherpa refs ParseFile
 gosherpa deps ./internal/sherpa
+gosherpa callees ParseFile
 ```
 
 ## Status
@@ -138,11 +150,13 @@ Implemented:
 - Symbol lookup
 - Reference lookup
 - Package dependency analysis
+- Direct syntactic callee analysis
 
 In progress:
 
 - Better reference analysis
-- Call graph analysis
+- Caller analysis
+- Longer call paths
 
 ## Philosophy
 
