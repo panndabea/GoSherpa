@@ -77,6 +77,14 @@ ParseFile
 Found 4 references
 ```
 
+### Package Dependencies
+
+Show imports and local packages that depend on a package.
+
+```bash
+gosherpa deps ./internal/sherpa
+```
+
 ## Roadmap
 
 Planned features:
@@ -88,14 +96,6 @@ Inspect incoming and outgoing function calls.
 ```bash
 gosherpa callers UserService.Create
 gosherpa callees UserService.Create
-```
-
-### Package Dependencies
-
-Understand how packages relate to each other.
-
-```bash
-gosherpa deps ./internal/auth
 ```
 
 ### Impact Analysis
@@ -120,6 +120,7 @@ gosherpa tests UserService.Create
 gosherpa symbols
 gosherpa symbol ParseFile
 gosherpa refs ParseFile
+gosherpa deps ./internal/sherpa
 ```
 
 ## Status
@@ -136,11 +137,11 @@ Implemented:
 - Method discovery
 - Symbol lookup
 - Reference lookup
+- Package dependency analysis
 
 In progress:
 
 - Better reference analysis
-- Dependency analysis
 - Call graph analysis
 
 ## Philosophy

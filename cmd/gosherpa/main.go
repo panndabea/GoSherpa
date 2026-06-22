@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: gosherpa symbol <name>")
+		printUsage()
 		return
 	}
 
@@ -50,24 +50,49 @@ func main() {
 
 		sherpa.PrintSymbols(symbols)
 
-
 	case "refs":
-	if len(os.Args) < 3 {
-		fmt.Println("usage: gosherpa refs <name>")
-		return
-	}
+		if len(os.Args) < 3 {
+			fmt.Println("usage: gosherpa refs <name>")
+			return
+		}
 
-	name := os.Args[2]
+		name := os.Args[2]
 
-	refs, err := sherpa.FindReferences(".", name)
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+		refs, err := sherpa.FindReferences(".", name)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
 
-	sherpa.PrintReferences(name, refs)
+		sherpa.PrintReferences(name, refs)
+
+	case "deps":
+		if len(os.Args) < 3 {
+			fmt.Println("usage: gosherpa deps <package>")
+			return
+		}
+
+		targetPackage := os.Args[2]
+
+		deps, err := sherpa.FindPackageDependencies(".", targetPackage)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+
+		sherpa.PrintPackageDependencies(deps)
 	default:
 		fmt.Println("unknown command:", command)
-		fmt.Println("usage: gosherpa symbol <name>")
+		printUsage()
 	}
+}
+
+func printUsage() {
+	fmt.Println("usage: gosherpa <command> [args]")
+	fmt.Println()
+	fmt.Println("commands:")
+	fmt.Println("  symbols")
+	fmt.Println("  symbol <name>")
+	fmt.Println("  refs <name>")
+	fmt.Println("  deps <package>")
 }
