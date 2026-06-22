@@ -1,5 +1,9 @@
 # GoSherpa
 
+<p align="center">
+  <img src="pictures/gosherpa-logo-banner.png" alt="GoSherpa logo banner with an explorer mascot, map, and mountain" width="720">
+</p>
+
 GoSherpa helps you explore and understand Go codebases.
 
 It provides fast access to symbols, references, package relationships, and eventually call paths, dependency analysis, and impact discovery across a repository.
