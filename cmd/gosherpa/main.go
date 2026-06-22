@@ -81,6 +81,21 @@ func main() {
 		}
 
 		sherpa.PrintPackageDependencies(deps)
+	case "callers":
+		if len(os.Args) < 3 {
+			fmt.Println("usage: gosherpa callers <function-or-method>")
+			return
+		}
+
+		target := os.Args[2]
+
+		result, err := sherpa.FindCallers(".", target)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+
+		sherpa.PrintCallers(result)
 	case "callees":
 		if len(os.Args) < 3 {
 			fmt.Println("usage: gosherpa callees <function-or-method>")
@@ -110,5 +125,6 @@ func printUsage() {
 	fmt.Println("  symbol <name>")
 	fmt.Println("  refs <name>")
 	fmt.Println("  deps <package>")
+	fmt.Println("  callers <function-or-method>")
 	fmt.Println("  callees <function-or-method>")
 }

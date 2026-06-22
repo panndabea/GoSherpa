@@ -19,6 +19,16 @@ type CalleesResult struct {
 	Callees []Callee
 }
 
+type Caller struct {
+	Name     string
+	Position Position
+}
+
+type CallersResult struct {
+	Target  string
+	Callers []Caller
+}
+
 type functionInfo struct {
 	Target   string
 	Decl     *ast.FuncDecl
@@ -47,6 +57,30 @@ func FindCallees(root string, target string) (CalleesResult, error) {
 	return CalleesResult{
 		Target:  normalizedTarget,
 		Callees: callees,
+	}, nil
+}
+
+func FindCallers(root string, target string) (CallersResult, error) {
+	normalizedTarget, err := normalizeCallTarget(target)
+	if err != nil {
+		return CallersResult{}, err
+	}
+
+	functions, err := collectFunctionInfos(root)
+	if err != nil {
+		return CallersResult{Target: normalizedTarget}, err
+	}
+
+	_, err = findFunctionInfo(functions, normalizedTarget)
+	if err != nil {
+		return CallersResult{Target: normalizedTarget}, err
+	}
+
+	callers := collectCallersFromFunctions(functions, normalizedTarget)
+
+	return CallersResult{
+		Target:  normalizedTarget,
+		Callers: callers,
 	}, nil
 }
 
@@ -187,6 +221,18 @@ func callName(expr ast.Expr) (string, bool) {
 	}
 }
 
+func callMatchesTarget(calleeName string, target string) bool {
+	if calleeName == target {
+		return true
+	}
+
+	if strings.Contains(target, ".") {
+		return false
+	}
+
+	return strings.HasSuffix(calleeName, "."+target)
+}
+
 func selectorName(expr ast.Expr) (string, bool) {
 	switch node := expr.(type) {
 	case *ast.Ident:
@@ -265,4 +311,40 @@ func sortCallees(callees []Callee) {
 
 		return callees[i].Name < callees[j].Name
 	})
+}
+
+func sortCallers(callers []Caller) {
+	sort.Slice(callers, func(i int, j int) bool {
+		if callers[i].Position.File != callers[j].Position.File {
+			return callers[i].Position.File < callers[j].Position.File
+		}
+
+		if callers[i].Position.Line != callers[j].Position.Line {
+			return callers[i].Position.Line < callers[j].Position.Line
+		}
+
+		return callers[i].Name < callers[j].Name
+	})
+}
+
+func collectCallersFromFunctions(functions []functionInfo, target string) []Caller {
+	var callers []Caller
+
+	for _, function := range functions {
+		callees := collectCalleesFromFunction(function)
+		for _, callee := range callees {
+			if !callMatchesTarget(callee.Name, target) {
+				continue
+			}
+
+			callers = append(callers, Caller{
+				Name:     function.Target,
+				Position: callee.Position,
+			})
+		}
+	}
+
+	sortCallers(callers)
+
+	return callers
 }

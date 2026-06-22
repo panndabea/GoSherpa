@@ -121,6 +121,30 @@ func Calls() {
 	}
 }
 
+func TestCallMatchesTarget(t *testing.T) {
+	tests := []struct {
+		name       string
+		calleeName string
+		target     string
+		want       bool
+	}{
+		{name: "exact function", calleeName: "Step", target: "Step", want: true},
+		{name: "selector function", calleeName: "sherpa.ParseFile", target: "ParseFile", want: true},
+		{name: "different function", calleeName: "Start", target: "Stop", want: false},
+		{name: "exact method expression", calleeName: "Server.Start", target: "Server.Start", want: true},
+		{name: "receiver variable does not match method target", calleeName: "server.Start", target: "Server.Start", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := callMatchesTarget(test.calleeName, test.target)
+			if got != test.want {
+				t.Fatalf("expected %v, got %v", test.want, got)
+			}
+		})
+	}
+}
+
 func TestCallNameHandlesParenthesizedAndMethodExpressionCalls(t *testing.T) {
 	calls := parseCallTestCalls(t, `package sample
 
@@ -183,6 +207,62 @@ func Run() {
 	}
 }
 
+func TestCollectCallersFromFunctions(t *testing.T) {
+	function := parseCallTestFunction(t, `package sample
+
+func Run() {
+	Step()
+}
+`, "Run")
+
+	got := collectCallersFromFunctions([]functionInfo{function}, "Step")
+
+	if len(got) != 1 {
+		t.Fatalf("expected 1 caller, got %v", got)
+	}
+
+	if got[0].Name != "Run" {
+		t.Fatalf("expected Run, got %s", got[0].Name)
+	}
+}
+
+func TestCollectCallersFromFunctionsMatchesSelectorFunctionTarget(t *testing.T) {
+	function := parseCallTestFunction(t, `package sample
+
+func Run() {
+	sherpa.ParseFile()
+}
+`, "Run")
+
+	got := collectCallersFromFunctions([]functionInfo{function}, "ParseFile")
+
+	if len(got) != 1 {
+		t.Fatalf("expected 1 caller, got %v", got)
+	}
+
+	if got[0].Name != "Run" {
+		t.Fatalf("expected Run, got %s", got[0].Name)
+	}
+}
+
+func TestCollectCallersFromFunctionsIgnoresFunctionLiterals(t *testing.T) {
+	function := parseCallTestFunction(t, `package sample
+
+func Run() {
+	fn := func() {
+		Step()
+	}
+	fn()
+}
+`, "Run")
+
+	got := collectCallersFromFunctions([]functionInfo{function}, "Step")
+
+	if len(got) != 0 {
+		t.Fatalf("expected no callers, got %v", got)
+	}
+}
+
 func TestCollectCalleesFromFunctionReturnsEmptyForNilBody(t *testing.T) {
 	got := collectCalleesFromFunction(functionInfo{
 		Decl: &ast.FuncDecl{},
@@ -208,6 +288,29 @@ func TestSortCallees(t *testing.T) {
 		callees[1].Name,
 		callees[2].Name,
 		callees[3].Name,
+	}
+	want := []string{"Alpha", "Gamma", "Beta", "Beta"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestSortCallers(t *testing.T) {
+	callers := []Caller{
+		{Name: "Beta", Position: Position{File: "b.go", Line: 1}},
+		{Name: "Beta", Position: Position{File: "a.go", Line: 2}},
+		{Name: "Gamma", Position: Position{File: "a.go", Line: 1}},
+		{Name: "Alpha", Position: Position{File: "a.go", Line: 1}},
+	}
+
+	sortCallers(callers)
+
+	got := []string{
+		callers[0].Name,
+		callers[1].Name,
+		callers[2].Name,
+		callers[3].Name,
 	}
 	want := []string{"Alpha", "Gamma", "Beta", "Beta"}
 
@@ -345,6 +448,202 @@ func Run(
 	}
 }
 
+func TestFindCallersFindsTopLevelFunctionCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Stop() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result, err := FindCallers(tmp, "Step")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	assertContainsString(t, names, "Run")
+	assertContainsString(t, names, "Stop")
+}
+
+func TestFindCallersFindsMethodExpressionCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func Run(server *Server) {
+	(*Server).Start(server)
+}
+
+func (s *Server) Start() {}
+`)
+
+	result, err := FindCallers(tmp, "Server.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	assertContainsString(t, names, "Run")
+}
+
+func TestFindCallersDoesNotMatchReceiverVariableCallsToMethodTargets(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func Run(server *Server) {
+	server.Start()
+}
+
+func (s *Server) Start() {}
+`)
+
+	result, err := FindCallers(tmp, "Server.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callers) != 0 {
+		t.Fatalf("expected no callers, got %v", result.Callers)
+	}
+}
+
+func TestFindCallersReturnsEmptyWhenTargetHasNoCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {}
+`)
+
+	result, err := FindCallers(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callers) != 0 {
+		t.Fatalf("expected no callers, got %v", result.Callers)
+	}
+}
+
+func TestFindCallersReturnsErrorForMissingFunction(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {}
+`)
+
+	_, err := FindCallers(tmp, "Missing")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "function not found: Missing") {
+		t.Fatalf("expected missing function error, got %v", err)
+	}
+}
+
+func TestFindCallersReturnsErrorForAmbiguousTarget(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "one", "service.go"), `package one
+
+func Run() {}
+`)
+	writeFile(t, filepath.Join(tmp, "two", "service.go"), `package two
+
+func Run() {}
+`)
+
+	_, err := FindCallers(tmp, "Run")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "ambiguous function target: Run") {
+		t.Fatalf("expected ambiguous function error, got %v", err)
+	}
+}
+
+func TestFindCallersIgnoresTestFileCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Step() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestStep() {
+	Step()
+}
+`)
+
+	result, err := FindCallers(tmp, "Step")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callers) != 0 {
+		t.Fatalf("expected no callers from test files, got %v", result.Callers)
+	}
+}
+
+func TestFindCallersIgnoresTargetsDefinedOnlyInTestFiles(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestOnlyTarget() {}
+`)
+
+	_, err := FindCallers(tmp, "TestOnlyTarget")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "function not found: TestOnlyTarget") {
+		t.Fatalf("expected missing function error, got %v", err)
+	}
+}
+
+func TestFindCallersWrapsParseErrorsWithFilePath(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "broken.go")
+
+	writeFile(t, path, `package service
+
+func Run(
+`)
+
+	_, err := FindCallers(tmp, "Run")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "parse ") {
+		t.Fatalf("expected parse prefix, got %v", err)
+	}
+
+	if !strings.Contains(err.Error(), path) {
+		t.Fatalf("expected error to contain %s, got %v", path, err)
+	}
+}
+
 func parseCallTestCalls(t *testing.T, source string) []*ast.CallExpr {
 	t.Helper()
 
@@ -407,6 +706,15 @@ func callTestCalleeNames(callees []Callee) []string {
 	var names []string
 	for _, callee := range callees {
 		names = append(names, callee.Name)
+	}
+
+	return names
+}
+
+func callTestCallerNames(callers []Caller) []string {
+	var names []string
+	for _, caller := range callers {
+		names = append(names, caller.Name)
 	}
 
 	return names

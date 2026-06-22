@@ -96,18 +96,30 @@ gosherpa callees Server.Start
 
 This is an AST-based MVP. It does not perform semantic type analysis, so builtins and type conversions may appear as callees.
 
+### Callers
+
+Show direct syntactic callers of a function or method.
+
+```bash
+gosherpa callers ParseFile
+gosherpa callers Server.Start
+```
+
+This is an AST-based MVP. It can match direct calls and simple package-selector calls for function targets, but it does not perform semantic type analysis for receiver variables. One-segment function targets can produce selector-call false positives, and method targets can miss receiver-variable calls.
+
 ## Roadmap
 
-Planned features:
+Next planned feature:
 
 ### Call Paths
 
-Planned follow-ups:
+Find paths between two functions or methods.
 
 ```bash
-gosherpa callers UserService.Create
 gosherpa paths UserService.Create Handler.ServeHTTP
 ```
+
+Planned follow-ups:
 
 ### Impact Analysis
 
@@ -133,6 +145,7 @@ gosherpa symbol ParseFile
 gosherpa refs ParseFile
 gosherpa deps ./internal/sherpa
 gosherpa callees ParseFile
+gosherpa callers ParseFile
 ```
 
 ## Status
@@ -151,11 +164,11 @@ Implemented:
 - Reference lookup
 - Package dependency analysis
 - Direct syntactic callee analysis
+- Direct syntactic caller analysis
 
 In progress:
 
 - Better reference analysis
-- Caller analysis
 - Longer call paths
 
 ## Philosophy

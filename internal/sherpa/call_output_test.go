@@ -49,3 +49,51 @@ func TestFormatCalleesWithEmptyList(t *testing.T) {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
 	}
 }
+
+func TestFormatCallers(t *testing.T) {
+	result := CallersResult{
+		Target: "ParseFile",
+		Callers: []Caller{
+			{
+				Name: "Load",
+				Position: Position{
+					File: "internal/sherpa/repository.go",
+					Line: 12,
+				},
+			},
+			{
+				Name: "Run",
+				Position: Position{
+					File: "cmd/gosherpa/main.go",
+					Line: 70,
+				},
+			},
+		},
+	}
+
+	got := FormatCallers(result)
+	want := `CALLERS
+
+ParseFile
+
+  Load                                 internal/sherpa/repository.go:12
+  Run                                  cmd/gosherpa/main.go:70
+
+Found 2 callers
+`
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatCallersWithEmptyList(t *testing.T) {
+	result := CallersResult{Target: "Empty"}
+
+	got := FormatCallers(result)
+	want := "no callers found: Empty\n"
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}

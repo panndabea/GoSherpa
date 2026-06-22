@@ -18,6 +18,70 @@ func TestPrintUsageIncludesCallees(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesCallers(t *testing.T) {
+	output := captureMainTestStdout(t, func() {
+		printUsage()
+	})
+
+	if !strings.Contains(output, "callers <function-or-method>") {
+		t.Fatalf("expected usage to contain callers command, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
+	setMainTestArgs(t, []string{"gosherpa", "callers"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	want := "usage: gosherpa callers <function-or-method>\n"
+	if output != want {
+		t.Fatalf("expected %q, got %q", want, output)
+	}
+}
+
+func TestMainRunsCallersCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	oldWorkingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Chdir(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		err := os.Chdir(oldWorkingDirectory)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	setMainTestArgs(t, []string{"gosherpa", "callers", "Step"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"CALLERS", "Step", "Run", "Found 1 callers"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+}
+
 func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 	setMainTestArgs(t, []string{"gosherpa", "callees"})
 
