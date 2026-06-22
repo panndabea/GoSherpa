@@ -1,77 +1,52 @@
-# GoSherpa
+<div align="center">
+  <img src="pictures/gosherpa-readme-hero.png" alt="GoSherpa explorer mascot with a mountain map" width="900">
 
-<p align="center">
-  <img src="pictures/gosherpa-logo-banner.png" alt="GoSherpa logo banner with an explorer mascot, map, and mountain" width="720">
-</p>
+  <h1>GoSherpa</h1>
 
-GoSherpa helps you explore and understand Go codebases.
+  <p>
+    <strong>Structural code intelligence for Go projects.</strong><br>
+    Explore symbols, references, packages, callers, and callees from a calm, deterministic CLI.
+  </p>
 
-It provides fast access to symbols, references, package relationships, and eventually call paths, dependency analysis, and impact discovery across a repository.
+  <p>
+    <img alt="Go 1.24.4" src="https://img.shields.io/badge/Go-1.24.4-00ADD8?style=for-the-badge&amp;logo=go&amp;logoColor=white">
+    <img alt="Status: Early MVP" src="https://img.shields.io/badge/status-early%20MVP-2F855A?style=for-the-badge">
+    <img alt="Interface: CLI" src="https://img.shields.io/badge/interface-CLI-111827?style=for-the-badge">
+    <img alt="Analysis: AST based" src="https://img.shields.io/badge/analysis-AST%20based-F6AD55?style=for-the-badge">
+  </p>
+</div>
 
-## Why?
+---
 
-As Go projects grow, answering simple questions becomes harder:
+> Ask a code-structure question. Get a small, trustworthy answer.
 
-- Where is this function used?
-- Where is this type defined?
-- Which packages depend on this one?
-- What implements this interface?
-- Which tests are affected by a change?
-- What code paths lead here?
+GoSherpa is a fast command-line companion for understanding Go repositories without opening half the project in your editor. It gives you just enough structure to navigate confidently: where a symbol lives, who references it, which packages depend on it, and how functions connect.
 
-GoSherpa helps answer these questions without manually jumping through dozens of files.
+## Why It Exists
 
-## Current Features
+As Go projects grow, the important answer is often spread across files, packages, and call sites. GoSherpa turns common navigation questions into focused commands:
 
-### List Symbols
+| When you ask... | GoSherpa helps you find... |
+| --- | --- |
+| "Where is this thing defined?" | Symbols, files, and line numbers |
+| "Who uses this function?" | References and direct callers |
+| "What does this function touch?" | Direct callees |
+| "What depends on this package?" | Local package dependency relationships |
+| "What might this change affect?" | The future impact-analysis workflow |
 
-Explore all discovered symbols in a repository.
+## Current Experience
 
-```bash
-gosherpa symbols
-```
-
-Example output:
-
-```text
-📦 STRUCTS
-  Symbol                               internal/sherpa/symbol.go:17
-  Position                             internal/sherpa/symbol.go:12
-
-⚙️ FUNCTIONS
-  ParseFile                            internal/sherpa/parse.go:9
-  FindGoFiles                          internal/sherpa/scan.go:8
-```
-
-### Symbol Lookup
-
-Find a symbol and show where it is defined.
-
-```bash
-gosherpa symbol ParseFile
-```
-
-Example:
+| Capability | Command | Result |
+| --- | --- | --- |
+| Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
+| Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
+| Reference search | `gosherpa refs ParseFile` | Finds syntactic references across the repository |
+| Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
+| Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
+| Callers | `gosherpa callers ParseFile` | Lists direct syntactic callers of a function or method |
 
 ```text
-Name: ParseFile
-Kind: function
-File: internal/sherpa/parse.go
-Line: 9
-```
-
-### Reference Search
-
-Find references to a symbol across the repository.
-
-```bash
-gosherpa refs ParseFile
-```
-
-Example:
-
-```text
-🔍 REFERENCES
+REFERENCES
 
 ParseFile
 
@@ -81,106 +56,76 @@ ParseFile
 Found 4 references
 ```
 
-### Package Dependencies
-
-Show imports and local packages that depend on a package.
+## Quick Start
 
 ```bash
-gosherpa deps ./internal/sherpa
+git clone https://github.com/panndabea/GoSherpa.git
+cd GoSherpa
+go test ./...
+go build -o gosherpa ./cmd/gosherpa
 ```
 
-### Callees
-
-Show direct syntactic calls made inside a function or method.
+Then explore the repository from the project root:
 
 ```bash
-gosherpa callees ParseFile
-gosherpa callees Server.Start
+./gosherpa symbols
+./gosherpa symbol ParseFile
+./gosherpa refs ParseFile
+./gosherpa deps ./internal/sherpa
+./gosherpa callees ParseFile
+./gosherpa callers ParseFile
 ```
 
-This is an AST-based MVP. It does not perform semantic type analysis, so builtins and type conversions may appear as callees.
-
-### Callers
-
-Show direct syntactic callers of a function or method.
+Prefer not to build a binary yet?
 
 ```bash
-gosherpa callers ParseFile
-gosherpa callers Server.Start
+go run ./cmd/gosherpa symbols
+go run ./cmd/gosherpa callers ParseFile
 ```
 
-This is an AST-based MVP. It can match direct calls and simple package-selector calls for function targets, but it does not perform semantic type analysis for receiver variables. One-segment function targets can produce selector-call false positives, and method targets can miss receiver-variable calls.
+## Design Principles
+
+| Principle | What it means in practice |
+| --- | --- |
+| Human-readable first | Output is meant to be scanned in a terminal, not decoded from a dump |
+| Deterministic by default | Stable answers make it easier to trust diffs and repeated runs |
+| Small commands | Each command answers one navigation question clearly |
+| Repository-native | GoSherpa uses information already present in the codebase |
+| No hidden ceremony | No annotations, no generated metadata, no project-specific setup for normal use |
 
 ## Roadmap
 
-Next planned feature:
+GoSherpa is an early MVP, with the next work focused on deeper navigation and safer changes.
 
-### Call Paths
+| Next | Goal |
+| --- | --- |
+| Call paths | Find paths between two functions or methods |
+| Better references | Move from syntactic matches toward more Go-aware relationships |
+| Impact analysis | Estimate what a change might affect before making it |
+| Test discovery | Find tests related to packages, types, and functions |
+| Machine-readable output | Add a stable surface for scripts and agents once the concepts settle |
 
-Find paths between two functions or methods.
-
-```bash
-gosherpa paths UserService.Create Handler.ServeHTTP
-```
-
-Planned follow-ups:
-
-### Impact Analysis
-
-Estimate the scope of a change before making it.
-
-```bash
-gosherpa impact internal/auth/session.go
-```
-
-### Test Discovery
-
-Find tests related to packages, types, and functions.
-
-```bash
-gosherpa tests UserService.Create
-```
-
-## Example
-
-```bash
-gosherpa symbols
-gosherpa symbol ParseFile
-gosherpa refs ParseFile
-gosherpa deps ./internal/sherpa
-gosherpa callees ParseFile
-gosherpa callers ParseFile
-```
+Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
 ## Status
 
-Early MVP.
+Implemented today:
 
-Implemented:
-
-- Repository scanning
-- Go file discovery
-- Struct discovery
-- Interface discovery
-- Function discovery
-- Method discovery
-- Symbol lookup
-- Reference lookup
+- Repository scanning and Go file discovery
+- Struct, interface, function, and method discovery
+- Symbol lookup and reference lookup
 - Package dependency analysis
-- Direct syntactic callee analysis
-- Direct syntactic caller analysis
+- Direct syntactic caller and callee analysis
 
-In progress:
+Known MVP limitations:
 
-- Better reference analysis
-- Longer call paths
+- Reference search is syntactic, not type-checked.
+- Caller and callee analysis is AST-based and can miss receiver-variable method calls.
+- One-segment function targets can produce selector-call false positives.
+- Function names can be ambiguous across packages.
 
 ## Philosophy
 
-GoSherpa focuses on information already present in the codebase.
+GoSherpa focuses on visibility, not magic.
 
-No annotations.
-No code generation.
-No magic.
-
-Just better visibility into how a Go project is put together.
+It does not try to become your IDE, rewrite your project, or infer more certainty than it has. It reads the code you already have and returns compact answers that help you keep moving.
