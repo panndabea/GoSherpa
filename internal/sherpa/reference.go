@@ -13,7 +13,12 @@ type Reference struct {
 }
 
 func FindReferences(root string, name string) ([]Reference, error) {
-	files, err := FindGoFiles(root)
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := FindGoFiles(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -24,6 +29,10 @@ func FindReferences(root string, name string) ([]Reference, error) {
 		fileRefs, err := findReferencesInFile(file, name)
 		if err != nil {
 			return nil, err
+		}
+
+		for i := range fileRefs {
+			fileRefs[i].Position = positionRelativeToRoot(rootPath, fileRefs[i].Position)
 		}
 
 		refs = append(refs, fileRefs...)

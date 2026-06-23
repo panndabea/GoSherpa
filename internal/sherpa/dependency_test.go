@@ -250,6 +250,31 @@ import (
 	}
 }
 
+func TestFindPackageDependenciesWorksWithAbsoluteRoot(t *testing.T) {
+	tmp := t.TempDir()
+	absoluteRoot, err := filepath.Abs(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "service.go"), `package auth
+
+import "fmt"
+`)
+
+	deps, err := FindPackageDependencies(absoluteRoot, "./internal/auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if deps.Package != "./internal/auth" {
+		t.Fatalf("expected ./internal/auth, got %s", deps.Package)
+	}
+
+	assertContainsString(t, deps.Imports, "fmt")
+}
+
 func TestFindPackageDependenciesFindsUsedBy(t *testing.T) {
 	tmp := t.TempDir()
 

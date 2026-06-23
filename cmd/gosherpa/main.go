@@ -3,28 +3,94 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
+type cliInvocation struct {
+	Root        string
+	Command     string
+	CommandArgs []string
+}
+
+func parseCLIArgs(args []string) (cliInvocation, error) {
+	invocation := cliInvocation{Root: "."}
+	var positionals []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "--root" {
+			if i+1 >= len(args) {
+				return cliInvocation{}, fmt.Errorf("missing value for --root")
+			}
+
+			value := strings.TrimSpace(args[i+1])
+			if value == "" {
+				return cliInvocation{}, fmt.Errorf("missing value for --root")
+			}
+
+			invocation.Root = value
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--root=") {
+			value := strings.TrimSpace(strings.TrimPrefix(arg, "--root="))
+			if value == "" {
+				return cliInvocation{}, fmt.Errorf("missing value for --root")
+			}
+
+			invocation.Root = value
+			continue
+		}
+
+		if strings.HasPrefix(arg, "-") {
+			return cliInvocation{}, fmt.Errorf("unknown flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) > 0 {
+		invocation.Command = positionals[0]
+	}
+
+	if len(positionals) > 1 {
+		invocation.CommandArgs = positionals[1:]
+	}
+
+	return invocation, nil
+}
+
 func main() {
-	if len(os.Args) < 2 {
+	invocation, err := parseCLIArgs(os.Args[1:])
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	if invocation.Command == "" {
 		printUsage()
 		return
 	}
 
-	command := os.Args[1]
-
-	switch command {
+	switch invocation.Command {
 	case "symbol":
-		if len(os.Args) < 3 {
-			fmt.Println("usage: gosherpa symbol <name>")
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] symbol <name>")
 			return
 		}
 
-		name := os.Args[2]
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
 
-		symbols, err := sherpa.ParseRepository(".")
+		name := invocation.CommandArgs[0]
+
+		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -42,7 +108,12 @@ func main() {
 		fmt.Println("Line:", symbol.Position.Line)
 
 	case "symbols":
-		symbols, err := sherpa.ParseRepository(".")
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
+
+		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -51,14 +122,19 @@ func main() {
 		sherpa.PrintSymbols(symbols)
 
 	case "refs":
-		if len(os.Args) < 3 {
-			fmt.Println("usage: gosherpa refs <name>")
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] refs <name>")
 			return
 		}
 
-		name := os.Args[2]
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
 
-		refs, err := sherpa.FindReferences(".", name)
+		name := invocation.CommandArgs[0]
+
+		refs, err := sherpa.FindReferences(root, name)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -67,14 +143,19 @@ func main() {
 		sherpa.PrintReferences(name, refs)
 
 	case "deps":
-		if len(os.Args) < 3 {
-			fmt.Println("usage: gosherpa deps <package>")
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] deps <package>")
 			return
 		}
 
-		targetPackage := os.Args[2]
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
 
-		deps, err := sherpa.FindPackageDependencies(".", targetPackage)
+		targetPackage := invocation.CommandArgs[0]
+
+		deps, err := sherpa.FindPackageDependencies(root, targetPackage)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -82,14 +163,19 @@ func main() {
 
 		sherpa.PrintPackageDependencies(deps)
 	case "callers":
-		if len(os.Args) < 3 {
-			fmt.Println("usage: gosherpa callers <function-or-method>")
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] callers <function-or-method>")
 			return
 		}
 
-		target := os.Args[2]
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
 
-		result, err := sherpa.FindCallers(".", target)
+		target := invocation.CommandArgs[0]
+
+		result, err := sherpa.FindCallers(root, target)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -97,14 +183,19 @@ func main() {
 
 		sherpa.PrintCallers(result)
 	case "callees":
-		if len(os.Args) < 3 {
-			fmt.Println("usage: gosherpa callees <function-or-method>")
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] callees <function-or-method>")
 			return
 		}
 
-		target := os.Args[2]
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
 
-		result, err := sherpa.FindCallees(".", target)
+		target := invocation.CommandArgs[0]
+
+		result, err := sherpa.FindCallees(root, target)
 		if err != nil {
 			fmt.Println("error:", err)
 			return
@@ -112,13 +203,26 @@ func main() {
 
 		sherpa.PrintCallees(result)
 	default:
-		fmt.Println("unknown command:", command)
+		fmt.Println("unknown command:", invocation.Command)
 		printUsage()
 	}
 }
 
+func resolveRootPath(root string) (string, bool) {
+	repositoryRoot, err := sherpa.ResolveRepositoryRoot(root)
+	if err != nil {
+		fmt.Println("error:", err)
+		return "", false
+	}
+
+	return repositoryRoot.Path, true
+}
+
 func printUsage() {
-	fmt.Println("usage: gosherpa <command> [args]")
+	fmt.Println("usage: gosherpa [--root <path>] <command> [args]")
+	fmt.Println()
+	fmt.Println("global options:")
+	fmt.Println("  --root <path>    repository root, defaults to .")
 	fmt.Println()
 	fmt.Println("commands:")
 	fmt.Println("  symbols")

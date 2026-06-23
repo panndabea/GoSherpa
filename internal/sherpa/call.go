@@ -34,6 +34,7 @@ type functionInfo struct {
 	Decl     *ast.FuncDecl
 	FileSet  *token.FileSet
 	Position Position
+	Root     string
 }
 
 func FindCallees(root string, target string) (CalleesResult, error) {
@@ -144,7 +145,12 @@ func receiverBaseName(expr ast.Expr) string {
 }
 
 func collectFunctionInfos(root string) ([]functionInfo, error) {
-	files, err := FindGoFiles(root)
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := FindGoFiles(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -170,14 +176,17 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 			}
 
 			pos := fileSet.Position(funcDecl.Pos())
+			position := positionRelativeToRoot(rootPath, Position{
+				File: pos.Filename,
+				Line: pos.Line,
+			})
+
 			functions = append(functions, functionInfo{
-				Target:  functionTargetName(funcDecl),
-				Decl:    funcDecl,
-				FileSet: fileSet,
-				Position: Position{
-					File: pos.Filename,
-					Line: pos.Line,
-				},
+				Target:   functionTargetName(funcDecl),
+				Decl:     funcDecl,
+				FileSet:  fileSet,
+				Position: position,
+				Root:     rootPath,
 			})
 		}
 	}
@@ -283,12 +292,14 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 		}
 
 		pos := function.FileSet.Position(call.Fun.Pos())
+		position := positionRelativeToRoot(function.Root, Position{
+			File: pos.Filename,
+			Line: pos.Line,
+		})
+
 		callees = append(callees, Callee{
-			Name: name,
-			Position: Position{
-				File: pos.Filename,
-				Line: pos.Line,
-			},
+			Name:     name,
+			Position: position,
 		})
 
 		return true

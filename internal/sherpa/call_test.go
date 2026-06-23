@@ -344,6 +344,37 @@ func Stop() {}
 	assertContainsString(t, names, "Stop")
 }
 
+func TestFindCalleesReturnsRootRelativeFilePositions(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callees) != 1 {
+		t.Fatalf("expected 1 callee, got %v", result.Callees)
+	}
+
+	got := result.Callees[0].Position.File
+	if got != "internal/service/service.go" {
+		t.Fatalf("expected internal/service/service.go, got %s", got)
+	}
+
+	if strings.Contains(got, tmp) {
+		t.Fatalf("expected root-relative path, got %s", got)
+	}
+}
+
 func TestFindCalleesFindsMethodCallees(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -472,6 +503,37 @@ func Step() {}
 	names := callTestCallerNames(result.Callers)
 	assertContainsString(t, names, "Run")
 	assertContainsString(t, names, "Stop")
+}
+
+func TestFindCallersReturnsRootRelativeFilePositions(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result, err := FindCallers(tmp, "Step")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callers) != 1 {
+		t.Fatalf("expected 1 caller, got %v", result.Callers)
+	}
+
+	got := result.Callers[0].Position.File
+	if got != "internal/service/service.go" {
+		t.Fatalf("expected internal/service/service.go, got %s", got)
+	}
+
+	if strings.Contains(got, tmp) {
+		t.Fatalf("expected root-relative path, got %s", got)
+	}
 }
 
 func TestFindCallersFindsMethodExpressionCallers(t *testing.T) {

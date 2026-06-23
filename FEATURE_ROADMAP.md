@@ -60,6 +60,7 @@ Implemented:
 - Package dependency analysis.
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
+- Repository root selection with `--root`.
 
 Current limitations:
 
@@ -67,7 +68,6 @@ Current limitations:
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Function names can be ambiguous across packages.
 - Output is optimized for reading, but not yet consistently structured.
-- Commands assume the current directory as repository root.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -103,6 +103,8 @@ Goal: make the existing tool feel reliable before adding bigger features.
 
 ### 0.1 Repository Root Selection
 
+Status: implemented.
+
 Human question:
 
 ```text
@@ -116,15 +118,16 @@ gosherpa symbols --root /path/to/repo
 gosherpa refs ParseFile --root .
 ```
 
-Requirements:
+Implemented behavior:
 
-- Add a global `--root` flag.
+- Global `--root` flag.
 - Default to `.` when omitted.
-- Normalize file paths relative to the chosen root in output.
-- Reject roots without a `go.mod` unless a command explicitly supports loose
+- File paths are normalized relative to the chosen root in output.
+- CLI roots are rejected when they do not contain a direct `go.mod`.
+- Internal analysis remains testable against loose
   Go files.
 
-Done when:
+Done:
 
 - Every command accepts the same root selection behavior.
 - Tests cover root normalization.

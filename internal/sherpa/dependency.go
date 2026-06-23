@@ -19,7 +19,12 @@ type PackageDependencies struct {
 }
 
 func FindPackageDependencies(root string, targetPackage string) (PackageDependencies, error) {
-	modPath, err := modulePath(root)
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return PackageDependencies{}, err
+	}
+
+	modPath, err := modulePath(rootPath)
 	if err != nil {
 		return PackageDependencies{}, err
 	}
@@ -29,7 +34,7 @@ func FindPackageDependencies(root string, targetPackage string) (PackageDependen
 		return PackageDependencies{}, err
 	}
 
-	importsByPackage, err := collectPackageImports(root)
+	importsByPackage, err := collectPackageImports(rootPath)
 	if err != nil {
 		return PackageDependencies{}, err
 	}

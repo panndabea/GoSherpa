@@ -65,7 +65,7 @@ go test ./...
 go build -o gosherpa ./cmd/gosherpa
 ```
 
-Then explore the repository from the project root:
+Then explore the repository:
 
 ```bash
 ./gosherpa symbols
@@ -74,6 +74,13 @@ Then explore the repository from the project root:
 ./gosherpa deps ./internal/sherpa
 ./gosherpa callees ParseFile
 ./gosherpa callers ParseFile
+```
+
+Use `--root` to run GoSherpa from another working directory. The path must point to a Go module root containing `go.mod`.
+
+```bash
+./gosherpa --root /path/to/GoSherpa symbols
+./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
 Prefer not to build a binary yet?
@@ -116,6 +123,7 @@ Implemented today:
 - Symbol lookup and reference lookup
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
+- Repository root selection with `--root`
 
 Known MVP limitations:
 

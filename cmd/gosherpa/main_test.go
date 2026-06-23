@@ -8,6 +8,145 @@ import (
 	"testing"
 )
 
+func TestParseCLIArgsDefaultsRootToCurrentDirectory(t *testing.T) {
+	got, err := parseCLIArgs([]string{"symbols"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "." {
+		t.Fatalf("expected root ., got %s", got.Root)
+	}
+
+	if got.Command != "symbols" {
+		t.Fatalf("expected command symbols, got %s", got.Command)
+	}
+
+	if len(got.CommandArgs) != 0 {
+		t.Fatalf("expected no command args, got %v", got.CommandArgs)
+	}
+}
+
+func TestParseCLIArgsAcceptsRootBeforeCommand(t *testing.T) {
+	got, err := parseCLIArgs([]string{"--root", "/repo", "symbols"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "/repo" {
+		t.Fatalf("expected root /repo, got %s", got.Root)
+	}
+
+	if got.Command != "symbols" {
+		t.Fatalf("expected command symbols, got %s", got.Command)
+	}
+}
+
+func TestParseCLIArgsAcceptsRootAfterCommand(t *testing.T) {
+	got, err := parseCLIArgs([]string{"symbols", "--root", "/repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "/repo" {
+		t.Fatalf("expected root /repo, got %s", got.Root)
+	}
+
+	if got.Command != "symbols" {
+		t.Fatalf("expected command symbols, got %s", got.Command)
+	}
+}
+
+func TestParseCLIArgsAcceptsRootAfterCommandArgument(t *testing.T) {
+	got, err := parseCLIArgs([]string{"refs", "ParseFile", "--root", "/repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "/repo" {
+		t.Fatalf("expected root /repo, got %s", got.Root)
+	}
+
+	if got.Command != "refs" {
+		t.Fatalf("expected command refs, got %s", got.Command)
+	}
+
+	assertMainTestStrings(t, got.CommandArgs, []string{"ParseFile"})
+}
+
+func TestParseCLIArgsAcceptsRootEqualsForm(t *testing.T) {
+	got, err := parseCLIArgs([]string{"--root=/repo", "symbols"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "/repo" {
+		t.Fatalf("expected root /repo, got %s", got.Root)
+	}
+
+	if got.Command != "symbols" {
+		t.Fatalf("expected command symbols, got %s", got.Command)
+	}
+}
+
+func TestParseCLIArgsRejectsMissingRootValue(t *testing.T) {
+	tests := [][]string{
+		{"--root"},
+		{"--root="},
+		{"--root", "   "},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+
+			if !strings.Contains(err.Error(), "missing value for --root") {
+				t.Fatalf("expected missing root value error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestParseCLIArgsRejectsUnknownFlag(t *testing.T) {
+	_, err := parseCLIArgs([]string{"--json", "symbols"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "unknown flag: --json") {
+		t.Fatalf("expected unknown flag error, got %v", err)
+	}
+}
+
+func TestParseCLIArgsLastRootWins(t *testing.T) {
+	got, err := parseCLIArgs([]string{"--root", "/one", "symbols", "--root=/two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Root != "/two" {
+		t.Fatalf("expected root /two, got %s", got.Root)
+	}
+}
+
+func TestPrintUsageIncludesRoot(t *testing.T) {
+	output := captureMainTestStdout(t, func() {
+		printUsage()
+	})
+
+	for _, want := range []string{
+		"usage: gosherpa [--root <path>] <command> [args]",
+		"--root <path>    repository root, defaults to .",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output)
+		}
+	}
+}
+
 func TestPrintUsageIncludesCallees(t *testing.T) {
 	output := captureMainTestStdout(t, func() {
 		printUsage()
@@ -35,7 +174,7 @@ func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 		main()
 	})
 
-	want := "usage: gosherpa callers <function-or-method>\n"
+	want := "usage: gosherpa [--root <path>] callers <function-or-method>\n"
 	if output != want {
 		t.Fatalf("expected %q, got %q", want, output)
 	}
@@ -44,6 +183,7 @@ func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainRunsCallersCommand(t *testing.T) {
 	tmp := t.TempDir()
 
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
 	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
 
 func Run() {
@@ -53,23 +193,7 @@ func Run() {
 func Step() {}
 `)
 
-	oldWorkingDirectory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.Chdir(tmp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		err := os.Chdir(oldWorkingDirectory)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	setMainTestArgs(t, []string{"gosherpa", "callers", "Step"})
+	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "callers", "Step"})
 
 	output := captureMainTestStdout(t, func() {
 		main()
@@ -80,6 +204,10 @@ func Step() {}
 			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
 		}
 	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
+	}
 }
 
 func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
@@ -89,7 +217,7 @@ func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 		main()
 	})
 
-	want := "usage: gosherpa callees <function-or-method>\n"
+	want := "usage: gosherpa [--root <path>] callees <function-or-method>\n"
 	if output != want {
 		t.Fatalf("expected %q, got %q", want, output)
 	}
@@ -98,6 +226,7 @@ func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainRunsCalleesCommand(t *testing.T) {
 	tmp := t.TempDir()
 
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
 	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
 
 func Run() {
@@ -107,23 +236,7 @@ func Run() {
 func Step() {}
 `)
 
-	oldWorkingDirectory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.Chdir(tmp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		err := os.Chdir(oldWorkingDirectory)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	setMainTestArgs(t, []string{"gosherpa", "callees", "Run"})
+	setMainTestArgs(t, []string{"gosherpa", "callees", "Run", "--root", tmp})
 
 	output := captureMainTestStdout(t, func() {
 		main()
@@ -133,6 +246,141 @@ func Step() {}
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
 		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+	setMainTestArgs(t, []string{"gosherpa", "--root", missingRoot, "refs"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	want := "usage: gosherpa [--root <path>] refs <name>\n"
+	if output != want {
+		t.Fatalf("expected %q, got %q", want, output)
+	}
+}
+
+func TestMainPrintsUnknownCommandWithoutValidatingRoot(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+	setMainTestArgs(t, []string{"gosherpa", "--root", missingRoot, "unknown"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{
+		"unknown command: unknown",
+		"usage: gosherpa [--root <path>] <command> [args]",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, "error: repository root") {
+		t.Fatalf("expected no root validation, got:\n%s", output)
+	}
+}
+
+func TestMainRunsSymbolsWithRootBeforeCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {}
+`)
+
+	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "symbols"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"Run", "internal/service/service.go"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
+	}
+}
+
+func TestMainRunsRefsWithRootAfterCommandArgument(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func ParseFile() {
+}
+
+func Run() {
+	ParseFile()
+}
+`)
+
+	setMainTestArgs(t, []string{"gosherpa", "refs", "ParseFile", "--root", tmp})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"ParseFile", "internal/service/service.go", "Found 2 references"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsErrorWhenRootIsMissing(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+	setMainTestArgs(t, []string{"gosherpa", "--root", missingRoot, "symbols"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	if !strings.Contains(output, "error: repository root does not exist") {
+		t.Fatalf("expected missing root error, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsErrorWhenRootHasNoGoMod(t *testing.T) {
+	tmp := t.TempDir()
+	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "symbols"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	if !strings.Contains(output, "error: repository root does not contain go.mod") {
+		t.Fatalf("expected missing go.mod error, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsErrorForUnknownFlag(t *testing.T) {
+	setMainTestArgs(t, []string{"gosherpa", "--json", "symbols"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	if !strings.Contains(output, "error: unknown flag: --json") {
+		t.Fatalf("expected unknown flag error, got:\n%s", output)
 	}
 }
 
@@ -191,5 +439,19 @@ func writeMainTestFile(t *testing.T, path string, contents string) {
 	err = os.WriteFile(path, []byte(contents), 0644)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertMainTestStrings(t *testing.T, got []string, want []string) {
+	t.Helper()
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
 	}
 }

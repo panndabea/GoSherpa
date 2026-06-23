@@ -1,7 +1,12 @@
 package sherpa
 
 func ParseRepository(root string) ([]Symbol, error) {
-	files, err := FindGoFiles(root)
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := FindGoFiles(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -12,6 +17,10 @@ func ParseRepository(root string) ([]Symbol, error) {
 		fileSymbols, err := ParseFile(file)
 		if err != nil {
 			return nil, err
+		}
+
+		for i := range fileSymbols {
+			fileSymbols[i].Position = positionRelativeToRoot(rootPath, fileSymbols[i].Position)
 		}
 
 		symbols = append(symbols, fileSymbols...)
