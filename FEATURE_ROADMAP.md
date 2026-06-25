@@ -63,7 +63,8 @@ Implemented:
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
-- Machine-readable JSON output for `refs`, `impact`, and `tests`.
+- Machine-readable JSON output for `refs`, `impact`, and `tests` with a
+  stable response envelope.
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
 
@@ -1001,7 +1002,8 @@ will not churn constantly.
 
 ### 8.1 JSON Output
 
-Status: partial MVP implemented for `refs`, `impact`, and `tests`.
+Status: partial MVP implemented for `refs`, `impact`, and `tests` with a
+versioned response envelope.
 
 Human and agent question:
 
@@ -1020,8 +1022,8 @@ Requirements:
 
 - Extend `--json` to all commands.
 - Define stable schemas per command.
-- Include schema version.
-- Include command metadata:
+- Include schema version. Implemented for the current JSON commands.
+- Include command metadata. Implemented for the current JSON commands:
   - root
   - module path
   - target
@@ -1034,6 +1036,8 @@ Requirements:
 Done when:
 
 - Current JSON commands are covered by CLI tests.
+- JSON responses use one envelope shape with `schemaVersion`, `command`,
+  `target`, `root`, `modulePath`, `warnings`, and `data`.
 - JSON output can be tested with golden files.
 - Human text output and JSON output share the same analysis result.
 

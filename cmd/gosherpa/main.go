@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	exitSuccess = 0
-	exitFailure = 1
-	exitUsage   = 2
+	exitSuccess       = 0
+	exitFailure       = 1
+	exitUsage         = 2
+	jsonSchemaVersion = 1
 )
 
 type cliInvocation struct {
@@ -27,9 +28,34 @@ type cliInvocation struct {
 	HasCallPathOption bool
 }
 
-type referencesResult struct {
-	Target     string             `json:"target"`
+type jsonResponse[T any] struct {
+	SchemaVersion int      `json:"schemaVersion"`
+	Command       string   `json:"command"`
+	Target        string   `json:"target"`
+	Root          string   `json:"root"`
+	ModulePath    string   `json:"modulePath"`
+	Warnings      []string `json:"warnings"`
+	Data          T        `json:"data"`
+}
+
+type referencesJSONData struct {
 	References []sherpa.Reference `json:"references"`
+}
+
+type impactJSONData struct {
+	Kind         sherpa.ImpactKind          `json:"kind"`
+	References   []sherpa.Reference         `json:"references"`
+	Callers      []sherpa.Caller            `json:"callers"`
+	Dependencies sherpa.PackageDependencies `json:"dependencies"`
+	Packages     []string                   `json:"packages"`
+	RelatedTests []sherpa.RelatedTest       `json:"relatedTests"`
+	TestCommands []string                   `json:"testCommands"`
+}
+
+type testsJSONData struct {
+	Kind     sherpa.TestTargetKind `json:"kind"`
+	Tests    []sherpa.RelatedTest  `json:"tests"`
+	Commands []string              `json:"commands"`
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -248,10 +274,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 
 		if invocation.JSON {
-			return writeJSON(stdout, stderr, referencesResult{
-				Target:     name,
+			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, nil, referencesJSONData{
 				References: nonNilSlice(refs),
-			})
+			}))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatReferences(name, refs))
@@ -277,7 +302,14 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 
 		if invocation.JSON {
-			return writeJSON(stdout, stderr, impactJSONResult(result))
+			normalizedResult := impactJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"impact",
+				normalizedResult.Target,
+				normalizedResult.Warnings,
+				impactJSONDataFromResult(normalizedResult),
+			))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatImpact(result))
@@ -303,7 +335,14 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 
 		if invocation.JSON {
-			return writeJSON(stdout, stderr, testsJSONResult(result))
+			normalizedResult := testsJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"tests",
+				normalizedResult.Target,
+				nil,
+				testsJSONDataFromResult(normalizedResult),
+			))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatTests(result))
@@ -433,6 +472,23 @@ func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
 	return exitSuccess
 }
 
+func newJSONResponse[T any](root string, command string, target string, warnings []string, data T) jsonResponse[T] {
+	modulePath, err := sherpa.ModulePath(root)
+	if err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	return jsonResponse[T]{
+		SchemaVersion: jsonSchemaVersion,
+		Command:       command,
+		Target:        target,
+		Root:          root,
+		ModulePath:    modulePath,
+		Warnings:      nonNilSlice(warnings),
+		Data:          data,
+	}
+}
+
 func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	result.References = nonNilSlice(result.References)
 	result.Callers = nonNilSlice(result.Callers)
@@ -446,11 +502,31 @@ func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	return result
 }
 
+func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
+	return impactJSONData{
+		Kind:         result.Kind,
+		References:   result.References,
+		Callers:      result.Callers,
+		Dependencies: result.Dependencies,
+		Packages:     result.Packages,
+		RelatedTests: result.RelatedTests,
+		TestCommands: result.TestCommands,
+	}
+}
+
 func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
 	result.Tests = nonNilSlice(result.Tests)
 	result.Commands = nonNilSlice(result.Commands)
 
 	return result
+}
+
+func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
+	return testsJSONData{
+		Kind:     result.Kind,
+		Tests:    result.Tests,
+		Commands: result.Commands,
+	}
 }
 
 func nonNilSlice[T any](values []T) []T {

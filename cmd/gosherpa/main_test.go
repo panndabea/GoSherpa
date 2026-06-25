@@ -386,16 +386,14 @@ func TestUsesParser(t *testing.T) {
 	}
 
 	payload := decodeMainTestJSON(t, result.Stdout)
-	if payload["target"] != "ParseFile" {
-		t.Fatalf("expected target ParseFile, got %v", payload["target"])
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests", "ParseFile", "example.com/app")
+
+	if data["kind"] != "symbol" {
+		t.Fatalf("expected kind symbol, got %v", data["kind"])
 	}
 
-	if payload["kind"] != "symbol" {
-		t.Fatalf("expected kind symbol, got %v", payload["kind"])
-	}
-
-	assertMainTestJSONArrayHasLength(t, payload, "tests", 2)
-	assertMainTestJSONArrayHasLength(t, payload, "commands", 2)
+	assertMainTestJSONArrayHasLength(t, data, "tests", 2)
+	assertMainTestJSONArrayHasLength(t, data, "commands", 2)
 
 	if strings.Contains(result.Stdout, "TESTS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
@@ -521,23 +519,24 @@ func TestUsesParser(t *testing.T) {
 	}
 
 	payload := decodeMainTestJSON(t, result.Stdout)
-	if payload["target"] != "ParseFile" {
-		t.Fatalf("expected target ParseFile, got %v", payload["target"])
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact", "ParseFile", "example.com/app")
+
+	if data["kind"] != "symbol" {
+		t.Fatalf("expected kind symbol, got %v", data["kind"])
 	}
 
-	if payload["kind"] != "symbol" {
-		t.Fatalf("expected kind symbol, got %v", payload["kind"])
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 2)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
 	}
 
-	assertMainTestJSONArrayHasLength(t, payload, "references", 2)
-	assertMainTestJSONArrayHasLength(t, payload, "callers", 1)
-	assertMainTestJSONArrayHasLength(t, payload, "relatedTests", 2)
-	assertMainTestJSONArrayHasLength(t, payload, "testCommands", 2)
-	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
-
-	dependencies, ok := payload["dependencies"].(map[string]any)
+	dependencies, ok := data["dependencies"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected dependencies to be a JSON object, got %T", payload["dependencies"])
+		t.Fatalf("expected dependencies to be a JSON object, got %T", data["dependencies"])
 	}
 
 	assertMainTestJSONArrayHasLength(t, dependencies, "imports", 0)
@@ -882,11 +881,9 @@ func Run() {
 	}
 
 	payload := decodeMainTestJSON(t, result.Stdout)
-	if payload["target"] != "ParseFile" {
-		t.Fatalf("expected target ParseFile, got %v", payload["target"])
-	}
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "refs", "ParseFile", "example.com/app")
 
-	assertMainTestJSONArrayHasLength(t, payload, "references", 2)
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
 
 	if strings.Contains(result.Stdout, "REFERENCES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
@@ -1043,6 +1040,39 @@ func decodeMainTestJSON(t *testing.T, output string) map[string]any {
 	}
 
 	return payload
+}
+
+func assertMainTestJSONEnvelope(t *testing.T, payload map[string]any, root string, command string, target string, modulePath string) map[string]any {
+	t.Helper()
+
+	if payload["schemaVersion"] != float64(jsonSchemaVersion) {
+		t.Fatalf("expected schemaVersion %d, got %v", jsonSchemaVersion, payload["schemaVersion"])
+	}
+
+	if payload["command"] != command {
+		t.Fatalf("expected command %s, got %v", command, payload["command"])
+	}
+
+	if payload["target"] != target {
+		t.Fatalf("expected target %s, got %v", target, payload["target"])
+	}
+
+	if payload["root"] != filepath.Clean(root) {
+		t.Fatalf("expected root %s, got %v", filepath.Clean(root), payload["root"])
+	}
+
+	if payload["modulePath"] != modulePath {
+		t.Fatalf("expected modulePath %s, got %v", modulePath, payload["modulePath"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data to be a JSON object, got %T", payload["data"])
+	}
+
+	return data
 }
 
 func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) {

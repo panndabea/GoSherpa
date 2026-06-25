@@ -18,6 +18,10 @@ type PackageDependencies struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+func ModulePath(root string) (string, error) {
+	return modulePath(root)
+}
+
 func FindPackageDependencies(root string, targetPackage string) (PackageDependencies, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {

@@ -97,6 +97,20 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
+JSON output for `refs`, `impact`, and `tests` uses a stable envelope:
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "impact",
+  "target": "ParseFile",
+  "root": "/path/to/GoSherpa",
+  "modulePath": "github.com/supertabaluga/gosherpa",
+  "warnings": [],
+  "data": {}
+}
+```
+
 Prefer not to build a binary yet?
 
 ```bash
@@ -139,7 +153,7 @@ Implemented today:
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
-- Machine-readable JSON output for refs, impact analysis, and test discovery
+- Machine-readable JSON output for refs, impact analysis, and test discovery with a stable response envelope
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
 
