@@ -112,8 +112,8 @@ func TestAnalyzeSymbolReportsSymbolImpact(t *testing.T) {
 	assertStrings(t, report.ChangedPackages, []string{})
 	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Session"})
 	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
-	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestSession"})
-	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 }
 
 func TestAnalyzeSymbolHonorsPackageQualifiedTargets(t *testing.T) {

@@ -83,13 +83,14 @@ Implemented:
 - Changed-symbol extraction from git diff hunks.
 - Package-qualified symbol impact for references and affected tests.
 - Transitive caller impact for symbol changes.
+- Affected-test planning for transitive caller packages.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
-- Symbol impact includes transitive callers in affected packages, but
-  affected-test suggestions remain symbol/direct-reference oriented.
+- Symbol impact includes transitive callers and package tests for affected
+  caller packages.
 - Diff impact extracts changed symbols from current-file hunk ranges;
   deletion-only symbols that no longer exist in the working tree may not be
   reported.
@@ -827,6 +828,7 @@ and JSON output. Interface and implementer impact signals are implemented as a
 conservative local method-set scan with signature matching and embedded-interface
 expansion. Package-qualified symbol impact disambiguates references and affected
 tests. Symbol impact includes transitive callers in affected packages.
+Affected-test planning includes package tests for affected caller packages.
 
 Human question:
 
@@ -858,6 +860,7 @@ MVP behavior:
 - Disambiguate package-qualified symbol impact for references and affected
   tests. Implemented foundation.
 - Include transitive caller packages for symbol impact. Implemented foundation.
+- Include package tests for affected caller packages. Implemented foundation.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -893,6 +896,8 @@ Done when:
   other packages. Implemented foundation.
 - Symbol impact reports transitive callers in affected packages. Implemented
   foundation.
+- Symbol impact suggests package tests for transitive caller packages.
+  Implemented foundation.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 

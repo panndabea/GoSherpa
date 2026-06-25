@@ -3,6 +3,7 @@ package sherpa
 import (
 	"go/token"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -126,7 +127,7 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 
 	result.Packages = impactedPackages(root, refs, result.Callers)
 
-	tests, warnings := impactTests(root, target)
+	tests, warnings := impactSymbolTests(root, target, result.Packages)
 	result.RelatedTests = tests.Tests
 	result.TestCommands = tests.Commands
 	result.Warnings = append(result.Warnings, warnings...)
@@ -148,6 +149,44 @@ func impactSymbolCallers(root string, target string) ([]Caller, error) {
 	return collectTransitiveCallersFromFunctions(functions, normalizedTarget)
 }
 
+func impactSymbolTests(root string, target string, packages []string) (TestsResult, []string) {
+	symbolTests, warnings := impactTests(root, target)
+	mergedTests := symbolTests.Tests
+	commands := symbolTests.Commands
+
+	packageTests, packageWarnings := impactTestsForPackages(root, packages)
+	warnings = append(warnings, packageWarnings...)
+	mergedTests = mergeRelatedTests(mergedTests, packageTests)
+	commands = append(commands, testCommands(packageTests)...)
+
+	sortRelatedTests(mergedTests)
+
+	return TestsResult{
+		Target:   symbolTests.Target,
+		Kind:     TestTargetKindSymbol,
+		Tests:    mergedTests,
+		Commands: uniqueSorted(commands),
+	}, uniqueSorted(warnings)
+}
+
+func impactTestsForPackages(root string, packages []string) ([]RelatedTest, []string) {
+	if len(packages) == 0 {
+		return nil, nil
+	}
+
+	testFiles, err := collectTestFiles(root)
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+
+	packageSet := make(map[string]struct{})
+	for _, pkg := range packages {
+		packageSet[pkg] = struct{}{}
+	}
+
+	return collectRelatedTests(root, testFiles, packageSet, referenceTarget{}), nil
+}
+
 func impactTests(root string, target string) (TestsResult, []string) {
 	tests, err := FindTests(root, target)
 	if err != nil {
@@ -155,6 +194,48 @@ func impactTests(root string, target string) (TestsResult, []string) {
 	}
 
 	return tests, nil
+}
+
+func mergeRelatedTests(existing []RelatedTest, incoming []RelatedTest) []RelatedTest {
+	merged := make(map[string]RelatedTest)
+
+	for _, test := range existing {
+		merged[relatedTestImpactKey(test)] = test
+	}
+
+	for _, test := range incoming {
+		key := relatedTestImpactKey(test)
+		current, ok := merged[key]
+		if ok {
+			current.DirectReference = current.DirectReference || test.DirectReference
+			current.ExternalPackage = current.ExternalPackage || test.ExternalPackage
+			merged[key] = current
+			continue
+		}
+
+		merged[key] = test
+	}
+
+	tests := make([]RelatedTest, 0, len(merged))
+	for _, test := range merged {
+		tests = append(tests, test)
+	}
+
+	sortRelatedTests(tests)
+
+	return tests
+}
+
+func relatedTestImpactKey(test RelatedTest) string {
+	parts := []string{
+		test.Package,
+		test.PackageName,
+		test.Name,
+		test.Position.File,
+		strconv.Itoa(test.Position.Line),
+	}
+
+	return strings.Join(parts, "\x00")
 }
 
 func isImpactNonFunctionTargetError(err error) bool {

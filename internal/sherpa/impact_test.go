@@ -82,6 +82,12 @@ func TestFindImpactIncludesTransitiveCallerPackages(t *testing.T) {
 
 func Target() {}
 `)
+	writeFile(t, filepath.Join(tmp, "internal", "core", "core_test.go"), `package core
+
+import "testing"
+
+func TestCore(t *testing.T) {}
+`)
 	writeFile(t, filepath.Join(tmp, "internal", "worker", "worker.go"), `package worker
 
 import "example.com/app/internal/core"
@@ -90,6 +96,12 @@ func Mid() {
 	core.Target()
 }
 `)
+	writeFile(t, filepath.Join(tmp, "internal", "worker", "worker_test.go"), `package worker
+
+import "testing"
+
+func TestWorker(t *testing.T) {}
+`)
 	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
 
 import "example.com/app/internal/worker"
@@ -97,6 +109,12 @@ import "example.com/app/internal/worker"
 func Entry() {
 	worker.Mid()
 }
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import "testing"
+
+func TestApp(t *testing.T) {}
 `)
 
 	result, err := FindImpact(tmp, "Target")
@@ -111,6 +129,16 @@ func Entry() {
 	assertContainsString(t, result.Packages, "./internal/core")
 	assertContainsString(t, result.Packages, "./internal/worker")
 	assertContainsString(t, result.Packages, "./cmd/app")
+
+	tests := relatedTestNames(result.RelatedTests)
+	assertContainsString(t, tests, "TestCore")
+	assertContainsString(t, tests, "TestWorker")
+	assertContainsString(t, tests, "TestApp")
+
+	wantCommands := []string{"go test ./cmd/app", "go test ./internal/core", "go test ./internal/worker"}
+	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
+	}
 }
 
 func TestFindImpactForTypeSymbolDoesNotWarnWhenCallersDoNotApply(t *testing.T) {
