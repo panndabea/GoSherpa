@@ -57,6 +57,7 @@ Implemented:
 - Method discovery.
 - Symbol lookup.
 - Go-aware reference lookup.
+- Direct symbol and package impact analysis.
 - Package dependency analysis.
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
@@ -67,6 +68,8 @@ Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
+- Impact analysis is direct-only and does not yet include related tests or
+  transitive callers.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
@@ -681,6 +684,9 @@ Done when:
 
 ## Phase 5: Tests and Impact
 
+Status: impact MVP implemented for symbols and packages; test discovery is not
+yet implemented.
+
 Goal: help developers make changes with confidence.
 
 ### 5.1 Test Discovery
@@ -746,10 +752,15 @@ gosherpa impact internal/user/service.go
 
 MVP behavior:
 
-- Accept symbol, package, or file targets.
-- Show direct callers.
+- Accept symbol and package targets.
+- Show direct references and direct callers for symbols.
+- Show direct dependent packages for packages.
+- Show affected local packages.
+
+Later behavior:
+
+- Accept file targets.
 - Show transitive callers up to a default depth.
-- Show dependent packages.
 - Show related tests.
 - Show exported API impact when target is exported.
 

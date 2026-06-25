@@ -41,6 +41,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
+| Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, and affected packages |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ParseFile` | Lists direct syntactic callers of a function or method |
@@ -73,6 +74,8 @@ Then explore the repository:
 ./gosherpa symbols
 ./gosherpa symbol ParseFile
 ./gosherpa refs ParseFile
+./gosherpa impact ParseFile
+./gosherpa impact ./internal/sherpa
 ./gosherpa deps ./internal/sherpa
 ./gosherpa callees ParseFile
 ./gosherpa callers ParseFile
@@ -92,6 +95,7 @@ Prefer not to build a binary yet?
 ```bash
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa callers ParseFile
+go run ./cmd/gosherpa impact ParseFile
 go run ./cmd/gosherpa path main FindCallers
 ```
 
@@ -111,7 +115,6 @@ GoSherpa is an early MVP, with the next work focused on deeper navigation and sa
 
 | Next | Goal |
 | --- | --- |
-| Impact analysis | Estimate what a change might affect before making it |
 | Test discovery | Find tests related to packages, types, and functions |
 | Machine-readable output | Add a stable surface for scripts and agents once the concepts settle |
 
@@ -124,6 +127,7 @@ Implemented today:
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
 - Symbol lookup and Go-aware reference lookup
+- Direct symbol and package impact analysis
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
@@ -133,6 +137,7 @@ Known MVP limitations:
 
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
+- Impact analysis is direct-only and does not yet include related tests or transitive callers.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
 - One-segment function targets can produce selector-call false positives.

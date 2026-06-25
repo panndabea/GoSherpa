@@ -205,6 +205,16 @@ func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesImpact(t *testing.T) {
+	output := captureMainTestStdout(t, func() {
+		printUsage()
+	})
+
+	if !strings.Contains(output, "impact <symbol-or-package>") {
+		t.Fatalf("expected usage to contain impact command, got:\n%s", output)
+	}
+}
+
 func TestPrintUsageIncludesCallees(t *testing.T) {
 	output := captureMainTestStdout(t, func() {
 		printUsage()
@@ -222,6 +232,53 @@ func TestPrintUsageIncludesCallers(t *testing.T) {
 
 	if !strings.Contains(output, "callers <function-or-method>") {
 		t.Fatalf("expected usage to contain callers command, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
+	setMainTestArgs(t, []string{"gosherpa", "impact"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	want := "usage: gosherpa [--root <path>] impact <symbol-or-package>\n"
+	if output != want {
+		t.Fatalf("expected %q, got %q", want, output)
+	}
+}
+
+func TestMainRunsImpactCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/parser"
+
+func Run() {
+	parser.ParseFile()
+}
+`)
+
+	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "impact", "ParseFile"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "DIRECT CALLERS", "AFFECTED PACKAGES", "./cmd/app", "./internal/parser"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
 	}
 }
 
