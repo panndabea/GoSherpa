@@ -621,7 +621,7 @@ func Run() {
 		main()
 	})
 
-	for _, want := range []string{"ParseFile", "internal/service/service.go", "Found 2 references"} {
+	for _, want := range []string{"REFERENCES", "ParseFile", "internal/service/service.go", "Found 2 references"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
 		}
