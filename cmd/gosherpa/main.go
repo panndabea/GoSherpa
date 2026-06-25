@@ -58,6 +58,26 @@ type testsJSONData struct {
 	Commands []string              `json:"commands"`
 }
 
+type dependenciesJSONData struct {
+	Package string   `json:"package"`
+	Imports []string `json:"imports"`
+	UsedBy  []string `json:"usedBy"`
+}
+
+type callersJSONData struct {
+	Callers []sherpa.Caller `json:"callers"`
+}
+
+type calleesJSONData struct {
+	Callees []sherpa.Callee `json:"callees"`
+}
+
+type callPathsJSONData struct {
+	From  string            `json:"from"`
+	To    string            `json:"to"`
+	Paths []sherpa.CallPath `json:"paths"`
+}
+
 func parseCLIArgs(args []string) (cliInvocation, error) {
 	invocation := cliInvocation{Root: "."}
 	var positionals []string
@@ -203,7 +223,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --json is only supported by refs, impact, and tests")
+		fmt.Fprintln(stderr, "error: --json is only supported by refs, impact, tests, deps, path, paths, callers, and callees")
 		return exitUsage
 	}
 
@@ -367,6 +387,17 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			normalizedDeps := dependenciesJSONResult(deps)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"deps",
+				normalizedDeps.Package,
+				nil,
+				dependenciesJSONDataFromResult(normalizedDeps),
+			))
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatPackageDependencies(deps))
 		return exitSuccess
 	case "path", "paths":
@@ -391,6 +422,17 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			normalizedResult := callPathsJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				invocation.Command,
+				callPathJSONTarget(normalizedResult),
+				nil,
+				callPathsJSONDataFromResult(normalizedResult),
+			))
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatCallPaths(result))
 		return exitSuccess
 	case "callers":
@@ -410,6 +452,17 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return exitFailure
+		}
+
+		if invocation.JSON {
+			normalizedResult := callersJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"callers",
+				normalizedResult.Target,
+				nil,
+				callersJSONDataFromResult(normalizedResult),
+			))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatCallers(result))
@@ -433,6 +486,17 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			normalizedResult := calleesJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"callees",
+				normalizedResult.Target,
+				nil,
+				calleesJSONDataFromResult(normalizedResult),
+			))
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatCallees(result))
 		return exitSuccess
 	default:
@@ -453,7 +517,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "refs", "impact", "tests":
+	case "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
 		return true
 	default:
 		return false
@@ -463,6 +527,7 @@ func supportsJSON(command string) bool {
 func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
 
 	if err := encoder.Encode(value); err != nil {
 		fmt.Fprintln(stderr, "error:", err)
@@ -529,6 +594,66 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 	}
 }
 
+func dependenciesJSONResult(result sherpa.PackageDependencies) sherpa.PackageDependencies {
+	result.Imports = nonNilSlice(result.Imports)
+	result.UsedBy = nonNilSlice(result.UsedBy)
+
+	return result
+}
+
+func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenciesJSONData {
+	return dependenciesJSONData{
+		Package: result.Package,
+		Imports: result.Imports,
+		UsedBy:  result.UsedBy,
+	}
+}
+
+func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
+	result.Callers = nonNilSlice(result.Callers)
+
+	return result
+}
+
+func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
+	return callersJSONData{
+		Callers: result.Callers,
+	}
+}
+
+func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
+	result.Callees = nonNilSlice(result.Callees)
+
+	return result
+}
+
+func calleesJSONDataFromResult(result sherpa.CalleesResult) calleesJSONData {
+	return calleesJSONData{
+		Callees: result.Callees,
+	}
+}
+
+func callPathsJSONResult(result sherpa.CallPathsResult) sherpa.CallPathsResult {
+	result.Paths = nonNilSlice(result.Paths)
+	for i := range result.Paths {
+		result.Paths[i].Steps = nonNilSlice(result.Paths[i].Steps)
+	}
+
+	return result
+}
+
+func callPathJSONTarget(result sherpa.CallPathsResult) string {
+	return result.From + " -> " + result.To
+}
+
+func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONData {
+	return callPathsJSONData{
+		From:  result.From,
+		To:    result.To,
+		Paths: result.Paths,
+	}
+}
+
 func nonNilSlice[T any](values []T) []T {
 	if values == nil {
 		return []T{}
@@ -552,7 +677,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "global options:")
 	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
-	fmt.Fprintln(writer, "  --json           machine-readable output for refs, impact, and tests")
+	fmt.Fprintln(writer, "  --json           machine-readable output for analysis commands")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  symbols")

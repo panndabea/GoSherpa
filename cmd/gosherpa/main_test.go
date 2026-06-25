@@ -209,7 +209,7 @@ func TestPrintUsageIncludesRoot(t *testing.T) {
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] <command> [args]",
 		"--root <path>    repository root, defaults to .",
-		"--json           machine-readable output for refs, impact, and tests",
+		"--json           machine-readable output for analysis commands",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -602,6 +602,57 @@ func Target() {}
 	}
 }
 
+func TestMainRunsPathCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Middle()
+}
+
+func Middle() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "path", "Entry", "Target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "path", "Entry -> Target", "example.com/app")
+
+	if data["from"] != "Entry" {
+		t.Fatalf("expected from Entry, got %v", data["from"])
+	}
+
+	if data["to"] != "Target" {
+		t.Fatalf("expected to Target, got %v", data["to"])
+	}
+
+	paths := assertMainTestJSONArrayHasLength(t, data, "paths", 1)
+	path, ok := paths[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected path object, got %T", paths[0])
+	}
+
+	assertMainTestJSONArrayHasLength(t, path, "steps", 2)
+
+	if strings.Contains(result.Stdout, "CALL PATH") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsPathsCommandWithLimit(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -642,6 +693,48 @@ func Target() {}
 
 	if strings.Contains(result.Stdout, tmp) {
 		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsPathsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	First()
+	Second()
+}
+
+func First() {
+	Target()
+}
+
+func Second() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "paths", "Entry", "Target", "--limit", "2", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "paths", "Entry -> Target", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "paths", 2)
+
+	if strings.Contains(result.Stdout, "CALL PATHS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -696,6 +789,39 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCallersCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Step", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callers", "Step", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+
+	if strings.Contains(result.Stdout, "CALLERS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callees"})
 
@@ -744,6 +870,39 @@ func Step() {}
 
 	if strings.Contains(result.Stdout, tmp) {
 		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsCalleesCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "callees", "Run", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callees", "Run", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "callees", 1)
+
+	if strings.Contains(result.Stdout, "CALLEES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -890,6 +1049,48 @@ func Run() {
 	}
 }
 
+func TestMainRunsDepsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/parser"
+
+func Run() {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "deps", "./internal/parser", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "deps", "./internal/parser", "example.com/app")
+
+	if data["package"] != "./internal/parser" {
+		t.Fatalf("expected package ./internal/parser, got %v", data["package"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "imports", 0)
+	assertMainTestJSONArrayHasLength(t, data, "usedBy", 1)
+
+	if strings.Contains(result.Stdout, "PACKAGE DEPENDENCIES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPrintsErrorWhenRootIsMissing(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "symbols"})
@@ -952,7 +1153,7 @@ func TestMainPrintsErrorForJSONOnUnsupportedCommand(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --json is only supported by refs, impact, and tests") {
+	if !strings.Contains(result.Stderr, "error: --json is only supported by refs, impact, tests, deps, path, paths, callers, and callees") {
 		t.Fatalf("expected unsupported JSON error, got:\n%s", result.Stderr)
 	}
 
@@ -1075,7 +1276,7 @@ func assertMainTestJSONEnvelope(t *testing.T, payload map[string]any, root strin
 	return data
 }
 
-func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) {
+func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) []any {
 	t.Helper()
 
 	values, ok := payload[key].([]any)
@@ -1086,4 +1287,6 @@ func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key 
 	if len(values) != length {
 		t.Fatalf("expected %s length %d, got %d", key, length, len(values))
 	}
+
+	return values
 }

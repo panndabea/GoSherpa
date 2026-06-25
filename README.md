@@ -43,7 +43,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
-| Machine-readable output | `gosherpa impact ParseFile --json` | Emits JSON for references, impact analysis, and test discovery |
+| Machine-readable output | `gosherpa callers ParseFile --json` | Emits JSON for analysis commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ParseFile` | Lists direct syntactic callers of a function or method |
@@ -84,10 +84,15 @@ Then explore the repository:
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
 ./gosherpa deps ./internal/sherpa
+./gosherpa deps ./internal/sherpa --json
 ./gosherpa callees ParseFile
+./gosherpa callees ParseFile --json
 ./gosherpa callers ParseFile
+./gosherpa callers ParseFile --json
 ./gosherpa path main FindCallers
+./gosherpa path main FindCallers --json
 ./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6
+./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6 --json
 ```
 
 Use `--root` to run GoSherpa from another working directory. The path must point to a Go module root containing `go.mod`.
@@ -97,7 +102,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
-JSON output for `refs`, `impact`, and `tests` uses a stable envelope:
+JSON output for analysis commands uses a stable envelope:
 
 ```json
 {
@@ -137,7 +142,7 @@ GoSherpa is an early MVP, with the next work focused on deeper navigation and sa
 
 | Next | Goal |
 | --- | --- |
-| JSON coverage for remaining commands | Extend the machine-readable surface beyond `refs`, `impact`, and `tests` |
+| JSON coverage for symbol commands | Extend the machine-readable surface to `symbol` and `symbols` |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -153,7 +158,7 @@ Implemented today:
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
-- Machine-readable JSON output for refs, impact analysis, and test discovery with a stable response envelope
+- Machine-readable JSON output for analysis commands with a stable response envelope
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
 
@@ -165,7 +170,7 @@ Known MVP limitations:
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
-- JSON output is currently limited to `refs`, `impact`, and `tests`.
+- JSON output is currently limited to analysis commands and does not cover `symbol` or `symbols`.
 - One-segment function targets can produce selector-call false positives.
 - Function names can be ambiguous across packages.
 
