@@ -121,6 +121,87 @@ func Added() {}
 	}
 }
 
+func TestChangedSymbolsBetweenRefsReadsHeadFileContents(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Run() string {
+	return "old"
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Run() string {
+	return "new"
+}
+
+func AddedInHead() {}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "change symbols")
+	head := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Run() string {
+	return "working tree"
+}
+`)
+
+	got, err := ChangedSymbols(root, base, head)
+	if err != nil {
+		t.Fatalf("ChangedSymbols returned error: %v", err)
+	}
+
+	want := []string{"AddedInHead", "Run"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ChangedSymbols() = %#v, want %#v", got, want)
+	}
+}
+
+func TestChangedSymbolsIncludesDeletedSymbolsBetweenRefs(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+type Removed struct{}
+
+func Gone() string {
+	return "old"
+}
+
+func Kept() {}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Kept() {}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "remove symbols")
+	head := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	got, err := ChangedSymbols(root, base, head)
+	if err != nil {
+		t.Fatalf("ChangedSymbols returned error: %v", err)
+	}
+
+	want := []string{"Gone", "Removed"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ChangedSymbols() = %#v, want %#v", got, want)
+	}
+}
+
 func TestChangedPackagesPropagatesGitErrors(t *testing.T) {
 	root := initImpactGitTestRepository(t)
 

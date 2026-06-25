@@ -99,6 +99,74 @@ func Added() {}
 	}
 }
 
+func TestChangedLineRangesIncludesOldRangesForDeletedHunks(t *testing.T) {
+	root := initGitTestRepository(t)
+
+	writeGitTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Kept() {}
+
+func Removed() string {
+	return "old"
+}
+`)
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+
+	writeGitTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Kept() {}
+`)
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "remove function")
+	head := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+
+	got, err := ChangedLineRanges(root, base, head)
+	if err != nil {
+		t.Fatalf("ChangedLineRanges returned error: %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("ChangedLineRanges returned %#v, want one changed file", got)
+	}
+	if got[0].Path != "service.go" {
+		t.Fatalf("ChangedLineRanges path = %q, want service.go", got[0].Path)
+	}
+	if got[0].OldPath != "service.go" {
+		t.Fatalf("ChangedLineRanges old path = %q, want service.go", got[0].OldPath)
+	}
+	if len(got[0].Ranges) != 0 {
+		t.Fatalf("ChangedLineRanges ranges = %#v, want no current-file ranges", got[0].Ranges)
+	}
+	if !lineRangesContain(got[0].OldRanges, 5) {
+		t.Fatalf("ChangedLineRanges old ranges = %#v, want deleted function line 5", got[0].OldRanges)
+	}
+}
+
+func TestFileAtRefReadsFileContents(t *testing.T) {
+	root := initGitTestRepository(t)
+
+	contents := "package service\n\nfunc Run() string { return \"old\" }\n"
+	writeGitTestFile(t, filepath.Join(root, "service.go"), contents)
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+
+	writeGitTestFile(t, filepath.Join(root, "service.go"), "package service\n\nfunc Run() string { return \"new\" }\n")
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "change file")
+
+	got, err := FileAtRef(root, base, "service.go")
+	if err != nil {
+		t.Fatalf("FileAtRef returned error: %v", err)
+	}
+
+	if string(got) != contents {
+		t.Fatalf("FileAtRef() = %q, want %q", string(got), contents)
+	}
+}
+
 func TestChangedFilesRejectsEmptyRoot(t *testing.T) {
 	_, err := ChangedFiles(" \t ", "HEAD", "")
 	if err == nil {

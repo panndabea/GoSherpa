@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 
 	gitdiff "github.com/supertabaluga/gosherpa/internal/git"
 )
@@ -23,31 +24,65 @@ func ChangedSymbols(root string, base string, head string) ([]string, error) {
 		return nil, err
 	}
 
-	return symbolsForChangedLineRanges(root, changedLines)
+	return symbolsForChangedLineRanges(root, base, head, changedLines)
 }
 
-func symbolsForChangedLineRanges(root string, changedLines []gitdiff.ChangedFileLineRanges) ([]string, error) {
+func symbolsForChangedLineRanges(root string, base string, head string, changedLines []gitdiff.ChangedFileLineRanges) ([]string, error) {
 	var symbols []string
 
 	for _, changedFile := range changedLines {
-		if _, ok := packageForChangedFile(changedFile.Path); !ok {
+		if !changedFileHasGoPath(changedFile) {
 			continue
 		}
 
-		fileSymbols, err := changedSymbolsForFile(root, changedFile)
+		currentSymbols, err := changedSymbolsForCurrentFile(root, head, changedFile)
 		if err != nil {
 			return nil, err
 		}
+		symbols = append(symbols, currentSymbols...)
 
-		symbols = append(symbols, fileSymbols...)
+		baseSymbols, err := changedSymbolsForBaseFile(root, base, changedFile)
+		if err != nil {
+			return nil, err
+		}
+		symbols = append(symbols, baseSymbols...)
 	}
 
 	return uniqueSortedStrings(symbols), nil
 }
 
-func changedSymbolsForFile(root string, changedFile gitdiff.ChangedFileLineRanges) ([]string, error) {
+func changedFileHasGoPath(changedFile gitdiff.ChangedFileLineRanges) bool {
+	if _, ok := packageForChangedFile(changedFile.Path); ok {
+		return true
+	}
+
+	if _, ok := packageForChangedFile(changedFile.OldPath); ok {
+		return true
+	}
+
+	return false
+}
+
+func changedSymbolsForCurrentFile(root string, head string, changedFile gitdiff.ChangedFileLineRanges) ([]string, error) {
+	if len(changedFile.Ranges) == 0 {
+		return nil, nil
+	}
+	if _, ok := packageForChangedFile(changedFile.Path); !ok {
+		return nil, nil
+	}
+
 	filePath := filepath.Join(root, filepath.FromSlash(changedFile.Path))
-	symbols, err := parseChangedSymbolRanges(filePath)
+	var symbols []changedSymbolRange
+	var err error
+	if strings.TrimSpace(head) == "" {
+		symbols, err = parseChangedSymbolRanges(filePath)
+	} else {
+		var source []byte
+		source, err = gitdiff.FileAtRef(root, head, changedFile.Path)
+		if err == nil {
+			symbols, err = parseChangedSymbolRangesFromSource(filePath, source)
+		}
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -56,9 +91,40 @@ func changedSymbolsForFile(root string, changedFile gitdiff.ChangedFileLineRange
 		return nil, err
 	}
 
+	return changedSymbolsForRanges(symbols, changedFile.Ranges), nil
+}
+
+func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.ChangedFileLineRanges) ([]string, error) {
+	if len(changedFile.OldRanges) == 0 {
+		return nil, nil
+	}
+
+	oldPath := changedFile.OldPath
+	if oldPath == "" {
+		oldPath = changedFile.Path
+	}
+	if _, ok := packageForChangedFile(oldPath); !ok {
+		return nil, nil
+	}
+
+	source, err := gitdiff.FileAtRef(root, base, oldPath)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath := filepath.Join(root, filepath.FromSlash(oldPath))
+	symbols, err := parseChangedSymbolRangesFromSource(filePath, source)
+	if err != nil {
+		return nil, err
+	}
+
+	return changedSymbolsForRanges(symbols, changedFile.OldRanges), nil
+}
+
+func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.ChangedLineRange) []string {
 	var changedSymbols []string
 	for _, symbol := range symbols {
-		for _, lineRange := range changedFile.Ranges {
+		for _, lineRange := range ranges {
 			if !lineRangesOverlap(symbol.Start, symbol.End, lineRange.Start, lineRange.End) {
 				continue
 			}
@@ -68,12 +134,16 @@ func changedSymbolsForFile(root string, changedFile gitdiff.ChangedFileLineRange
 		}
 	}
 
-	return changedSymbols, nil
+	return changedSymbols
 }
 
 func parseChangedSymbolRanges(filePath string) ([]changedSymbolRange, error) {
+	return parseChangedSymbolRangesFromSource(filePath, nil)
+}
+
+func parseChangedSymbolRangesFromSource(filePath string, source any) ([]changedSymbolRange, error) {
 	fileSet := token.NewFileSet()
-	file, err := parser.ParseFile(fileSet, filePath, nil, 0)
+	file, err := parser.ParseFile(fileSet, filePath, source, 0)
 	if err != nil {
 		return nil, fmt.Errorf("parse changed symbols in %s: %w", filePath, err)
 	}

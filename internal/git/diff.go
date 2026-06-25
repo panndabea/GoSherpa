@@ -16,11 +16,13 @@ type ChangedLineRange struct {
 }
 
 type ChangedFileLineRanges struct {
-	Path   string
-	Ranges []ChangedLineRange
+	Path      string
+	OldPath   string
+	Ranges    []ChangedLineRange
+	OldRanges []ChangedLineRange
 }
 
-var diffHunkHeaderPattern = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
+var diffHunkHeaderPattern = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
 
 func ChangedFiles(root string, base string, head string) ([]string, error) {
 	root = strings.TrimSpace(root)
@@ -81,6 +83,34 @@ func ChangedLineRanges(root string, base string, head string) ([]ChangedFileLine
 	return parseChangedLineRanges(output), nil
 }
 
+func FileAtRef(root string, ref string, file string) ([]byte, error) {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return nil, fmt.Errorf("repository root is empty")
+	}
+
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil, fmt.Errorf("ref is empty")
+	}
+
+	file = filepath.ToSlash(strings.TrimSpace(file))
+	if file == "" {
+		return nil, fmt.Errorf("file path is empty")
+	}
+
+	output, err := exec.Command("git", "-C", root, "show", ref+":"+file).CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			return nil, fmt.Errorf("git show failed: %w", err)
+		}
+		return nil, fmt.Errorf("git show failed: %s: %w", message, err)
+	}
+
+	return output, nil
+}
+
 func parseChangedFiles(output []byte) []string {
 	seen := make(map[string]struct{})
 	var files []string
@@ -104,31 +134,65 @@ func parseChangedFiles(output []byte) []string {
 }
 
 func parseChangedLineRanges(output []byte) []ChangedFileLineRanges {
-	byPath := make(map[string][]ChangedLineRange)
-	var currentPath string
+	byPath := make(map[string]*ChangedFileLineRanges)
+	var oldPath string
+	var newPath string
 
 	for _, line := range strings.Split(string(output), "\n") {
-		if strings.HasPrefix(line, "+++ ") {
-			currentPath = diffNewPath(line)
+		if strings.HasPrefix(line, "diff --git ") {
+			oldPath = ""
+			newPath = ""
 			continue
 		}
-		if currentPath == "" {
+		if strings.HasPrefix(line, "--- ") {
+			oldPath = diffPath(line, "--- ", "a/")
+			continue
+		}
+		if strings.HasPrefix(line, "+++ ") {
+			newPath = diffPath(line, "+++ ", "b/")
 			continue
 		}
 
-		lineRange, ok := diffHunkLineRange(line)
+		oldRange, oldCount, newRange, newCount, ok := diffHunkLineRanges(line)
 		if !ok {
 			continue
 		}
 
-		byPath[currentPath] = append(byPath[currentPath], lineRange)
+		path := newPath
+		if path == "" {
+			path = oldPath
+		}
+		if path == "" {
+			continue
+		}
+
+		changedFile := byPath[path]
+		if changedFile == nil {
+			changedFile = &ChangedFileLineRanges{
+				Path:    path,
+				OldPath: oldPath,
+			}
+			byPath[path] = changedFile
+		}
+		if changedFile.OldPath == "" {
+			changedFile.OldPath = oldPath
+		}
+
+		if newCount > 0 {
+			changedFile.Ranges = append(changedFile.Ranges, newRange)
+		}
+		if oldCount > 0 {
+			changedFile.OldRanges = append(changedFile.OldRanges, oldRange)
+		}
 	}
 
 	files := make([]ChangedFileLineRanges, 0, len(byPath))
-	for path, ranges := range byPath {
+	for _, changedFile := range byPath {
 		files = append(files, ChangedFileLineRanges{
-			Path:   path,
-			Ranges: mergeChangedLineRanges(ranges),
+			Path:      changedFile.Path,
+			OldPath:   changedFile.OldPath,
+			Ranges:    mergeChangedLineRanges(changedFile.Ranges),
+			OldRanges: mergeChangedLineRanges(changedFile.OldRanges),
 		})
 	}
 
@@ -139,8 +203,8 @@ func parseChangedLineRanges(output []byte) []ChangedFileLineRanges {
 	return files
 }
 
-func diffNewPath(line string) string {
-	value := strings.TrimSpace(strings.TrimPrefix(line, "+++ "))
+func diffPath(line string, prefix string, gitPrefix string) string {
+	value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
 	if value == "/dev/null" || value == "" {
 		return ""
 	}
@@ -152,30 +216,44 @@ func diffNewPath(line string) string {
 		}
 	}
 
-	value = strings.TrimPrefix(value, "b/")
+	value = strings.TrimPrefix(value, gitPrefix)
 
 	return filepath.ToSlash(value)
 }
 
-func diffHunkLineRange(line string) (ChangedLineRange, bool) {
+func diffHunkLineRanges(line string) (ChangedLineRange, int, ChangedLineRange, int, bool) {
 	matches := diffHunkHeaderPattern.FindStringSubmatch(line)
 	if matches == nil {
-		return ChangedLineRange{}, false
+		return ChangedLineRange{}, 0, ChangedLineRange{}, 0, false
 	}
 
-	start, err := strconv.Atoi(matches[1])
+	oldRange, oldCount, err := diffHunkSideLineRange(matches[1], matches[2])
 	if err != nil {
-		return ChangedLineRange{}, false
+		return ChangedLineRange{}, 0, ChangedLineRange{}, 0, false
+	}
+
+	newRange, newCount, err := diffHunkSideLineRange(matches[3], matches[4])
+	if err != nil {
+		return ChangedLineRange{}, 0, ChangedLineRange{}, 0, false
+	}
+
+	return oldRange, oldCount, newRange, newCount, true
+}
+
+func diffHunkSideLineRange(startValue string, countValue string) (ChangedLineRange, int, error) {
+	start, err := strconv.Atoi(startValue)
+	if err != nil {
+		return ChangedLineRange{}, 0, err
 	}
 	if start < 1 {
 		start = 1
 	}
 
 	count := 1
-	if matches[2] != "" {
-		count, err = strconv.Atoi(matches[2])
+	if countValue != "" {
+		count, err = strconv.Atoi(countValue)
 		if err != nil {
-			return ChangedLineRange{}, false
+			return ChangedLineRange{}, 0, err
 		}
 	}
 
@@ -184,7 +262,7 @@ func diffHunkLineRange(line string) (ChangedLineRange, bool) {
 		end = start
 	}
 
-	return ChangedLineRange{Start: start, End: end}, true
+	return ChangedLineRange{Start: start, End: end}, count, nil
 }
 
 func mergeChangedLineRanges(ranges []ChangedLineRange) []ChangedLineRange {

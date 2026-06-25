@@ -80,7 +80,8 @@ Implemented:
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
   signature matching and embedded-interface expansion.
-- Changed-symbol extraction from git diff hunks.
+- Changed-symbol extraction from git diff hunks, including deleted symbols from
+  base files.
 - Package-qualified symbol impact for references and affected tests.
 - Transitive caller impact for symbol changes.
 - Affected-test planning for transitive caller packages.
@@ -91,9 +92,9 @@ Current limitations:
   calls, but do not yet use full module/package loading.
 - Symbol impact includes transitive callers and package tests for affected
   caller packages.
-- Diff impact extracts changed symbols from current-file hunk ranges;
-  deletion-only symbols that no longer exist in the working tree may not be
-  reported.
+- Diff impact is hunk-based; it reports directly changed or deleted top-level
+  Go functions and struct/interface types, but it does not infer every semantic
+  consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests;
   unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact compares method signatures by local AST shape
@@ -821,13 +822,14 @@ Done when:
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
 `internal/impact.AnalyzeDiff` are implemented. `internal/impact.ChangedSymbols`
-extracts changed symbols from git diff hunks. `gosherpa impact diff --base
-<ref>` and `gosherpa tests affected --base <ref>` are implemented for human
-and JSON output. `gosherpa impact file|package|symbol` is implemented for human
-and JSON output. Interface and implementer impact signals are implemented as a
-conservative local method-set scan with signature matching and embedded-interface
-expansion. Package-qualified symbol impact disambiguates references and affected
-tests. Symbol impact includes transitive callers in affected packages.
+extracts changed and deleted symbols from git diff hunks. `gosherpa impact diff
+--base <ref>` and `gosherpa tests affected --base <ref>` are implemented for
+human and JSON output. `gosherpa impact file|package|symbol` is implemented for
+human and JSON output. Interface and implementer impact signals are implemented
+as a conservative local method-set scan with signature matching and
+embedded-interface expansion. Package-qualified symbol impact disambiguates
+references and affected tests. Symbol impact includes transitive callers in
+affected packages.
 Affected-test planning includes package tests for affected caller packages.
 
 Human question:
@@ -852,7 +854,8 @@ MVP behavior:
 - Map changed files to packages. Implemented foundation for Go files.
 - Report changed packages and affected dependent packages. Implemented
   foundation for diff reports.
-- Report changed symbols from git diff hunks. Implemented foundation.
+- Report changed and deleted symbols from git diff hunks. Implemented
+  foundation.
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Report affected interfaces and implementations. Implemented foundation with
@@ -866,13 +869,15 @@ MVP behavior:
 
 Architecture:
 
-- `internal/git` reads diffs, changed files, and changed hunk line ranges; it
-  knows no Go semantics. `ChangedFiles` and hunk range parsing are implemented.
+- `internal/git` reads diffs, changed files, changed hunk line ranges, and file
+  contents at refs; it knows no Go semantics. `ChangedFiles`, hunk range
+  parsing, and `FileAtRef` are implemented.
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
   `ChangedPackages` maps changed Go files to local package paths first, and
-  `ChangedSymbols` maps hunk ranges to current-file Go symbols. `AnalyzeDiff`,
-  `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce the first
+  `ChangedSymbols` maps hunk ranges to current-file Go symbols plus deleted
+  symbols from base-file ranges. `AnalyzeDiff`, `AnalyzeFile`,
+  `AnalyzePackage`, and `AnalyzeSymbol` produce the first
   package/test/symbol/interface/implementation impact reports. Package-qualified
   symbol targets are normalized before reference and test impact collection, and
   symbol impact walks caller chains for affected-package impact.
@@ -887,8 +892,8 @@ Done when:
 - `gosherpa impact file|package|symbol` reports package/test impact through
   `ImpactReport`. Implemented foundation.
 - `gosherpa impact diff --base <ref>` reports affected symbols from changed
-  hunks where the current file still contains the symbol. Implemented
-  foundation.
+  hunks, including deleted top-level symbols read from the base ref.
+  Implemented foundation.
 - Affected interfaces and implementations are populated for changed packages
   and symbol targets. Implemented foundation with signature matching and
   embedded-interface expansion.

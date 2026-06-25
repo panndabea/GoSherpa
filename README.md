@@ -159,7 +159,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| More precise impact signals | Add richer type identity checks and better changed-symbol deletion handling |
+| More precise impact signals | Add richer type identity checks for interface impact |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -186,7 +186,7 @@ Implemented today:
 - `gosherpa tests affected --base <ref>` with human and JSON output
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with signature matching and embedded-interface expansion
-- Changed-symbol extraction from git diff hunks
+- Changed-symbol extraction from git diff hunks, including deleted symbols from base files
 - Package-qualified symbol impact for references and affected tests
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
@@ -194,14 +194,13 @@ Implemented today:
 Planned next from PRD v0.1:
 
 - richer type identity checks for interface impact
-- deletion-aware changed-symbol extraction from git diffs
 
 Known MVP limitations:
 
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
-- Diff impact extracts changed symbols from current-file hunk ranges; deletion-only symbols that no longer exist in the working tree may not be reported.
+- Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact compares method signatures by local AST shape and resolves local embedded interfaces, but does not yet use full Go type identity.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
