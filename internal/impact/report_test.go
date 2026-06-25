@@ -178,6 +178,18 @@ func TestAnalyzePackageRequiresMatchingInterfaceMethodSignatures(t *testing.T) {
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
 
+func TestAnalyzePackageUsesImportIdentityForInterfaceMethodSignatures(t *testing.T) {
+	root := writeInterfaceImportIdentityProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/auth")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/good.GoodAuthenticator"})
+}
+
 func TestAnalyzePackageResolvesEmbeddedInterfaceMethodSets(t *testing.T) {
 	root := writeEmbeddedInterfaceImpactProject(t)
 
@@ -308,6 +320,60 @@ type CountAuthenticator struct{}
 
 func (CountAuthenticator) Authenticate(user string) (bool, error) {
 	return false, nil
+}
+`)
+
+	return root
+}
+
+func writeInterfaceImportIdentityProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "authmodel", "user.go"), `package model
+
+type User struct{}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "sessionmodel", "user.go"), `package model
+
+type User struct{}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import (
+	ctx "context"
+	model "example.com/app/internal/authmodel"
+)
+
+type Authenticator interface {
+	Authenticate(ctx.Context, model.User) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "good", "good.go"), `package good
+
+import (
+	"context"
+	authuser "example.com/app/internal/authmodel"
+)
+
+type GoodAuthenticator struct{}
+
+func (GoodAuthenticator) Authenticate(context.Context, authuser.User) error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "bad", "bad.go"), `package bad
+
+import (
+	ctx "context"
+	model "example.com/app/internal/sessionmodel"
+)
+
+type BadAuthenticator struct{}
+
+func (BadAuthenticator) Authenticate(ctx.Context, model.User) error {
+	return nil
 }
 `)
 

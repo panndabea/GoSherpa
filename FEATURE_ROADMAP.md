@@ -79,7 +79,7 @@ Implemented:
 - `gosherpa tests affected --base <ref>` with human and JSON output.
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
-  signature matching and embedded-interface expansion.
+  import-aware signature matching and embedded-interface expansion.
 - Changed-symbol extraction from git diff hunks, including deleted symbols from
   base files.
 - Package-qualified symbol impact for references and affected tests.
@@ -97,9 +97,9 @@ Current limitations:
   consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests;
   unqualified symbol targets can still be ambiguous across packages.
-- Interface implementer impact compares method signatures by local AST shape
-  and resolves local embedded interfaces, but does not yet use full Go type
-  identity.
+- Interface implementer impact canonicalizes local/external import paths in
+  method signatures and resolves local embedded interfaces, but does not yet run
+  the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
@@ -826,7 +826,7 @@ extracts changed and deleted symbols from git diff hunks. `gosherpa impact diff
 --base <ref>` and `gosherpa tests affected --base <ref>` are implemented for
 human and JSON output. `gosherpa impact file|package|symbol` is implemented for
 human and JSON output. Interface and implementer impact signals are implemented
-as a conservative local method-set scan with signature matching and
+as a conservative local method-set scan with import-aware signature matching and
 embedded-interface expansion. Package-qualified symbol impact disambiguates
 references and affected tests. Symbol impact includes transitive callers in
 affected packages.
@@ -859,7 +859,7 @@ MVP behavior:
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Report affected interfaces and implementations. Implemented foundation with
-  method signature matching and embedded-interface expansion.
+  import-aware method signature matching and embedded-interface expansion.
 - Disambiguate package-qualified symbol impact for references and affected
   tests. Implemented foundation.
 - Include transitive caller packages for symbol impact. Implemented foundation.
@@ -895,8 +895,8 @@ Done when:
   hunks, including deleted top-level symbols read from the base ref.
   Implemented foundation.
 - Affected interfaces and implementations are populated for changed packages
-  and symbol targets. Implemented foundation with signature matching and
-  embedded-interface expansion.
+  and symbol targets. Implemented foundation with import-aware signature
+  matching and embedded-interface expansion.
 - Package-qualified symbol targets avoid same-name reference/test bleed from
   other packages. Implemented foundation.
 - Symbol impact reports transitive callers in affected packages. Implemented

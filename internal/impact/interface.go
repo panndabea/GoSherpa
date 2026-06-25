@@ -243,7 +243,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 				}
 
 				typ := ensureTypeInfo(typesByQualified, packagePath, receiver)
-				typ.Methods[decl.Name.Name] = methodSignature(decl.Type)
+				typ.Methods[decl.Name.Name] = methodSignature(decl.Type, packagePath, imports)
 			}
 		}
 	}
@@ -306,7 +306,7 @@ func interfaceMethodSet(iface *ast.InterfaceType, packagePath string, imports ma
 	for _, method := range iface.Methods.List {
 		funcType, ok := method.Type.(*ast.FuncType)
 		if ok {
-			signature := methodSignature(funcType)
+			signature := methodSignature(funcType, packagePath, imports)
 			for _, name := range method.Names {
 				methods[name.Name] = signature
 			}
@@ -357,17 +357,17 @@ func interfaceImportAliases(file *ast.File, modulePath string) map[string]string
 			continue
 		}
 
-		packagePath, ok := localInterfaceImportPackage(importPath, modulePath)
-		if !ok {
-			continue
-		}
-
 		alias := interfaceImportAlias(importSpec, importPath)
 		if alias == "" {
 			continue
 		}
 
-		imports[alias] = packagePath
+		importIdentity := importPath
+		if packagePath, ok := localInterfaceImportPackage(importPath, modulePath); ok {
+			importIdentity = packagePath
+		}
+
+		imports[alias] = importIdentity
 	}
 
 	return imports
@@ -506,22 +506,32 @@ func collectEmbeddingInterfaces(qualified string, direct map[string][]string, se
 	return result
 }
 
-func methodSignature(funcType *ast.FuncType) string {
+type interfaceTypeContext struct {
+	PackagePath string
+	Imports     map[string]string
+}
+
+func methodSignature(funcType *ast.FuncType, packagePath string, imports map[string]string) string {
 	if funcType == nil {
 		return ""
 	}
 
-	return fieldListSignature(funcType.Params) + "->" + fieldListSignature(funcType.Results)
+	context := interfaceTypeContext{
+		PackagePath: packagePath,
+		Imports:     imports,
+	}
+
+	return fieldListSignature(funcType.Params, context) + "->" + fieldListSignature(funcType.Results, context)
 }
 
-func fieldListSignature(fields *ast.FieldList) string {
+func fieldListSignature(fields *ast.FieldList, context interfaceTypeContext) string {
 	if fields == nil || len(fields.List) == 0 {
 		return ""
 	}
 
 	var parts []string
 	for _, field := range fields.List {
-		fieldType := exprSignature(field.Type)
+		fieldType := exprSignature(field.Type, context)
 		count := len(field.Names)
 		if count == 0 {
 			count = 1
@@ -535,15 +545,84 @@ func fieldListSignature(fields *ast.FieldList) string {
 	return strings.Join(parts, ",")
 }
 
-func exprSignature(expr ast.Expr) string {
+func exprSignature(expr ast.Expr, context interfaceTypeContext) string {
 	switch expr := expr.(type) {
+	case *ast.Ident:
+		if isPredeclaredTypeIdentifier(expr.Name) {
+			return expr.Name
+		}
+
+		return qualifiedTypeIdentity(context.PackagePath, expr.Name)
+	case *ast.SelectorExpr:
+		ident, ok := expr.X.(*ast.Ident)
+		if ok {
+			if importPath, ok := context.Imports[ident.Name]; ok {
+				return qualifiedTypeIdentity(importPath, expr.Sel.Name)
+			}
+		}
+
+		return exprSignature(expr.X, context) + "." + expr.Sel.Name
+	case *ast.StarExpr:
+		return "*" + exprSignature(expr.X, context)
+	case *ast.ArrayType:
+		if expr.Len == nil {
+			return "[]" + exprSignature(expr.Elt, context)
+		}
+
+		return "[" + nodeSignature(expr.Len) + "]" + exprSignature(expr.Elt, context)
+	case *ast.Ellipsis:
+		return "..." + exprSignature(expr.Elt, context)
+	case *ast.MapType:
+		return "map[" + exprSignature(expr.Key, context) + "]" + exprSignature(expr.Value, context)
+	case *ast.ChanType:
+		switch expr.Dir {
+		case ast.RECV:
+			return "<-chan " + exprSignature(expr.Value, context)
+		case ast.SEND:
+			return "chan<- " + exprSignature(expr.Value, context)
+		default:
+			return "chan " + exprSignature(expr.Value, context)
+		}
 	case *ast.FuncType:
-		return "func(" + fieldListSignature(expr.Params) + ")->" + fieldListSignature(expr.Results)
+		return "func(" + fieldListSignature(expr.Params, context) + ")->" + fieldListSignature(expr.Results, context)
+	case *ast.IndexExpr:
+		return exprSignature(expr.X, context) + "[" + exprSignature(expr.Index, context) + "]"
+	case *ast.IndexListExpr:
+		var indexes []string
+		for _, index := range expr.Indices {
+			indexes = append(indexes, exprSignature(index, context))
+		}
+
+		return exprSignature(expr.X, context) + "[" + strings.Join(indexes, ",") + "]"
+	case *ast.ParenExpr:
+		return exprSignature(expr.X, context)
 	}
 
+	return nodeSignature(expr)
+}
+
+func nodeSignature(node any) string {
 	var buffer bytes.Buffer
-	_ = printer.Fprint(&buffer, token.NewFileSet(), expr)
+	_ = printer.Fprint(&buffer, token.NewFileSet(), node)
 	return buffer.String()
+}
+
+func isPredeclaredTypeIdentifier(name string) bool {
+	switch name {
+	case "any", "bool", "byte", "comparable", "complex64", "complex128", "error", "float32", "float64",
+		"int", "int8", "int16", "int32", "int64", "rune", "string", "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
+		return true
+	default:
+		return false
+	}
+}
+
+func qualifiedTypeIdentity(packagePath string, name string) string {
+	if packagePath == "" {
+		return name
+	}
+
+	return packagePath + "." + name
 }
 
 func ensureTypeInfo(types map[string]*typeInfo, packagePath string, name string) *typeInfo {

@@ -159,7 +159,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| More precise impact signals | Add richer type identity checks for interface impact |
+| V01 completion audit | Check PRD v0.1 against the implementation and close remaining test/doc gaps |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -185,7 +185,7 @@ Implemented today:
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
 - `gosherpa impact file|package|symbol` with human and JSON output
-- Interface and implementer impact signals based on local method sets with signature matching and embedded-interface expansion
+- Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
 - Changed-symbol extraction from git diff hunks, including deleted symbols from base files
 - Package-qualified symbol impact for references and affected tests
 - Transitive caller impact for symbol changes
@@ -193,7 +193,7 @@ Implemented today:
 
 Planned next from PRD v0.1:
 
-- richer type identity checks for interface impact
+- final PRD v0.1 completion audit and release notes
 
 Known MVP limitations:
 
@@ -202,7 +202,7 @@ Known MVP limitations:
 - Symbol impact includes transitive callers and package tests for affected caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
-- Interface implementer impact compares method signatures by local AST shape and resolves local embedded interfaces, but does not yet use full Go type identity.
+- Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet run the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
