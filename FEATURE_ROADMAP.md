@@ -75,13 +75,15 @@ Implemented:
 - Git changed-file discovery foundation via `internal/git.ChangedFiles`.
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`.
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`.
+- `gosherpa impact diff --base <ref>` with human and JSON output.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff-based impact CLI commands from PRD v0.1 are not implemented yet.
+- Diff impact is currently package/test-level and does not yet include symbol,
+  interface, or implementer impact.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
@@ -804,7 +806,8 @@ Done when:
 
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
-`internal/impact.AnalyzeDiff` are implemented.
+`internal/impact.AnalyzeDiff` are implemented. `gosherpa impact diff --base
+<ref>` is implemented for human and JSON output.
 
 Human question:
 
@@ -830,7 +833,8 @@ MVP behavior:
   foundation for diff reports.
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
-- Preserve the existing JSON response discipline for new commands.
+- Preserve the existing JSON response discipline for new commands. Implemented
+  for `impact diff`.
 
 Architecture:
 
@@ -845,7 +849,7 @@ Architecture:
 Done when:
 
 - `gosherpa impact diff --base <ref>` reports changed packages, affected
-  packages, and affected tests.
+  packages, and affected tests. Implemented foundation.
 - `gosherpa tests affected --base <ref>` prints suggested `go test` commands.
 - JSON and human output are covered by focused tests and golden fixtures.
 

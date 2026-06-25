@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -26,6 +27,8 @@ type cliInvocation struct {
 	CallPathLimit     int
 	CallPathMaxDepth  int
 	HasCallPathOption bool
+	BaseRef           string
+	HasBaseOption     bool
 }
 
 type jsonResponse[T any] struct {
@@ -58,6 +61,17 @@ type impactJSONData struct {
 	Packages     []string                   `json:"packages"`
 	RelatedTests []sherpa.RelatedTest       `json:"relatedTests"`
 	TestCommands []string                   `json:"testCommands"`
+}
+
+type impactDiffJSONData struct {
+	ChangedFiles            []string                   `json:"changedFiles"`
+	ChangedPackages         []string                   `json:"changedPackages"`
+	AffectedPackages        []string                   `json:"affectedPackages"`
+	AffectedSymbols         []string                   `json:"affectedSymbols"`
+	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
+	AffectedImplementations []string                   `json:"affectedImplementations"`
+	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
+	TestCommands            []string                   `json:"testCommands"`
 }
 
 type testsJSONData struct {
@@ -120,6 +134,29 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			}
 
 			invocation.Root = value
+			continue
+		}
+
+		if arg == "--base" {
+			value, err := parseStringFlagValue("--base", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.BaseRef = value
+			invocation.HasBaseOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--base=") {
+			value, err := parseStringFlag("--base", strings.TrimPrefix(arg, "--base="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.BaseRef = value
+			invocation.HasBaseOption = true
 			continue
 		}
 
@@ -187,6 +224,23 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 	return invocation, nil
 }
 
+func parseStringFlagValue(flag string, args []string, index int) (string, error) {
+	if index+1 >= len(args) {
+		return "", fmt.Errorf("missing value for %s", flag)
+	}
+
+	return parseStringFlag(flag, args[index+1])
+}
+
+func parseStringFlag(flag string, value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+		return "", fmt.Errorf("missing value for %s", flag)
+	}
+
+	return trimmed, nil
+}
+
 func parsePositiveFlagValue(flag string, args []string, index int) (int, error) {
 	if index+1 >= len(args) {
 		return 0, fmt.Errorf("missing value for %s", flag)
@@ -227,6 +281,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if invocation.HasCallPathOption && invocation.Command != "path" && invocation.Command != "paths" {
 		fmt.Fprintln(stderr, "error: --limit and --max-depth are only supported by path commands")
+		return exitUsage
+	}
+
+	if invocation.HasBaseOption && !isImpactDiffInvocation(invocation) {
+		fmt.Fprintln(stderr, "error: --base is only supported by impact diff")
 		return exitUsage
 	}
 
@@ -324,8 +383,40 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "impact":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] impact <symbol-or-package>")
+			printImpactUsage(stderr)
 			return exitUsage
+		}
+
+		if invocation.CommandArgs[0] == "diff" {
+			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
+				printImpactDiffUsage(stderr)
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
+			if err != nil {
+				fmt.Fprintln(stderr, "error:", err)
+				return exitFailure
+			}
+
+			if invocation.JSON {
+				normalizedReport := impactDiffJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"impact diff",
+					invocation.BaseRef,
+					normalizedReport.Warnings,
+					impactDiffJSONDataFromReport(normalizedReport),
+				))
+			}
+
+			fmt.Fprint(stdout, impactengine.FormatDiffReport(report))
+			return exitSuccess
 		}
 
 		root, ok := resolveRootPath(invocation.Root, stderr)
@@ -544,6 +635,10 @@ func supportsJSON(command string) bool {
 	}
 }
 
+func isImpactDiffInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
+}
+
 func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
@@ -596,6 +691,33 @@ func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
 		Packages:     result.Packages,
 		RelatedTests: result.RelatedTests,
 		TestCommands: result.TestCommands,
+	}
+}
+
+func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactReport {
+	report.ChangedFiles = nonNilSlice(report.ChangedFiles)
+	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.AffectedTests = nonNilSlice(report.AffectedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
+func impactDiffJSONDataFromReport(report impactengine.ImpactReport) impactDiffJSONData {
+	return impactDiffJSONData{
+		ChangedFiles:            report.ChangedFiles,
+		ChangedPackages:         report.ChangedPackages,
+		AffectedPackages:        report.AffectedPackages,
+		AffectedSymbols:         report.AffectedSymbols,
+		AffectedInterfaces:      report.AffectedInterfaces,
+		AffectedImplementations: report.AffectedImplementations,
+		AffectedTests:           report.AffectedTests,
+		TestCommands:            report.TestCommands,
 	}
 }
 
@@ -704,10 +826,20 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  symbol <name>")
 	fmt.Fprintln(writer, "  refs <name>")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
+	fmt.Fprintln(writer, "  impact diff --base <ref>")
 	fmt.Fprintln(writer, "  tests <symbol-or-package>")
 	fmt.Fprintln(writer, "  deps <package>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
 	fmt.Fprintln(writer, "  callers <function-or-method>")
 	fmt.Fprintln(writer, "  callees <function-or-method>")
+}
+
+func printImpactUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact <symbol-or-package>")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact diff --base <ref>")
+}
+
+func printImpactDiffUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact diff --base <ref>")
 }

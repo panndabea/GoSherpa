@@ -34,7 +34,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | "Who uses this function?" | References and direct callers |
 | "What does this function touch?" | Direct callees |
 | "What depends on this package?" | Local package dependency relationships |
-| "What might this change affect?" | Direct impact today; diff-based impact analysis next |
+| "What might this change affect?" | Direct and diff-based package/test impact |
 
 ## Current Experience
 
@@ -44,6 +44,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
+| Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
@@ -84,6 +85,8 @@ Then explore the repository:
 ./gosherpa impact ParseFile
 ./gosherpa impact ParseFile --json
 ./gosherpa impact ./internal/sherpa
+./gosherpa impact diff --base HEAD
+./gosherpa impact diff --base HEAD --json
 ./gosherpa tests ParseFile
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
@@ -126,6 +129,7 @@ Prefer not to build a binary yet?
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
+go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa path main FindCallers
 ```
@@ -146,7 +150,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| Impact Engine CLI | Add file/package/diff impact entrypoints on top of the new report model |
+| Impact Engine CLI completion | Add file/package impact subcommands and `tests affected` on top of the diff report |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -169,12 +173,12 @@ Implemented today:
 - Git changed-file discovery foundation via `internal/git.ChangedFiles`
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
+- `gosherpa impact diff --base <ref>` with human and JSON output
 
 Planned next from PRD v0.1:
 
-- `gosherpa impact diff --base <ref>`
-- file and package impact subcommands
-- package-level affected tests
+- file, package, and symbol impact subcommands
+- `gosherpa tests affected --base <ref>`
 - interface and implementer impact signals
 
 Known MVP limitations:
@@ -182,7 +186,7 @@ Known MVP limitations:
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff-based impact CLI commands from PRD v0.1 are not implemented yet.
+- Diff impact is currently package/test-level and does not yet include symbol, interface, or implementer impact.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
