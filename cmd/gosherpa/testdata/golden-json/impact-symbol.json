@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "command": "impact symbol",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "changedFiles": [],
+    "changedPackages": [],
+    "affectedPackages": [
+      "."
+    ],
+    "affectedSymbols": [
+      "Target"
+    ],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "affectedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": true,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test ."
+    ]
+  }
+}

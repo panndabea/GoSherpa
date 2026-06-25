@@ -310,6 +310,9 @@ func TestPrintUsageIncludesImpact(t *testing.T) {
 
 	for _, want := range []string{
 		"impact <symbol-or-package>",
+		"impact file <file>",
+		"impact package <package>",
+		"impact symbol <symbol>",
 		"impact diff --base <ref>",
 	} {
 		if !strings.Contains(output.String(), want) {
@@ -679,6 +682,48 @@ func TestMainPrintsImpactDiffUsageWhenBaseIsMissing(t *testing.T) {
 	}
 }
 
+func TestMainPrintsImpactSubcommandUsageWhenTargetIsMissing(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "file",
+			args: []string{"gosherpa", "impact", "file"},
+			want: "usage: gosherpa [--root <path>] impact file <file>\n",
+		},
+		{
+			name: "package",
+			args: []string{"gosherpa", "impact", "package"},
+			want: "usage: gosherpa [--root <path>] impact package <package>\n",
+		},
+		{
+			name: "symbol",
+			args: []string{"gosherpa", "impact", "symbol"},
+			want: "usage: gosherpa [--root <path>] impact symbol <symbol>\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := runMainTest(t, test.args)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+
+			if result.Stderr != test.want {
+				t.Fatalf("expected %q, got %q", test.want, result.Stderr)
+			}
+
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
+	}
+}
+
 func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "symbols", "--base", "HEAD"})
 
@@ -822,6 +867,74 @@ func TestUsesParser(t *testing.T) {
 
 	if strings.Contains(result.Stdout, "IMPACT") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactFileCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "file", "service.go"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"IMPACT FILE", "CHANGED FILES", "service.go", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactPackageCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "package", "."})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"IMPACT PACKAGE", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, "CHANGED FILES") {
+		t.Fatalf("expected package output not to include changed files, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactSymbolCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "symbol", "Target"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"IMPACT SYMBOL", "AFFECTED SYMBOLS", "Target", "AFFECTED PACKAGES", ".", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
 	}
 }
 
@@ -1690,6 +1803,39 @@ func writeMainTestFile(t *testing.T, path string, contents string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeMainImpactReportProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app"
+
+func Run() {
+	service.Entry()
+}
+`)
+
+	return tmp
 }
 
 func copyMainTestTree(t *testing.T, source string, destination string) {

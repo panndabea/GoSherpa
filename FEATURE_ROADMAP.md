@@ -77,6 +77,7 @@ Implemented:
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`.
 - `gosherpa impact diff --base <ref>` with human and JSON output.
 - `gosherpa tests affected --base <ref>` with human and JSON output.
+- `gosherpa impact file|package|symbol` with human and JSON output.
 
 Current limitations:
 
@@ -85,6 +86,8 @@ Current limitations:
 - Impact analysis is direct-only and does not yet include transitive callers.
 - Diff impact is currently package/test-level and does not yet include symbol,
   interface, or implementer impact.
+- File, package, and symbol impact use the shared report model, but symbol
+  impact does not yet fully disambiguate duplicate package-qualified symbols.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
@@ -809,7 +812,8 @@ Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
 `internal/impact.AnalyzeDiff` are implemented. `gosherpa impact diff --base
 <ref>` and `gosherpa tests affected --base <ref>` are implemented for human
-and JSON output.
+and JSON output. `gosherpa impact file|package|symbol` is implemented for
+human and JSON output.
 
 Human question:
 
@@ -836,7 +840,7 @@ MVP behavior:
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Preserve the existing JSON response discipline for new commands. Implemented
-  for `impact diff` and `tests affected`.
+  for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
 Architecture:
 
@@ -845,7 +849,8 @@ Architecture:
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
   `ChangedPackages` maps changed Go files to local package paths first, and
-  `AnalyzeDiff` produces the first package/test impact report.
+  `AnalyzeDiff`, `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce
+  the first package/test impact reports.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
@@ -854,8 +859,10 @@ Done when:
   packages, and affected tests. Implemented foundation.
 - `gosherpa tests affected --base <ref>` prints suggested `go test` commands.
   Implemented foundation.
+- `gosherpa impact file|package|symbol` reports package/test impact through
+  `ImpactReport`. Implemented foundation.
 - JSON and human output are covered by focused tests and golden fixtures for
-  diff impact and affected tests.
+  diff impact, affected tests, and file/package/symbol impact.
 
 ### 5.4 Change Risk Summary
 

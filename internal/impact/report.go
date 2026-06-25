@@ -1,6 +1,9 @@
 package impact
 
 import (
+	"fmt"
+	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,6 +38,18 @@ func AnalyzeDiff(root string, base string, head string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzeDiff(base, head)
 }
 
+func AnalyzeFile(root string, file string) (ImpactReport, error) {
+	return NewAnalyzer(root).AnalyzeFile(file)
+}
+
+func AnalyzePackage(root string, targetPackage string) (ImpactReport, error) {
+	return NewAnalyzer(root).AnalyzePackage(targetPackage)
+}
+
+func AnalyzeSymbol(root string, target string) (ImpactReport, error) {
+	return NewAnalyzer(root).AnalyzeSymbol(target)
+}
+
 func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	changedFiles, err := gitdiff.ChangedFiles(a.Root, base, head)
 	if err != nil {
@@ -53,6 +68,99 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
 
 	return normalizeReport(report), nil
+}
+
+func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {
+	changedFile, changedPackage, err := fileTarget(file)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
+	report, err := a.AnalyzePackage(changedPackage)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
+	report.ChangedFiles = []string{changedFile}
+	report.ChangedPackages = []string{changedPackage}
+
+	return normalizeReport(report), nil
+}
+
+func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
+	result, err := sherpa.FindImpact(a.Root, targetPackage)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	if result.Kind != sherpa.ImpactKindPackage {
+		return ImpactReport{}, fmt.Errorf("package impact target must be a package path: %s", targetPackage)
+	}
+
+	report := reportFromImpactResult(result)
+	report.ChangedPackages = []string{result.Target}
+	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
+
+	return normalizeReport(report), nil
+}
+
+func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
+	lookupTarget := symbolLookupTarget(target)
+
+	result, err := sherpa.FindImpact(a.Root, lookupTarget)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	if result.Kind != sherpa.ImpactKindSymbol {
+		return ImpactReport{}, fmt.Errorf("symbol impact target must be a symbol: %s", target)
+	}
+
+	report := reportFromImpactResult(result)
+	report.AffectedSymbols = []string{lookupTarget}
+
+	return normalizeReport(report), nil
+}
+
+func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
+	return ImpactReport{
+		AffectedPackages: result.Packages,
+		AffectedTests:    result.RelatedTests,
+		TestCommands:     result.TestCommands,
+		Warnings:         result.Warnings,
+	}
+}
+
+func fileTarget(file string) (string, string, error) {
+	value := strings.TrimSpace(file)
+	if value == "" {
+		return "", "", fmt.Errorf("file path is empty")
+	}
+	if filepath.IsAbs(value) {
+		return "", "", fmt.Errorf("absolute file paths are not supported: %s", file)
+	}
+
+	value = path.Clean(filepath.ToSlash(value))
+	pkg, ok := packageForChangedFile(value)
+	if !ok {
+		return "", "", fmt.Errorf("impact file target must be a repository-local Go file: %s", file)
+	}
+
+	return value, pkg, nil
+}
+
+func symbolLookupTarget(target string) string {
+	value := strings.TrimSpace(target)
+	lastSlash := strings.LastIndexAny(value, `/\`)
+	if lastSlash < 0 {
+		return value
+	}
+
+	tail := value[lastSlash+1:]
+	firstDot := strings.Index(tail, ".")
+	if firstDot < 0 || firstDot+1 >= len(tail) {
+		return value
+	}
+
+	return tail[firstDot+1:]
 }
 
 func affectedPackagesForChangedPackages(root string, changedPackages []string) ([]string, []string) {

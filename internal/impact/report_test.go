@@ -68,6 +68,77 @@ func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
 	assertStrings(t, report.Warnings, []string{})
 }
 
+func TestAnalyzeFileReportsPackageImpact(t *testing.T) {
+	root := writeImpactAnalysisProject(t)
+
+	report, err := AnalyzeFile(root, "internal/auth/session.go")
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	assertStrings(t, report.ChangedFiles, []string{"internal/auth/session.go"})
+	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
+}
+
+func TestAnalyzePackageReportsPackageImpact(t *testing.T) {
+	root := writeImpactAnalysisProject(t)
+
+	report, err := NewAnalyzer(root).AnalyzePackage("./internal/auth")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.ChangedFiles, []string{})
+	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
+}
+
+func TestAnalyzeSymbolReportsSymbolImpact(t *testing.T) {
+	root := writeImpactAnalysisProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.Session")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.ChangedFiles, []string{})
+	assertStrings(t, report.ChangedPackages, []string{})
+	assertStrings(t, report.AffectedSymbols, []string{"Session"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+}
+
+func TestAnalyzeFileRejectsNonGoFiles(t *testing.T) {
+	root := writeImpactAnalysisProject(t)
+
+	_, err := AnalyzeFile(root, "README.md")
+	if err == nil {
+		t.Fatal("AnalyzeFile returned nil error")
+	}
+	if !strings.Contains(err.Error(), "impact file target must be a repository-local Go file") {
+		t.Fatalf("AnalyzeFile error = %q, want Go file error", err)
+	}
+}
+
+func writeImpactAnalysisProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), "package auth\n\ntype Session struct{}\n\nfunc NewSession() Session { return Session{} }\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), "package auth\n\nimport \"testing\"\n\nfunc TestSession(t *testing.T) { _ = Session{} }\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler.go"), "package api\n\nimport \"example.com/app/internal/auth\"\n\nvar _ = auth.Session{}\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler_test.go"), "package api\n\nimport \"testing\"\n\nfunc TestHandler(t *testing.T) {}\n")
+
+	return root
+}
+
 func assertStrings(t *testing.T, got []string, want []string) {
 	t.Helper()
 

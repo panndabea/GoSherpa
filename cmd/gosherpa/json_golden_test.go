@@ -31,6 +31,18 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"impact", "Target", "--json"},
 		},
 		{
+			name: "impact-file",
+			args: []string{"impact", "file", "service.go", "--json"},
+		},
+		{
+			name: "impact-package",
+			args: []string{"impact", "package", ".", "--json"},
+		},
+		{
+			name: "impact-symbol",
+			args: []string{"impact", "symbol", "Target", "--json"},
+		},
+		{
 			name: "tests",
 			args: []string{"tests", "Target", "--json"},
 		},

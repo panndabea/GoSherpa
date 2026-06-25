@@ -44,6 +44,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
+| Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
@@ -86,6 +87,9 @@ Then explore the repository:
 ./gosherpa impact ParseFile
 ./gosherpa impact ParseFile --json
 ./gosherpa impact ./internal/sherpa
+./gosherpa impact file internal/sherpa/impact.go
+./gosherpa impact package ./internal/sherpa
+./gosherpa impact symbol ParseFile
 ./gosherpa impact diff --base HEAD
 ./gosherpa impact diff --base HEAD --json
 ./gosherpa tests ParseFile
@@ -132,6 +136,7 @@ Prefer not to build a binary yet?
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
+go run ./cmd/gosherpa impact file internal/sherpa/impact.go
 go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa tests affected --base HEAD
@@ -154,7 +159,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| Impact Engine CLI completion | Add file/package/symbol impact subcommands on top of the diff report |
+| Deeper impact signals | Add interface, implementer, and more precise symbol impact signals |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -179,11 +184,12 @@ Implemented today:
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
+- `gosherpa impact file|package|symbol` with human and JSON output
 
 Planned next from PRD v0.1:
 
-- file, package, and symbol impact subcommands
 - interface and implementer impact signals
+- more precise symbol-level impact for package-qualified targets
 
 Known MVP limitations:
 
@@ -191,6 +197,7 @@ Known MVP limitations:
 - Test files are skipped by reference, caller, and callee analysis.
 - Impact analysis is direct-only and does not yet include transitive callers.
 - Diff impact is currently package/test-level and does not yet include symbol, interface, or implementer impact.
+- `impact file`, `impact package`, and `impact symbol` use the shared report model, but symbol impact does not yet fully disambiguate duplicate package-qualified symbols.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.

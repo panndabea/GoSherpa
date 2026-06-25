@@ -424,6 +424,40 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitSuccess
 		}
 
+		if isImpactReportSubcommand(invocation.CommandArgs[0]) {
+			if len(invocation.CommandArgs) != 2 {
+				printImpactSubcommandUsage(stderr, invocation.CommandArgs[0])
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			kind := invocation.CommandArgs[0]
+			target := invocation.CommandArgs[1]
+			report, err := analyzeImpactSubcommand(root, kind, target)
+			if err != nil {
+				fmt.Fprintln(stderr, "error:", err)
+				return exitFailure
+			}
+
+			if invocation.JSON {
+				normalizedReport := impactDiffJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"impact "+kind,
+					target,
+					normalizedReport.Warnings,
+					impactDiffJSONDataFromReport(normalizedReport),
+				))
+			}
+
+			fmt.Fprint(stdout, formatImpactSubcommandReport(kind, report))
+			return exitSuccess
+		}
+
 		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
 			return exitFailure
@@ -684,6 +718,41 @@ func isTestsAffectedInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "tests" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "affected"
 }
 
+func isImpactReportSubcommand(command string) bool {
+	switch command {
+	case "file", "package", "symbol":
+		return true
+	default:
+		return false
+	}
+}
+
+func analyzeImpactSubcommand(root string, kind string, target string) (impactengine.ImpactReport, error) {
+	switch kind {
+	case "file":
+		return impactengine.AnalyzeFile(root, target)
+	case "package":
+		return impactengine.AnalyzePackage(root, target)
+	case "symbol":
+		return impactengine.AnalyzeSymbol(root, target)
+	default:
+		return impactengine.ImpactReport{}, fmt.Errorf("unknown impact subcommand: %s", kind)
+	}
+}
+
+func formatImpactSubcommandReport(kind string, report impactengine.ImpactReport) string {
+	switch kind {
+	case "file":
+		return impactengine.FormatFileReport(report)
+	case "package":
+		return impactengine.FormatPackageReport(report)
+	case "symbol":
+		return impactengine.FormatSymbolReport(report)
+	default:
+		return impactengine.FormatDiffReport(report)
+	}
+}
+
 func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
@@ -878,6 +947,9 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  symbol <name>")
 	fmt.Fprintln(writer, "  refs <name>")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
+	fmt.Fprintln(writer, "  impact file <file>")
+	fmt.Fprintln(writer, "  impact package <package>")
+	fmt.Fprintln(writer, "  impact symbol <symbol>")
 	fmt.Fprintln(writer, "  impact diff --base <ref>")
 	fmt.Fprintln(writer, "  tests <symbol-or-package>")
 	fmt.Fprintln(writer, "  tests affected --base <ref>")
@@ -890,11 +962,27 @@ func printUsage(writer io.Writer) {
 
 func printImpactUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact <symbol-or-package>")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact file <file>")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact package <package>")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact symbol <symbol>")
 	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact diff --base <ref>")
 }
 
 func printImpactDiffUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact diff --base <ref>")
+}
+
+func printImpactSubcommandUsage(writer io.Writer, kind string) {
+	switch kind {
+	case "file":
+		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact file <file>")
+	case "package":
+		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact package <package>")
+	case "symbol":
+		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact symbol <symbol>")
+	default:
+		printImpactUsage(writer)
+	}
 }
 
 func printTestsUsage(writer io.Writer) {
