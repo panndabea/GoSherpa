@@ -74,6 +74,7 @@ Implemented:
 - Stable CLI exit codes with diagnostics on stderr.
 - Git changed-file discovery foundation via `internal/git.ChangedFiles`.
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`.
+- Diff impact report foundation via `internal/impact.AnalyzeDiff`.
 
 Current limitations:
 
@@ -802,8 +803,8 @@ Done when:
 ### 5.3 Impact Engine v0.1
 
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
-`internal/git.ChangedFiles` and `internal/impact.ChangedPackages` are
-implemented.
+`internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
+`internal/impact.AnalyzeDiff` are implemented.
 
 Human question:
 
@@ -825,8 +826,10 @@ MVP behavior:
 
 - Read changed files from git diffs. Implemented foundation.
 - Map changed files to packages. Implemented foundation for Go files.
-- Report changed packages and affected dependent packages.
-- Report affected tests at package granularity.
+- Report changed packages and affected dependent packages. Implemented
+  foundation for diff reports.
+- Report affected tests at package granularity. Implemented foundation for
+  affected packages.
 - Preserve the existing JSON response discipline for new commands.
 
 Architecture:
@@ -835,7 +838,8 @@ Architecture:
   `ChangedFiles` is implemented first.
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
-  `ChangedPackages` maps changed Go files to local package paths first.
+  `ChangedPackages` maps changed Go files to local package paths first, and
+  `AnalyzeDiff` produces the first package/test impact report.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
