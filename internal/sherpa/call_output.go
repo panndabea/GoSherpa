@@ -70,3 +70,55 @@ func FormatCallers(result CallersResult) string {
 func PrintCallers(result CallersResult) {
 	fmt.Print(FormatCallers(result))
 }
+
+func FormatCallPaths(result CallPathsResult) string {
+	if len(result.Paths) == 0 {
+		return fmt.Sprintf("no call path found: %s -> %s\n", result.From, result.To)
+	}
+
+	var builder strings.Builder
+
+	if len(result.Paths) == 1 {
+		builder.WriteString("CALL PATH\n")
+		builder.WriteString("\n")
+		writeCallPath(&builder, result.From, result.Paths[0], "")
+		builder.WriteString("\n")
+		fmt.Fprintf(&builder, "Found %d path\n", len(result.Paths))
+
+		return builder.String()
+	}
+
+	builder.WriteString("CALL PATHS\n")
+	builder.WriteString("\n")
+	fmt.Fprintf(&builder, "%s -> %s\n", result.From, result.To)
+	builder.WriteString("\n")
+
+	for i, path := range result.Paths {
+		fmt.Fprintf(&builder, "Path %d\n", i+1)
+		writeCallPath(&builder, result.From, path, "  ")
+		builder.WriteString("\n")
+	}
+
+	fmt.Fprintf(&builder, "Found %d paths\n", len(result.Paths))
+
+	return builder.String()
+}
+
+func PrintCallPaths(result CallPathsResult) {
+	fmt.Print(FormatCallPaths(result))
+}
+
+func writeCallPath(builder *strings.Builder, from string, path CallPath, indent string) {
+	fmt.Fprintf(builder, "%s%s\n", indent, from)
+
+	for _, step := range path.Steps {
+		fmt.Fprintf(
+			builder,
+			"%s  -> %-36s %s:%d\n",
+			indent,
+			step.Callee,
+			step.Position.File,
+			step.Position.Line,
+		)
+	}
+}

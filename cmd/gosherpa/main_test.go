@@ -132,6 +132,49 @@ func TestParseCLIArgsLastRootWins(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsCallPathOptions(t *testing.T) {
+	got, err := parseCLIArgs([]string{"paths", "Entry", "Target", "--limit", "3", "--max-depth=4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Command != "paths" {
+		t.Fatalf("expected command paths, got %s", got.Command)
+	}
+
+	assertMainTestStrings(t, got.CommandArgs, []string{"Entry", "Target"})
+
+	if got.CallPathLimit != 3 {
+		t.Fatalf("expected limit 3, got %d", got.CallPathLimit)
+	}
+
+	if got.CallPathMaxDepth != 4 {
+		t.Fatalf("expected max depth 4, got %d", got.CallPathMaxDepth)
+	}
+
+	if !got.HasCallPathOption {
+		t.Fatal("expected call path option marker")
+	}
+}
+
+func TestParseCLIArgsRejectsInvalidCallPathOptions(t *testing.T) {
+	tests := [][]string{
+		{"paths", "Entry", "Target", "--limit"},
+		{"paths", "Entry", "Target", "--limit="},
+		{"paths", "Entry", "Target", "--limit", "0"},
+		{"paths", "Entry", "Target", "--max-depth", "nope"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
 func TestPrintUsageIncludesRoot(t *testing.T) {
 	output := captureMainTestStdout(t, func() {
 		printUsage()
@@ -140,6 +183,21 @@ func TestPrintUsageIncludesRoot(t *testing.T) {
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] <command> [args]",
 		"--root <path>    repository root, defaults to .",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output)
+		}
+	}
+}
+
+func TestPrintUsageIncludesPathCommands(t *testing.T) {
+	output := captureMainTestStdout(t, func() {
+		printUsage()
+	})
+
+	for _, want := range []string{
+		"path <from> <to>",
+		"paths <from> <to> [--limit <n>] [--max-depth <n>]",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output)
@@ -164,6 +222,92 @@ func TestPrintUsageIncludesCallers(t *testing.T) {
 
 	if !strings.Contains(output, "callers <function-or-method>") {
 		t.Fatalf("expected usage to contain callers command, got:\n%s", output)
+	}
+}
+
+func TestMainPrintsPathUsageWhenArgumentIsMissing(t *testing.T) {
+	setMainTestArgs(t, []string{"gosherpa", "path", "Entry"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	want := "usage: gosherpa [--root <path>] path <from> <to> [--limit <n>] [--max-depth <n>]\n"
+	if output != want {
+		t.Fatalf("expected %q, got %q", want, output)
+	}
+}
+
+func TestMainRunsPathCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Middle()
+}
+
+func Middle() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "path", "Entry", "Target"})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"CALL PATH", "Entry", "Middle", "Target", "Found 1 path"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
+	}
+}
+
+func TestMainRunsPathsCommandWithLimit(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	First()
+	Second()
+}
+
+func First() {
+	Target()
+}
+
+func Second() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	setMainTestArgs(t, []string{"gosherpa", "paths", "Entry", "Target", "--limit", "2", "--root", tmp})
+
+	output := captureMainTestStdout(t, func() {
+		main()
+	})
+
+	for _, want := range []string{"CALL PATHS", "Path 1", "Path 2", "First", "Second", "Found 2 paths"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", output)
 	}
 }
 

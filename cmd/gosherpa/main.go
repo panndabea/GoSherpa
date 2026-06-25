@@ -3,15 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
 type cliInvocation struct {
-	Root        string
-	Command     string
-	CommandArgs []string
+	Root              string
+	Command           string
+	CommandArgs       []string
+	CallPathLimit     int
+	CallPathMaxDepth  int
+	HasCallPathOption bool
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -46,6 +50,52 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			continue
 		}
 
+		if arg == "--limit" {
+			value, err := parsePositiveFlagValue("--limit", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.CallPathLimit = value
+			invocation.HasCallPathOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--limit=") {
+			value, err := parsePositiveInteger("--limit", strings.TrimPrefix(arg, "--limit="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.CallPathLimit = value
+			invocation.HasCallPathOption = true
+			continue
+		}
+
+		if arg == "--max-depth" {
+			value, err := parsePositiveFlagValue("--max-depth", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.CallPathMaxDepth = value
+			invocation.HasCallPathOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-depth=") {
+			value, err := parsePositiveInteger("--max-depth", strings.TrimPrefix(arg, "--max-depth="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.CallPathMaxDepth = value
+			invocation.HasCallPathOption = true
+			continue
+		}
+
 		if strings.HasPrefix(arg, "-") {
 			return cliInvocation{}, fmt.Errorf("unknown flag: %s", arg)
 		}
@@ -64,6 +114,28 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 	return invocation, nil
 }
 
+func parsePositiveFlagValue(flag string, args []string, index int) (int, error) {
+	if index+1 >= len(args) {
+		return 0, fmt.Errorf("missing value for %s", flag)
+	}
+
+	return parsePositiveInteger(flag, args[index+1])
+}
+
+func parsePositiveInteger(flag string, value string) (int, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, fmt.Errorf("missing value for %s", flag)
+	}
+
+	parsed, err := strconv.Atoi(trimmed)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid value for %s: %s", flag, trimmed)
+	}
+
+	return parsed, nil
+}
+
 func main() {
 	invocation, err := parseCLIArgs(os.Args[1:])
 	if err != nil {
@@ -73,6 +145,11 @@ func main() {
 
 	if invocation.Command == "" {
 		printUsage()
+		return
+	}
+
+	if invocation.HasCallPathOption && invocation.Command != "path" && invocation.Command != "paths" {
+		fmt.Println("error: --limit and --max-depth are only supported by path commands")
 		return
 	}
 
@@ -162,6 +239,29 @@ func main() {
 		}
 
 		sherpa.PrintPackageDependencies(deps)
+	case "path", "paths":
+		if len(invocation.CommandArgs) < 2 {
+			fmt.Printf("usage: gosherpa [--root <path>] %s <from> <to> [--limit <n>] [--max-depth <n>]\n", invocation.Command)
+			return
+		}
+
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
+
+		options := sherpa.CallPathOptions{
+			Limit:    invocation.CallPathLimit,
+			MaxDepth: invocation.CallPathMaxDepth,
+		}
+
+		result, err := sherpa.FindCallPaths(root, invocation.CommandArgs[0], invocation.CommandArgs[1], options)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+
+		sherpa.PrintCallPaths(result)
 	case "callers":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Println("usage: gosherpa [--root <path>] callers <function-or-method>")
@@ -229,6 +329,8 @@ func printUsage() {
 	fmt.Println("  symbol <name>")
 	fmt.Println("  refs <name>")
 	fmt.Println("  deps <package>")
+	fmt.Println("  path <from> <to>")
+	fmt.Println("  paths <from> <to> [--limit <n>] [--max-depth <n>]")
 	fmt.Println("  callers <function-or-method>")
 	fmt.Println("  callees <function-or-method>")
 }

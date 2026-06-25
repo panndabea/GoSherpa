@@ -706,6 +706,228 @@ func Run(
 	}
 }
 
+func TestFindCallPathsFindsShortestPath(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Slow()
+	Fast()
+}
+
+func Slow() {
+	Hop()
+}
+
+func Hop() {
+	Target()
+}
+
+func Fast() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Fast", "Target"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsReturnsMultiplePathsWithLimit(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	First()
+	Second()
+}
+
+func First() {
+	Target()
+}
+
+func Second() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 2 {
+		t.Fatalf("expected 2 paths, got %v", result.Paths)
+	}
+
+	got := [][]string{
+		callTestPathCallees(result.Paths[0]),
+		callTestPathCallees(result.Paths[1]),
+	}
+	want := [][]string{
+		{"First", "Target"},
+		{"Second", "Target"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsHonorsMaxDepth(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Middle()
+}
+
+func Middle() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{MaxDepth: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 0 {
+		t.Fatalf("expected no paths, got %v", result.Paths)
+	}
+}
+
+func TestFindCallPathsReturnsRootRelativeCallPositions(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 || len(result.Paths[0].Steps) != 1 {
+		t.Fatalf("expected 1 direct path, got %v", result.Paths)
+	}
+
+	got := result.Paths[0].Steps[0].Position.File
+	if got != "internal/service/service.go" {
+		t.Fatalf("expected internal/service/service.go, got %s", got)
+	}
+
+	if strings.Contains(got, tmp) {
+		t.Fatalf("expected root-relative path, got %s", got)
+	}
+}
+
+func TestFindCallPathsMatchesSelectorFunctionCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	service.Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Target"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsReturnsZeroStepPathForSameTarget(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Entry", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	if len(result.Paths[0].Steps) != 0 {
+		t.Fatalf("expected zero steps, got %v", result.Paths[0].Steps)
+	}
+}
+
+func TestFindCallPathsReturnsErrorForMissingFunction(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {}
+`)
+
+	_, err := FindCallPaths(tmp, "Entry", "Missing", CallPathOptions{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "function not found: Missing") {
+		t.Fatalf("expected missing function error, got %v", err)
+	}
+}
+
+func TestNormalizeCallPathOptionsRejectsNegativeValues(t *testing.T) {
+	_, err := normalizeCallPathOptions(CallPathOptions{Limit: -1})
+	if err == nil {
+		t.Fatal("expected limit error")
+	}
+
+	_, err = normalizeCallPathOptions(CallPathOptions{MaxDepth: -1})
+	if err == nil {
+		t.Fatal("expected max depth error")
+	}
+}
+
 func parseCallTestCalls(t *testing.T, source string) []*ast.CallExpr {
 	t.Helper()
 
@@ -777,6 +999,15 @@ func callTestCallerNames(callers []Caller) []string {
 	var names []string
 	for _, caller := range callers {
 		names = append(names, caller.Name)
+	}
+
+	return names
+}
+
+func callTestPathCallees(path CallPath) []string {
+	var names []string
+	for _, step := range path.Steps {
+		names = append(names, step.Callee)
 	}
 
 	return names

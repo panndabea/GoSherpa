@@ -1,6 +1,9 @@
 package sherpa
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestFormatCallees(t *testing.T) {
 	result := CalleesResult{
@@ -92,6 +95,134 @@ func TestFormatCallersWithEmptyList(t *testing.T) {
 
 	got := FormatCallers(result)
 	want := "no callers found: Empty\n"
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatCallPaths(t *testing.T) {
+	result := CallPathsResult{
+		From: "Entry",
+		To:   "Target",
+		Paths: []CallPath{
+			{
+				Steps: []CallPathStep{
+					{
+						Caller: "Entry",
+						Callee: "Middle",
+						Position: Position{
+							File: "service.go",
+							Line: 4,
+						},
+					},
+					{
+						Caller: "Middle",
+						Callee: "Target",
+						Position: Position{
+							File: "service.go",
+							Line: 8,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := FormatCallPaths(result)
+	want := fmt.Sprintf(`CALL PATH
+
+Entry
+  -> %-36s service.go:4
+  -> %-36s service.go:8
+
+Found 1 path
+`, "Middle", "Target")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatCallPathsWithEmptyList(t *testing.T) {
+	result := CallPathsResult{
+		From: "Entry",
+		To:   "Target",
+	}
+
+	got := FormatCallPaths(result)
+	want := "no call path found: Entry -> Target\n"
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatCallPathsWithMultiplePaths(t *testing.T) {
+	result := CallPathsResult{
+		From: "Entry",
+		To:   "Target",
+		Paths: []CallPath{
+			{
+				Steps: []CallPathStep{
+					{
+						Caller: "Entry",
+						Callee: "First",
+						Position: Position{
+							File: "service.go",
+							Line: 4,
+						},
+					},
+					{
+						Caller: "First",
+						Callee: "Target",
+						Position: Position{
+							File: "service.go",
+							Line: 8,
+						},
+					},
+				},
+			},
+			{
+				Steps: []CallPathStep{
+					{
+						Caller: "Entry",
+						Callee: "Second",
+						Position: Position{
+							File: "service.go",
+							Line: 5,
+						},
+					},
+					{
+						Caller: "Second",
+						Callee: "Target",
+						Position: Position{
+							File: "service.go",
+							Line: 12,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := FormatCallPaths(result)
+	want := fmt.Sprintf(`CALL PATHS
+
+Entry -> Target
+
+Path 1
+  Entry
+    -> %-36s service.go:4
+    -> %-36s service.go:8
+
+Path 2
+  Entry
+    -> %-36s service.go:5
+    -> %-36s service.go:12
+
+Found 2 paths
+`, "First", "Target", "Second", "Target")
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)

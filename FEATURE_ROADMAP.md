@@ -60,12 +60,14 @@ Implemented:
 - Package dependency analysis.
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
+- Shortest and limited repository-local call path analysis.
 - Repository root selection with `--root`.
 
 Current limitations:
 
 - References are syntactic identifier matches, not type-checked references.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
+- Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
 - Output is optimized for reading, but not yet consistently structured.
 - Positions only expose file and line, not columns or ranges.
@@ -576,6 +578,8 @@ Done when:
   function values.
 
 ### 4.2 Call Paths
+
+Status: MVP implemented with a syntactic repository-local call graph.
 
 Human question:
 

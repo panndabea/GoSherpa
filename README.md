@@ -44,6 +44,8 @@ As Go projects grow, the important answer is often spread across files, packages
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ParseFile` | Lists direct syntactic callers of a function or method |
+| Call path | `gosherpa path Run ParseFile` | Shows the shortest repository-local call path between functions or methods |
+| Call paths | `gosherpa paths Run ParseFile --limit 3` | Shows multiple call paths with optional limit and max depth |
 
 ```text
 REFERENCES
@@ -74,6 +76,8 @@ Then explore the repository:
 ./gosherpa deps ./internal/sherpa
 ./gosherpa callees ParseFile
 ./gosherpa callers ParseFile
+./gosherpa path main FindCallers
+./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6
 ```
 
 Use `--root` to run GoSherpa from another working directory. The path must point to a Go module root containing `go.mod`.
@@ -88,6 +92,7 @@ Prefer not to build a binary yet?
 ```bash
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa callers ParseFile
+go run ./cmd/gosherpa path main FindCallers
 ```
 
 ## Design Principles
@@ -106,7 +111,6 @@ GoSherpa is an early MVP, with the next work focused on deeper navigation and sa
 
 | Next | Goal |
 | --- | --- |
-| Call paths | Find paths between two functions or methods |
 | Better references | Move from syntactic matches toward more Go-aware relationships |
 | Impact analysis | Estimate what a change might affect before making it |
 | Test discovery | Find tests related to packages, types, and functions |
@@ -123,12 +127,14 @@ Implemented today:
 - Symbol lookup and reference lookup
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
+- Shortest and limited repository-local call path analysis
 - Repository root selection with `--root`
 
 Known MVP limitations:
 
 - Reference search is syntactic, not type-checked.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
+- Call path analysis inherits the current AST-based caller and callee limitations.
 - One-segment function targets can produce selector-call false positives.
 - Function names can be ambiguous across packages.
 

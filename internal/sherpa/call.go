@@ -29,12 +29,51 @@ type CallersResult struct {
 	Callers []Caller
 }
 
+type CallPathOptions struct {
+	Limit    int
+	MaxDepth int
+}
+
+type CallPathStep struct {
+	Caller   string
+	Callee   string
+	Position Position
+}
+
+type CallPath struct {
+	Steps []CallPathStep
+}
+
+type CallPathsResult struct {
+	From  string
+	To    string
+	Paths []CallPath
+}
+
 type functionInfo struct {
 	Target   string
 	Decl     *ast.FuncDecl
 	FileSet  *token.FileSet
 	Position Position
 	Root     string
+}
+
+type callGraphNode struct {
+	Key      string
+	Target   string
+	Position Position
+}
+
+type callGraphEdge struct {
+	Caller   callGraphNode
+	Callee   callGraphNode
+	Position Position
+}
+
+type callPathSearchState struct {
+	Node  string
+	Nodes []string
+	Steps []CallPathStep
 }
 
 func FindCallees(root string, target string) (CalleesResult, error) {
@@ -83,6 +122,68 @@ func FindCallers(root string, target string) (CallersResult, error) {
 		Target:  normalizedTarget,
 		Callers: callers,
 	}, nil
+}
+
+func FindCallPaths(root string, from string, to string, options CallPathOptions) (CallPathsResult, error) {
+	normalizedFrom, err := normalizeCallTarget(from)
+	if err != nil {
+		return CallPathsResult{}, err
+	}
+
+	normalizedTo, err := normalizeCallTarget(to)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom}, err
+	}
+
+	options, err = normalizeCallPathOptions(options)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+	}
+
+	functions, err := collectFunctionInfos(root)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+	}
+
+	fromFunction, err := findFunctionInfo(functions, normalizedFrom)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+	}
+
+	toFunction, err := findFunctionInfo(functions, normalizedTo)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+	}
+
+	graph := buildCallGraph(functions)
+	paths := findCallPathsInGraph(
+		graph,
+		functionNode(fromFunction),
+		functionNode(toFunction),
+		options,
+	)
+
+	return CallPathsResult{
+		From:  normalizedFrom,
+		To:    normalizedTo,
+		Paths: paths,
+	}, nil
+}
+
+func normalizeCallPathOptions(options CallPathOptions) (CallPathOptions, error) {
+	if options.Limit < 0 {
+		return CallPathOptions{}, fmt.Errorf("limit must be greater than zero")
+	}
+
+	if options.Limit == 0 {
+		options.Limit = 1
+	}
+
+	if options.MaxDepth < 0 {
+		return CallPathOptions{}, fmt.Errorf("max depth must be zero or greater")
+	}
+
+	return options, nil
 }
 
 func normalizeCallTarget(target string) (string, error) {
@@ -211,6 +312,162 @@ func findFunctionInfo(functions []functionInfo, target string) (functionInfo, er
 	}
 
 	return matches[0], nil
+}
+
+func functionNode(function functionInfo) callGraphNode {
+	key := fmt.Sprintf(
+		"%s\x00%s:%d",
+		function.Target,
+		function.Position.File,
+		function.Position.Line,
+	)
+
+	return callGraphNode{
+		Key:      key,
+		Target:   function.Target,
+		Position: function.Position,
+	}
+}
+
+func buildCallGraph(functions []functionInfo) map[string][]callGraphEdge {
+	graph := make(map[string][]callGraphEdge)
+
+	for _, function := range functions {
+		caller := functionNode(function)
+		graph[caller.Key] = nil
+
+		callees := collectCalleesFromFunction(function)
+		for _, callee := range callees {
+			matches := matchingFunctionInfos(functions, callee.Name)
+			for _, match := range matches {
+				graph[caller.Key] = append(graph[caller.Key], callGraphEdge{
+					Caller:   caller,
+					Callee:   functionNode(match),
+					Position: callee.Position,
+				})
+			}
+		}
+
+		sortCallGraphEdges(graph[caller.Key])
+	}
+
+	return graph
+}
+
+func matchingFunctionInfos(functions []functionInfo, calleeName string) []functionInfo {
+	var matches []functionInfo
+	for _, function := range functions {
+		if callMatchesTarget(calleeName, function.Target) {
+			matches = append(matches, function)
+		}
+	}
+
+	sortFunctionInfos(matches)
+
+	return matches
+}
+
+func sortFunctionInfos(functions []functionInfo) {
+	sort.Slice(functions, func(i int, j int) bool {
+		if functions[i].Position.File != functions[j].Position.File {
+			return functions[i].Position.File < functions[j].Position.File
+		}
+
+		if functions[i].Position.Line != functions[j].Position.Line {
+			return functions[i].Position.Line < functions[j].Position.Line
+		}
+
+		return functions[i].Target < functions[j].Target
+	})
+}
+
+func sortCallGraphEdges(edges []callGraphEdge) {
+	sort.Slice(edges, func(i int, j int) bool {
+		if edges[i].Position.File != edges[j].Position.File {
+			return edges[i].Position.File < edges[j].Position.File
+		}
+
+		if edges[i].Position.Line != edges[j].Position.Line {
+			return edges[i].Position.Line < edges[j].Position.Line
+		}
+
+		if edges[i].Callee.Target != edges[j].Callee.Target {
+			return edges[i].Callee.Target < edges[j].Callee.Target
+		}
+
+		return edges[i].Callee.Key < edges[j].Callee.Key
+	})
+}
+
+func findCallPathsInGraph(graph map[string][]callGraphEdge, from callGraphNode, to callGraphNode, options CallPathOptions) []CallPath {
+	if from.Key == to.Key {
+		return []CallPath{{}}
+	}
+
+	maxDepth := options.MaxDepth
+	if maxDepth == 0 {
+		maxDepth = len(graph)
+	}
+
+	queue := []callPathSearchState{
+		{
+			Node:  from.Key,
+			Nodes: []string{from.Key},
+		},
+	}
+
+	var paths []CallPath
+	for len(queue) > 0 && len(paths) < options.Limit {
+		state := queue[0]
+		queue = queue[1:]
+
+		if len(state.Steps) >= maxDepth {
+			continue
+		}
+
+		for _, edge := range graph[state.Node] {
+			if containsCallPathNode(state.Nodes, edge.Callee.Key) {
+				continue
+			}
+
+			steps := append([]CallPathStep{}, state.Steps...)
+			steps = append(steps, CallPathStep{
+				Caller:   edge.Caller.Target,
+				Callee:   edge.Callee.Target,
+				Position: edge.Position,
+			})
+
+			if edge.Callee.Key == to.Key {
+				paths = append(paths, CallPath{Steps: steps})
+				if len(paths) >= options.Limit {
+					break
+				}
+
+				continue
+			}
+
+			nodes := append([]string{}, state.Nodes...)
+			nodes = append(nodes, edge.Callee.Key)
+
+			queue = append(queue, callPathSearchState{
+				Node:  edge.Callee.Key,
+				Nodes: nodes,
+				Steps: steps,
+			})
+		}
+	}
+
+	return paths
+}
+
+func containsCallPathNode(nodes []string, target string) bool {
+	for _, node := range nodes {
+		if node == target {
+			return true
+		}
+	}
+
+	return false
 }
 
 func callName(expr ast.Expr) (string, bool) {
