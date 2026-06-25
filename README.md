@@ -159,7 +159,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| More precise impact signals | Add richer type identity checks and more precise package-qualified symbol impact |
+| More precise impact signals | Add richer type identity checks and transitive caller impact |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -187,11 +187,12 @@ Implemented today:
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with signature matching and embedded-interface expansion
 - Changed-symbol extraction from git diff hunks
+- Package-qualified symbol impact for references and affected tests
 
 Planned next from PRD v0.1:
 
 - richer type identity checks for interface impact
-- more precise symbol-level impact for duplicate package-qualified targets
+- transitive caller impact for symbol changes
 
 Known MVP limitations:
 
@@ -199,7 +200,7 @@ Known MVP limitations:
 - Test files are skipped by reference, caller, and callee analysis.
 - Impact analysis is direct-only and does not yet include transitive callers.
 - Diff impact extracts changed symbols from current-file hunk ranges; deletion-only symbols that no longer exist in the working tree may not be reported.
-- `impact file`, `impact package`, and `impact symbol` use the shared report model, but symbol impact does not yet fully disambiguate duplicate package-qualified symbols.
+- Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact compares method signatures by local AST shape and resolves local embedded interfaces, but does not yet use full Go type identity.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.

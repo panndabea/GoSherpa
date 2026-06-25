@@ -120,9 +120,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
-	lookupTarget := symbolLookupTarget(target)
-
-	result, err := sherpa.FindImpact(a.Root, lookupTarget)
+	result, err := sherpa.FindImpact(a.Root, target)
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -131,7 +129,7 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 	}
 
 	report := reportFromImpactResult(result)
-	report.AffectedSymbols = []string{lookupTarget}
+	report.AffectedSymbols = []string{result.Target}
 	signals, err := interfaceSignalsForSymbol(a.Root, target)
 	if err != nil {
 		return ImpactReport{}, err

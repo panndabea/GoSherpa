@@ -102,6 +102,69 @@ func Run(server Server) {}
 	}
 }
 
+func TestFindImpactHonorsPackageQualifiedSymbolTargets(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestAuthSession(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "billing", "session_test.go"), `package billing
+
+import "testing"
+
+func TestBillingSession(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import (
+	auth "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func Run() {
+	_ = auth.Session{}
+	_ = billing.Session{}
+}
+`)
+
+	result, err := FindImpact(tmp, "./internal/auth.Session")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "./internal/auth.Session" {
+		t.Fatalf("expected ./internal/auth.Session target, got %s", result.Target)
+	}
+
+	if result.Kind != ImpactKindSymbol {
+		t.Fatalf("expected symbol impact, got %s", result.Kind)
+	}
+
+	assertContainsString(t, result.Packages, "./cmd/app")
+	assertContainsString(t, result.Packages, "./internal/auth")
+	if containsString(result.Packages, "./internal/billing") {
+		t.Fatalf("expected auth packages only, got %v", result.Packages)
+	}
+
+	tests := relatedTestNames(result.RelatedTests)
+	assertContainsString(t, tests, "TestAuthSession")
+	if containsString(tests, "TestBillingSession") {
+		t.Fatalf("expected auth tests only, got %v", tests)
+	}
+}
+
 func TestFindImpactForPackage(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -157,6 +220,8 @@ func TestIsImpactPackageTarget(t *testing.T) {
 		{target: "./internal/auth", want: true},
 		{target: "internal/auth", want: true},
 		{target: "example.com/app/internal/auth", want: true},
+		{target: "./internal/auth.Session", want: false},
+		{target: "example.com/app/internal/auth.Session", want: false},
 		{target: "ParseFile", want: false},
 		{target: "Server.Start", want: false},
 	}

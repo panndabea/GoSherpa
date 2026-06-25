@@ -81,6 +81,7 @@ Implemented:
 - Interface and implementer impact signals based on local method sets with
   signature matching and embedded-interface expansion.
 - Changed-symbol extraction from git diff hunks.
+- Package-qualified symbol impact for references and affected tests.
 
 Current limitations:
 
@@ -90,8 +91,8 @@ Current limitations:
 - Diff impact extracts changed symbols from current-file hunk ranges;
   deletion-only symbols that no longer exist in the working tree may not be
   reported.
-- File, package, and symbol impact use the shared report model, but symbol
-  impact does not yet fully disambiguate duplicate package-qualified symbols.
+- Package-qualified symbol impact disambiguates references and affected tests;
+  unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact compares method signatures by local AST shape
   and resolves local embedded interfaces, but does not yet use full Go type
   identity.
@@ -822,7 +823,8 @@ extracts changed symbols from git diff hunks. `gosherpa impact diff --base
 and JSON output. `gosherpa impact file|package|symbol` is implemented for human
 and JSON output. Interface and implementer impact signals are implemented as a
 conservative local method-set scan with signature matching and embedded-interface
-expansion.
+expansion. Package-qualified symbol impact disambiguates references and affected
+tests.
 
 Human question:
 
@@ -851,6 +853,8 @@ MVP behavior:
   affected packages.
 - Report affected interfaces and implementations. Implemented foundation with
   method signature matching and embedded-interface expansion.
+- Disambiguate package-qualified symbol impact for references and affected
+  tests. Implemented foundation.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -863,7 +867,8 @@ Architecture:
   `ChangedPackages` maps changed Go files to local package paths first, and
   `ChangedSymbols` maps hunk ranges to current-file Go symbols. `AnalyzeDiff`,
   `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce the first
-  package/test/symbol/interface/implementation impact reports.
+  package/test/symbol/interface/implementation impact reports. Package-qualified
+  symbol targets are normalized before reference and test impact collection.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
@@ -880,6 +885,8 @@ Done when:
 - Affected interfaces and implementations are populated for changed packages
   and symbol targets. Implemented foundation with signature matching and
   embedded-interface expansion.
+- Package-qualified symbol targets avoid same-name reference/test bleed from
+  other packages. Implemented foundation.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 

@@ -107,6 +107,70 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestFindTestsHonorsPackageQualifiedSymbolTargets(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestAuthSession(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "billing", "session_test.go"), `package billing
+
+import "testing"
+
+func TestBillingSession(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	auth "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func TestUsesAuthSession(t *testing.T) {
+	_ = auth.Session{}
+}
+
+func TestUsesBillingSession(t *testing.T) {
+	_ = billing.Session{}
+}
+`)
+
+	result, err := FindTests(tmp, "./internal/auth.Session")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "./internal/auth.Session" {
+		t.Fatalf("expected ./internal/auth.Session target, got %s", result.Target)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestAuthSession")
+	assertContainsString(t, names, "TestUsesAuthSession")
+	if containsString(names, "TestBillingSession") || containsString(names, "TestUsesBillingSession") {
+		t.Fatalf("expected auth tests only, got %v", names)
+	}
+
+	wantCommands := []string{"go test ./cmd/app", "go test ./internal/auth"}
+	if !reflect.DeepEqual(result.Commands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.Commands)
+	}
+}
+
 func TestFindTestsMarksMethodReferencesAsDirect(t *testing.T) {
 	tmp := t.TempDir()
 

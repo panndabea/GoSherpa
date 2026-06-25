@@ -182,14 +182,61 @@ func Run() {
 	assertContainsString(t, files, "cmd/app/main.go")
 }
 
+func TestFindReferencesHonorsPackageQualifiedTargets(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func New(session Session) Session {
+	return session
+}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+
+func New(session Session) Session {
+	return session
+}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import (
+	auth "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func Run() {
+	_ = auth.Session{}
+	_ = billing.Session{}
+}
+`)
+
+	refs, err := FindReferences(tmp, "./internal/auth.Session")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	files := referenceTestFiles(refs)
+	assertContainsString(t, files, "internal/auth/session.go")
+	assertContainsString(t, files, "cmd/app/main.go")
+	if containsString(files, "internal/billing/session.go") {
+		t.Fatalf("expected auth Session refs only, got %v", refs)
+	}
+}
+
 func TestNormalizeReferenceTargetRejectsInvalidInput(t *testing.T) {
+	tmp := t.TempDir()
+
 	tests := []string{
 		"",
 		"   ",
 		"Server.",
 		".Start",
 		"A.B.C",
-		"./internal/sherpa.ParseFile",
 		"github.com/example/app.ParseFile",
 		`C:\repo\Run`,
 		"not valid",
@@ -197,7 +244,7 @@ func TestNormalizeReferenceTargetRejectsInvalidInput(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
-			_, err := normalizeReferenceTarget(test)
+			_, err := normalizeReferenceTarget(tmp, test)
 			if err == nil {
 				t.Fatal("expected error")
 			}

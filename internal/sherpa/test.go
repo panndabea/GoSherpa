@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -91,7 +93,7 @@ func findPackageTests(root string, target string) (TestsResult, error) {
 }
 
 func findSymbolTests(root string, target string) (TestsResult, error) {
-	normalizedTarget, err := normalizeReferenceTarget(target)
+	normalizedTarget, err := normalizeReferenceTarget(root, target)
 	if err != nil {
 		return TestsResult{}, err
 	}
@@ -180,6 +182,9 @@ func referenceTargetPackages(root string, target referenceTarget) (map[string]st
 		if err != nil {
 			return nil, err
 		}
+		if target.Package != "" && packagePath != target.Package {
+			continue
+		}
 
 		packages[packagePath] = struct{}{}
 	}
@@ -199,9 +204,11 @@ func fileDefinesReferenceTarget(file *ast.File, target referenceTarget) bool {
 
 func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget) []RelatedTest {
 	var tests []RelatedTest
+	modulePath := readModulePath(root)
 
 	for _, testFile := range testFiles {
 		_, packageMatches := packages[testFile.Package]
+		imports := testFileLocalImports(testFile.File, modulePath)
 
 		for _, decl := range testFile.File.Decls {
 			funcDecl, ok := decl.(*ast.FuncDecl)
@@ -211,7 +218,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 
 			directReference := false
 			if target.Name != "" {
-				directReference = functionReferencesTarget(funcDecl, target)
+				directReference = functionReferencesTarget(funcDecl, target, packageMatches, imports)
 			}
 
 			if !packageMatches && !directReference {
@@ -235,11 +242,42 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 	return tests
 }
 
+func testFileLocalImports(file *ast.File, modulePath string) map[string]string {
+	imports := make(map[string]string)
+	if modulePath == "" {
+		return imports
+	}
+
+	for _, importSpec := range file.Imports {
+		importPath, err := strconv.Unquote(importSpec.Path.Value)
+		if err != nil {
+			continue
+		}
+
+		localPath, ok := localPackagePath(importPath, modulePath)
+		if !ok {
+			continue
+		}
+
+		name := path.Base(importPath)
+		if importSpec.Name != nil {
+			name = importSpec.Name.Name
+		}
+		if name == "" || name == "." || name == "_" {
+			continue
+		}
+
+		imports[name] = localPath
+	}
+
+	return imports
+}
+
 func isGoTestFunction(funcDecl *ast.FuncDecl) bool {
 	return funcDecl.Recv == nil && strings.HasPrefix(funcDecl.Name.Name, "Test")
 }
 
-func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget) bool {
+func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget, samePackage bool, imports map[string]string) bool {
 	if funcDecl.Body == nil {
 		return false
 	}
@@ -252,12 +290,12 @@ func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget) bo
 
 		switch node := node.(type) {
 		case *ast.Ident:
-			if target.Receiver == "" && node.Name == target.Name {
+			if target.Receiver == "" && node.Name == target.Name && (target.Package == "" || samePackage) {
 				found = true
 				return false
 			}
 		case *ast.SelectorExpr:
-			if selectorReferencesTarget(node, target) {
+			if selectorReferencesTarget(node, target, samePackage, imports) {
 				found = true
 				return false
 			}
@@ -269,9 +307,25 @@ func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget) bo
 	return found
 }
 
-func selectorReferencesTarget(selector *ast.SelectorExpr, target referenceTarget) bool {
+func selectorReferencesTarget(selector *ast.SelectorExpr, target referenceTarget, samePackage bool, imports map[string]string) bool {
+	if target.Package != "" {
+		if samePackage {
+			name, ok := selectorName(selector)
+			if ok && name == target.Symbol() {
+				return true
+			}
+		}
+
+		packageName, ok := selector.X.(*ast.Ident)
+		if !ok || target.Receiver != "" || selector.Sel.Name != target.Name {
+			return false
+		}
+
+		return imports[packageName.Name] == target.Package
+	}
+
 	name, ok := selectorName(selector)
-	if ok && name == target.String() {
+	if ok && name == target.Symbol() {
 		return true
 	}
 

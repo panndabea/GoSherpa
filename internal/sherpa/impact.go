@@ -1,6 +1,7 @@
 package sherpa
 
 import (
+	"go/token"
 	"path/filepath"
 	"strings"
 )
@@ -39,11 +40,42 @@ func FindImpact(root string, target string) (ImpactResult, error) {
 
 func isImpactPackageTarget(target string) bool {
 	value := strings.TrimSpace(target)
+	if hasPackageQualifiedSymbolShape(value) {
+		return false
+	}
 	if value == "." || strings.HasPrefix(value, "./") {
 		return true
 	}
 
 	return strings.Contains(value, "/") || strings.Contains(value, "\\")
+}
+
+func hasPackageQualifiedSymbolShape(target string) bool {
+	value := strings.TrimSpace(filepath.ToSlash(target))
+
+	lastSlash := strings.LastIndex(value, "/")
+	if lastSlash < 0 {
+		return false
+	}
+
+	firstDotAfterSlash := strings.Index(value[lastSlash+1:], ".")
+	if firstDotAfterSlash < 0 {
+		return false
+	}
+
+	symbol := value[lastSlash+1+firstDotAfterSlash+1:]
+	segments := strings.Split(symbol, ".")
+	if len(segments) != 1 && len(segments) != 2 {
+		return false
+	}
+
+	for _, segment := range segments {
+		if segment == "" || !token.IsIdentifier(segment) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func findPackageImpact(root string, target string) (ImpactResult, error) {
@@ -67,22 +99,29 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 }
 
 func findSymbolImpact(root string, target string) (ImpactResult, error) {
+	normalizedTarget, err := normalizeReferenceTarget(root, target)
+	if err != nil {
+		return ImpactResult{}, err
+	}
+
 	refs, err := FindReferences(root, target)
 	if err != nil {
 		return ImpactResult{}, err
 	}
 
 	result := ImpactResult{
-		Target:     strings.TrimSpace(target),
+		Target:     normalizedTarget.String(),
 		Kind:       ImpactKindSymbol,
 		References: refs,
 	}
 
-	callers, err := FindCallers(root, target)
-	if err == nil {
-		result.Callers = callers.Callers
-	} else if !isImpactNonFunctionTargetError(err) {
-		result.Warnings = append(result.Warnings, err.Error())
+	if normalizedTarget.Package == "" {
+		callers, err := FindCallers(root, target)
+		if err == nil {
+			result.Callers = callers.Callers
+		} else if !isImpactNonFunctionTargetError(err) {
+			result.Warnings = append(result.Warnings, err.Error())
+		}
 	}
 
 	result.Packages = impactedPackages(root, refs, result.Callers)

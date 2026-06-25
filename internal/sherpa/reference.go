@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -20,11 +21,13 @@ type Reference struct {
 }
 
 type referenceTarget struct {
+	Package  string
 	Receiver string
 	Name     string
 }
 
 type referencePackage struct {
+	Package    string
 	ImportPath string
 	Name       string
 	FileSet    *token.FileSet
@@ -33,12 +36,12 @@ type referencePackage struct {
 }
 
 func FindReferences(root string, name string) ([]Reference, error) {
-	target, err := normalizeReferenceTarget(name)
+	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return nil, err
 	}
 
-	rootPath, err := absoluteRootPath(root)
+	target, err := normalizeReferenceTarget(rootPath, name)
 	if err != nil {
 		return nil, err
 	}
@@ -68,17 +71,22 @@ func FindReferences(root string, name string) ([]Reference, error) {
 	return refs, nil
 }
 
-func normalizeReferenceTarget(name string) (referenceTarget, error) {
+func normalizeReferenceTarget(root string, name string) (referenceTarget, error) {
 	value := strings.TrimSpace(name)
 	if value == "" {
 		return referenceTarget{}, fmt.Errorf("reference target is empty")
 	}
 
-	if strings.Contains(value, "/") || strings.Contains(value, "\\") {
-		return referenceTarget{}, fmt.Errorf("package-qualified reference targets are not supported: %s", value)
+	packagePath, symbol, hasPackage, err := splitPackageQualifiedTarget(root, value)
+	if err != nil {
+		return referenceTarget{}, err
+	}
+	if !hasPackage && (strings.Contains(value, "/") || strings.Contains(value, "\\")) {
+		return referenceTarget{}, fmt.Errorf("invalid reference target: %s", value)
 	}
 
-	segments := strings.Split(value, ".")
+	segments := strings.Split(symbol, ".")
+
 	if len(segments) != 1 && len(segments) != 2 {
 		return referenceTarget{}, fmt.Errorf("invalid reference target: %s", value)
 	}
@@ -89,7 +97,10 @@ func normalizeReferenceTarget(name string) (referenceTarget, error) {
 		}
 	}
 
-	target := referenceTarget{Name: segments[len(segments)-1]}
+	target := referenceTarget{
+		Package: packagePath,
+		Name:    segments[len(segments)-1],
+	}
 	if len(segments) == 2 {
 		target.Receiver = segments[0]
 	}
@@ -98,6 +109,15 @@ func normalizeReferenceTarget(name string) (referenceTarget, error) {
 }
 
 func (target referenceTarget) String() string {
+	symbol := target.Symbol()
+	if target.Package != "" {
+		return target.Package + "." + symbol
+	}
+
+	return symbol
+}
+
+func (target referenceTarget) Symbol() string {
 	if target.Receiver == "" {
 		return target.Name
 	}
@@ -141,7 +161,13 @@ func parseReferencePackages(root string, files []string) ([]referencePackage, er
 		}
 		_, _ = config.Check(importPath, fileSet, parsedFiles, &info)
 
+		packagePath, err := referencePackagePathForDir(root, dir)
+		if err != nil {
+			return nil, err
+		}
+
 		packages = append(packages, referencePackage{
+			Package:    packagePath,
 			ImportPath: importPath,
 			Name:       parsedFiles[0].Name.Name,
 			FileSet:    fileSet,
@@ -151,6 +177,83 @@ func parseReferencePackages(root string, files []string) ([]referencePackage, er
 	}
 
 	return packages, nil
+}
+
+func splitPackageQualifiedTarget(root string, value string) (string, string, bool, error) {
+	value = strings.TrimSpace(filepath.ToSlash(value))
+
+	lastSlash := strings.LastIndex(value, "/")
+	if lastSlash < 0 {
+		return "", value, false, nil
+	}
+
+	firstDotAfterSlash := strings.Index(value[lastSlash+1:], ".")
+	if firstDotAfterSlash < 0 {
+		return "", value, false, nil
+	}
+
+	separator := lastSlash + 1 + firstDotAfterSlash
+	packagePath, err := normalizeReferencePackagePath(root, value[:separator])
+	if err != nil {
+		return "", "", false, err
+	}
+
+	return packagePath, value[separator+1:], true, nil
+}
+
+func normalizeReferencePackagePath(root string, packagePath string) (string, error) {
+	value := strings.TrimSpace(filepath.ToSlash(packagePath))
+	if value == "" {
+		return "", fmt.Errorf("package path is empty")
+	}
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("absolute package paths are not supported: %s", packagePath)
+	}
+
+	modulePath := readModulePath(root)
+	if modulePath != "" {
+		if value == modulePath {
+			return ".", nil
+		}
+		if strings.HasPrefix(value, modulePath+"/") {
+			value = strings.TrimPrefix(value, modulePath+"/")
+		} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
+			return "", fmt.Errorf("non-local package-qualified reference targets are not supported: %s", packagePath)
+		}
+	} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
+		return "", fmt.Errorf("module path is required for package-qualified reference target: %s", packagePath)
+	}
+
+	value = strings.TrimPrefix(value, "./")
+	for _, segment := range strings.Split(value, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("package path must not contain '..': %s", packagePath)
+		}
+	}
+
+	cleaned := path.Clean(value)
+	if cleaned == "." {
+		return ".", nil
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("package path escapes repository: %s", packagePath)
+	}
+
+	return "./" + cleaned, nil
+}
+
+func referencePackagePathForDir(root string, dir string) (string, error) {
+	relativePath, err := filepath.Rel(root, dir)
+	if err != nil {
+		return "", err
+	}
+
+	relativePath = filepath.ToSlash(relativePath)
+	if relativePath == "." {
+		return ".", nil
+	}
+
+	return "./" + relativePath, nil
 }
 
 func readModulePath(root string) string {
@@ -222,6 +325,9 @@ func referenceTargetPackageImports(packages []referencePackage, target reference
 	}
 
 	for _, pkg := range packages {
+		if target.Package != "" && pkg.Package != target.Package {
+			continue
+		}
 		if packageDefinesReferenceTarget(pkg, target) {
 			imports[pkg.ImportPath] = struct{}{}
 		}
@@ -231,6 +337,10 @@ func referenceTargetPackageImports(packages []referencePackage, target reference
 }
 
 func packageDefinesReferenceTarget(pkg referencePackage, target referenceTarget) bool {
+	if target.Package != "" && pkg.Package != target.Package {
+		return false
+	}
+
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
 			if declDefinesReferenceTarget(decl, target) {
@@ -310,6 +420,10 @@ func findReferencesInPackage(
 
 func referenceTargetObjects(pkg referencePackage, target referenceTarget) map[types.Object]struct{} {
 	objects := make(map[types.Object]struct{})
+	if target.Package != "" && pkg.Package != target.Package {
+		return objects
+	}
+
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
 			addReferenceTargetObjects(objects, pkg.Info, decl, target)

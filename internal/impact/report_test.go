@@ -110,9 +110,23 @@ func TestAnalyzeSymbolReportsSymbolImpact(t *testing.T) {
 
 	assertStrings(t, report.ChangedFiles, []string{})
 	assertStrings(t, report.ChangedPackages, []string{})
-	assertStrings(t, report.AffectedSymbols, []string{"Session"})
+	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Session"})
 	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+}
+
+func TestAnalyzeSymbolHonorsPackageQualifiedTargets(t *testing.T) {
+	root := writePackageQualifiedSymbolImpactProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.Session")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Session"})
+	assertStrings(t, report.AffectedPackages, []string{"./cmd/app", "./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestAuthSession"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
 }
 
@@ -203,7 +217,7 @@ func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 		t.Fatalf("AnalyzeSymbol returned error: %v", err)
 	}
 
-	assertStrings(t, report.AffectedSymbols, []string{"Authenticator"})
+	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
@@ -216,7 +230,7 @@ func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
 		t.Fatalf("AnalyzeSymbol returned error: %v", err)
 	}
 
-	assertStrings(t, report.AffectedSymbols, []string{"JWTAuthenticator"})
+	assertStrings(t, report.AffectedSymbols, []string{"./internal/jwt.JWTAuthenticator"})
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
@@ -294,6 +308,47 @@ type CountAuthenticator struct{}
 
 func (CountAuthenticator) Authenticate(user string) (bool, error) {
 	return false, nil
+}
+`)
+
+	return root
+}
+
+func writePackageQualifiedSymbolImpactProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestAuthSession(t *testing.T) {}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "session_test.go"), `package billing
+
+import "testing"
+
+func TestBillingSession(t *testing.T) {}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "cmd", "app", "main.go"), `package main
+
+import (
+	auth "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func Run() {
+	_ = auth.Session{}
+	_ = billing.Session{}
 }
 `)
 
