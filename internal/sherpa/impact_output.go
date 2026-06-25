@@ -57,7 +57,7 @@ func writeImpactReferences(builder *strings.Builder, refs []Reference) {
 }
 
 func writeImpactCallers(builder *strings.Builder, callers []Caller) {
-	builder.WriteString("DIRECT CALLERS\n")
+	builder.WriteString("CALLERS\n")
 	if len(callers) == 0 {
 		builder.WriteString("  none\n")
 		return

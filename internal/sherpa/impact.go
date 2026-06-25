@@ -116,9 +116,9 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 	}
 
 	if normalizedTarget.Package == "" {
-		callers, err := FindCallers(root, target)
+		callers, err := impactSymbolCallers(root, target)
 		if err == nil {
-			result.Callers = callers.Callers
+			result.Callers = callers
 		} else if !isImpactNonFunctionTargetError(err) {
 			result.Warnings = append(result.Warnings, err.Error())
 		}
@@ -132,6 +132,20 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 	result.Warnings = append(result.Warnings, warnings...)
 
 	return result, nil
+}
+
+func impactSymbolCallers(root string, target string) ([]Caller, error) {
+	normalizedTarget, err := normalizeCallTarget(target)
+	if err != nil {
+		return nil, err
+	}
+
+	functions, err := collectFunctionInfos(root)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectTransitiveCallersFromFunctions(functions, normalizedTarget)
 }
 
 func impactTests(root string, target string) (TestsResult, []string) {

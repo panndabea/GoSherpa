@@ -263,6 +263,32 @@ func Run() {
 	}
 }
 
+func TestCollectTransitiveCallersFromFunctions(t *testing.T) {
+	functions := parseCallTestFunctions(t, `package sample
+
+func Entry() {
+	Mid()
+}
+
+func Mid() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	got, err := collectTransitiveCallersFromFunctions(functions, "Step")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(got)
+	want := []string{"Entry", "Mid"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("expected %v, got %v", want, names)
+	}
+}
+
 func TestCollectCalleesFromFunctionReturnsEmptyForNilBody(t *testing.T) {
 	got := collectCalleesFromFunction(functionInfo{
 		Decl: &ast.FuncDecl{},
@@ -944,6 +970,32 @@ func parseCallTestCalls(t *testing.T, source string) []*ast.CallExpr {
 	})
 
 	return calls
+}
+
+func parseCallTestFunctions(t *testing.T, source string) []functionInfo {
+	t.Helper()
+
+	fileSet := token.NewFileSet()
+	parsedFile, err := parser.ParseFile(fileSet, "calls.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var functions []functionInfo
+	for _, decl := range parsedFile.Decls {
+		funcDecl, ok := decl.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+
+		functions = append(functions, functionInfo{
+			Target:  functionTargetName(funcDecl),
+			Decl:    funcDecl,
+			FileSet: fileSet,
+		})
+	}
+
+	return functions
 }
 
 func parseCallTestFunction(t *testing.T, source string, target string) functionInfo {

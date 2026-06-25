@@ -67,7 +67,7 @@ REFERENCES
   internal/parser/parser.go:3
   cmd/app/main.go:6
 
-DIRECT CALLERS
+CALLERS
   %-36s cmd/app/main.go:6
 
 AFFECTED PACKAGES
@@ -150,7 +150,7 @@ TARGET
 REFERENCES
   none
 
-DIRECT CALLERS
+CALLERS
   none
 
 AFFECTED PACKAGES
@@ -184,7 +184,7 @@ TARGET
 REFERENCES
   none
 
-DIRECT CALLERS
+CALLERS
   none
 
 AFFECTED PACKAGES

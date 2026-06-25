@@ -82,12 +82,14 @@ Implemented:
   signature matching and embedded-interface expansion.
 - Changed-symbol extraction from git diff hunks.
 - Package-qualified symbol impact for references and affected tests.
+- Transitive caller impact for symbol changes.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
-- Impact analysis is direct-only and does not yet include transitive callers.
+- Symbol impact includes transitive callers in affected packages, but
+  affected-test suggestions remain symbol/direct-reference oriented.
 - Diff impact extracts changed symbols from current-file hunk ranges;
   deletion-only symbols that no longer exist in the working tree may not be
   reported.
@@ -790,7 +792,7 @@ gosherpa impact internal/user/service.go
 MVP behavior:
 
 - Accept symbol and package targets.
-- Show direct references and direct callers for symbols.
+- Show direct references and caller-chain impact for symbols.
 - Show direct dependent packages for packages.
 - Show affected local packages.
 - Show related tests and suggested `go test` commands.
@@ -798,7 +800,7 @@ MVP behavior:
 Later behavior:
 
 - Accept file targets.
-- Show transitive callers up to a default depth.
+- Expose configurable caller-depth controls.
 - Show exported API impact when target is exported.
 
 Useful output groups:
@@ -824,7 +826,7 @@ and JSON output. `gosherpa impact file|package|symbol` is implemented for human
 and JSON output. Interface and implementer impact signals are implemented as a
 conservative local method-set scan with signature matching and embedded-interface
 expansion. Package-qualified symbol impact disambiguates references and affected
-tests.
+tests. Symbol impact includes transitive callers in affected packages.
 
 Human question:
 
@@ -855,6 +857,7 @@ MVP behavior:
   method signature matching and embedded-interface expansion.
 - Disambiguate package-qualified symbol impact for references and affected
   tests. Implemented foundation.
+- Include transitive caller packages for symbol impact. Implemented foundation.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -868,7 +871,8 @@ Architecture:
   `ChangedSymbols` maps hunk ranges to current-file Go symbols. `AnalyzeDiff`,
   `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce the first
   package/test/symbol/interface/implementation impact reports. Package-qualified
-  symbol targets are normalized before reference and test impact collection.
+  symbol targets are normalized before reference and test impact collection, and
+  symbol impact walks caller chains for affected-package impact.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
@@ -887,6 +891,8 @@ Done when:
   embedded-interface expansion.
 - Package-qualified symbol targets avoid same-name reference/test bleed from
   other packages. Implemented foundation.
+- Symbol impact reports transitive callers in affected packages. Implemented
+  foundation.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 

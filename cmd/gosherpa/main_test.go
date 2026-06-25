@@ -785,7 +785,7 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "DIRECT CALLERS", "AFFECTED PACKAGES", "SUGGESTED TESTS", "SUGGESTED COMMANDS", "TestParserPackage", "TestUsesParser", "go test ./cmd/app", "go test ./internal/parser", "./cmd/app", "./internal/parser"} {
+	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "CALLERS", "AFFECTED PACKAGES", "SUGGESTED TESTS", "SUGGESTED COMMANDS", "TestParserPackage", "TestUsesParser", "go test ./cmd/app", "go test ./internal/parser", "./cmd/app", "./internal/parser"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}

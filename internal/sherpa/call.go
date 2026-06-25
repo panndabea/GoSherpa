@@ -616,3 +616,61 @@ func collectCallersFromFunctions(functions []functionInfo, target string) []Call
 
 	return callers
 }
+
+func collectTransitiveCallersFromFunctions(functions []functionInfo, target string) ([]Caller, error) {
+	targetFunction, err := findFunctionInfo(functions, target)
+	if err != nil {
+		return nil, err
+	}
+
+	graph := buildCallGraph(functions)
+	reverseGraph := reverseCallGraph(graph)
+	targetNode := functionNode(targetFunction)
+	queue := []string{targetNode.Key}
+	seenQueue := map[string]struct{}{
+		targetNode.Key: {},
+	}
+	seenCallers := make(map[string]struct{})
+	var callers []Caller
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		for _, edge := range reverseGraph[current] {
+			if _, ok := seenCallers[edge.Caller.Key]; !ok {
+				seenCallers[edge.Caller.Key] = struct{}{}
+				callers = append(callers, Caller{
+					Name:     edge.Caller.Target,
+					Position: edge.Position,
+				})
+			}
+
+			if _, ok := seenQueue[edge.Caller.Key]; ok {
+				continue
+			}
+
+			seenQueue[edge.Caller.Key] = struct{}{}
+			queue = append(queue, edge.Caller.Key)
+		}
+	}
+
+	sortCallers(callers)
+
+	return callers, nil
+}
+
+func reverseCallGraph(graph map[string][]callGraphEdge) map[string][]callGraphEdge {
+	reversed := make(map[string][]callGraphEdge)
+	for _, edges := range graph {
+		for _, edge := range edges {
+			reversed[edge.Callee.Key] = append(reversed[edge.Callee.Key], edge)
+		}
+	}
+
+	for key := range reversed {
+		sortCallGraphEdges(reversed[key])
+	}
+
+	return reversed
+}

@@ -32,6 +32,20 @@
     ],
     "callers": [
       {
+        "name": "Run",
+        "position": {
+          "file": "cmd/app/main.go",
+          "line": 6
+        }
+      },
+      {
+        "name": "Entry",
+        "position": {
+          "file": "service.go",
+          "line": 6
+        }
+      },
+      {
         "name": "First",
         "position": {
           "file": "service.go",
@@ -52,7 +66,8 @@
       "usedBy": []
     },
     "packages": [
-      "."
+      ".",
+      "./cmd/app"
     ],
     "relatedTests": [
       {

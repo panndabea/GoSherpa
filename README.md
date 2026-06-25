@@ -34,7 +34,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | "Who uses this function?" | References and direct callers |
 | "What does this function touch?" | Direct callees |
 | "What depends on this package?" | Local package dependency relationships |
-| "What might this change affect?" | Direct and diff-based package/test impact |
+| "What might this change affect?" | Symbol, caller-chain, and diff-based package/test impact |
 
 ## Current Experience
 
@@ -43,7 +43,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
-| Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
+| Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
@@ -159,7 +159,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| More precise impact signals | Add richer type identity checks and transitive caller impact |
+| More precise impact signals | Add richer type identity checks and broader affected-test planning |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -188,17 +188,18 @@ Implemented today:
 - Interface and implementer impact signals based on local method sets with signature matching and embedded-interface expansion
 - Changed-symbol extraction from git diff hunks
 - Package-qualified symbol impact for references and affected tests
+- Transitive caller impact for symbol changes
 
 Planned next from PRD v0.1:
 
 - richer type identity checks for interface impact
-- transitive caller impact for symbol changes
+- broader affected-test planning for transitive caller packages
 
 Known MVP limitations:
 
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
-- Impact analysis is direct-only and does not yet include transitive callers.
+- Symbol impact includes transitive callers in affected packages, but affected-test suggestions remain symbol/direct-reference oriented.
 - Diff impact extracts changed symbols from current-file hunk ranges; deletion-only symbols that no longer exist in the working tree may not be reported.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact compares method signatures by local AST shape and resolves local embedded interfaces, but does not yet use full Go type identity.

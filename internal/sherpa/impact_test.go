@@ -74,6 +74,45 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestFindImpactIncludesTransitiveCallerPackages(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "core", "core.go"), `package core
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "worker", "worker.go"), `package worker
+
+import "example.com/app/internal/core"
+
+func Mid() {
+	core.Target()
+}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/worker"
+
+func Entry() {
+	worker.Mid()
+}
+`)
+
+	result, err := FindImpact(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	callers := callTestCallerNames(result.Callers)
+	assertContainsString(t, callers, "Mid")
+	assertContainsString(t, callers, "Entry")
+
+	assertContainsString(t, result.Packages, "./internal/core")
+	assertContainsString(t, result.Packages, "./internal/worker")
+	assertContainsString(t, result.Packages, "./cmd/app")
+}
+
 func TestFindImpactForTypeSymbolDoesNotWarnWhenCallersDoNotApply(t *testing.T) {
 	tmp := t.TempDir()
 

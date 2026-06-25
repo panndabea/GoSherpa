@@ -9,7 +9,8 @@
     "changedFiles": [],
     "changedPackages": [],
     "affectedPackages": [
-      "."
+      ".",
+      "./cmd/app"
     ],
     "affectedSymbols": [
       "Target"
