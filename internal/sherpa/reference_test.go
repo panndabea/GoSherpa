@@ -79,3 +79,137 @@ func Run() {
 		}
 	}
 }
+
+func TestFindReferencesIgnoresShadowedIdentifiers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func ParseFile() {}
+
+func Run() {
+	ParseFile()
+
+	ParseFile := func() {}
+	ParseFile()
+}
+`)
+
+	refs, err := FindReferences(tmp, "ParseFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+}
+
+func TestFindReferencesFindsTypeReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func Run(server Server) Server {
+	return server
+}
+`)
+
+	refs, err := FindReferences(tmp, "Server")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 3 {
+		t.Fatalf("expected 3 references, got %d: %v", len(refs), refs)
+	}
+}
+
+func TestFindReferencesFindsMethodReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func (server Server) Start() {}
+
+func Run(server Server) {
+	server.Start()
+}
+`)
+
+	refs, err := FindReferences(tmp, "Server.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+}
+
+func TestFindReferencesFindsLocalPackageSelectorReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/parser"
+
+func Run() {
+	parser.ParseFile()
+}
+`)
+
+	refs, err := FindReferences(tmp, "ParseFile")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+
+	files := referenceTestFiles(refs)
+	assertContainsString(t, files, "internal/parser/parser.go")
+	assertContainsString(t, files, "cmd/app/main.go")
+}
+
+func TestNormalizeReferenceTargetRejectsInvalidInput(t *testing.T) {
+	tests := []string{
+		"",
+		"   ",
+		"Server.",
+		".Start",
+		"A.B.C",
+		"./internal/sherpa.ParseFile",
+		"github.com/example/app.ParseFile",
+		`C:\repo\Run`,
+		"not valid",
+	}
+
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			_, err := normalizeReferenceTarget(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func referenceTestFiles(refs []Reference) []string {
+	var files []string
+	for _, ref := range refs {
+		files = append(files, ref.Position.File)
+	}
+
+	return files
+}

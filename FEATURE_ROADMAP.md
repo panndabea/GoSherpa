@@ -56,7 +56,7 @@ Implemented:
 - Function discovery.
 - Method discovery.
 - Symbol lookup.
-- Reference lookup.
+- Go-aware reference lookup.
 - Package dependency analysis.
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
@@ -65,7 +65,8 @@ Implemented:
 
 Current limitations:
 
-- References are syntactic identifier matches, not type-checked references.
+- References are type-aware inside packages and recognize local package selector
+  calls, but do not yet use full module/package loading.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
@@ -353,6 +354,9 @@ Done when:
 - Missing files or unreadable files produce clear errors.
 
 ## Phase 2: Semantic References
+
+Status: MVP implemented with per-package `go/types` object matching and local
+module import selector matching.
 
 Goal: replace fragile text-like references with Go-aware relationships.
 
