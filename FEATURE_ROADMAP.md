@@ -72,13 +72,14 @@ Implemented:
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
+- Git changed-file discovery foundation via `internal/git.ChangedFiles`.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff-based impact commands from PRD v0.1 are not implemented yet.
+- Diff-based impact CLI commands from PRD v0.1 are not implemented yet.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
@@ -697,7 +698,8 @@ Done when:
 ## Phase 5: Tests and Impact
 
 Status: direct impact MVP and test discovery MVP implemented for symbols and
-packages. PRD v0.1 Impact Engine is planned next.
+packages. PRD v0.1 Impact Engine foundation has started with git changed-file
+discovery.
 
 Goal: help developers make changes with confidence.
 
@@ -798,7 +800,8 @@ Done when:
 
 ### 5.3 Impact Engine v0.1
 
-Status: planned from [PRD_V01.md](PRD_V01.md).
+Status: foundation started from [PRD_V01.md](PRD_V01.md);
+`internal/git.ChangedFiles` is implemented.
 
 Human question:
 
@@ -818,7 +821,7 @@ gosherpa tests affected --base origin/main
 
 MVP behavior:
 
-- Read changed files from git diffs.
+- Read changed files from git diffs. Implemented foundation.
 - Map changed files to packages.
 - Report changed packages and affected dependent packages.
 - Report affected tests at package granularity.
@@ -827,6 +830,7 @@ MVP behavior:
 Architecture:
 
 - `internal/git` reads diffs and changed files; it knows no Go semantics.
+  `ChangedFiles` is implemented first.
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
 - Test discovery remains separate and package-oriented for v0.1.

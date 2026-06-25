@@ -146,7 +146,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| Impact Engine skeleton | Add git diff reading, file/package impact entrypoints, and an `ImpactReport` model |
+| Impact Engine skeleton | Map changed files to packages, add file/package impact entrypoints, and introduce an `ImpactReport` model |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -166,10 +166,11 @@ Implemented today:
 - Golden JSON fixtures for all commands
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
+- Git changed-file discovery foundation via `internal/git.ChangedFiles`
 
 Planned next from PRD v0.1:
 
-- `internal/git` for changed-file discovery from `git diff`
+- changed-package discovery from git diffs
 - file/package/diff impact entrypoints
 - package-level affected tests
 - interface and implementer impact signals
@@ -179,7 +180,7 @@ Known MVP limitations:
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff-based impact commands from PRD v0.1 are not implemented yet.
+- Diff-based impact CLI commands from PRD v0.1 are not implemented yet.
 - Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
