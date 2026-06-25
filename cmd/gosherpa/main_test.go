@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,13 +112,39 @@ func TestParseCLIArgsRejectsMissingRootValue(t *testing.T) {
 }
 
 func TestParseCLIArgsRejectsUnknownFlag(t *testing.T) {
-	_, err := parseCLIArgs([]string{"--json", "symbols"})
+	_, err := parseCLIArgs([]string{"--xml", "symbols"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 
-	if !strings.Contains(err.Error(), "unknown flag: --json") {
+	if !strings.Contains(err.Error(), "unknown flag: --xml") {
 		t.Fatalf("expected unknown flag error, got %v", err)
+	}
+}
+
+func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
+	tests := [][]string{
+		{"--json", "refs", "ParseFile"},
+		{"refs", "ParseFile", "--json"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.JSON {
+				t.Fatal("expected JSON flag")
+			}
+
+			if got.Command != "refs" {
+				t.Fatalf("expected command refs, got %s", got.Command)
+			}
+
+			assertMainTestStrings(t, got.CommandArgs, []string{"ParseFile"})
+		})
 	}
 }
 
@@ -182,6 +209,7 @@ func TestPrintUsageIncludesRoot(t *testing.T) {
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] <command> [args]",
 		"--root <path>    repository root, defaults to .",
+		"--json           machine-readable output for refs, impact, and tests",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -320,6 +348,60 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestMainRunsTestsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "ParseFile", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["target"] != "ParseFile" {
+		t.Fatalf("expected target ParseFile, got %v", payload["target"])
+	}
+
+	if payload["kind"] != "symbol" {
+		t.Fatalf("expected kind symbol, got %v", payload["kind"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, payload, "tests", 2)
+	assertMainTestJSONArrayHasLength(t, payload, "commands", 2)
+
+	if strings.Contains(result.Stdout, "TESTS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "impact"})
 
@@ -390,6 +472,79 @@ func TestUsesParser(t *testing.T) {
 
 	if strings.Contains(result.Stdout, tmp) {
 		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/parser"
+
+func Run() {
+	parser.ParseFile()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--json", "--root", tmp, "impact", "ParseFile"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["target"] != "ParseFile" {
+		t.Fatalf("expected target ParseFile, got %v", payload["target"])
+	}
+
+	if payload["kind"] != "symbol" {
+		t.Fatalf("expected kind symbol, got %v", payload["kind"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, payload, "references", 2)
+	assertMainTestJSONArrayHasLength(t, payload, "callers", 1)
+	assertMainTestJSONArrayHasLength(t, payload, "relatedTests", 2)
+	assertMainTestJSONArrayHasLength(t, payload, "testCommands", 2)
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	dependencies, ok := payload["dependencies"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected dependencies to be a JSON object, got %T", payload["dependencies"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, dependencies, "imports", 0)
+	assertMainTestJSONArrayHasLength(t, dependencies, "usedBy", 0)
+
+	if strings.Contains(result.Stdout, "IMPACT") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -702,6 +857,42 @@ func Run() {
 	}
 }
 
+func TestMainRunsRefsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func ParseFile() {
+}
+
+func Run() {
+	ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "refs", "ParseFile", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["target"] != "ParseFile" {
+		t.Fatalf("expected target ParseFile, got %v", payload["target"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, payload, "references", 2)
+
+	if strings.Contains(result.Stdout, "REFERENCES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPrintsErrorWhenRootIsMissing(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "symbols"})
@@ -757,14 +948,30 @@ func TestRunReturnsFailureExitWhenSymbolIsMissing(t *testing.T) {
 	}
 }
 
-func TestMainPrintsErrorForUnknownFlag(t *testing.T) {
+func TestMainPrintsErrorForJSONOnUnsupportedCommand(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "--json", "symbols"})
 
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: unknown flag: --json") {
+	if !strings.Contains(result.Stderr, "error: --json is only supported by refs, impact, and tests") {
+		t.Fatalf("expected unsupported JSON error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainPrintsErrorForUnknownFlag(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "--xml", "symbols"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: unknown flag: --xml") {
 		t.Fatalf("expected unknown flag error, got:\n%s", result.Stderr)
 	}
 
@@ -824,5 +1031,29 @@ func assertMainTestStrings(t *testing.T, got []string, want []string) {
 		if got[i] != want[i] {
 			t.Fatalf("expected %v, got %v", want, got)
 		}
+	}
+}
+
+func decodeMainTestJSON(t *testing.T, output string) map[string]any {
+	t.Helper()
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(output), &payload); err != nil {
+		t.Fatalf("expected valid JSON, got %v:\n%s", err, output)
+	}
+
+	return payload
+}
+
+func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) {
+	t.Helper()
+
+	values, ok := payload[key].([]any)
+	if !ok {
+		t.Fatalf("expected %s to be a JSON array, got %T", key, payload[key])
+	}
+
+	if len(values) != length {
+		t.Fatalf("expected %s length %d, got %d", key, length, len(values))
 	}
 }

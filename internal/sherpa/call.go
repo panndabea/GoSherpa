@@ -10,44 +10,44 @@ import (
 )
 
 type Callee struct {
-	Name     string
-	Position Position
+	Name     string   `json:"name"`
+	Position Position `json:"position"`
 }
 
 type CalleesResult struct {
-	Target  string
-	Callees []Callee
+	Target  string   `json:"target"`
+	Callees []Callee `json:"callees"`
 }
 
 type Caller struct {
-	Name     string
-	Position Position
+	Name     string   `json:"name"`
+	Position Position `json:"position"`
 }
 
 type CallersResult struct {
-	Target  string
-	Callers []Caller
+	Target  string   `json:"target"`
+	Callers []Caller `json:"callers"`
 }
 
 type CallPathOptions struct {
-	Limit    int
-	MaxDepth int
+	Limit    int `json:"limit"`
+	MaxDepth int `json:"maxDepth"`
 }
 
 type CallPathStep struct {
-	Caller   string
-	Callee   string
-	Position Position
+	Caller   string   `json:"caller"`
+	Callee   string   `json:"callee"`
+	Position Position `json:"position"`
 }
 
 type CallPath struct {
-	Steps []CallPathStep
+	Steps []CallPathStep `json:"steps"`
 }
 
 type CallPathsResult struct {
-	From  string
-	To    string
-	Paths []CallPath
+	From  string     `json:"from"`
+	To    string     `json:"to"`
+	Paths []CallPath `json:"paths"`
 }
 
 type functionInfo struct {

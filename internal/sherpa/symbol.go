@@ -10,13 +10,13 @@ const (
 )
 
 type Position struct {
-	File string
-	Line int
+	File string `json:"file"`
+	Line int    `json:"line"`
 }
 
 type Symbol struct {
-	Name     string
-	Kind     SymbolKind
-	Position Position
-	Receiver string
+	Name     string     `json:"name"`
+	Kind     SymbolKind `json:"kind"`
+	Position Position   `json:"position"`
+	Receiver string     `json:"receiver"`
 }

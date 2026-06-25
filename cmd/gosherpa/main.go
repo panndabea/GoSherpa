@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -20,9 +21,15 @@ type cliInvocation struct {
 	Root              string
 	Command           string
 	CommandArgs       []string
+	JSON              bool
 	CallPathLimit     int
 	CallPathMaxDepth  int
 	HasCallPathOption bool
+}
+
+type referencesResult struct {
+	Target     string             `json:"target"`
+	References []sherpa.Reference `json:"references"`
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -31,6 +38,11 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+
+		if arg == "--json" {
+			invocation.JSON = true
+			continue
+		}
 
 		if arg == "--root" {
 			if i+1 >= len(args) {
@@ -164,6 +176,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --json is only supported by refs, impact, and tests")
+		return exitUsage
+	}
+
 	switch invocation.Command {
 	case "symbol":
 		if len(invocation.CommandArgs) < 1 {
@@ -230,6 +247,13 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, referencesResult{
+				Target:     name,
+				References: nonNilSlice(refs),
+			})
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatReferences(name, refs))
 		return exitSuccess
 
@@ -252,6 +276,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, impactJSONResult(result))
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatImpact(result))
 		return exitSuccess
 
@@ -272,6 +300,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return exitFailure
+		}
+
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, testsJSONResult(result))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatTests(result))
@@ -371,6 +403,64 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 }
 
+func knownCommand(command string) bool {
+	switch command {
+	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportsJSON(command string) bool {
+	switch command {
+	case "refs", "impact", "tests":
+		return true
+	default:
+		return false
+	}
+}
+
+func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(value); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return exitFailure
+	}
+
+	return exitSuccess
+}
+
+func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
+	result.References = nonNilSlice(result.References)
+	result.Callers = nonNilSlice(result.Callers)
+	result.Dependencies.Imports = nonNilSlice(result.Dependencies.Imports)
+	result.Dependencies.UsedBy = nonNilSlice(result.Dependencies.UsedBy)
+	result.Packages = nonNilSlice(result.Packages)
+	result.RelatedTests = nonNilSlice(result.RelatedTests)
+	result.TestCommands = nonNilSlice(result.TestCommands)
+	result.Warnings = nonNilSlice(result.Warnings)
+
+	return result
+}
+
+func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
+	result.Tests = nonNilSlice(result.Tests)
+	result.Commands = nonNilSlice(result.Commands)
+
+	return result
+}
+
+func nonNilSlice[T any](values []T) []T {
+	if values == nil {
+		return []T{}
+	}
+
+	return values
+}
+
 func resolveRootPath(root string, stderr io.Writer) (string, bool) {
 	repositoryRoot, err := sherpa.ResolveRepositoryRoot(root)
 	if err != nil {
@@ -386,6 +476,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "global options:")
 	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
+	fmt.Fprintln(writer, "  --json           machine-readable output for refs, impact, and tests")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  symbols")

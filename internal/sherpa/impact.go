@@ -13,15 +13,15 @@ const (
 )
 
 type ImpactResult struct {
-	Target       string
-	Kind         ImpactKind
-	References   []Reference
-	Callers      []Caller
-	Dependencies PackageDependencies
-	Packages     []string
-	RelatedTests []RelatedTest
-	TestCommands []string
-	Warnings     []string
+	Target       string              `json:"target"`
+	Kind         ImpactKind          `json:"kind"`
+	References   []Reference         `json:"references"`
+	Callers      []Caller            `json:"callers"`
+	Dependencies PackageDependencies `json:"dependencies"`
+	Packages     []string            `json:"packages"`
+	RelatedTests []RelatedTest       `json:"relatedTests"`
+	TestCommands []string            `json:"testCommands"`
+	Warnings     []string            `json:"warnings"`
 }
 
 func FindImpact(root string, target string) (ImpactResult, error) {

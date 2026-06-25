@@ -63,6 +63,7 @@ Implemented:
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
+- Machine-readable JSON output for `refs`, `impact`, and `tests`.
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
 
@@ -76,7 +77,7 @@ Current limitations:
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
-- Output is optimized for reading, but not yet consistently structured.
+- JSON output is currently limited to `refs`, `impact`, and `tests`.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -1000,6 +1001,8 @@ will not churn constantly.
 
 ### 8.1 JSON Output
 
+Status: partial MVP implemented for `refs`, `impact`, and `tests`.
+
 Human and agent question:
 
 ```text
@@ -1015,7 +1018,7 @@ gosherpa impact ./internal/user --json
 
 Requirements:
 
-- Add `--json` to all commands.
+- Extend `--json` to all commands.
 - Define stable schemas per command.
 - Include schema version.
 - Include command metadata:
@@ -1030,6 +1033,7 @@ Requirements:
 
 Done when:
 
+- Current JSON commands are covered by CLI tests.
 - JSON output can be tested with golden files.
 - Human text output and JSON output share the same analysis result.
 
@@ -1343,7 +1347,7 @@ Theme: make GoSherpa excellent for scripts and agents.
 
 Included:
 
-- `--json`
+- `--json` for remaining commands
 - stable schemas
 - batch query mode
 - possible MCP server
@@ -1365,7 +1369,7 @@ Included:
 | `packages` | Medium | Low | Mid-term |
 | `cycles` | Medium | Low | Later |
 | TUI | Medium | Medium | Later |
-| JSON | High for tools | Low after result model | Later |
+| JSON | High for tools | Low after result model | In progress |
 | MCP server | High for agents | Medium | Later |
 
 ## Near-Term Implementation Plan

@@ -13,9 +13,9 @@ import (
 )
 
 type PackageDependencies struct {
-	Package string
-	Imports []string
-	UsedBy  []string
+	Package string   `json:"package"`
+	Imports []string `json:"imports"`
+	UsedBy  []string `json:"usedBy"`
 }
 
 func FindPackageDependencies(root string, targetPackage string) (PackageDependencies, error) {

@@ -15,8 +15,8 @@ import (
 )
 
 type Reference struct {
-	Name     string
-	Position Position
+	Name     string   `json:"name"`
+	Position Position `json:"position"`
 }
 
 type referenceTarget struct {

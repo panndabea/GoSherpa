@@ -17,19 +17,19 @@ const (
 )
 
 type RelatedTest struct {
-	Name            string
-	Package         string
-	PackageName     string
-	Position        Position
-	DirectReference bool
-	ExternalPackage bool
+	Name            string   `json:"name"`
+	Package         string   `json:"package"`
+	PackageName     string   `json:"packageName"`
+	Position        Position `json:"position"`
+	DirectReference bool     `json:"directReference"`
+	ExternalPackage bool     `json:"externalPackage"`
 }
 
 type TestsResult struct {
-	Target   string
-	Kind     TestTargetKind
-	Tests    []RelatedTest
-	Commands []string
+	Target   string         `json:"target"`
+	Kind     TestTargetKind `json:"kind"`
+	Tests    []RelatedTest  `json:"tests"`
+	Commands []string       `json:"commands"`
 }
 
 type testFileInfo struct {
