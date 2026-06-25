@@ -162,6 +162,37 @@ func TestAnalyzePackageRequiresMatchingInterfaceMethodSignatures(t *testing.T) {
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
 
+func TestAnalyzePackageResolvesEmbeddedInterfaceMethodSets(t *testing.T) {
+	root := writeEmbeddedInterfaceImpactProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/store")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{
+		"./internal/auth.ReadWriter",
+		"./internal/auth.Writer",
+		"./internal/base.Reader",
+	})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/store.FileStore"})
+}
+
+func TestAnalyzePackageReportsInterfacesEmbeddingChangedInterface(t *testing.T) {
+	root := writeEmbeddedInterfaceImpactProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/base")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{
+		"./internal/auth.ReadWriter",
+		"./internal/base.Reader",
+	})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/store.FileStore"})
+}
+
 func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	root := writeInterfaceImpactProject(t)
 
@@ -261,6 +292,46 @@ type CountAuthenticator struct{}
 
 func (CountAuthenticator) Authenticate(user string) (bool, error) {
 	return false, nil
+}
+`)
+
+	return root
+}
+
+func writeEmbeddedInterfaceImpactProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "base", "reader.go"), `package base
+
+type Reader interface {
+	Read() error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import ports "example.com/app/internal/base"
+
+type Writer interface {
+	Write() error
+}
+
+type ReadWriter interface {
+	ports.Reader
+	Writer
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "store", "store.go"), `package store
+
+type FileStore struct{}
+
+func (FileStore) Read() error {
+	return nil
+}
+
+func (FileStore) Write() error {
+	return nil
 }
 `)
 

@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
@@ -24,6 +25,7 @@ type interfaceGraph struct {
 	Types                  []typeInfo
 	ImplementationsByIface map[string][]string
 	InterfacesByType       map[string][]string
+	EmbeddingByIface       map[string][]string
 }
 
 type interfaceInfo struct {
@@ -31,6 +33,7 @@ type interfaceInfo struct {
 	Package   string
 	Qualified string
 	Methods   methodSet
+	Embedded  []interfaceRef
 }
 
 type typeInfo struct {
@@ -41,6 +44,11 @@ type typeInfo struct {
 }
 
 type methodSet map[string]string
+
+type interfaceRef struct {
+	Package string
+	Name    string
+}
 
 type interfaceSymbolTarget struct {
 	Package  string
@@ -72,8 +80,7 @@ func interfaceSignalsForPackages(root string, packages []string) (interfaceImpac
 			continue
 		}
 
-		interfaces = append(interfaces, iface.Qualified)
-		implementations = append(implementations, graph.ImplementationsByIface[iface.Qualified]...)
+		interfaces, implementations = appendInterfaceSignal(graph, interfaces, implementations, iface.Qualified)
 	}
 
 	for _, typ := range graph.Types {
@@ -119,8 +126,7 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 				continue
 			}
 
-			interfaces = append(interfaces, iface.Qualified)
-			implementations = append(implementations, graph.ImplementationsByIface[iface.Qualified]...)
+			interfaces, implementations = appendInterfaceSignal(graph, interfaces, implementations, iface.Qualified)
 		}
 
 		for _, typ := range graph.Types {
@@ -146,8 +152,7 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 			continue
 		}
 
-		interfaces = append(interfaces, iface.Qualified)
-		implementations = append(implementations, graph.ImplementationsByIface[iface.Qualified]...)
+		interfaces, implementations = appendInterfaceSignal(graph, interfaces, implementations, iface.Qualified)
 	}
 
 	for _, typ := range graph.Types {
@@ -173,6 +178,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 
 	sort.Strings(files)
 
+	modulePath, _ := sherpa.ModulePath(root)
 	var interfaces []interfaceInfo
 	typesByQualified := make(map[string]*typeInfo)
 
@@ -191,6 +197,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 		if err != nil {
 			return interfaceGraph{}, err
 		}
+		imports := interfaceImportAliases(file, modulePath)
 
 		for _, decl := range file.Decls {
 			switch decl := decl.(type) {
@@ -207,8 +214,8 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 
 					iface, ok := typeSpec.Type.(*ast.InterfaceType)
 					if ok {
-						methods := interfaceMethodSet(iface)
-						if len(methods) == 0 {
+						methods, embedded := interfaceMethodSet(iface, packagePath, imports)
+						if len(methods) == 0 && len(embedded) == 0 {
 							continue
 						}
 
@@ -218,6 +225,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 							Package:   packagePath,
 							Qualified: qualifiedSignalName(packagePath, name),
 							Methods:   methods,
+							Embedded:  embedded,
 						})
 						continue
 					}
@@ -240,6 +248,8 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 		}
 	}
 
+	interfaces = resolveInterfaceMethodSets(interfaces)
+
 	types := make([]typeInfo, 0, len(typesByQualified))
 	for _, typ := range typesByQualified {
 		types = append(types, *typ)
@@ -253,6 +263,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 		Types:                  types,
 		ImplementationsByIface: make(map[string][]string),
 		InterfacesByType:       make(map[string][]string),
+		EmbeddingByIface:       interfaceEmbeddingMap(interfaces),
 	}
 
 	for _, iface := range interfaces {
@@ -276,21 +287,223 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 	return graph, nil
 }
 
-func interfaceMethodSet(iface *ast.InterfaceType) methodSet {
+func appendInterfaceSignal(graph interfaceGraph, interfaces []string, implementations []string, qualified string) ([]string, []string) {
+	interfaces = append(interfaces, qualified)
+	implementations = append(implementations, graph.ImplementationsByIface[qualified]...)
+
+	for _, embedding := range graph.EmbeddingByIface[qualified] {
+		interfaces = append(interfaces, embedding)
+		implementations = append(implementations, graph.ImplementationsByIface[embedding]...)
+	}
+
+	return interfaces, implementations
+}
+
+func interfaceMethodSet(iface *ast.InterfaceType, packagePath string, imports map[string]string) (methodSet, []interfaceRef) {
 	methods := make(methodSet)
+	var embedded []interfaceRef
+
 	for _, method := range iface.Methods.List {
 		funcType, ok := method.Type.(*ast.FuncType)
+		if ok {
+			signature := methodSignature(funcType)
+			for _, name := range method.Names {
+				methods[name.Name] = signature
+			}
+			continue
+		}
+
+		ref, ok := embeddedInterfaceRef(method.Type, packagePath, imports)
+		if ok {
+			embedded = append(embedded, ref)
+		}
+	}
+
+	return methods, embedded
+}
+
+func embeddedInterfaceRef(expr ast.Expr, packagePath string, imports map[string]string) (interfaceRef, bool) {
+	switch expr := expr.(type) {
+	case *ast.Ident:
+		return interfaceRef{Package: packagePath, Name: expr.Name}, true
+	case *ast.SelectorExpr:
+		ident, ok := expr.X.(*ast.Ident)
+		if !ok {
+			return interfaceRef{}, false
+		}
+
+		importPackage, ok := imports[ident.Name]
+		if !ok {
+			return interfaceRef{}, false
+		}
+
+		return interfaceRef{Package: importPackage, Name: expr.Sel.Name}, true
+	case *ast.ParenExpr:
+		return embeddedInterfaceRef(expr.X, packagePath, imports)
+	default:
+		return interfaceRef{}, false
+	}
+}
+
+func interfaceImportAliases(file *ast.File, modulePath string) map[string]string {
+	imports := make(map[string]string)
+	if modulePath == "" {
+		return imports
+	}
+
+	for _, importSpec := range file.Imports {
+		importPath, err := strconv.Unquote(importSpec.Path.Value)
+		if err != nil {
+			continue
+		}
+
+		packagePath, ok := localInterfaceImportPackage(importPath, modulePath)
 		if !ok {
 			continue
 		}
 
-		signature := methodSignature(funcType)
-		for _, name := range method.Names {
-			methods[name.Name] = signature
+		alias := interfaceImportAlias(importSpec, importPath)
+		if alias == "" {
+			continue
+		}
+
+		imports[alias] = packagePath
+	}
+
+	return imports
+}
+
+func interfaceImportAlias(importSpec *ast.ImportSpec, importPath string) string {
+	if importSpec.Name != nil {
+		switch importSpec.Name.Name {
+		case ".", "_":
+			return ""
+		default:
+			return importSpec.Name.Name
 		}
 	}
 
-	return methods
+	return path.Base(importPath)
+}
+
+func localInterfaceImportPackage(importPath string, modulePath string) (string, bool) {
+	if importPath == modulePath {
+		return ".", true
+	}
+
+	prefix := modulePath + "/"
+	if !strings.HasPrefix(importPath, prefix) {
+		return "", false
+	}
+
+	return "./" + strings.TrimPrefix(importPath, prefix), true
+}
+
+func resolveInterfaceMethodSets(interfaces []interfaceInfo) []interfaceInfo {
+	indexes := make(map[string]int, len(interfaces))
+	for i, iface := range interfaces {
+		indexes[iface.Qualified] = i
+	}
+
+	resolved := make(map[string]methodSet, len(interfaces))
+	for i := range interfaces {
+		interfaces[i].Methods = resolveInterfaceMethodSet(i, interfaces, indexes, resolved, make(map[string]struct{}))
+	}
+
+	return interfaces
+}
+
+func resolveInterfaceMethodSet(index int, interfaces []interfaceInfo, indexes map[string]int, resolved map[string]methodSet, resolving map[string]struct{}) methodSet {
+	iface := interfaces[index]
+	if methods, ok := resolved[iface.Qualified]; ok {
+		return cloneMethodSet(methods)
+	}
+
+	if _, ok := resolving[iface.Qualified]; ok {
+		return cloneMethodSet(iface.Methods)
+	}
+	resolving[iface.Qualified] = struct{}{}
+
+	methods := cloneMethodSet(iface.Methods)
+	for _, embedded := range iface.Embedded {
+		embeddedQualified := qualifiedSignalName(embedded.Package, embedded.Name)
+		embeddedIndex, ok := indexes[embeddedQualified]
+		if !ok {
+			continue
+		}
+
+		embeddedMethods := resolveInterfaceMethodSet(embeddedIndex, interfaces, indexes, resolved, resolving)
+		mergeMethodSets(methods, embeddedMethods)
+	}
+
+	delete(resolving, iface.Qualified)
+	resolved[iface.Qualified] = cloneMethodSet(methods)
+
+	return cloneMethodSet(methods)
+}
+
+func cloneMethodSet(methods methodSet) methodSet {
+	cloned := make(methodSet, len(methods))
+	for name, signature := range methods {
+		cloned[name] = signature
+	}
+
+	return cloned
+}
+
+func mergeMethodSets(target methodSet, source methodSet) {
+	const conflictingMethodSignature = "\x00conflicting-interface-method"
+
+	for name, signature := range source {
+		existing, ok := target[name]
+		if ok && existing != signature {
+			target[name] = conflictingMethodSignature
+			continue
+		}
+
+		target[name] = signature
+	}
+}
+
+func interfaceEmbeddingMap(interfaces []interfaceInfo) map[string][]string {
+	known := make(map[string]struct{}, len(interfaces))
+	direct := make(map[string][]string)
+	for _, iface := range interfaces {
+		known[iface.Qualified] = struct{}{}
+	}
+
+	for _, iface := range interfaces {
+		for _, embedded := range iface.Embedded {
+			embeddedQualified := qualifiedSignalName(embedded.Package, embedded.Name)
+			if _, ok := known[embeddedQualified]; !ok {
+				continue
+			}
+
+			direct[embeddedQualified] = append(direct[embeddedQualified], iface.Qualified)
+		}
+	}
+
+	result := make(map[string][]string)
+	for qualified := range known {
+		result[qualified] = uniqueSortedStrings(collectEmbeddingInterfaces(qualified, direct, make(map[string]struct{})))
+	}
+
+	return result
+}
+
+func collectEmbeddingInterfaces(qualified string, direct map[string][]string, seen map[string]struct{}) []string {
+	var result []string
+	for _, embedding := range direct[qualified] {
+		if _, ok := seen[embedding]; ok {
+			continue
+		}
+
+		seen[embedding] = struct{}{}
+		result = append(result, embedding)
+		result = append(result, collectEmbeddingInterfaces(embedding, direct, seen)...)
+	}
+
+	return result
 }
 
 func methodSignature(funcType *ast.FuncType) string {
