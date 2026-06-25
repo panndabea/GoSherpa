@@ -46,6 +46,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
+| Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
@@ -90,6 +91,8 @@ Then explore the repository:
 ./gosherpa tests ParseFile
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
+./gosherpa tests affected --base HEAD
+./gosherpa tests affected --base HEAD --json
 ./gosherpa deps ./internal/sherpa
 ./gosherpa deps ./internal/sherpa --json
 ./gosherpa callees ParseFile
@@ -131,6 +134,7 @@ go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
 go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa tests ParseFile
+go run ./cmd/gosherpa tests affected --base HEAD
 go run ./cmd/gosherpa path main FindCallers
 ```
 
@@ -150,7 +154,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| Impact Engine CLI completion | Add file/package impact subcommands and `tests affected` on top of the diff report |
+| Impact Engine CLI completion | Add file/package/symbol impact subcommands on top of the diff report |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -174,11 +178,11 @@ Implemented today:
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
+- `gosherpa tests affected --base <ref>` with human and JSON output
 
 Planned next from PRD v0.1:
 
 - file, package, and symbol impact subcommands
-- `gosherpa tests affected --base <ref>`
 - interface and implementer impact signals
 
 Known MVP limitations:

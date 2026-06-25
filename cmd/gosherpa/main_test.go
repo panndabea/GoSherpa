@@ -149,24 +149,45 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	}
 }
 
-func TestParseCLIArgsAcceptsImpactDiffBaseFlag(t *testing.T) {
-	tests := [][]string{
-		{"impact", "diff", "--base", "HEAD"},
-		{"--base=HEAD", "impact", "diff"},
+func TestParseCLIArgsAcceptsBaseFlagForDiffCommands(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		command     string
+		commandArgs []string
+	}{
+		{
+			name:        "impact diff spaced",
+			args:        []string{"impact", "diff", "--base", "HEAD"},
+			command:     "impact",
+			commandArgs: []string{"diff"},
+		},
+		{
+			name:        "impact diff equals",
+			args:        []string{"--base=HEAD", "impact", "diff"},
+			command:     "impact",
+			commandArgs: []string{"diff"},
+		},
+		{
+			name:        "tests affected",
+			args:        []string{"tests", "affected", "--base", "HEAD"},
+			command:     "tests",
+			commandArgs: []string{"affected"},
+		},
 	}
 
 	for _, test := range tests {
-		t.Run(strings.Join(test, " "), func(t *testing.T) {
-			got, err := parseCLIArgs(test)
+		t.Run(test.name, func(t *testing.T) {
+			got, err := parseCLIArgs(test.args)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if got.Command != "impact" {
-				t.Fatalf("expected command impact, got %s", got.Command)
+			if got.Command != test.command {
+				t.Fatalf("expected command %s, got %s", test.command, got.Command)
 			}
 
-			assertMainTestStrings(t, got.CommandArgs, []string{"diff"})
+			assertMainTestStrings(t, got.CommandArgs, test.commandArgs)
 
 			if got.BaseRef != "HEAD" {
 				t.Fatalf("expected base HEAD, got %s", got.BaseRef)
@@ -301,8 +322,13 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
 
-	if !strings.Contains(output.String(), "tests <symbol-or-package>") {
-		t.Fatalf("expected usage to contain tests command, got:\n%s", output.String())
+	for _, want := range []string{
+		"tests <symbol-or-package>",
+		"tests affected --base <ref>",
+	} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
+		}
 	}
 }
 
@@ -327,7 +353,28 @@ func TestPrintUsageIncludesCallers(t *testing.T) {
 func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "tests"})
 
-	want := "usage: gosherpa [--root <path>] tests <symbol-or-package>\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	for _, want := range []string{
+		"usage: gosherpa [--root <path>] tests <symbol-or-package>",
+		"gosherpa [--root <path>] tests affected --base <ref>",
+	} {
+		if !strings.Contains(result.Stderr, want) {
+			t.Fatalf("expected stderr to contain %s, got %q", want, result.Stderr)
+		}
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainPrintsTestsAffectedUsageWhenBaseIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "tests", "affected"})
+
+	want := "usage: gosherpa [--root <path>] tests affected --base <ref>\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -457,6 +504,143 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestMainRunsTestsAffectedCommand(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestSession(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler.go"), `package api
+
+import "example.com/app/internal/auth"
+
+var _ = auth.Session{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler_test.go"), `package api
+
+import "testing"
+
+func TestHandler(t *testing.T) {}
+`)
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"AFFECTED TESTS",
+		"TestSession",
+		"TestHandler",
+		"SUGGESTED COMMANDS",
+		"go test ./internal/api",
+		"go test ./internal/auth",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	for _, notWant := range []string{"IMPACT DIFF", "CHANGED FILES", "CHANGED PACKAGES"} {
+		if strings.Contains(result.Stdout, notWant) {
+			t.Fatalf("expected output not to contain %s, got:\n%s", notWant, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsTestsAffectedCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestSession(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler.go"), `package api
+
+import "example.com/app/internal/auth"
+
+var _ = auth.Session{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler_test.go"), `package api
+
+import "testing"
+
+func TestHandler(t *testing.T) {}
+`)
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
+	assertMainTestJSONArrayHasLength(t, data, "commands", 2)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "AFFECTED TESTS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "impact"})
 
@@ -502,7 +686,7 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --base is only supported by impact diff") {
+	if !strings.Contains(result.Stderr, "error: --base is only supported by impact diff and tests affected") {
 		t.Fatalf("expected base flag error, got:\n%s", result.Stderr)
 	}
 

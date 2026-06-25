@@ -29,6 +29,21 @@ func FormatDiffReport(report ImpactReport) string {
 	return builder.String()
 }
 
+func FormatAffectedTestsReport(report ImpactReport) string {
+	var builder strings.Builder
+
+	writeReportRelatedTests(&builder, report.AffectedTests)
+	builder.WriteString("\n")
+	writeReportValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+
+	if len(report.Warnings) > 0 {
+		builder.WriteString("\n")
+		writeReportValues(&builder, "WARNINGS", report.Warnings)
+	}
+
+	return builder.String()
+}
+
 func writeReportValues(builder *strings.Builder, title string, values []string) {
 	builder.WriteString(title)
 	builder.WriteString("\n")

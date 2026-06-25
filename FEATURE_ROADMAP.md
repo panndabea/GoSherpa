@@ -76,6 +76,7 @@ Implemented:
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`.
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`.
 - `gosherpa impact diff --base <ref>` with human and JSON output.
+- `gosherpa tests affected --base <ref>` with human and JSON output.
 
 Current limitations:
 
@@ -807,7 +808,8 @@ Done when:
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
 `internal/impact.AnalyzeDiff` are implemented. `gosherpa impact diff --base
-<ref>` is implemented for human and JSON output.
+<ref>` and `gosherpa tests affected --base <ref>` are implemented for human
+and JSON output.
 
 Human question:
 
@@ -834,7 +836,7 @@ MVP behavior:
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Preserve the existing JSON response discipline for new commands. Implemented
-  for `impact diff`.
+  for `impact diff` and `tests affected`.
 
 Architecture:
 
@@ -851,7 +853,9 @@ Done when:
 - `gosherpa impact diff --base <ref>` reports changed packages, affected
   packages, and affected tests. Implemented foundation.
 - `gosherpa tests affected --base <ref>` prints suggested `go test` commands.
-- JSON and human output are covered by focused tests and golden fixtures.
+  Implemented foundation.
+- JSON and human output are covered by focused tests and golden fixtures for
+  diff impact and affected tests.
 
 ### 5.4 Change Risk Summary
 

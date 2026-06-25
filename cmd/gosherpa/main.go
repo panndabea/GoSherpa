@@ -80,6 +80,11 @@ type testsJSONData struct {
 	Commands []string              `json:"commands"`
 }
 
+type testsAffectedJSONData struct {
+	AffectedTests []impactengine.RelatedTest `json:"affectedTests"`
+	Commands      []string                   `json:"commands"`
+}
+
 type dependenciesJSONData struct {
 	Package string   `json:"package"`
 	Imports []string `json:"imports"`
@@ -284,8 +289,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasBaseOption && !isImpactDiffInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --base is only supported by impact diff")
+	if invocation.HasBaseOption && !isBaseAwareInvocation(invocation) {
+		fmt.Fprintln(stderr, "error: --base is only supported by impact diff and tests affected")
 		return exitUsage
 	}
 
@@ -448,8 +453,40 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "tests":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] tests <symbol-or-package>")
+			printTestsUsage(stderr)
 			return exitUsage
+		}
+
+		if invocation.CommandArgs[0] == "affected" {
+			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
+				printTestsAffectedUsage(stderr)
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
+			if err != nil {
+				fmt.Fprintln(stderr, "error:", err)
+				return exitFailure
+			}
+
+			if invocation.JSON {
+				normalizedReport := impactDiffJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"tests affected",
+					invocation.BaseRef,
+					normalizedReport.Warnings,
+					testsAffectedJSONDataFromReport(normalizedReport),
+				))
+			}
+
+			fmt.Fprint(stdout, impactengine.FormatAffectedTestsReport(report))
+			return exitSuccess
 		}
 
 		root, ok := resolveRootPath(invocation.Root, stderr)
@@ -635,8 +672,16 @@ func supportsJSON(command string) bool {
 	}
 }
 
+func isBaseAwareInvocation(invocation cliInvocation) bool {
+	return isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
+}
+
 func isImpactDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
+}
+
+func isTestsAffectedInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "tests" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "affected"
 }
 
 func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
@@ -736,6 +781,13 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 	}
 }
 
+func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffectedJSONData {
+	return testsAffectedJSONData{
+		AffectedTests: report.AffectedTests,
+		Commands:      report.TestCommands,
+	}
+}
+
 func dependenciesJSONResult(result sherpa.PackageDependencies) sherpa.PackageDependencies {
 	result.Imports = nonNilSlice(result.Imports)
 	result.UsedBy = nonNilSlice(result.UsedBy)
@@ -828,6 +880,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact diff --base <ref>")
 	fmt.Fprintln(writer, "  tests <symbol-or-package>")
+	fmt.Fprintln(writer, "  tests affected --base <ref>")
 	fmt.Fprintln(writer, "  deps <package>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
@@ -842,4 +895,13 @@ func printImpactUsage(writer io.Writer) {
 
 func printImpactDiffUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact diff --base <ref>")
+}
+
+func printTestsUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests <symbol-or-package>")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] tests affected --base <ref>")
+}
+
+func printTestsAffectedUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests affected --base <ref>")
 }

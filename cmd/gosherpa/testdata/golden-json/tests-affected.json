@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "command": "tests affected",
+  "target": "HEAD",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "affectedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": false,
+        "externalPackage": false
+      }
+    ],
+    "commands": [
+      "go test ."
+    ]
+  }
+}
