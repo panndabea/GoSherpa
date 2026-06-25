@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "command": "paths",
+  "target": "Entry -> Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "from": "Entry",
+    "to": "Target",
+    "paths": [
+      {
+        "steps": [
+          {
+            "caller": "Entry",
+            "callee": "First",
+            "position": {
+              "file": "service.go",
+              "line": 6
+            }
+          },
+          {
+            "caller": "First",
+            "callee": "Target",
+            "position": {
+              "file": "service.go",
+              "line": 11
+            }
+          }
+        ]
+      },
+      {
+        "steps": [
+          {
+            "caller": "Entry",
+            "callee": "Second",
+            "position": {
+              "file": "service.go",
+              "line": 7
+            }
+          },
+          {
+            "caller": "Second",
+            "callee": "Target",
+            "position": {
+              "file": "service.go",
+              "line": 15
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

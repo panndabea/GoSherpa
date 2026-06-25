@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "command": "symbol",
+  "target": "Entry",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "symbol": {
+      "name": "Entry",
+      "kind": "function",
+      "position": {
+        "file": "service.go",
+        "line": 5
+      },
+      "receiver": ""
+    }
+  }
+}

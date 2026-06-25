@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "command": "tests",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "kind": "symbol",
+    "tests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": true,
+        "externalPackage": false
+      }
+    ],
+    "commands": [
+      "go test ."
+    ]
+  }
+}

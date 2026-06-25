@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "command": "path",
+  "target": "Entry -> Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "from": "Entry",
+    "to": "Target",
+    "paths": [
+      {
+        "steps": [
+          {
+            "caller": "Entry",
+            "callee": "First",
+            "position": {
+              "file": "service.go",
+              "line": 6
+            }
+          },
+          {
+            "caller": "First",
+            "callee": "Target",
+            "position": {
+              "file": "service.go",
+              "line": 11
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

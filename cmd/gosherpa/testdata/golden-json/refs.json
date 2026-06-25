@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "command": "refs",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "references": [
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 18
+        }
+      }
+    ]
+  }
+}

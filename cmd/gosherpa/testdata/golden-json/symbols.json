@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "command": "symbols",
+  "target": "",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "symbols": [
+      {
+        "name": "Run",
+        "kind": "function",
+        "position": {
+          "file": "cmd/app/main.go",
+          "line": 5
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Worker",
+        "kind": "struct",
+        "position": {
+          "file": "service.go",
+          "line": 3
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Entry",
+        "kind": "function",
+        "position": {
+          "file": "service.go",
+          "line": 5
+        },
+        "receiver": ""
+      },
+      {
+        "name": "First",
+        "kind": "function",
+        "position": {
+          "file": "service.go",
+          "line": 10
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Second",
+        "kind": "function",
+        "position": {
+          "file": "service.go",
+          "line": 14
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Target",
+        "kind": "function",
+        "position": {
+          "file": "service.go",
+          "line": 18
+        },
+        "receiver": ""
+      },
+      {
+        "name": "TestTarget",
+        "kind": "function",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "receiver": ""
+      }
+    ]
+  }
+}

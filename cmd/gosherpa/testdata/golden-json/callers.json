@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "command": "callers",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "callers": [
+      {
+        "name": "First",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Second",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      }
+    ]
+  }
+}

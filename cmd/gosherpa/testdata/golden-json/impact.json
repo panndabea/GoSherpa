@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "command": "impact",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "kind": "symbol",
+    "references": [
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 18
+        }
+      }
+    ],
+    "callers": [
+      {
+        "name": "First",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Second",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      }
+    ],
+    "dependencies": {
+      "package": "",
+      "imports": [],
+      "usedBy": []
+    },
+    "packages": [
+      "."
+    ],
+    "relatedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": true,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test ."
+    ]
+  }
+}

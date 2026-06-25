@@ -64,6 +64,7 @@ Implemented:
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
 - Machine-readable JSON output for all commands with a stable response envelope.
+- Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
 
@@ -77,7 +78,6 @@ Current limitations:
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
-- JSON schemas are versioned, but not yet covered by golden fixture tests.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -1002,7 +1002,7 @@ will not churn constantly.
 ### 8.1 JSON Output
 
 Status: JSON MVP implemented for all commands with a versioned response
-envelope.
+envelope and golden fixtures.
 
 Human and agent question:
 
@@ -1037,7 +1037,7 @@ Done when:
 - Current JSON commands are covered by CLI tests.
 - JSON responses use one envelope shape with `schemaVersion`, `command`,
   `target`, `root`, `modulePath`, `warnings`, and `data`.
-- JSON output can be tested with golden files.
+- JSON output is covered by golden fixture tests.
 - Human text output and JSON output share the same analysis result.
 
 ### 8.2 Batch Queries
@@ -1350,7 +1350,6 @@ Theme: make GoSherpa excellent for scripts and agents.
 
 Included:
 
-- golden JSON fixtures
 - stable schemas
 - batch query mode
 - possible MCP server

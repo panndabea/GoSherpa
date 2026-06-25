@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "command": "callees",
+  "target": "Entry",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "callees": [
+      {
+        "name": "First",
+        "position": {
+          "file": "service.go",
+          "line": 6
+        }
+      },
+      {
+        "name": "Second",
+        "position": {
+          "file": "service.go",
+          "line": 7
+        }
+      }
+    ]
+  }
+}

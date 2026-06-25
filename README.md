@@ -144,7 +144,7 @@ GoSherpa is an early MVP, with the next work focused on deeper navigation and sa
 
 | Next | Goal |
 | --- | --- |
-| Golden JSON fixtures | Lock the JSON contract with fixture-based output tests |
+| Batch JSON queries | Let scripts ask several questions without repeated CLI setup |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -161,6 +161,7 @@ Implemented today:
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
 - Machine-readable JSON output for all commands with a stable response envelope
+- Golden JSON fixtures for all commands
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
 
@@ -172,7 +173,6 @@ Known MVP limitations:
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
-- JSON schemas are versioned, but not yet covered by golden fixture tests.
 - One-segment function targets can produce selector-call false positives.
 - Function names can be ambiguous across packages.
 
