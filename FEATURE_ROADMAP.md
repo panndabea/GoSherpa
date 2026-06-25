@@ -73,6 +73,7 @@ Implemented:
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
 - Git changed-file discovery foundation via `internal/git.ChangedFiles`.
+- Changed-package mapping for git diffs via `internal/impact.ChangedPackages`.
 
 Current limitations:
 
@@ -801,7 +802,8 @@ Done when:
 ### 5.3 Impact Engine v0.1
 
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
-`internal/git.ChangedFiles` is implemented.
+`internal/git.ChangedFiles` and `internal/impact.ChangedPackages` are
+implemented.
 
 Human question:
 
@@ -822,7 +824,7 @@ gosherpa tests affected --base origin/main
 MVP behavior:
 
 - Read changed files from git diffs. Implemented foundation.
-- Map changed files to packages.
+- Map changed files to packages. Implemented foundation for Go files.
 - Report changed packages and affected dependent packages.
 - Report affected tests at package granularity.
 - Preserve the existing JSON response discipline for new commands.
@@ -833,6 +835,7 @@ Architecture:
   `ChangedFiles` is implemented first.
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
+  `ChangedPackages` maps changed Go files to local package paths first.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:

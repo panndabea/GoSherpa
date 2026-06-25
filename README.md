@@ -146,7 +146,7 @@ GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 t
 
 | Next | Goal |
 | --- | --- |
-| Impact Engine skeleton | Map changed files to packages, add file/package impact entrypoints, and introduce an `ImpactReport` model |
+| Impact Engine skeleton | Introduce an `ImpactReport` model and add file/package/diff impact entrypoints |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -167,10 +167,11 @@ Implemented today:
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
 - Git changed-file discovery foundation via `internal/git.ChangedFiles`
+- Changed-package mapping for git diffs via `internal/impact.ChangedPackages`
 
 Planned next from PRD v0.1:
 
-- changed-package discovery from git diffs
+- `ImpactReport` model
 - file/package/diff impact entrypoints
 - package-level affected tests
 - interface and implementer impact signals
