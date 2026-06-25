@@ -22,7 +22,7 @@
 
 GoSherpa is a fast command-line companion for understanding Go repositories without opening half the project in your editor. It gives you just enough structure to navigate confidently: where a symbol lives, who references it, which packages depend on it, and how functions connect.
 
-The next product track is the Impact Engine described in [PRD_V01.md](PRD_V01.md): change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff.
+The Impact Engine described in [PRD_V01.md](PRD_V01.md) is implemented as the v0.1 MVP: change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff. The next product track is Symbol Intelligence from [PRD_V02.md](PRD_V02.md), with `gosherpa explain` as the likely center of gravity.
 
 ## Why It Exists
 
@@ -155,17 +155,17 @@ go run ./cmd/gosherpa path main FindCallers
 
 ## Roadmap
 
-GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 track from [PRD_V01.md](PRD_V01.md).
+GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](PRD_V01.md) is complete; the next work is Symbol Intelligence from [PRD_V02.md](PRD_V02.md).
 
 | Next | Goal |
 | --- | --- |
-| V01 completion audit | Check PRD v0.1 against the implementation and close remaining test/doc gaps |
+| Symbol Intelligence | Start `gosherpa explain` as the focused entry point for PRD v0.5 |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
 ## Status
 
-Implemented today:
+Implemented:
 
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
@@ -191,9 +191,13 @@ Implemented today:
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
 
-Planned next from PRD v0.1:
+Release notes:
 
-- final PRD v0.1 completion audit and release notes
+- [GoSherpa Impact Engine v0.1](RELEASE_NOTES_V01.md)
+
+Planned next:
+
+- `gosherpa explain` from [PRD_V02.md](PRD_V02.md)
 
 Known MVP limitations:
 

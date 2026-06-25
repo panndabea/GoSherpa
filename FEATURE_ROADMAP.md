@@ -27,10 +27,11 @@ It is not an IDE replacement, a static analyzer suite, or a code generation
 framework. It is a fast command-line companion for answering navigation and
 impact questions inside a repository.
 
-The next product direction is defined by [PRD_V01.md](PRD_V01.md): evolve the
-current code explorer into a conservative Change Intelligence CLI with
-diff-based impact analysis, package-level affected tests, and interface impact
-signals.
+The Impact Engine direction from [PRD_V01.md](PRD_V01.md) is implemented as the
+v0.1 MVP: a conservative Change Intelligence CLI with diff-based impact
+analysis, package-level affected tests, and interface impact signals. The next
+product direction is Symbol Intelligence from [PRD_V02.md](PRD_V02.md), centered
+on richer symbol profiles and `gosherpa explain`.
 
 Core promise:
 
@@ -716,9 +717,8 @@ Done when:
 
 ## Phase 5: Tests and Impact
 
-Status: direct impact MVP and test discovery MVP implemented for symbols and
-packages. PRD v0.1 Impact Engine foundation has started with git changed-file
-discovery.
+Status: direct impact MVP, test discovery MVP, and PRD v0.1 Impact Engine MVP
+implemented for symbols, packages, files, and diffs.
 
 Goal: help developers make changes with confidence.
 
@@ -819,17 +819,16 @@ Done when:
 
 ### 5.3 Impact Engine v0.1
 
-Status: foundation started from [PRD_V01.md](PRD_V01.md);
-`internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
-`internal/impact.AnalyzeDiff` are implemented. `internal/impact.ChangedSymbols`
-extracts changed and deleted symbols from git diff hunks. `gosherpa impact diff
---base <ref>` and `gosherpa tests affected --base <ref>` are implemented for
-human and JSON output. `gosherpa impact file|package|symbol` is implemented for
-human and JSON output. Interface and implementer impact signals are implemented
-as a conservative local method-set scan with import-aware signature matching and
-embedded-interface expansion. Package-qualified symbol impact disambiguates
-references and affected tests. Symbol impact includes transitive callers in
-affected packages.
+Status: implemented from [PRD_V01.md](PRD_V01.md). `internal/git.ChangedFiles`,
+`internal/impact.ChangedPackages`, and `internal/impact.AnalyzeDiff` are
+implemented. `internal/impact.ChangedSymbols` extracts changed and deleted
+symbols from git diff hunks. `gosherpa impact diff --base <ref>` and `gosherpa
+tests affected --base <ref>` are implemented for human and JSON output.
+`gosherpa impact file|package|symbol` is implemented for human and JSON output.
+Interface and implementer impact signals are implemented as a conservative
+local method-set scan with import-aware signature matching and embedded-interface
+expansion. Package-qualified symbol impact disambiguates references and affected
+tests. Symbol impact includes transitive callers in affected packages.
 Affected-test planning includes package tests for affected caller packages.
 
 Human question:
@@ -850,20 +849,20 @@ gosherpa tests affected --base origin/main
 
 MVP behavior:
 
-- Read changed files from git diffs. Implemented foundation.
-- Map changed files to packages. Implemented foundation for Go files.
+- Read changed files from git diffs. Implemented.
+- Map changed files to packages. Implemented for Go files.
 - Report changed packages and affected dependent packages. Implemented
-  foundation for diff reports.
+  for diff reports.
 - Report changed and deleted symbols from git diff hunks. Implemented
-  foundation.
-- Report affected tests at package granularity. Implemented foundation for
-  affected packages.
-- Report affected interfaces and implementations. Implemented foundation with
+  for top-level Go functions and struct/interface types.
+- Report affected tests at package granularity. Implemented for affected
+  packages.
+- Report affected interfaces and implementations. Implemented with
   import-aware method signature matching and embedded-interface expansion.
 - Disambiguate package-qualified symbol impact for references and affected
-  tests. Implemented foundation.
-- Include transitive caller packages for symbol impact. Implemented foundation.
-- Include package tests for affected caller packages. Implemented foundation.
+  tests. Implemented.
+- Include transitive caller packages for symbol impact. Implemented.
+- Include package tests for affected caller packages. Implemented.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -886,23 +885,22 @@ Architecture:
 Done when:
 
 - `gosherpa impact diff --base <ref>` reports changed packages, affected
-  packages, and affected tests. Implemented foundation.
+  packages, and affected tests. Implemented.
 - `gosherpa tests affected --base <ref>` prints suggested `go test` commands.
-  Implemented foundation.
+  Implemented.
 - `gosherpa impact file|package|symbol` reports package/test impact through
-  `ImpactReport`. Implemented foundation.
+  `ImpactReport`. Implemented.
 - `gosherpa impact diff --base <ref>` reports affected symbols from changed
   hunks, including deleted top-level symbols read from the base ref.
-  Implemented foundation.
+  Implemented.
 - Affected interfaces and implementations are populated for changed packages
-  and symbol targets. Implemented foundation with import-aware signature
+  and symbol targets. Implemented with import-aware signature
   matching and embedded-interface expansion.
 - Package-qualified symbol targets avoid same-name reference/test bleed from
-  other packages. Implemented foundation.
-- Symbol impact reports transitive callers in affected packages. Implemented
-  foundation.
+  other packages. Implemented.
+- Symbol impact reports transitive callers in affected packages. Implemented.
 - Symbol impact suggests package tests for transitive caller packages.
-  Implemented foundation.
+  Implemented.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 

@@ -1,5 +1,35 @@
 # PRD — GoSherpa Impact Engine (v0.1)
 
+## Implementation Status
+
+Status: MVP completed on 2026-06-26.
+
+Implemented:
+
+* `gosherpa impact file <file>`
+* `gosherpa impact diff --base <ref>`
+* `gosherpa tests affected --base <ref>`
+* `gosherpa impact symbol <package.Symbol>`
+* `gosherpa impact package <package>`
+* shared `ImpactReport`
+* git changed-file and changed-symbol extraction
+* deletion-aware diff symbol extraction from base refs
+* changed package and affected package reporting
+* affected interface and implementation reporting
+* affected test and `go test` command planning
+* human and JSON output with golden coverage
+
+Conservative MVP boundaries:
+
+* analysis remains local and AST-based
+* interface impact uses import-aware signature matching, not the full Go type checker
+* test selection is package-oriented plus existing direct-reference signals
+* no SSA, pointer analysis, GitHub Action, MCP, IDE, or AI integration
+
+Release notes: [RELEASE_NOTES_V01.md](RELEASE_NOTES_V01.md)
+
+---
+
 ## Hintergrund
 
 GoSherpa ist ein CLI-Tool zur strukturellen Analyse von Go-Codebasen.
