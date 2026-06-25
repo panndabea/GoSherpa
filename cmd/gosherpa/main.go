@@ -240,6 +240,27 @@ func main() {
 
 		sherpa.PrintImpact(result)
 
+	case "tests":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Println("usage: gosherpa [--root <path>] tests <symbol-or-package>")
+			return
+		}
+
+		root, ok := resolveRootPath(invocation.Root)
+		if !ok {
+			return
+		}
+
+		target := invocation.CommandArgs[0]
+
+		result, err := sherpa.FindTests(root, target)
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+
+		sherpa.PrintTests(result)
+
 	case "deps":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Println("usage: gosherpa [--root <path>] deps <package>")
@@ -350,6 +371,7 @@ func printUsage() {
 	fmt.Println("  symbol <name>")
 	fmt.Println("  refs <name>")
 	fmt.Println("  impact <symbol-or-package>")
+	fmt.Println("  tests <symbol-or-package>")
 	fmt.Println("  deps <package>")
 	fmt.Println("  path <from> <to>")
 	fmt.Println("  paths <from> <to> [--limit <n>] [--max-depth <n>]")

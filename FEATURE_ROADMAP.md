@@ -58,6 +58,7 @@ Implemented:
 - Symbol lookup.
 - Go-aware reference lookup.
 - Direct symbol and package impact analysis.
+- Related test discovery with suggested `go test` commands.
 - Package dependency analysis.
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
@@ -70,6 +71,8 @@ Current limitations:
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include related tests or
   transitive callers.
+- Test discovery uses same-package tests and syntactic direct-reference
+  matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
@@ -684,12 +687,15 @@ Done when:
 
 ## Phase 5: Tests and Impact
 
-Status: impact MVP implemented for symbols and packages; test discovery is not
-yet implemented.
+Status: impact MVP and test discovery MVP implemented for symbols and packages;
+impact does not yet include related test suggestions.
 
 Goal: help developers make changes with confidence.
 
 ### 5.1 Test Discovery
+
+Status: MVP implemented with same-package tests, external `_test` packages,
+direct symbol references, and suggested `go test` commands.
 
 Human question:
 
@@ -710,8 +716,13 @@ MVP behavior:
 - Find tests in the same package.
 - Find tests in external `_test` packages.
 - Find tests that reference the target symbol.
-- Find table-test names when possible.
 - Suggest exact `go test` commands.
+
+Later behavior:
+
+- Accept file targets.
+- Find table-test names when possible.
+- Use type-aware reference matching inside test files.
 
 Example:
 
