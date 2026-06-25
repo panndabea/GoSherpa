@@ -78,17 +78,20 @@ Implemented:
 - `gosherpa impact diff --base <ref>` with human and JSON output.
 - `gosherpa tests affected --base <ref>` with human and JSON output.
 - `gosherpa impact file|package|symbol` with human and JSON output.
+- Interface and implementer impact signals based on local method sets.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff impact is currently package/test-level and does not yet include symbol,
-  interface, or implementer impact.
+- Diff impact is currently package/test-level plus method-set
+  interface/implementer signals; it does not yet extract changed symbols from
+  hunks.
 - File, package, and symbol impact use the shared report model, but symbol
   impact does not yet fully disambiguate duplicate package-qualified symbols.
-- Interface implementer impact is not implemented yet.
+- Interface implementer impact uses method-name matching and does not yet
+  compare method signatures or embedded interfaces.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
@@ -813,7 +816,8 @@ Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/impact.AnalyzeDiff` are implemented. `gosherpa impact diff --base
 <ref>` and `gosherpa tests affected --base <ref>` are implemented for human
 and JSON output. `gosherpa impact file|package|symbol` is implemented for
-human and JSON output.
+human and JSON output. Interface and implementer impact signals are implemented
+as a conservative local method-set scan.
 
 Human question:
 
@@ -839,6 +843,8 @@ MVP behavior:
   foundation for diff reports.
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
+- Report affected interfaces and implementations. Implemented foundation with
+  method-name matching.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -850,7 +856,7 @@ Architecture:
 - `internal/impact` consumes index data and produces `ImpactReport`.
   `ChangedPackages` maps changed Go files to local package paths first, and
   `AnalyzeDiff`, `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce
-  the first package/test impact reports.
+  the first package/test/interface/implementation impact reports.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
@@ -861,6 +867,8 @@ Done when:
   Implemented foundation.
 - `gosherpa impact file|package|symbol` reports package/test impact through
   `ImpactReport`. Implemented foundation.
+- Affected interfaces and implementations are populated for changed packages
+  and symbol targets. Implemented foundation.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 

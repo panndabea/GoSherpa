@@ -66,6 +66,12 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
+	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	report.AffectedInterfaces = signals.Interfaces
+	report.AffectedImplementations = signals.Implementations
 
 	return normalizeReport(report), nil
 }
@@ -99,6 +105,12 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
 	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
+	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	report.AffectedInterfaces = signals.Interfaces
+	report.AffectedImplementations = signals.Implementations
 
 	return normalizeReport(report), nil
 }
@@ -116,6 +128,12 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.AffectedSymbols = []string{lookupTarget}
+	signals, err := interfaceSignalsForSymbol(a.Root, target)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	report.AffectedInterfaces = signals.Interfaces
+	report.AffectedImplementations = signals.Implementations
 
 	return normalizeReport(report), nil
 }

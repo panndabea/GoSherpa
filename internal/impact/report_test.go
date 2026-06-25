@@ -126,6 +126,56 @@ func TestAnalyzeFileRejectsNonGoFiles(t *testing.T) {
 	}
 }
 
+func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedInterfacePackage(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/auth")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
+func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedImplementationPackage(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/jwt")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
+func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.Authenticator")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"Authenticator"})
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
+func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/jwt.JWTAuthenticator")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"JWTAuthenticator"})
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
 func writeImpactAnalysisProject(t *testing.T) string {
 	t.Helper()
 
@@ -135,6 +185,33 @@ func writeImpactAnalysisProject(t *testing.T) string {
 	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), "package auth\n\nimport \"testing\"\n\nfunc TestSession(t *testing.T) { _ = Session{} }\n")
 	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler.go"), "package api\n\nimport \"example.com/app/internal/auth\"\n\nvar _ = auth.Session{}\n")
 	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler_test.go"), "package api\n\nimport \"testing\"\n\nfunc TestHandler(t *testing.T) {}\n")
+
+	return root
+}
+
+func writeInterfaceImpactProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+type Authenticator interface {
+	Authenticate() error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt.go"), `package jwt
+
+type JWTAuthenticator struct{}
+
+func (JWTAuthenticator) Authenticate() error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+type SessionStore struct{}
+`)
 
 	return root
 }

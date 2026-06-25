@@ -58,6 +58,10 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 
 	writeReportValues(&builder, "AFFECTED PACKAGES", report.AffectedPackages)
 	builder.WriteString("\n")
+	writeReportValues(&builder, "AFFECTED INTERFACES", report.AffectedInterfaces)
+	builder.WriteString("\n")
+	writeReportValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
+	builder.WriteString("\n")
 	writeReportRelatedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
 	writeReportValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
