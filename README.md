@@ -22,6 +22,8 @@
 
 GoSherpa is a fast command-line companion for understanding Go repositories without opening half the project in your editor. It gives you just enough structure to navigate confidently: where a symbol lives, who references it, which packages depend on it, and how functions connect.
 
+The next product track is the Impact Engine described in [PRD_V01.md](PRD_V01.md): change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff.
+
 ## Why It Exists
 
 As Go projects grow, the important answer is often spread across files, packages, and call sites. GoSherpa turns common navigation questions into focused commands:
@@ -32,7 +34,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | "Who uses this function?" | References and direct callers |
 | "What does this function touch?" | Direct callees |
 | "What depends on this package?" | Local package dependency relationships |
-| "What might this change affect?" | The future impact-analysis workflow |
+| "What might this change affect?" | Direct impact today; diff-based impact analysis next |
 
 ## Current Experience
 
@@ -140,11 +142,11 @@ go run ./cmd/gosherpa path main FindCallers
 
 ## Roadmap
 
-GoSherpa is an early MVP, with the next work focused on deeper navigation and safer changes.
+GoSherpa is an early MVP, with the next work focused on the Impact Engine v0.1 track from [PRD_V01.md](PRD_V01.md).
 
 | Next | Goal |
 | --- | --- |
-| Batch JSON queries | Let scripts ask several questions without repeated CLI setup |
+| Impact Engine skeleton | Add git diff reading, file/package impact entrypoints, and an `ImpactReport` model |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
 
@@ -165,11 +167,20 @@ Implemented today:
 - Repository root selection with `--root`
 - Stable CLI exit codes with diagnostics on stderr
 
+Planned next from PRD v0.1:
+
+- `internal/git` for changed-file discovery from `git diff`
+- file/package/diff impact entrypoints
+- package-level affected tests
+- interface and implementer impact signals
+
 Known MVP limitations:
 
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
 - Impact analysis is direct-only and does not yet include transitive callers.
+- Diff-based impact commands from PRD v0.1 are not implemented yet.
+- Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.

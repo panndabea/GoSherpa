@@ -27,6 +27,11 @@ It is not an IDE replacement, a static analyzer suite, or a code generation
 framework. It is a fast command-line companion for answering navigation and
 impact questions inside a repository.
 
+The next product direction is defined by [PRD_V01.md](PRD_V01.md): evolve the
+current code explorer into a conservative Change Intelligence CLI with
+diff-based impact analysis, package-level affected tests, and interface impact
+signals.
+
 Core promise:
 
 ```text
@@ -73,6 +78,8 @@ Current limitations:
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include transitive callers.
+- Diff-based impact commands from PRD v0.1 are not implemented yet.
+- Interface implementer impact is not implemented yet.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
@@ -689,7 +696,8 @@ Done when:
 
 ## Phase 5: Tests and Impact
 
-Status: impact MVP and test discovery MVP implemented for symbols and packages.
+Status: direct impact MVP and test discovery MVP implemented for symbols and
+packages. PRD v0.1 Impact Engine is planned next.
 
 Goal: help developers make changes with confidence.
 
@@ -788,7 +796,49 @@ Done when:
 
 - A developer can use the output to decide what to inspect and test next.
 
-### 5.3 Change Risk Summary
+### 5.3 Impact Engine v0.1
+
+Status: planned from [PRD_V01.md](PRD_V01.md).
+
+Human question:
+
+```text
+If I change this file, package, symbol, or diff, what is affected?
+```
+
+Command sketch:
+
+```bash
+gosherpa impact file internal/auth/session.go
+gosherpa impact diff --base origin/main
+gosherpa impact symbol ./internal/auth.Session
+gosherpa impact package ./internal/auth
+gosherpa tests affected --base origin/main
+```
+
+MVP behavior:
+
+- Read changed files from git diffs.
+- Map changed files to packages.
+- Report changed packages and affected dependent packages.
+- Report affected tests at package granularity.
+- Preserve the existing JSON response discipline for new commands.
+
+Architecture:
+
+- `internal/git` reads diffs and changed files; it knows no Go semantics.
+- `internal/index` builds repository graphs; it knows no Git semantics.
+- `internal/impact` consumes index data and produces `ImpactReport`.
+- Test discovery remains separate and package-oriented for v0.1.
+
+Done when:
+
+- `gosherpa impact diff --base <ref>` reports changed packages, affected
+  packages, and affected tests.
+- `gosherpa tests affected --base <ref>` prints suggested `go test` commands.
+- JSON and human output are covered by focused tests and golden fixtures.
+
+### 5.4 Change Risk Summary
 
 Human question:
 
