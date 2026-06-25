@@ -18,6 +18,10 @@ func FormatImpact(result ImpactResult) string {
 		writeImpactValues(&builder, "DIRECT DEPENDENTS", result.Dependencies.UsedBy)
 		builder.WriteString("\n")
 		writeImpactValues(&builder, "AFFECTED PACKAGES", result.Packages)
+		builder.WriteString("\n")
+		writeImpactRelatedTests(&builder, result.RelatedTests)
+		builder.WriteString("\n")
+		writeImpactValues(&builder, "SUGGESTED COMMANDS", result.TestCommands)
 		writeImpactWarnings(&builder, result.Warnings)
 		return builder.String()
 	}
@@ -27,6 +31,10 @@ func FormatImpact(result ImpactResult) string {
 	writeImpactCallers(&builder, result.Callers)
 	builder.WriteString("\n")
 	writeImpactValues(&builder, "AFFECTED PACKAGES", result.Packages)
+	builder.WriteString("\n")
+	writeImpactRelatedTests(&builder, result.RelatedTests)
+	builder.WriteString("\n")
+	writeImpactValues(&builder, "SUGGESTED COMMANDS", result.TestCommands)
 	writeImpactWarnings(&builder, result.Warnings)
 
 	return builder.String()
@@ -78,6 +86,37 @@ func writeImpactValues(builder *strings.Builder, title string, values []string) 
 		builder.WriteString("  ")
 		builder.WriteString(value)
 		builder.WriteString("\n")
+	}
+}
+
+func writeImpactRelatedTests(builder *strings.Builder, tests []RelatedTest) {
+	builder.WriteString("SUGGESTED TESTS\n")
+	if len(tests) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for _, test := range tests {
+		tags := relatedTestTags(test)
+		if tags == "" {
+			fmt.Fprintf(
+				builder,
+				"  %-36s %s:%d\n",
+				test.Name,
+				test.Position.File,
+				test.Position.Line,
+			)
+			continue
+		}
+
+		fmt.Fprintf(
+			builder,
+			"  %-36s %s:%d (%s)\n",
+			test.Name,
+			test.Position.File,
+			test.Position.Line,
+			tags,
+		)
 	}
 }
 

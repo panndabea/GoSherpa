@@ -331,6 +331,24 @@ func Run() {
 	parser.ParseFile()
 }
 `)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
 
 	setMainTestArgs(t, []string{"gosherpa", "--root", tmp, "impact", "ParseFile"})
 
@@ -338,7 +356,7 @@ func Run() {
 		main()
 	})
 
-	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "DIRECT CALLERS", "AFFECTED PACKAGES", "./cmd/app", "./internal/parser"} {
+	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "DIRECT CALLERS", "AFFECTED PACKAGES", "SUGGESTED TESTS", "SUGGESTED COMMANDS", "TestParserPackage", "TestUsesParser", "go test ./cmd/app", "go test ./internal/parser", "./cmd/app", "./internal/parser"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, output)
 		}

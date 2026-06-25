@@ -19,6 +19,8 @@ type ImpactResult struct {
 	Callers      []Caller
 	Dependencies PackageDependencies
 	Packages     []string
+	RelatedTests []RelatedTest
+	TestCommands []string
 	Warnings     []string
 }
 
@@ -51,12 +53,16 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 	}
 
 	packages := uniqueSorted(append([]string{deps.Package}, deps.UsedBy...))
+	tests, warnings := impactTests(root, target)
 
 	return ImpactResult{
 		Target:       deps.Package,
 		Kind:         ImpactKindPackage,
 		Dependencies: deps,
 		Packages:     packages,
+		RelatedTests: tests.Tests,
+		TestCommands: tests.Commands,
+		Warnings:     warnings,
 	}, nil
 }
 
@@ -81,7 +87,21 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 
 	result.Packages = impactedPackages(root, refs, result.Callers)
 
+	tests, warnings := impactTests(root, target)
+	result.RelatedTests = tests.Tests
+	result.TestCommands = tests.Commands
+	result.Warnings = append(result.Warnings, warnings...)
+
 	return result, nil
+}
+
+func impactTests(root string, target string) (TestsResult, []string) {
+	tests, err := FindTests(root, target)
+	if err != nil {
+		return TestsResult{}, []string{err.Error()}
+	}
+
+	return tests, nil
 }
 
 func isImpactNonFunctionTargetError(err error) bool {

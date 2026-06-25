@@ -35,6 +35,26 @@ func TestFormatImpactForSymbol(t *testing.T) {
 			},
 		},
 		Packages: []string{"./cmd/app", "./internal/parser"},
+		RelatedTests: []RelatedTest{
+			{
+				Name:    "TestParserPackage",
+				Package: "./internal/parser",
+				Position: Position{
+					File: "internal/parser/parser_test.go",
+					Line: 5,
+				},
+			},
+			{
+				Name:            "TestUsesParser",
+				Package:         "./cmd/app",
+				DirectReference: true,
+				Position: Position{
+					File: "cmd/app/main_test.go",
+					Line: 9,
+				},
+			},
+		},
+		TestCommands: []string{"go test ./cmd/app", "go test ./internal/parser"},
 	}
 
 	got := FormatImpact(result)
@@ -53,7 +73,15 @@ DIRECT CALLERS
 AFFECTED PACKAGES
   ./cmd/app
   ./internal/parser
-`, "Run")
+
+SUGGESTED TESTS
+  %-36s internal/parser/parser_test.go:5
+  %-36s cmd/app/main_test.go:9 (direct)
+
+SUGGESTED COMMANDS
+  go test ./cmd/app
+  go test ./internal/parser
+`, "Run", "TestParserPackage", "TestUsesParser")
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
@@ -69,10 +97,21 @@ func TestFormatImpactForPackage(t *testing.T) {
 			UsedBy:  []string{"./cmd/api"},
 		},
 		Packages: []string{"./cmd/api", "./internal/auth"},
+		RelatedTests: []RelatedTest{
+			{
+				Name:    "TestAuth",
+				Package: "./internal/auth",
+				Position: Position{
+					File: "internal/auth/service_test.go",
+					Line: 5,
+				},
+			},
+		},
+		TestCommands: []string{"go test ./internal/auth"},
 	}
 
 	got := FormatImpact(result)
-	want := `IMPACT
+	want := fmt.Sprintf(`IMPACT
 
 TARGET
   ./internal/auth (package)
@@ -83,7 +122,13 @@ DIRECT DEPENDENTS
 AFFECTED PACKAGES
   ./cmd/api
   ./internal/auth
-`
+
+SUGGESTED TESTS
+  %-36s internal/auth/service_test.go:5
+
+SUGGESTED COMMANDS
+  go test ./internal/auth
+`, "TestAuth")
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
@@ -109,6 +154,12 @@ DIRECT CALLERS
   none
 
 AFFECTED PACKAGES
+  none
+
+SUGGESTED TESTS
+  none
+
+SUGGESTED COMMANDS
   none
 `
 
@@ -137,6 +188,12 @@ DIRECT CALLERS
   none
 
 AFFECTED PACKAGES
+  none
+
+SUGGESTED TESTS
+  none
+
+SUGGESTED COMMANDS
   none
 
 WARNINGS

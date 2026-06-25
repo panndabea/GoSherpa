@@ -41,7 +41,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
-| Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, and affected packages |
+| Impact analysis | `gosherpa impact ParseFile` | Summarizes direct references, callers, affected packages, and suggested tests |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
@@ -119,7 +119,6 @@ GoSherpa is an early MVP, with the next work focused on deeper navigation and sa
 
 | Next | Goal |
 | --- | --- |
-| Impact test suggestions | Include related tests directly in impact output |
 | Machine-readable output | Add a stable surface for scripts and agents once the concepts settle |
 
 Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
@@ -142,7 +141,7 @@ Known MVP limitations:
 
 - Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
-- Impact analysis is direct-only and does not yet include related tests or transitive callers.
+- Impact analysis is direct-only and does not yet include transitive callers.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.

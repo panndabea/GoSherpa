@@ -69,8 +69,7 @@ Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
-- Impact analysis is direct-only and does not yet include related tests or
-  transitive callers.
+- Impact analysis is direct-only and does not yet include transitive callers.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
@@ -687,8 +686,7 @@ Done when:
 
 ## Phase 5: Tests and Impact
 
-Status: impact MVP and test discovery MVP implemented for symbols and packages;
-impact does not yet include related test suggestions.
+Status: impact MVP and test discovery MVP implemented for symbols and packages.
 
 Goal: help developers make changes with confidence.
 
@@ -767,12 +765,12 @@ MVP behavior:
 - Show direct references and direct callers for symbols.
 - Show direct dependent packages for packages.
 - Show affected local packages.
+- Show related tests and suggested `go test` commands.
 
 Later behavior:
 
 - Accept file targets.
 - Show transitive callers up to a default depth.
-- Show related tests.
 - Show exported API impact when target is exported.
 
 Useful output groups:

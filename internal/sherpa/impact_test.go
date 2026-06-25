@@ -22,6 +22,24 @@ func Run() {
 	parser.ParseFile()
 }
 `)
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
 
 	result, err := FindImpact(tmp, "ParseFile")
 	if err != nil {
@@ -45,6 +63,15 @@ func Run() {
 
 	assertContainsString(t, result.Packages, "./cmd/app")
 	assertContainsString(t, result.Packages, "./internal/parser")
+
+	tests := relatedTestNames(result.RelatedTests)
+	assertContainsString(t, tests, "TestParserPackage")
+	assertContainsString(t, tests, "TestUsesParser")
+
+	wantCommands := []string{"go test ./cmd/app", "go test ./internal/parser"}
+	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
+	}
 }
 
 func TestFindImpactForTypeSymbolDoesNotWarnWhenCallersDoNotApply(t *testing.T) {
@@ -84,6 +111,12 @@ func TestFindImpactForPackage(t *testing.T) {
 
 import "example.com/app/internal/auth"
 `)
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "service_test.go"), `package auth
+
+import "testing"
+
+func TestAuth(t *testing.T) {}
+`)
 
 	result, err := FindImpact(tmp, "./internal/auth")
 	if err != nil {
@@ -104,6 +137,14 @@ import "example.com/app/internal/auth"
 	want := []string{"./cmd/api", "./internal/auth"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	tests := relatedTestNames(result.RelatedTests)
+	assertContainsString(t, tests, "TestAuth")
+
+	wantCommands := []string{"go test ./internal/auth"}
+	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
 	}
 }
 
