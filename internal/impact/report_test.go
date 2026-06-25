@@ -150,6 +150,18 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedImplementati
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
 
+func TestAnalyzePackageRequiresMatchingInterfaceMethodSignatures(t *testing.T) {
+	root := writeInterfaceSignatureProject(t)
+
+	report, err := AnalyzePackage(root, "./internal/auth")
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
 func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	root := writeInterfaceImpactProject(t)
 
@@ -211,6 +223,45 @@ func (JWTAuthenticator) Authenticate() error {
 	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
 
 type SessionStore struct{}
+`)
+
+	return root
+}
+
+func writeInterfaceSignatureProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+type Authenticator interface {
+	Authenticate(user string) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt.go"), `package jwt
+
+type JWTAuthenticator struct{}
+
+func (JWTAuthenticator) Authenticate(name string) error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "bad", "bad.go"), `package bad
+
+type BadAuthenticator struct{}
+
+func (BadAuthenticator) Authenticate() error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "count", "count.go"), `package count
+
+type CountAuthenticator struct{}
+
+func (CountAuthenticator) Authenticate(user string) (bool, error) {
+	return false, nil
+}
 `)
 
 	return root

@@ -1,8 +1,10 @@
 package impact
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"path"
 	"path/filepath"
@@ -28,15 +30,17 @@ type interfaceInfo struct {
 	Name      string
 	Package   string
 	Qualified string
-	Methods   map[string]struct{}
+	Methods   methodSet
 }
 
 type typeInfo struct {
 	Name      string
 	Package   string
 	Qualified string
-	Methods   map[string]struct{}
+	Methods   methodSet
 }
+
+type methodSet map[string]string
 
 type interfaceSymbolTarget struct {
 	Package  string
@@ -231,7 +235,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 				}
 
 				typ := ensureTypeInfo(typesByQualified, packagePath, receiver)
-				typ.Methods[decl.Name.Name] = struct{}{}
+				typ.Methods[decl.Name.Name] = methodSignature(decl.Type)
 			}
 		}
 	}
@@ -272,15 +276,61 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 	return graph, nil
 }
 
-func interfaceMethodSet(iface *ast.InterfaceType) map[string]struct{} {
-	methods := make(map[string]struct{})
+func interfaceMethodSet(iface *ast.InterfaceType) methodSet {
+	methods := make(methodSet)
 	for _, method := range iface.Methods.List {
+		funcType, ok := method.Type.(*ast.FuncType)
+		if !ok {
+			continue
+		}
+
+		signature := methodSignature(funcType)
 		for _, name := range method.Names {
-			methods[name.Name] = struct{}{}
+			methods[name.Name] = signature
 		}
 	}
 
 	return methods
+}
+
+func methodSignature(funcType *ast.FuncType) string {
+	if funcType == nil {
+		return ""
+	}
+
+	return fieldListSignature(funcType.Params) + "->" + fieldListSignature(funcType.Results)
+}
+
+func fieldListSignature(fields *ast.FieldList) string {
+	if fields == nil || len(fields.List) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, field := range fields.List {
+		fieldType := exprSignature(field.Type)
+		count := len(field.Names)
+		if count == 0 {
+			count = 1
+		}
+
+		for range count {
+			parts = append(parts, fieldType)
+		}
+	}
+
+	return strings.Join(parts, ",")
+}
+
+func exprSignature(expr ast.Expr) string {
+	switch expr := expr.(type) {
+	case *ast.FuncType:
+		return "func(" + fieldListSignature(expr.Params) + ")->" + fieldListSignature(expr.Results)
+	}
+
+	var buffer bytes.Buffer
+	_ = printer.Fprint(&buffer, token.NewFileSet(), expr)
+	return buffer.String()
 }
 
 func ensureTypeInfo(types map[string]*typeInfo, packagePath string, name string) *typeInfo {
@@ -293,7 +343,7 @@ func ensureTypeInfo(types map[string]*typeInfo, packagePath string, name string)
 		Name:      name,
 		Package:   packagePath,
 		Qualified: qualified,
-		Methods:   make(map[string]struct{}),
+		Methods:   make(methodSet),
 	}
 	types[qualified] = typ
 
@@ -320,8 +370,9 @@ func interfaceReceiverName(funcDecl *ast.FuncDecl) string {
 }
 
 func typeImplementsInterface(typ typeInfo, iface interfaceInfo) bool {
-	for method := range iface.Methods {
-		if _, ok := typ.Methods[method]; !ok {
+	for method, ifaceSignature := range iface.Methods {
+		typeSignature, ok := typ.Methods[method]
+		if !ok || typeSignature != ifaceSignature {
 			return false
 		}
 	}

@@ -78,7 +78,8 @@ Implemented:
 - `gosherpa impact diff --base <ref>` with human and JSON output.
 - `gosherpa tests affected --base <ref>` with human and JSON output.
 - `gosherpa impact file|package|symbol` with human and JSON output.
-- Interface and implementer impact signals based on local method sets.
+- Interface and implementer impact signals based on local method sets with
+  signature matching.
 
 Current limitations:
 
@@ -90,8 +91,8 @@ Current limitations:
   hunks.
 - File, package, and symbol impact use the shared report model, but symbol
   impact does not yet fully disambiguate duplicate package-qualified symbols.
-- Interface implementer impact uses method-name matching and does not yet
-  compare method signatures or embedded interfaces.
+- Interface implementer impact compares method signatures by local AST shape,
+  but does not yet resolve embedded interfaces or cross-package type identity.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
@@ -817,7 +818,7 @@ Status: foundation started from [PRD_V01.md](PRD_V01.md);
 <ref>` and `gosherpa tests affected --base <ref>` are implemented for human
 and JSON output. `gosherpa impact file|package|symbol` is implemented for
 human and JSON output. Interface and implementer impact signals are implemented
-as a conservative local method-set scan.
+as a conservative local method-set scan with signature matching.
 
 Human question:
 
@@ -844,7 +845,7 @@ MVP behavior:
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Report affected interfaces and implementations. Implemented foundation with
-  method-name matching.
+  method signature matching.
 - Preserve the existing JSON response discipline for new commands. Implemented
   for `impact diff`, `tests affected`, and `impact file|package|symbol`.
 
@@ -868,7 +869,7 @@ Done when:
 - `gosherpa impact file|package|symbol` reports package/test impact through
   `ImpactReport`. Implemented foundation.
 - Affected interfaces and implementations are populated for changed packages
-  and symbol targets. Implemented foundation.
+  and symbol targets. Implemented foundation with signature matching.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.
 
