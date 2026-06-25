@@ -2,11 +2,18 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
+)
+
+const (
+	exitSuccess = 0
+	exitFailure = 1
+	exitUsage   = 2
 )
 
 type cliInvocation struct {
@@ -137,159 +144,169 @@ func parsePositiveInteger(flag string, value string) (int, error) {
 }
 
 func main() {
-	invocation, err := parseCLIArgs(os.Args[1:])
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout io.Writer, stderr io.Writer) int {
+	invocation, err := parseCLIArgs(args)
 	if err != nil {
-		fmt.Println("error:", err)
-		return
+		fmt.Fprintln(stderr, "error:", err)
+		return exitUsage
 	}
 
 	if invocation.Command == "" {
-		printUsage()
-		return
+		printUsage(stderr)
+		return exitUsage
 	}
 
 	if invocation.HasCallPathOption && invocation.Command != "path" && invocation.Command != "paths" {
-		fmt.Println("error: --limit and --max-depth are only supported by path commands")
-		return
+		fmt.Fprintln(stderr, "error: --limit and --max-depth are only supported by path commands")
+		return exitUsage
 	}
 
 	switch invocation.Command {
 	case "symbol":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] symbol <name>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <name>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		name := invocation.CommandArgs[0]
 
 		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
 		symbol := sherpa.FindSymbol(symbols, name)
 		if symbol == nil {
-			fmt.Println("symbol not found:", name)
-			return
+			fmt.Fprintln(stderr, "symbol not found:", name)
+			return exitFailure
 		}
 
-		fmt.Println("Name:", symbol.Name)
-		fmt.Println("Kind:", symbol.Kind)
-		fmt.Println("File:", symbol.Position.File)
-		fmt.Println("Line:", symbol.Position.Line)
+		fmt.Fprintln(stdout, "Name:", symbol.Name)
+		fmt.Fprintln(stdout, "Kind:", symbol.Kind)
+		fmt.Fprintln(stdout, "File:", symbol.Position.File)
+		fmt.Fprintln(stdout, "Line:", symbol.Position.Line)
+		return exitSuccess
 
 	case "symbols":
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintSymbols(symbols)
+		fmt.Fprint(stdout, sherpa.FormatSymbols(symbols))
+		return exitSuccess
 
 	case "refs":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] refs <name>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		name := invocation.CommandArgs[0]
 
 		refs, err := sherpa.FindReferences(root, name)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintReferences(name, refs)
+		fmt.Fprint(stdout, sherpa.FormatReferences(name, refs))
+		return exitSuccess
 
 	case "impact":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] impact <symbol-or-package>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] impact <symbol-or-package>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		target := invocation.CommandArgs[0]
 
 		result, err := sherpa.FindImpact(root, target)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintImpact(result)
+		fmt.Fprint(stdout, sherpa.FormatImpact(result))
+		return exitSuccess
 
 	case "tests":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] tests <symbol-or-package>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] tests <symbol-or-package>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		target := invocation.CommandArgs[0]
 
 		result, err := sherpa.FindTests(root, target)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintTests(result)
+		fmt.Fprint(stdout, sherpa.FormatTests(result))
+		return exitSuccess
 
 	case "deps":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] deps <package>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] deps <package>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		targetPackage := invocation.CommandArgs[0]
 
 		deps, err := sherpa.FindPackageDependencies(root, targetPackage)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintPackageDependencies(deps)
+		fmt.Fprint(stdout, sherpa.FormatPackageDependencies(deps))
+		return exitSuccess
 	case "path", "paths":
 		if len(invocation.CommandArgs) < 2 {
-			fmt.Printf("usage: gosherpa [--root <path>] %s <from> <to> [--limit <n>] [--max-depth <n>]\n", invocation.Command)
-			return
+			fmt.Fprintf(stderr, "usage: gosherpa [--root <path>] %s <from> <to> [--limit <n>] [--max-depth <n>]\n", invocation.Command)
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		options := sherpa.CallPathOptions{
@@ -299,82 +316,86 @@ func main() {
 
 		result, err := sherpa.FindCallPaths(root, invocation.CommandArgs[0], invocation.CommandArgs[1], options)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintCallPaths(result)
+		fmt.Fprint(stdout, sherpa.FormatCallPaths(result))
+		return exitSuccess
 	case "callers":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] callers <function-or-method>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		target := invocation.CommandArgs[0]
 
 		result, err := sherpa.FindCallers(root, target)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintCallers(result)
+		fmt.Fprint(stdout, sherpa.FormatCallers(result))
+		return exitSuccess
 	case "callees":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Println("usage: gosherpa [--root <path>] callees <function-or-method>")
-			return
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callees <function-or-method>")
+			return exitUsage
 		}
 
-		root, ok := resolveRootPath(invocation.Root)
+		root, ok := resolveRootPath(invocation.Root, stderr)
 		if !ok {
-			return
+			return exitFailure
 		}
 
 		target := invocation.CommandArgs[0]
 
 		result, err := sherpa.FindCallees(root, target)
 		if err != nil {
-			fmt.Println("error:", err)
-			return
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
 		}
 
-		sherpa.PrintCallees(result)
+		fmt.Fprint(stdout, sherpa.FormatCallees(result))
+		return exitSuccess
 	default:
-		fmt.Println("unknown command:", invocation.Command)
-		printUsage()
+		fmt.Fprintln(stderr, "unknown command:", invocation.Command)
+		printUsage(stderr)
+		return exitUsage
 	}
 }
 
-func resolveRootPath(root string) (string, bool) {
+func resolveRootPath(root string, stderr io.Writer) (string, bool) {
 	repositoryRoot, err := sherpa.ResolveRepositoryRoot(root)
 	if err != nil {
-		fmt.Println("error:", err)
+		fmt.Fprintln(stderr, "error:", err)
 		return "", false
 	}
 
 	return repositoryRoot.Path, true
 }
 
-func printUsage() {
-	fmt.Println("usage: gosherpa [--root <path>] <command> [args]")
-	fmt.Println()
-	fmt.Println("global options:")
-	fmt.Println("  --root <path>    repository root, defaults to .")
-	fmt.Println()
-	fmt.Println("commands:")
-	fmt.Println("  symbols")
-	fmt.Println("  symbol <name>")
-	fmt.Println("  refs <name>")
-	fmt.Println("  impact <symbol-or-package>")
-	fmt.Println("  tests <symbol-or-package>")
-	fmt.Println("  deps <package>")
-	fmt.Println("  path <from> <to>")
-	fmt.Println("  paths <from> <to> [--limit <n>] [--max-depth <n>]")
-	fmt.Println("  callers <function-or-method>")
-	fmt.Println("  callees <function-or-method>")
+func printUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] <command> [args]")
+	fmt.Fprintln(writer)
+	fmt.Fprintln(writer, "global options:")
+	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
+	fmt.Fprintln(writer)
+	fmt.Fprintln(writer, "commands:")
+	fmt.Fprintln(writer, "  symbols")
+	fmt.Fprintln(writer, "  symbol <name>")
+	fmt.Fprintln(writer, "  refs <name>")
+	fmt.Fprintln(writer, "  impact <symbol-or-package>")
+	fmt.Fprintln(writer, "  tests <symbol-or-package>")
+	fmt.Fprintln(writer, "  deps <package>")
+	fmt.Fprintln(writer, "  path <from> <to>")
+	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
+	fmt.Fprintln(writer, "  callers <function-or-method>")
+	fmt.Fprintln(writer, "  callees <function-or-method>")
 }

@@ -136,6 +136,7 @@ Implemented today:
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
 - Repository root selection with `--root`
+- Stable CLI exit codes with diagnostics on stderr
 
 Known MVP limitations:
 

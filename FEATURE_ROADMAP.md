@@ -64,6 +64,7 @@ Implemented:
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
 - Repository root selection with `--root`.
+- Stable CLI exit codes with diagnostics on stderr.
 
 Current limitations:
 
@@ -179,6 +180,8 @@ Done when:
 
 ### 0.3 Exit Codes
 
+Status: implemented.
+
 Human question:
 
 ```text
@@ -188,11 +191,10 @@ Did the command succeed, find nothing, or fail?
 Requirements:
 
 - Exit `0` for successful command execution.
-- Exit non-zero for invalid usage, parse errors, missing repository roots, and
-  ambiguous targets.
-- Decide whether "not found" should be exit `0` with an empty state or a
-  distinct non-zero status. For human-first UX, prefer exit `0` when the command
-  ran successfully and found no matches.
+- Exit `1` for runtime and analysis errors.
+- Exit `2` for invalid usage.
+- Print diagnostics and usage errors to stderr.
+- Keep successful command output on stdout.
 
 Done when:
 

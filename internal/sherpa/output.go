@@ -5,20 +5,29 @@ import (
 	"strings"
 )
 
-func PrintSymbols(symbols []Symbol) {
-	printSymbolGroup("📦 STRUCTS", symbols, SymbolKindStruct)
-	printSymbolGroup("🔌 INTERFACES", symbols, SymbolKindInterface)
-	printSymbolGroup("⚙️ FUNCTIONS", symbols, SymbolKindFunction)
-	printSymbolGroup("🔧 METHODS", symbols, SymbolKindMethod)
-	printTests(symbols)
+func FormatSymbols(symbols []Symbol) string {
+	var builder strings.Builder
+
+	writeSymbolGroup(&builder, "📦 STRUCTS", symbols, SymbolKindStruct)
+	writeSymbolGroup(&builder, "🔌 INTERFACES", symbols, SymbolKindInterface)
+	writeSymbolGroup(&builder, "⚙️ FUNCTIONS", symbols, SymbolKindFunction)
+	writeSymbolGroup(&builder, "🔧 METHODS", symbols, SymbolKindMethod)
+	writeSymbolTests(&builder, symbols)
+
+	return builder.String()
 }
 
-func printSymbolGroup(title string, symbols []Symbol, kind SymbolKind) {
+func PrintSymbols(symbols []Symbol) {
+	fmt.Print(FormatSymbols(symbols))
+}
+
+func writeSymbolGroup(builder *strings.Builder, title string, symbols []Symbol, kind SymbolKind) {
 	if !hasSymbolsOfKind(symbols, kind) {
 		return
 	}
 
-	fmt.Println(title)
+	builder.WriteString(title)
+	builder.WriteString("\n")
 
 	for _, symbol := range symbols {
 		if symbol.Kind != kind {
@@ -34,7 +43,8 @@ func printSymbolGroup(title string, symbols []Symbol, kind SymbolKind) {
 			name = symbol.Receiver + "." + symbol.Name
 		}
 
-		fmt.Printf(
+		fmt.Fprintf(
+			builder,
 			"  %-36s %s:%d\n",
 			name,
 			symbol.Position.File,
@@ -42,15 +52,15 @@ func printSymbolGroup(title string, symbols []Symbol, kind SymbolKind) {
 		)
 	}
 
-	fmt.Println()
+	builder.WriteString("\n")
 }
 
-func printTests(symbols []Symbol) {
+func writeSymbolTests(builder *strings.Builder, symbols []Symbol) {
 	if !hasTests(symbols) {
 		return
 	}
 
-	fmt.Println("🧪 TESTS")
+	builder.WriteString("🧪 TESTS\n")
 
 	for _, symbol := range symbols {
 		if symbol.Kind != SymbolKindFunction {
@@ -61,7 +71,8 @@ func printTests(symbols []Symbol) {
 			continue
 		}
 
-		fmt.Printf(
+		fmt.Fprintf(
+			builder,
 			"  %-36s %s:%d\n",
 			symbol.Name,
 			symbol.Position.File,
@@ -69,7 +80,7 @@ func printTests(symbols []Symbol) {
 		)
 	}
 
-	fmt.Println()
+	builder.WriteString("\n")
 }
 
 func hasSymbolsOfKind(symbols []Symbol, kind SymbolKind) bool {
