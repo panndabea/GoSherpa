@@ -64,6 +64,10 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 		AffectedImplementations: []string{},
 	}
 
+	report.AffectedSymbols, err = ChangedSymbols(a.Root, base, head)
+	if err != nil {
+		return ImpactReport{}, err
+	}
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)

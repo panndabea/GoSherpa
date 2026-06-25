@@ -80,15 +80,16 @@ Implemented:
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
   signature matching and embedded-interface expansion.
+- Changed-symbol extraction from git diff hunks.
 
 Current limitations:
 
 - References are type-aware inside packages and recognize local package selector
   calls, but do not yet use full module/package loading.
 - Impact analysis is direct-only and does not yet include transitive callers.
-- Diff impact is currently package/test-level plus method-set
-  interface/implementer signals; it does not yet extract changed symbols from
-  hunks.
+- Diff impact extracts changed symbols from current-file hunk ranges;
+  deletion-only symbols that no longer exist in the working tree may not be
+  reported.
 - File, package, and symbol impact use the shared report model, but symbol
   impact does not yet fully disambiguate duplicate package-qualified symbols.
 - Interface implementer impact compares method signatures by local AST shape
@@ -815,12 +816,13 @@ Done when:
 
 Status: foundation started from [PRD_V01.md](PRD_V01.md);
 `internal/git.ChangedFiles`, `internal/impact.ChangedPackages`, and
-`internal/impact.AnalyzeDiff` are implemented. `gosherpa impact diff --base
+`internal/impact.AnalyzeDiff` are implemented. `internal/impact.ChangedSymbols`
+extracts changed symbols from git diff hunks. `gosherpa impact diff --base
 <ref>` and `gosherpa tests affected --base <ref>` are implemented for human
-and JSON output. `gosherpa impact file|package|symbol` is implemented for
-human and JSON output. Interface and implementer impact signals are implemented
-as a conservative local method-set scan with signature matching and
-embedded-interface expansion.
+and JSON output. `gosherpa impact file|package|symbol` is implemented for human
+and JSON output. Interface and implementer impact signals are implemented as a
+conservative local method-set scan with signature matching and embedded-interface
+expansion.
 
 Human question:
 
@@ -844,6 +846,7 @@ MVP behavior:
 - Map changed files to packages. Implemented foundation for Go files.
 - Report changed packages and affected dependent packages. Implemented
   foundation for diff reports.
+- Report changed symbols from git diff hunks. Implemented foundation.
 - Report affected tests at package granularity. Implemented foundation for
   affected packages.
 - Report affected interfaces and implementations. Implemented foundation with
@@ -853,13 +856,14 @@ MVP behavior:
 
 Architecture:
 
-- `internal/git` reads diffs and changed files; it knows no Go semantics.
-  `ChangedFiles` is implemented first.
+- `internal/git` reads diffs, changed files, and changed hunk line ranges; it
+  knows no Go semantics. `ChangedFiles` and hunk range parsing are implemented.
 - `internal/index` builds repository graphs; it knows no Git semantics.
 - `internal/impact` consumes index data and produces `ImpactReport`.
   `ChangedPackages` maps changed Go files to local package paths first, and
-  `AnalyzeDiff`, `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce
-  the first package/test/interface/implementation impact reports.
+  `ChangedSymbols` maps hunk ranges to current-file Go symbols. `AnalyzeDiff`,
+  `AnalyzeFile`, `AnalyzePackage`, and `AnalyzeSymbol` produce the first
+  package/test/symbol/interface/implementation impact reports.
 - Test discovery remains separate and package-oriented for v0.1.
 
 Done when:
@@ -870,6 +874,9 @@ Done when:
   Implemented foundation.
 - `gosherpa impact file|package|symbol` reports package/test impact through
   `ImpactReport`. Implemented foundation.
+- `gosherpa impact diff --base <ref>` reports affected symbols from changed
+  hunks where the current file still contains the symbol. Implemented
+  foundation.
 - Affected interfaces and implementations are populated for changed packages
   and symbol targets. Implemented foundation with signature matching and
   embedded-interface expansion.

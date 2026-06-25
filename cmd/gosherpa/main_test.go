@@ -995,6 +995,8 @@ func NewSession() Session {
 		"./internal/auth",
 		"AFFECTED PACKAGES",
 		"./internal/api",
+		"AFFECTED SYMBOLS",
+		"NewSession",
 		"AFFECTED TESTS",
 		"TestSession",
 		"TestHandler",
@@ -1067,6 +1069,7 @@ func NewSession() Session {
 	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
 	assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 

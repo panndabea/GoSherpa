@@ -16,7 +16,9 @@
       ".",
       "./cmd/app"
     ],
-    "affectedSymbols": [],
+    "affectedSymbols": [
+      "Added"
+    ],
     "affectedInterfaces": [],
     "affectedImplementations": [],
     "affectedTests": [

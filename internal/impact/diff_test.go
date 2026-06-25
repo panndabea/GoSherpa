@@ -80,6 +80,47 @@ func TestChangedPackagesAgainstWorkingTree(t *testing.T) {
 	}
 }
 
+func TestChangedSymbolsBetweenRefs(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+type Server struct{}
+
+func (Server) Run() string {
+	return "old"
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+type Server struct{}
+
+func (Server) Run() string {
+	return "new"
+}
+
+func Added() {}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "change symbols")
+	head := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	got, err := ChangedSymbols(root, base, head)
+	if err != nil {
+		t.Fatalf("ChangedSymbols returned error: %v", err)
+	}
+
+	want := []string{"Added", "Server.Run"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ChangedSymbols() = %#v, want %#v", got, want)
+	}
+}
+
 func TestChangedPackagesPropagatesGitErrors(t *testing.T) {
 	root := initImpactGitTestRepository(t)
 

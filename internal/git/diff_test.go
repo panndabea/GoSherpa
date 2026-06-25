@@ -55,6 +55,50 @@ func TestChangedFilesAgainstWorkingTree(t *testing.T) {
 	}
 }
 
+func TestChangedLineRangesBetweenRefs(t *testing.T) {
+	root := initGitTestRepository(t)
+
+	writeGitTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Run() string {
+	return "old"
+}
+`)
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+
+	writeGitTestFile(t, filepath.Join(root, "service.go"), `package service
+
+func Run() string {
+	return "new"
+}
+
+func Added() {}
+`)
+	runGit(t, root, "add", ".")
+	runGit(t, root, "commit", "-m", "change service")
+	head := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+
+	got, err := ChangedLineRanges(root, base, head)
+	if err != nil {
+		t.Fatalf("ChangedLineRanges returned error: %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("ChangedLineRanges returned %#v, want one changed file", got)
+	}
+	if got[0].Path != "service.go" {
+		t.Fatalf("ChangedLineRanges path = %q, want service.go", got[0].Path)
+	}
+	if !lineRangesContain(got[0].Ranges, 4) {
+		t.Fatalf("ChangedLineRanges ranges = %#v, want line 4", got[0].Ranges)
+	}
+	if !lineRangesContain(got[0].Ranges, 7) {
+		t.Fatalf("ChangedLineRanges ranges = %#v, want line 7", got[0].Ranges)
+	}
+}
+
 func TestChangedFilesRejectsEmptyRoot(t *testing.T) {
 	_, err := ChangedFiles(" \t ", "HEAD", "")
 	if err == nil {
@@ -86,6 +130,18 @@ func TestChangedFilesReturnsGitErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "git diff --name-only failed") {
 		t.Fatalf("ChangedFiles error = %q, want git diff error", err)
+	}
+}
+
+func TestChangedLineRangesReturnsGitErrors(t *testing.T) {
+	root := initGitTestRepository(t)
+
+	_, err := ChangedLineRanges(root, "missing-ref", "")
+	if err == nil {
+		t.Fatal("ChangedLineRanges returned nil error")
+	}
+	if !strings.Contains(err.Error(), "git diff --unified=0 failed") {
+		t.Fatalf("ChangedLineRanges error = %q, want git diff error", err)
 	}
 }
 
@@ -131,4 +187,14 @@ func writeGitTestFile(t *testing.T, path string, contents string) {
 	if err := os.WriteFile(path, []byte(contents), 0644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
+}
+
+func lineRangesContain(ranges []ChangedLineRange, line int) bool {
+	for _, lineRange := range ranges {
+		if lineRange.Start <= line && line <= lineRange.End {
+			return true
+		}
+	}
+
+	return false
 }

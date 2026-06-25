@@ -6,7 +6,7 @@ import (
 )
 
 func FormatDiffReport(report ImpactReport) string {
-	return formatImpactReport("IMPACT DIFF", report, true, true, false)
+	return formatImpactReport("IMPACT DIFF", report, true, true, true)
 }
 
 func FormatFileReport(report ImpactReport) string {
