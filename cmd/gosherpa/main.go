@@ -42,6 +42,14 @@ type referencesJSONData struct {
 	References []sherpa.Reference `json:"references"`
 }
 
+type symbolJSONData struct {
+	Symbol sherpa.Symbol `json:"symbol"`
+}
+
+type symbolsJSONData struct {
+	Symbols []sherpa.Symbol `json:"symbols"`
+}
+
 type impactJSONData struct {
 	Kind         sherpa.ImpactKind          `json:"kind"`
 	References   []sherpa.Reference         `json:"references"`
@@ -223,7 +231,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --json is only supported by refs, impact, tests, deps, path, paths, callers, and callees")
+		fmt.Fprintln(stderr, "error: --json is only supported by known commands")
 		return exitUsage
 	}
 
@@ -253,6 +261,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", name, nil, symbolJSONData{
+				Symbol: *symbol,
+			}))
+		}
+
 		fmt.Fprintln(stdout, "Name:", symbol.Name)
 		fmt.Fprintln(stdout, "Kind:", symbol.Kind)
 		fmt.Fprintln(stdout, "File:", symbol.Position.File)
@@ -269,6 +283,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return exitFailure
+		}
+
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", nil, symbolsJSONData{
+				Symbols: nonNilSlice(symbols),
+			}))
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatSymbols(symbols))
@@ -517,7 +537,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
+	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
 		return true
 	default:
 		return false
@@ -677,7 +697,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "global options:")
 	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
-	fmt.Fprintln(writer, "  --json           machine-readable output for analysis commands")
+	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  symbols")

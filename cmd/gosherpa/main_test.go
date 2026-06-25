@@ -209,7 +209,7 @@ func TestPrintUsageIncludesRoot(t *testing.T) {
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] <command> [args]",
 		"--root <path>    repository root, defaults to .",
-		"--json           machine-readable output for analysis commands",
+		"--json           machine-readable output for all commands",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -980,6 +980,77 @@ func Run() {}
 	}
 }
 
+func TestMainRunsSymbolsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Worker struct{}
+
+func Run() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbols", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "symbols", "", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "symbols", 2)
+
+	if strings.Contains(result.Stdout, "FUNCTIONS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsSymbolCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbol", "Run", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "symbol", "Run", "example.com/app")
+
+	symbol, ok := data["symbol"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected symbol to be a JSON object, got %T", data["symbol"])
+	}
+
+	if symbol["name"] != "Run" {
+		t.Fatalf("expected symbol name Run, got %v", symbol["name"])
+	}
+
+	if symbol["kind"] != "function" {
+		t.Fatalf("expected symbol kind function, got %v", symbol["kind"])
+	}
+
+	if strings.Contains(result.Stdout, "Name:") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsRefsWithRootAfterCommandArgument(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1139,22 +1210,6 @@ func TestRunReturnsFailureExitWhenSymbolIsMissing(t *testing.T) {
 
 	if !strings.Contains(result.Stderr, "symbol not found: Missing") {
 		t.Fatalf("expected missing symbol error, got:\n%s", result.Stderr)
-	}
-
-	if result.Stdout != "" {
-		t.Fatalf("expected empty stdout, got %q", result.Stdout)
-	}
-}
-
-func TestMainPrintsErrorForJSONOnUnsupportedCommand(t *testing.T) {
-	result := runMainTest(t, []string{"gosherpa", "--json", "symbols"})
-
-	if result.ExitCode != exitUsage {
-		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
-	}
-
-	if !strings.Contains(result.Stderr, "error: --json is only supported by refs, impact, tests, deps, path, paths, callers, and callees") {
-		t.Fatalf("expected unsupported JSON error, got:\n%s", result.Stderr)
 	}
 
 	if result.Stdout != "" {

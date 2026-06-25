@@ -63,8 +63,7 @@ Implemented:
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
-- Machine-readable JSON output for analysis commands with a stable response
-  envelope.
+- Machine-readable JSON output for all commands with a stable response envelope.
 - Repository root selection with `--root`.
 - Stable CLI exit codes with diagnostics on stderr.
 
@@ -78,8 +77,7 @@ Current limitations:
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
 - Function names can be ambiguous across packages.
-- JSON output is currently limited to analysis commands and does not cover
-  `symbol` or `symbols`.
+- JSON schemas are versioned, but not yet covered by golden fixture tests.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -1003,7 +1001,7 @@ will not churn constantly.
 
 ### 8.1 JSON Output
 
-Status: partial MVP implemented for analysis commands with a versioned response
+Status: JSON MVP implemented for all commands with a versioned response
 envelope.
 
 Human and agent question:
@@ -1021,7 +1019,7 @@ gosherpa impact ./internal/user --json
 
 Requirements:
 
-- Extend `--json` to `symbol` and `symbols`.
+- Extend `--json` to all commands. Implemented.
 - Define stable schemas per command.
 - Include schema version. Implemented for the current JSON commands.
 - Include command metadata. Implemented for the current JSON commands:
@@ -1352,7 +1350,7 @@ Theme: make GoSherpa excellent for scripts and agents.
 
 Included:
 
-- `--json` for symbol commands
+- golden JSON fixtures
 - stable schemas
 - batch query mode
 - possible MCP server
