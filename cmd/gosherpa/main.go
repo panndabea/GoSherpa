@@ -30,6 +30,8 @@ type cliInvocation struct {
 	HasCallPathOption bool
 	BaseRef           string
 	HasBaseOption     bool
+	IncludeTests      bool
+	HasTestsOption    bool
 }
 
 type jsonResponse[T any] struct {
@@ -132,6 +134,12 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 
 		if arg == "--json" {
 			invocation.JSON = true
+			continue
+		}
+
+		if arg == "--tests" {
+			invocation.IncludeTests = true
+			invocation.HasTestsOption = true
 			continue
 		}
 
@@ -312,6 +320,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --tests is only supported by callers and explain")
+		return exitUsage
+	}
+
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --json is only supported by known commands")
 		return exitUsage
@@ -320,7 +333,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	switch invocation.Command {
 	case "explain":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol> [--tests]")
 			return exitUsage
 		}
 
@@ -331,7 +344,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		report, err := explainengine.Analyze(root, target)
+		report, err := explainengine.AnalyzeWithOptions(root, target, explainengine.AnalyzeOptions{
+			IncludeTests: invocation.IncludeTests,
+		})
 		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return exitFailure
@@ -670,7 +685,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitSuccess
 	case "callers":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method> [--tests]")
 			return exitUsage
 		}
 
@@ -681,7 +696,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := sherpa.FindCallers(root, target)
+		result, err := sherpa.FindCallersWithOptions(root, target, sherpa.CallOptions{
+			IncludeTests: invocation.IncludeTests,
+		})
 		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return exitFailure
@@ -759,6 +776,15 @@ func supportsJSON(command string) bool {
 
 func isBaseAwareInvocation(invocation cliInvocation) bool {
 	return isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
+}
+
+func supportsTestsOption(command string) bool {
+	switch command {
+	case "callers", "explain":
+		return true
+	default:
+		return false
+	}
 }
 
 func isImpactDiffInvocation(invocation cliInvocation) bool {
@@ -1028,7 +1054,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
-	fmt.Fprintln(writer, "  explain <symbol>")
+	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <name>")
 	fmt.Fprintln(writer, "  refs <name>")
@@ -1042,7 +1068,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  deps <package>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
-	fmt.Fprintln(writer, "  callers <function-or-method>")
+	fmt.Fprintln(writer, "  callers <function-or-method> [--tests]")
 	fmt.Fprintln(writer, "  callees <function-or-method>")
 }
 

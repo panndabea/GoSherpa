@@ -32,13 +32,13 @@ type explainFunctionInfo struct {
 	Imports  map[string]string
 }
 
-func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol) ([]sherpa.Caller, []sherpa.Callee, []string) {
+func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) ([]sherpa.Caller, []sherpa.Callee, []string) {
 	callTarget := callSignalTargetForSymbol(root, target, symbol)
 	if callTarget.Name == "" {
 		return nil, nil, nil
 	}
 
-	callers, callees, err := findCallSignals(root, callTarget)
+	callers, callees, err := findCallSignals(root, callTarget, options)
 	if err != nil {
 		return nil, nil, []string{"calls: " + err.Error()}
 	}
@@ -67,8 +67,8 @@ func callSignalTargetForSymbol(root string, target string, symbol sherpa.Symbol)
 	}
 }
 
-func findCallSignals(root string, target callSignalTarget) ([]sherpa.Caller, []sherpa.Callee, error) {
-	functions, err := collectExplainFunctionInfos(root)
+func findCallSignals(root string, target callSignalTarget, options AnalyzeOptions) ([]sherpa.Caller, []sherpa.Callee, error) {
+	functions, err := collectExplainFunctionInfos(root, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,10 +78,18 @@ func findCallSignals(root string, target callSignalTarget) ([]sherpa.Caller, []s
 		return nil, nil, err
 	}
 
-	return collectExplainCallers(functions, target), collectExplainCallees(function), nil
+	callerFunctions := functions
+	if options.IncludeTests {
+		callerFunctions, err = collectExplainFunctionInfos(root, true)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return collectExplainCallers(callerFunctions, target), collectExplainCallees(function), nil
 }
 
-func collectExplainFunctionInfos(root string) ([]explainFunctionInfo, error) {
+func collectExplainFunctionInfos(root string, includeTests bool) ([]explainFunctionInfo, error) {
 	rootPath, err := explainAbsoluteRootPath(root)
 	if err != nil {
 		return nil, err
@@ -95,9 +103,15 @@ func collectExplainFunctionInfos(root string) ([]explainFunctionInfo, error) {
 	modulePath, _ := sherpa.ModulePath(rootPath)
 	sort.Strings(files)
 
+	regularPackages, err := explainRegularPackageNames(files)
+	if err != nil {
+		return nil, err
+	}
+
 	var functions []explainFunctionInfo
 	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
+		isTestFile := strings.HasSuffix(file, "_test.go")
+		if isTestFile && !includeTests {
 			continue
 		}
 
@@ -108,6 +122,9 @@ func collectExplainFunctionInfos(root string) ([]explainFunctionInfo, error) {
 		}
 
 		packagePath := explainPackagePathForFile(rootPath, file)
+		if isTestFile {
+			packagePath = explainTestPackagePath(packagePath, parsedFile.Name.Name, regularPackages[filepath.Dir(file)])
+		}
 		imports := explainImportAliases(parsedFile, modulePath)
 		for _, decl := range parsedFile.Decls {
 			funcDecl, ok := decl.(*ast.FuncDecl)
@@ -134,6 +151,36 @@ func collectExplainFunctionInfos(root string) ([]explainFunctionInfo, error) {
 	}
 
 	return functions, nil
+}
+
+func explainRegularPackageNames(files []string) (map[string]string, error) {
+	names := make(map[string]string)
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+
+		fileSet := token.NewFileSet()
+		parsedFile, err := parser.ParseFile(fileSet, file, nil, parser.PackageClauseOnly)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", file, err)
+		}
+
+		dir := filepath.Dir(file)
+		if names[dir] == "" {
+			names[dir] = parsedFile.Name.Name
+		}
+	}
+
+	return names, nil
+}
+
+func explainTestPackagePath(packagePath string, packageName string, regularPackageName string) string {
+	if regularPackageName == "" || packageName == regularPackageName {
+		return packagePath
+	}
+
+	return packagePath + "_test"
 }
 
 func findExplainFunctionInfo(functions []explainFunctionInfo, target callSignalTarget) (explainFunctionInfo, error) {

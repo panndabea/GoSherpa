@@ -32,6 +32,10 @@ type Report struct {
 	Warnings                []string             `json:"warnings"`
 }
 
+type AnalyzeOptions struct {
+	IncludeTests bool `json:"includeTests"`
+}
+
 type RiskSummary struct {
 	Level   string   `json:"level"`
 	Reasons []string `json:"reasons"`
@@ -55,6 +59,10 @@ type symbolTarget struct {
 }
 
 func Analyze(root string, target string) (Report, error) {
+	return AnalyzeWithOptions(root, target, AnalyzeOptions{})
+}
+
+func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Report, error) {
 	impactResult, err := sherpa.FindImpact(root, target)
 	if err != nil {
 		return Report{}, err
@@ -99,7 +107,7 @@ func Analyze(root string, target string) (Report, error) {
 		report.Warnings = append(report.Warnings, impactReport.Warnings...)
 	}
 
-	callers, callees, warnings := callSignalsForSymbol(root, impactResult.Target, symbol)
+	callers, callees, warnings := callSignalsForSymbol(root, impactResult.Target, symbol, options)
 	report.Callers = callers
 	report.Callees = callees
 	report.Warnings = append(report.Warnings, warnings...)

@@ -17,10 +17,12 @@ Implemented first slice:
   `path`, and `paths`
 * receiver-variable method calls in standalone call graph commands, resolved
   with package-level type information
+* opt-in test callers for `gosherpa callers --tests` and
+  `gosherpa explain --tests`
 
 Next:
 
-* include test callers with an opt-in flag
+* improve ambiguity handling for duplicate unqualified symbols
 
 ---
 

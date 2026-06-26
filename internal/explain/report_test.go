@@ -49,6 +49,18 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 	})
 }
 
+func TestAnalyzeWithOptionsIncludesTestCallers(t *testing.T) {
+	root := writeExplainProject(t)
+
+	report, err := AnalyzeWithOptions(root, "Target", AnalyzeOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatalf("AnalyzeWithOptions returned error: %v", err)
+	}
+
+	assertNames(t, callerNames(report.Callers), []string{"Entry", "TestTarget"})
+	assertNames(t, callerFiles(report.Callers), []string{"service.go", "service_test.go"})
+}
+
 func TestAnalyzeUsesPackageQualifiedCallSignals(t *testing.T) {
 	root := writePackageQualifiedExplainProject(t)
 

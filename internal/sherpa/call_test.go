@@ -803,6 +803,77 @@ func TestStep() {
 	}
 }
 
+func TestFindCallersWithOptionsIncludesTestFileCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestStep() {
+	Step()
+}
+`)
+
+	result, err := FindCallersWithOptions(tmp, "Step", CallOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	want := []string{"Run", "TestStep"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("expected %v, got %v", want, names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	wantFiles := []string{"service.go", "service_test.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
+	}
+}
+
+func TestFindCallersWithOptionsIncludesExternalTestPackageCallers(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Step() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service_test
+
+import "example.com/app/internal/service"
+
+func TestStep() {
+	service.Step()
+}
+`)
+
+	result, err := FindCallersWithOptions(tmp, "./internal/service.Step", CallOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	want := []string{"TestStep"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("expected %v, got %v", want, names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	wantFiles := []string{"internal/service/service_test.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
+	}
+}
+
 func TestFindCallersIgnoresTargetsDefinedOnlyInTestFiles(t *testing.T) {
 	tmp := t.TempDir()
 

@@ -149,6 +149,30 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsTestsFlag(t *testing.T) {
+	tests := [][]string{
+		{"--tests", "callers", "Target"},
+		{"explain", "Target", "--tests"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.IncludeTests {
+				t.Fatal("expected tests flag")
+			}
+
+			if !got.HasTestsOption {
+				t.Fatal("expected tests option marker")
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsBaseFlagForDiffCommands(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -740,6 +764,22 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 	}
 }
 
+func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "symbols", "--tests"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by callers and explain") {
+		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainRunsImpactCommand(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1006,6 +1046,29 @@ func TestMainRunsExplainCommandAsJSON(t *testing.T) {
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
+func TestMainRunsExplainCommandAsJSONWithTests(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "explain", "Target", "--tests", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "explain", "Target", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
+
+	if strings.Contains(result.Stdout, "EXPLAIN") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -1347,7 +1410,7 @@ func Target() {}
 func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callers"})
 
-	want := "usage: gosherpa [--root <path>] callers <function-or-method>\n"
+	want := "usage: gosherpa [--root <path>] callers <function-or-method> [--tests]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1385,6 +1448,46 @@ func Step() {}
 	}
 
 	for _, want := range []string{"CALLERS", "Step", "Run", "Found 1 callers"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsCallersCommandWithTests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestStep() {
+	Step()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Step", "--tests"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"CALLERS", "Step", "Run", "TestStep", "Found 2 callers"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}

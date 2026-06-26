@@ -79,6 +79,8 @@ Implemented:
 - Package-aware standalone call graph commands for package-qualified targets.
 - Receiver-variable method calls in standalone call graph commands, resolved
   with package-level type information.
+- Opt-in test callers for `gosherpa callers --tests` and
+  `gosherpa explain --tests`.
 - Machine-readable JSON output for all commands with a stable response envelope.
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
@@ -119,7 +121,9 @@ Current limitations:
 - Unqualified standalone call graph targets can still be ambiguous across
   packages; package-qualified targets disambiguate local functions and methods.
 - Positions only expose file and line, not columns or ranges.
-- Tests are skipped by some analysis paths and are not yet first-class.
+- Test callers are available with `callers --tests` and `explain --tests`;
+  tests are still skipped by some other analysis paths and are not yet
+  first-class.
 
 ## Roadmap Overview
 
@@ -621,6 +625,7 @@ Improvements over current MVP:
 - Resolve receiver-variable method calls.
   Implemented for standalone call graph commands within type-checked packages.
 - Include test callers with `--tests`.
+  Implemented for `callers` and `explain`.
 - Include or exclude external package calls.
 - Group output by package.
 - Show call site line and enclosing function.

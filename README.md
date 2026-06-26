@@ -44,6 +44,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
+| Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
@@ -54,6 +55,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct callers of a function or method |
+| Test callers | `gosherpa callers ./internal/sherpa.ParseFile --tests` | Includes direct callers from `_test.go` files on demand |
 | Call path | `gosherpa path Run ./internal/sherpa.ParseFile` | Shows the shortest repository-local call path between functions or methods |
 | Call paths | `gosherpa paths Run ./internal/sherpa.ParseFile --limit 3` | Shows multiple repository-local call paths with optional limit and max depth |
 
@@ -85,6 +87,7 @@ Then explore the repository:
 ./gosherpa symbol ParseFile
 ./gosherpa symbol ParseFile --json
 ./gosherpa explain ParseFile
+./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json
 ./gosherpa refs ParseFile
 ./gosherpa refs ParseFile --json
@@ -107,6 +110,7 @@ Then explore the repository:
 ./gosherpa callees ./internal/sherpa.ParseFile
 ./gosherpa callees ParseFile --json
 ./gosherpa callers ParseFile
+./gosherpa callers ParseFile --tests
 ./gosherpa callers ./internal/sherpa.ParseFile
 ./gosherpa callers ParseFile --json
 ./gosherpa path main FindCallers
@@ -188,6 +192,7 @@ Implemented:
 - Shortest and limited repository-local call path analysis
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
+- Opt-in test callers for `gosherpa callers --tests` and `gosherpa explain --tests`
 - Machine-readable JSON output for all commands with a stable response envelope
 - Golden JSON fixtures for all commands
 - Repository root selection with `--root`
@@ -210,12 +215,12 @@ Release notes:
 
 Planned next:
 
-- include test callers with an opt-in flag
+- improve ambiguity handling for duplicate unqualified symbols
 
 Known MVP limitations:
 
 - Reference search and receiver-variable call resolution are type-aware inside packages and recognize local package selector calls, but they do not yet use full module/package loading.
-- Test files are skipped by reference, caller, and callee analysis.
+- Test files are skipped by reference, callee, path, and default caller analysis; `callers --tests` and `explain --tests` include test-file callers on demand.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.

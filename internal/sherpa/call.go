@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"go/types"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,6 +32,10 @@ type Caller struct {
 type CallersResult struct {
 	Target  string   `json:"target"`
 	Callers []Caller `json:"callers"`
+}
+
+type CallOptions struct {
+	IncludeTests bool `json:"includeTests"`
 }
 
 type CallPathOptions struct {
@@ -93,6 +98,11 @@ type callGraphEdge struct {
 	Position Position
 }
 
+type testFunctionGroupKey struct {
+	Dir     string
+	Package string
+}
+
 type callPathSearchState struct {
 	Node  string
 	Nodes []string
@@ -129,6 +139,10 @@ func FindCallees(root string, target string) (CalleesResult, error) {
 }
 
 func FindCallers(root string, target string) (CallersResult, error) {
+	return FindCallersWithOptions(root, target, CallOptions{})
+}
+
+func FindCallersWithOptions(root string, target string, options CallOptions) (CallersResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return CallersResult{}, err
@@ -149,7 +163,17 @@ func FindCallers(root string, target string) (CallersResult, error) {
 		return CallersResult{Target: normalizedTarget.String()}, err
 	}
 
-	callers := collectCallersFromFunctions(functions, functionCallTarget(function))
+	callerFunctions := functions
+	if options.IncludeTests {
+		testFunctions, err := collectTestCallerFunctionInfos(rootPath)
+		if err != nil {
+			return CallersResult{Target: normalizedTarget.String()}, err
+		}
+
+		callerFunctions = append(callerFunctions, testFunctions...)
+	}
+
+	callers := collectCallersFromFunctions(callerFunctions, functionCallTarget(function))
 
 	return CallersResult{
 		Target:  normalizedTarget.String(),
@@ -404,6 +428,170 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	}
 
 	return functions, nil
+}
+
+func collectTestCallerFunctionInfos(root string) ([]functionInfo, error) {
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := FindGoFiles(rootPath)
+	if err != nil {
+		return nil, err
+	}
+
+	modulePath := readModulePath(rootPath)
+	sort.Strings(files)
+
+	regularFilesByDir := make(map[string][]string)
+	regularPackagesByDir := make(map[string]string)
+	testFilesByGroup := make(map[testFunctionGroupKey][]string)
+
+	for _, file := range files {
+		dir := filepath.Dir(file)
+		packageName, err := parseCallFilePackageName(file)
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.HasSuffix(file, "_test.go") {
+			key := testFunctionGroupKey{
+				Dir:     dir,
+				Package: packageName,
+			}
+			testFilesByGroup[key] = append(testFilesByGroup[key], file)
+			continue
+		}
+
+		regularFilesByDir[dir] = append(regularFilesByDir[dir], file)
+		if regularPackagesByDir[dir] == "" {
+			regularPackagesByDir[dir] = packageName
+		}
+	}
+
+	for _, files := range regularFilesByDir {
+		sort.Strings(files)
+	}
+	for _, files := range testFilesByGroup {
+		sort.Strings(files)
+	}
+
+	keys := sortedTestFunctionGroupKeys(testFilesByGroup)
+	var functions []functionInfo
+	for _, key := range keys {
+		packagePath, err := referencePackagePathForDir(rootPath, key.Dir)
+		if err != nil {
+			return nil, err
+		}
+
+		regularPackage := regularPackagesByDir[key.Dir]
+		isExternalTestPackage := regularPackage != "" && key.Package != regularPackage
+		functionPackage := packagePath
+		importPath := referenceImportPath(rootPath, modulePath, key.Dir)
+		filesToParse := append([]string{}, testFilesByGroup[key]...)
+		if isExternalTestPackage {
+			functionPackage = packagePath + "_test"
+			importPath += "_test"
+		} else {
+			filesToParse = append(append([]string{}, regularFilesByDir[key.Dir]...), filesToParse...)
+		}
+
+		fileSet := token.NewFileSet()
+		fileImports := make(map[*ast.File]map[string]string)
+		testFiles := make(map[*ast.File]struct{})
+
+		var parsedFiles []*ast.File
+		for _, file := range filesToParse {
+			parsedFile, err := parser.ParseFile(fileSet, file, nil, 0)
+			if err != nil {
+				return nil, fmt.Errorf("parse %s: %w", file, err)
+			}
+
+			parsedFiles = append(parsedFiles, parsedFile)
+			fileImports[parsedFile] = callImportAliases(parsedFile, modulePath)
+			if strings.HasSuffix(file, "_test.go") {
+				testFiles[parsedFile] = struct{}{}
+			}
+		}
+
+		info := &types.Info{
+			Defs:       make(map[*ast.Ident]types.Object),
+			Uses:       make(map[*ast.Ident]types.Object),
+			Selections: make(map[*ast.SelectorExpr]*types.Selection),
+		}
+		config := types.Config{
+			Importer: importer.Default(),
+			Error:    func(error) {},
+		}
+		_, _ = config.Check(importPath, fileSet, parsedFiles, info)
+
+		for _, parsedFile := range parsedFiles {
+			if _, ok := testFiles[parsedFile]; !ok {
+				continue
+			}
+
+			imports := fileImports[parsedFile]
+			for _, decl := range parsedFile.Decls {
+				funcDecl, ok := decl.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+
+				receiver := receiverTypeName(funcDecl)
+				name := funcDecl.Name.Name
+				pos := fileSet.Position(funcDecl.Pos())
+				position := positionRelativeToRoot(rootPath, Position{
+					File: pos.Filename,
+					Line: pos.Line,
+				})
+
+				functions = append(functions, functionInfo{
+					Package:    functionPackage,
+					ImportPath: importPath,
+					ModulePath: modulePath,
+					Receiver:   receiver,
+					Name:       name,
+					Target:     functionTargetName(funcDecl),
+					Decl:       funcDecl,
+					FileSet:    fileSet,
+					TypeInfo:   info,
+					Position:   position,
+					Root:       rootPath,
+					Imports:    imports,
+				})
+			}
+		}
+	}
+
+	return functions, nil
+}
+
+func parseCallFilePackageName(file string) (string, error) {
+	fileSet := token.NewFileSet()
+	parsedFile, err := parser.ParseFile(fileSet, file, nil, parser.PackageClauseOnly)
+	if err != nil {
+		return "", fmt.Errorf("parse %s: %w", file, err)
+	}
+
+	return parsedFile.Name.Name, nil
+}
+
+func sortedTestFunctionGroupKeys(groups map[testFunctionGroupKey][]string) []testFunctionGroupKey {
+	keys := make([]testFunctionGroupKey, 0, len(groups))
+	for key := range groups {
+		keys = append(keys, key)
+	}
+
+	sort.Slice(keys, func(i int, j int) bool {
+		if keys[i].Dir != keys[j].Dir {
+			return keys[i].Dir < keys[j].Dir
+		}
+
+		return keys[i].Package < keys[j].Package
+	})
+
+	return keys
 }
 
 func findFunctionInfo(functions []functionInfo, target callTarget) (functionInfo, error) {
