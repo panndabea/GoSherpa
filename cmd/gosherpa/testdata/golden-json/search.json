@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "command": "search",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "terms": [
+      "Target"
+    ],
+    "results": [
+      {
+        "symbol": {
+          "name": "Target",
+          "kind": "function",
+          "package": ".",
+          "packageName": "golden",
+          "qualifiedName": "example.com/golden.Target",
+          "signature": "func Target()",
+          "position": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "range": {
+            "start": {
+              "file": "service.go",
+              "line": 18,
+              "column": 1
+            },
+            "end": {
+              "file": "service.go",
+              "line": 18,
+              "column": 17
+            }
+          },
+          "receiver": ""
+        },
+        "score": 200,
+        "matchedTerms": [
+          "target"
+        ]
+      },
+      {
+        "symbol": {
+          "name": "TestTarget",
+          "kind": "function",
+          "package": ".",
+          "packageName": "golden",
+          "qualifiedName": "example.com/golden.TestTarget",
+          "signature": "func TestTarget(t *testing.T)",
+          "position": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "range": {
+            "start": {
+              "file": "service_test.go",
+              "line": 5,
+              "column": 1
+            },
+            "end": {
+              "file": "service_test.go",
+              "line": 7,
+              "column": 2
+            }
+          },
+          "receiver": ""
+        },
+        "score": 70,
+        "matchedTerms": [
+          "target"
+        ]
+      }
+    ]
+  }
+}

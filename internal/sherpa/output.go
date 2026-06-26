@@ -59,8 +59,39 @@ func FormatSymbol(symbol Symbol) string {
 	return builder.String()
 }
 
+func FormatSymbolSearch(terms []string, results []SymbolSearchResult) string {
+	var builder strings.Builder
+
+	builder.WriteString("SYMBOL SEARCH\n\n")
+	fmt.Fprintf(&builder, "Query: %s\n", strings.Join(terms, " "))
+	fmt.Fprintf(&builder, "Found %d %s\n\n", len(results), pluralize("match", len(results)))
+
+	for _, result := range results {
+		fmt.Fprintf(
+			&builder,
+			"  %-5d %-10s %-36s %-20s %s:%d\n",
+			result.Score,
+			result.Symbol.Kind,
+			result.Symbol.DisplayName(),
+			result.Symbol.Package,
+			result.Symbol.Position.File,
+			result.Symbol.Position.Line,
+		)
+	}
+
+	return builder.String()
+}
+
 func PrintSymbols(symbols []Symbol) {
 	fmt.Print(FormatSymbols(symbols))
+}
+
+func pluralize(word string, count int) string {
+	if count == 1 {
+		return word
+	}
+
+	return word + "es"
 }
 
 func writeSymbolGroup(builder *strings.Builder, title string, symbols []Symbol, kind SymbolKind) {

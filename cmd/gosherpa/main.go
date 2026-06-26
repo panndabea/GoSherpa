@@ -75,6 +75,11 @@ type symbolsJSONData struct {
 	Symbols []sherpa.Symbol `json:"symbols"`
 }
 
+type searchJSONData struct {
+	Terms   []string                    `json:"terms"`
+	Results []sherpa.SymbolSearchResult `json:"results"`
+}
+
 type impactJSONData struct {
 	Kind         sherpa.ImpactKind          `json:"kind"`
 	References   []sherpa.Reference         `json:"references"`
@@ -414,6 +419,36 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatSymbol(symbol))
+		return exitSuccess
+
+	case "search":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] search <terms>")
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		terms := invocation.CommandArgs
+		target := strings.Join(terms, " ")
+
+		symbols, err := sherpa.ParseRepository(root)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "search", target, stderr, err)
+		}
+
+		results := sherpa.SearchSymbols(symbols, terms)
+		if invocation.JSON {
+			return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, nil, searchJSONData{
+				Terms:   nonNilSlice(terms),
+				Results: nonNilSlice(results),
+			}))
+		}
+
+		fmt.Fprint(stdout, sherpa.FormatSymbolSearch(terms, results))
 		return exitSuccess
 
 	case "symbols":
@@ -767,7 +802,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -776,7 +811,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -1118,6 +1153,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target>")
+	fmt.Fprintln(writer, "  search <terms>")
 	fmt.Fprintln(writer, "  refs <name>")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact file <file>")

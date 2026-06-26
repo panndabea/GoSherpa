@@ -58,6 +58,114 @@ func TestFindSymbolReturnsPosition(t *testing.T) {
 	}
 }
 
+func TestSearchSymbolsMatchesCaseInsensitivePartialName(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "DeleteTeam",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbols(symbols, []string{"USER"})
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if results[0].Symbol.Name != "CreateUser" {
+		t.Fatalf("expected CreateUser, got %s", results[0].Symbol.Name)
+	}
+
+	assertSearchTestStrings(t, results[0].MatchedTerms, []string{"user"})
+}
+
+func TestSearchSymbolsRequiresAllTerms(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "CreateTeam",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbols(symbols, []string{"create", "user"})
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if results[0].Symbol.Name != "CreateUser" {
+		t.Fatalf("expected CreateUser, got %s", results[0].Symbol.Name)
+	}
+}
+
+func TestSearchSymbolsRanksExactAndPrefixMatchesFirst(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUserCommand",
+			Kind: SymbolKindStruct,
+		},
+		{
+			Name: "CreateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "EnsureCreateUser",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbols(symbols, []string{"CreateUser"})
+
+	assertSearchTestResultNames(t, results, []string{"CreateUser", "CreateUserCommand", "EnsureCreateUser"})
+
+	if results[0].Score <= results[1].Score {
+		t.Fatalf("expected exact match score to beat prefix match: %#v", results)
+	}
+}
+
+func TestSearchSymbolsMatchesMethodDisplayName(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name:     "Create",
+			Kind:     SymbolKindMethod,
+			Receiver: "UserService",
+		},
+		{
+			Name: "CreateUserService",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbols(symbols, []string{"service", "create"})
+
+	assertSearchTestResultNames(t, results, []string{"UserService.Create", "CreateUserService"})
+}
+
+func TestSearchSymbolsUsesStableSortForTies(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "UpdateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "ArchiveUser",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbols(symbols, []string{"user"})
+
+	assertSearchTestResultNames(t, results, []string{"ArchiveUser", "UpdateUser"})
+}
+
 func TestFindSymbolTargetUsesPackageQualifiedTarget(t *testing.T) {
 	symbols := []Symbol{
 		{
@@ -141,5 +249,34 @@ func TestFindSymbolTargetReportsAmbiguousTargets(t *testing.T) {
 
 	if len(ambiguity.Candidates) != 2 {
 		t.Fatalf("expected 2 candidates, got %d", len(ambiguity.Candidates))
+	}
+}
+
+func assertSearchTestResultNames(t *testing.T, results []SymbolSearchResult, want []string) {
+	t.Helper()
+
+	if len(results) != len(want) {
+		t.Fatalf("expected %d results, got %d: %#v", len(want), len(results), results)
+	}
+
+	var got []string
+	for _, result := range results {
+		got = append(got, result.Symbol.DisplayName())
+	}
+
+	assertSearchTestStrings(t, got, want)
+}
+
+func assertSearchTestStrings(t *testing.T, got []string, want []string) {
+	t.Helper()
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
 	}
 }

@@ -282,6 +282,10 @@ Goal: make GoSherpa useful at the very beginning of a coding session.
 
 ### 1.1 Search
 
+Status: first slice implemented with `gosherpa search <terms>` for ranked,
+partial, case-insensitive symbol search and JSON output. Filters remain future
+work.
+
 Human question:
 
 ```text
@@ -298,11 +302,11 @@ gosherpa search handler --package ./internal/http
 
 MVP behavior:
 
-- Search symbols by partial, case-insensitive name matching.
-- Match multiple query terms.
-- Search functions, methods, structs, interfaces, constants, variables, and
-  tests once those symbols are indexed.
-- Support filters:
+- Search symbols by partial, case-insensitive name matching. Implemented for
+  currently indexed structs, interfaces, functions, methods, and tests.
+- Match multiple query terms. Implemented.
+- Return ranked human and JSON output. Implemented.
+- Support filters. Future:
   - `--kind`
   - `--package`
   - `--tests`
@@ -311,8 +315,7 @@ MVP behavior:
 Nice follow-ups:
 
 - Fuzzy ranking.
-- Exact-match boost.
-- Package-name boost.
+- Ranking tuning beyond exact, prefix, segment, and package-aware matches.
 - Recently touched file boost is out of scope for now because it requires VCS
   integration and can make output less deterministic.
 

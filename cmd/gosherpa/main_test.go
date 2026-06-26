@@ -377,6 +377,15 @@ func TestPrintUsageIncludesCallers(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesSearch(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "search <terms>") {
+		t.Fatalf("expected usage to contain search command, got:\n%s", output.String())
+	}
+}
+
 func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "tests"})
 
@@ -1735,6 +1744,24 @@ func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
 	}
 }
 
+func TestMainPrintsSearchUsageWithoutValidatingRoot(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "search"})
+
+	want := "usage: gosherpa [--root <path>] search <terms>\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainPrintsUnknownCommandWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "unknown"})
@@ -1818,6 +1845,88 @@ func Run() {}
 	assertMainTestJSONArrayHasLength(t, data, "symbols", 2)
 
 	if strings.Contains(result.Stdout, "FUNCTIONS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsSearchCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type UserRepository interface{}
+
+func CreateUser() {}
+
+func CreateTeam() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "search", "user", "create"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"SYMBOL SEARCH", "Query: user create", "Found 1 match", "CreateUser"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	for _, unwanted := range []string{"CreateTeam", "UserRepository", tmp} {
+		if strings.Contains(result.Stdout, unwanted) {
+			t.Fatalf("expected output not to contain %s, got:\n%s", unwanted, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsSearchCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Target() {}
+
+func TestTarget() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "search", "target", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "search", "target", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "terms", 1)
+	results := assertMainTestJSONArrayHasLength(t, data, "results", 2)
+
+	first, ok := results[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first result to be a JSON object, got %T", results[0])
+	}
+
+	symbol, ok := first["symbol"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first symbol to be a JSON object, got %T", first["symbol"])
+	}
+
+	if symbol["name"] != "Target" {
+		t.Fatalf("expected first search result Target, got %v", symbol["name"])
+	}
+
+	if strings.Contains(result.Stdout, "SYMBOL SEARCH") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }

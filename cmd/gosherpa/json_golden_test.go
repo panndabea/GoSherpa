@@ -23,6 +23,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"symbols", "--json"},
 		},
 		{
+			name: "search",
+			args: []string{"search", "Target", "--json"},
+		},
+		{
 			name: "refs",
 			args: []string{"refs", "Target", "--json"},
 		},
