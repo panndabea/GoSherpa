@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
@@ -80,6 +81,28 @@ func TestAnalyzeUsesPackageQualifiedCallSignals(t *testing.T) {
 	})
 	assertNames(t, calleeNames(report.Callees), []string{"Helper"})
 	assertNames(t, calleeFiles(report.Callees), []string{"internal/auth/auth.go"})
+}
+
+func TestAnalyzeReportsAmbiguousSymbolCandidates(t *testing.T) {
+	root := writePackageQualifiedExplainProject(t)
+
+	_, err := Analyze(root, "Target")
+	if err == nil {
+		t.Fatal("Analyze returned nil error")
+	}
+
+	for _, want := range []string{
+		"ambiguous symbol target: Target",
+		"package ./internal/auth, file internal/auth/auth.go:7, target ./internal/auth.Target",
+		"package ./internal/billing, file internal/billing/billing.go:7, target ./internal/billing.Target",
+		"use a package-qualified target",
+		"./internal/auth.Target",
+		"./internal/billing.Target",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected ambiguous symbol error to contain %q, got:\n%v", want, err)
+		}
+	}
 }
 
 func TestAnalyzeRejectsPackageTargets(t *testing.T) {

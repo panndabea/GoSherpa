@@ -110,6 +110,9 @@ func normalizeReferenceTarget(root string, name string) (referenceTarget, error)
 
 func (target referenceTarget) String() string {
 	symbol := target.Symbol()
+	if target.Package == "." {
+		return symbol
+	}
 	if target.Package != "" {
 		return target.Package + "." + symbol
 	}

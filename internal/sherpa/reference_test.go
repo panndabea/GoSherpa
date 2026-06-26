@@ -252,6 +252,23 @@ func TestNormalizeReferenceTargetRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestNormalizeReferenceTargetDisplaysModuleRootPackageTarget(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	got, err := normalizeReferenceTarget(tmp, "example.com/app.Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Package != "." {
+		t.Fatalf("expected root package, got %s", got.Package)
+	}
+	if got.String() != "Run" {
+		t.Fatalf("expected Run, got %s", got.String())
+	}
+}
+
 func referenceTestFiles(refs []Reference) []string {
 	var files []string
 	for _, ref := range refs {

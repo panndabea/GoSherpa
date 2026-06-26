@@ -81,6 +81,8 @@ Implemented:
   with package-level type information.
 - Opt-in test callers for `gosherpa callers --tests` and
   `gosherpa explain --tests`.
+- Ambiguity errors for duplicate unqualified targets show candidate packages,
+  files, lines, and package-qualified examples.
 - Machine-readable JSON output for all commands with a stable response envelope.
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
@@ -110,7 +112,7 @@ Current limitations:
   Go functions and struct/interface types, but it does not infer every semantic
   consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests;
-  unqualified symbol targets can still be ambiguous across packages.
+  unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in
   method signatures and resolves local embedded interfaces, but does not yet run
   the full Go type checker for aliases, build tags, or generic edge cases.
@@ -118,8 +120,9 @@ Current limitations:
   matching; table-test names are not extracted yet.
 - Callers, callees, and paths still do not resolve dynamic dispatch,
   reflection, function values, or every imported-package receiver call.
-- Unqualified standalone call graph targets can still be ambiguous across
-  packages; package-qualified targets disambiguate local functions and methods.
+- Unqualified standalone call graph targets can be ambiguous across packages;
+  GoSherpa reports candidates and package-qualified examples for
+  disambiguation.
 - Positions only expose file and line, not columns or ranges.
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
@@ -626,6 +629,8 @@ Improvements over current MVP:
   Implemented for standalone call graph commands within type-checked packages.
 - Include test callers with `--tests`.
   Implemented for `callers` and `explain`.
+- Show candidate package/file/line details for ambiguous unqualified targets.
+  Implemented for duplicate symbol and function targets.
 - Include or exclude external package calls.
 - Group output by package.
 - Show call site line and enclosing function.
@@ -1296,8 +1301,9 @@ Support levels:
 Recommendation:
 
 - Keep short names for convenience.
-- Show clear ambiguity errors.
-- Prefer package-qualified examples in documentation once ambiguity appears.
+- Show clear ambiguity errors with candidate package/file/line details.
+- Prefer package-qualified examples in diagnostics and documentation once
+  ambiguity appears.
 
 ### Build Tags and Package Loading
 

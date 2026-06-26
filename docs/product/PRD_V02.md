@@ -19,10 +19,8 @@ Implemented first slice:
   with package-level type information
 * opt-in test callers for `gosherpa callers --tests` and
   `gosherpa explain --tests`
-
-Next:
-
-* improve ambiguity handling for duplicate unqualified symbols
+* ambiguity handling for duplicate unqualified symbol/function targets, with
+  candidate package/file/line details and package-qualified examples
 
 ---
 

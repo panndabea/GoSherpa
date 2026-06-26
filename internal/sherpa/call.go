@@ -286,6 +286,9 @@ func normalizeCallTarget(root string, target string) (callTarget, error) {
 
 func (target callTarget) String() string {
 	symbol := target.Symbol()
+	if target.Package == "." {
+		return symbol
+	}
 	if target.Package != "" {
 		return target.Package + "." + symbol
 	}
@@ -607,10 +610,24 @@ func findFunctionInfo(functions []functionInfo, target callTarget) (functionInfo
 	}
 
 	if len(matches) > 1 {
-		return functionInfo{}, fmt.Errorf("ambiguous function target: %s", target.String())
+		return functionInfo{}, NewAmbiguousTargetError("function", target.String(), functionTargetCandidates(matches))
 	}
 
 	return matches[0], nil
+}
+
+func functionTargetCandidates(functions []functionInfo) []TargetCandidate {
+	candidates := make([]TargetCandidate, 0, len(functions))
+	for _, function := range functions {
+		candidates = append(candidates, TargetCandidate{
+			Package:  function.Package,
+			Symbol:   function.Target,
+			Position: function.Position,
+			Example:  FormatPackageQualifiedTarget(function.Package, function.Target, function.ModulePath),
+		})
+	}
+
+	return candidates
 }
 
 func functionMatchesCallTarget(function functionInfo, target callTarget) bool {

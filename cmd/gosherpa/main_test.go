@@ -1498,6 +1498,43 @@ func TestStep() {
 	}
 }
 
+func TestMainPrintsAmbiguousCallersCandidates(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "auth.go"), `package auth
+
+func Target() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "billing", "billing.go"), `package billing
+
+func Target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Target"})
+
+	if result.ExitCode != exitFailure {
+		t.Fatalf("expected exit %d, got %d", exitFailure, result.ExitCode)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+
+	for _, want := range []string{
+		"error: ambiguous function target: Target",
+		"package ./internal/auth, file internal/auth/auth.go:3, target ./internal/auth.Target",
+		"package ./internal/billing, file internal/billing/billing.go:3, target ./internal/billing.Target",
+		"use a package-qualified target",
+		"./internal/auth.Target",
+		"./internal/billing.Target",
+	} {
+		if !strings.Contains(result.Stderr, want) {
+			t.Fatalf("expected stderr to contain %q, got:\n%s", want, result.Stderr)
+		}
+	}
+}
+
 func TestMainRunsCallersCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 

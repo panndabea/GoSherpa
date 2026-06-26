@@ -83,9 +83,11 @@ func writeImpactValues(builder *strings.Builder, title string, values []string) 
 	}
 
 	for _, value := range values {
-		builder.WriteString("  ")
-		builder.WriteString(value)
-		builder.WriteString("\n")
+		for _, line := range strings.Split(value, "\n") {
+			builder.WriteString("  ")
+			builder.WriteString(line)
+			builder.WriteString("\n")
+		}
 	}
 }
 

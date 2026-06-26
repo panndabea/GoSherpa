@@ -39,6 +39,23 @@ func TestNormalizeCallTarget(t *testing.T) {
 	}
 }
 
+func TestNormalizeCallTargetDisplaysModuleRootPackageTarget(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	got, err := normalizeCallTarget(tmp, "example.com/app.Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Package != "." {
+		t.Fatalf("expected root package, got %s", got.Package)
+	}
+	if got.String() != "Run" {
+		t.Fatalf("expected Run, got %s", got.String())
+	}
+}
+
 func TestNormalizeCallTargetRejectsInvalidInput(t *testing.T) {
 	tests := []string{
 		"",
@@ -488,6 +505,17 @@ func Run() {}
 	if !strings.Contains(err.Error(), "ambiguous function target: Run") {
 		t.Fatalf("expected ambiguous function error, got %v", err)
 	}
+	for _, want := range []string{
+		"package ./one, file one/service.go:3, target ./one.Run",
+		"package ./two, file two/service.go:3, target ./two.Run",
+		"use a package-qualified target",
+		"./one.Run",
+		"./two.Run",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected ambiguous function error to contain %q, got:\n%v", want, err)
+		}
+	}
 }
 
 func TestFindCalleesUsesPackageQualifiedTarget(t *testing.T) {
@@ -714,6 +742,17 @@ func Run() {}
 
 	if !strings.Contains(err.Error(), "ambiguous function target: Run") {
 		t.Fatalf("expected ambiguous function error, got %v", err)
+	}
+	for _, want := range []string{
+		"package ./one, file one/service.go:3, target ./one.Run",
+		"package ./two, file two/service.go:3, target ./two.Run",
+		"use a package-qualified target",
+		"./one.Run",
+		"./two.Run",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected ambiguous function error to contain %q, got:\n%v", want, err)
+		}
 	}
 }
 

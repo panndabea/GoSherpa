@@ -193,6 +193,7 @@ Implemented:
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
 - Opt-in test callers for `gosherpa callers --tests` and `gosherpa explain --tests`
+- Ambiguity errors for duplicate unqualified symbols include candidate packages, files, lines, and package-qualified examples
 - Machine-readable JSON output for all commands with a stable response envelope
 - Golden JSON fixtures for all commands
 - Repository root selection with `--root`
@@ -213,21 +214,17 @@ Release notes:
 
 - [GoSherpa Impact Engine v0.1](docs/releases/RELEASE_NOTES_V01.md)
 
-Planned next:
-
-- improve ambiguity handling for duplicate unqualified symbols
-
 Known MVP limitations:
 
 - Reference search and receiver-variable call resolution are type-aware inside packages and recognize local package selector calls, but they do not yet use full module/package loading.
 - Test files are skipped by reference, callee, path, and default caller analysis; `callers --tests` and `explain --tests` include test-file callers on demand.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
-- Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
+- Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet run the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller, callee, and path analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
-- Unqualified standalone call targets can still be ambiguous across packages; use package-qualified targets such as `./internal/auth.Target` to disambiguate.
+- Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
 
 ## Philosophy
 

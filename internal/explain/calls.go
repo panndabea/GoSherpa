@@ -21,15 +21,16 @@ type callSignalTarget struct {
 }
 
 type explainFunctionInfo struct {
-	Package  string
-	Receiver string
-	Name     string
-	Target   string
-	Decl     *ast.FuncDecl
-	FileSet  *token.FileSet
-	Position sherpa.Position
-	Root     string
-	Imports  map[string]string
+	Package    string
+	ModulePath string
+	Receiver   string
+	Name       string
+	Target     string
+	Decl       *ast.FuncDecl
+	FileSet    *token.FileSet
+	Position   sherpa.Position
+	Root       string
+	Imports    map[string]string
 }
 
 func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) ([]sherpa.Caller, []sherpa.Callee, []string) {
@@ -137,15 +138,16 @@ func collectExplainFunctionInfos(root string, includeTests bool) ([]explainFunct
 			position := explainPosition(rootPath, fileSet, funcDecl.Pos())
 
 			functions = append(functions, explainFunctionInfo{
-				Package:  packagePath,
-				Receiver: receiver,
-				Name:     name,
-				Target:   explainFunctionTargetName(receiver, name),
-				Decl:     funcDecl,
-				FileSet:  fileSet,
-				Position: position,
-				Root:     rootPath,
-				Imports:  imports,
+				Package:    packagePath,
+				ModulePath: modulePath,
+				Receiver:   receiver,
+				Name:       name,
+				Target:     explainFunctionTargetName(receiver, name),
+				Decl:       funcDecl,
+				FileSet:    fileSet,
+				Position:   position,
+				Root:       rootPath,
+				Imports:    imports,
 			})
 		}
 	}
@@ -197,10 +199,24 @@ func findExplainFunctionInfo(functions []explainFunctionInfo, target callSignalT
 		return explainFunctionInfo{}, fmt.Errorf("function not found: %s", target.Display())
 	}
 	if len(matches) > 1 {
-		return explainFunctionInfo{}, fmt.Errorf("ambiguous function target: %s", target.Display())
+		return explainFunctionInfo{}, sherpa.NewAmbiguousTargetError("function", target.Display(), explainFunctionTargetCandidates(matches))
 	}
 
 	return matches[0], nil
+}
+
+func explainFunctionTargetCandidates(functions []explainFunctionInfo) []sherpa.TargetCandidate {
+	candidates := make([]sherpa.TargetCandidate, 0, len(functions))
+	for _, function := range functions {
+		candidates = append(candidates, sherpa.TargetCandidate{
+			Package:  function.Package,
+			Symbol:   function.Target,
+			Position: function.Position,
+			Example:  sherpa.FormatPackageQualifiedTarget(function.Package, function.Target, function.ModulePath),
+		})
+	}
+
+	return candidates
 }
 
 func explainFunctionMatchesTarget(function explainFunctionInfo, target callSignalTarget) bool {

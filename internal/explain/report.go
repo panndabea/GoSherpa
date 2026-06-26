@@ -138,10 +138,36 @@ func findSymbol(root string, symbols []sherpa.Symbol, target string) (sherpa.Sym
 		return sherpa.Symbol{}, fmt.Errorf("symbol not found: %s", target)
 	}
 	if len(matches) > 1 {
-		return sherpa.Symbol{}, fmt.Errorf("ambiguous symbol target: %s", target)
+		return sherpa.Symbol{}, sherpa.NewAmbiguousTargetError("symbol", target, symbolTargetCandidates(root, matches))
 	}
 
 	return matches[0], nil
+}
+
+func symbolTargetCandidates(root string, symbols []sherpa.Symbol) []sherpa.TargetCandidate {
+	modulePath, _ := sherpa.ModulePath(root)
+
+	candidates := make([]sherpa.TargetCandidate, 0, len(symbols))
+	for _, symbol := range symbols {
+		packagePath := symbolPackage(root, symbol)
+		target := symbolDisplayTarget(symbol)
+		candidates = append(candidates, sherpa.TargetCandidate{
+			Package:  packagePath,
+			Symbol:   target,
+			Position: symbol.Position,
+			Example:  sherpa.FormatPackageQualifiedTarget(packagePath, target, modulePath),
+		})
+	}
+
+	return candidates
+}
+
+func symbolDisplayTarget(symbol sherpa.Symbol) string {
+	if symbol.Receiver == "" {
+		return symbol.Name
+	}
+
+	return symbol.Receiver + "." + symbol.Name
 }
 
 func symbolMatchesTarget(root string, symbol sherpa.Symbol, target symbolTarget) bool {
