@@ -151,6 +151,36 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsContextFlag(t *testing.T) {
+	tests := [][]string{
+		{"--context", "symbol", "Run"},
+		{"symbol", "Run", "--context"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.ShowContext {
+				t.Fatal("expected context flag")
+			}
+
+			if !got.HasContextOption {
+				t.Fatal("expected context option marker")
+			}
+
+			if got.Command != "symbol" {
+				t.Fatalf("expected command symbol, got %s", got.Command)
+			}
+
+			assertMainTestStrings(t, got.CommandArgs, []string{"Run"})
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsTestsFlag(t *testing.T) {
 	tests := [][]string{
 		{"--tests", "callers", "Target"},
@@ -873,6 +903,22 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 	}
 }
 
+func TestMainRejectsContextWithJSON(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "symbol", "Run", "--context", "--json"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --context is only supported for human output") {
+		t.Fatalf("expected context JSON error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainRejectsSearchFilterFlagsForOtherCommands(t *testing.T) {
 	tests := [][]string{
 		{"gosherpa", "symbols", "--kind", "function"},
@@ -1560,7 +1606,7 @@ func Target() {}
 func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callers"})
 
-	want := "usage: gosherpa [--root <path>] callers <function-or-method> [--tests]\n"
+	want := "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1762,6 +1808,46 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCallersCommandWithContext(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Step", "--context"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"CALLERS",
+		"Run",
+		"service.go:4",
+		"> 4 | \tStep()",
+		"Found 1 callers",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsCallersCommandWithTests(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1940,7 +2026,7 @@ func Step() {}
 func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callees"})
 
-	want := "usage: gosherpa [--root <path>] callees <function-or-method>\n"
+	want := "usage: gosherpa [--root <path>] callees <function-or-method> [--context]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1988,6 +2074,46 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCalleesCommandWithContext(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "callees", "Run", "--context", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"CALLEES",
+		"Step",
+		"service.go:4",
+		"> 4 | \tStep()",
+		"Found 1 callees",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsCalleesCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2025,7 +2151,7 @@ func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "refs"})
 
-	want := "usage: gosherpa [--root <path>] refs <name>\n"
+	want := "usage: gosherpa [--root <path>] refs <name> [--context]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -2318,6 +2444,46 @@ func Run(name string) error {
 	}
 }
 
+func TestMainRunsSymbolCommandWithContext(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func helper() {}
+
+func Run() {
+	helper()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbol", "./internal/service.Run", "--context"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"SYMBOL",
+		"File: internal/service/service.go",
+		"CONTEXT",
+		"> 5 | func Run() {",
+		"  6 | \thelper()",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsSymbolCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2383,6 +2549,48 @@ func Run() {
 	}
 
 	for _, want := range []string{"REFERENCES", "ParseFile", "internal/service/service.go", "Found 2 references"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsRefsCommandWithContext(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func ParseFile() {
+}
+
+func Run() {
+	ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "refs", "ParseFile", "--context", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"REFERENCES",
+		"internal/service/service.go:3",
+		"> 3 | func ParseFile() {",
+		"internal/service/service.go:7",
+		"> 7 | \tParseFile()",
+		"Found 2 references",
+	} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}

@@ -59,6 +59,20 @@ func FormatSymbol(symbol Symbol) string {
 	return builder.String()
 }
 
+func FormatSymbolWithContext(symbol Symbol, context SourceContext) string {
+	var builder strings.Builder
+
+	builder.WriteString(FormatSymbol(symbol))
+	if len(context.Lines) == 0 {
+		return builder.String()
+	}
+
+	builder.WriteString("\nCONTEXT\n")
+	builder.WriteString(FormatSourceContext(context, "  "))
+
+	return builder.String()
+}
+
 func FormatSymbolSearch(terms []string, results []SymbolSearchResult) string {
 	var builder strings.Builder
 

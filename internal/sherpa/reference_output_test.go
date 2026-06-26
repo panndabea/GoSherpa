@@ -36,6 +36,63 @@ Found 2 references
 	}
 }
 
+func TestFormatReferencesWithContext(t *testing.T) {
+	refs := []Reference{
+		{
+			Name: "Run",
+			Position: Position{
+				File: "service.go",
+				Line: 3,
+			},
+		},
+		{
+			Name: "Run",
+			Position: Position{
+				File: "service.go",
+				Line: 7,
+			},
+		},
+	}
+	contexts := []SourceContext{
+		{
+			Lines: []SourceContextLine{
+				{Number: 2, Text: "func helper() {}"},
+				{Number: 3, Text: "func Run() {", Target: true},
+				{Number: 4, Text: "}"},
+			},
+		},
+		{
+			Lines: []SourceContextLine{
+				{Number: 6, Text: "func caller() {"},
+				{Number: 7, Text: "\tRun()", Target: true},
+				{Number: 8, Text: "}"},
+			},
+		},
+	}
+
+	got := FormatReferencesWithContext("Run", refs, contexts)
+	want := `REFERENCES
+
+Run
+
+  service.go:3
+      2 | func helper() {}
+    > 3 | func Run() {
+      4 | }
+
+  service.go:7
+      6 | func caller() {
+    > 7 | 	Run()
+      8 | }
+
+Found 2 references
+`
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatReferencesWithEmptyList(t *testing.T) {
 	got := FormatReferences("Missing", nil)
 	want := `REFERENCES

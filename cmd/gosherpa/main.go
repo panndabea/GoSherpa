@@ -35,6 +35,8 @@ type cliInvocation struct {
 	HasBaseOption     bool
 	IncludeTests      bool
 	HasTestsOption    bool
+	ShowContext       bool
+	HasContextOption  bool
 	SearchKind        sherpa.SymbolKind
 	HasKindOption     bool
 	SearchPackage     string
@@ -178,6 +180,12 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 		if arg == "--tests" {
 			invocation.IncludeTests = true
 			invocation.HasTestsOption = true
+			continue
+		}
+
+		if arg == "--context" {
+			invocation.ShowContext = true
+			invocation.HasContextOption = true
 			continue
 		}
 
@@ -454,6 +462,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasContextOption && invocation.JSON {
+		fmt.Fprintln(stderr, "error: --context is only supported for human output")
+		return exitUsage
+	}
+
+	if invocation.HasContextOption && knownCommand(invocation.Command) && !supportsContextOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --context is only supported by symbol, refs, callers, and callees")
+		return exitUsage
+	}
+
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --json is only supported by known commands")
 		return exitUsage
@@ -496,7 +514,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "symbol":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <target>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <target> [--context]")
 			return exitUsage
 		}
 
@@ -521,6 +539,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, nil, symbolJSONData{
 				Symbol: symbol,
 			}))
+		}
+
+		if invocation.ShowContext {
+			context, err := sherpa.ReadSourceContext(root, symbol.Position, sherpa.DefaultSourceContextRadius)
+			if err != nil {
+				return writeCommandError(false, root, "symbol", target, stderr, err)
+			}
+
+			fmt.Fprint(stdout, sherpa.FormatSymbolWithContext(symbol, context))
+			return exitSuccess
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatSymbol(symbol))
@@ -583,7 +611,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "refs":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name> [--context]")
 			return exitUsage
 		}
 
@@ -603,6 +631,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, nil, referencesJSONData{
 				References: nonNilSlice(refs),
 			}))
+		}
+
+		if invocation.ShowContext {
+			contexts, err := sherpa.ReadSourceContexts(root, referencePositions(refs), sherpa.DefaultSourceContextRadius)
+			if err != nil {
+				return writeCommandError(false, root, "refs", name, stderr, err)
+			}
+
+			fmt.Fprint(stdout, sherpa.FormatReferencesWithContext(name, refs, contexts))
+			return exitSuccess
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatReferences(name, refs))
@@ -903,7 +941,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitSuccess
 	case "callers":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method> [--tests]")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]")
 			return exitUsage
 		}
 
@@ -932,11 +970,21 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			))
 		}
 
+		if invocation.ShowContext {
+			contexts, err := sherpa.ReadSourceContexts(root, callerPositions(result.Callers), sherpa.DefaultSourceContextRadius)
+			if err != nil {
+				return writeCommandError(false, root, "callers", target, stderr, err)
+			}
+
+			fmt.Fprint(stdout, sherpa.FormatCallersWithContext(result, contexts))
+			return exitSuccess
+		}
+
 		fmt.Fprint(stdout, sherpa.FormatCallers(result))
 		return exitSuccess
 	case "callees":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callees <function-or-method>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callees <function-or-method> [--context]")
 			return exitUsage
 		}
 
@@ -961,6 +1009,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				nil,
 				calleesJSONDataFromResult(normalizedResult),
 			))
+		}
+
+		if invocation.ShowContext {
+			contexts, err := sherpa.ReadSourceContexts(root, calleePositions(result.Callees), sherpa.DefaultSourceContextRadius)
+			if err != nil {
+				return writeCommandError(false, root, "callees", target, stderr, err)
+			}
+
+			fmt.Fprint(stdout, sherpa.FormatCalleesWithContext(result, contexts))
+			return exitSuccess
 		}
 
 		fmt.Fprint(stdout, sherpa.FormatCallees(result))
@@ -1005,6 +1063,15 @@ func isPathCommand(command string) bool {
 func supportsTestsOption(command string) bool {
 	switch command {
 	case "search", "callers", "explain":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportsContextOption(command string) bool {
+	switch command {
+	case "symbol", "refs", "callers", "callees":
 		return true
 	default:
 		return false
@@ -1336,6 +1403,33 @@ func nonNilSlice[T any](values []T) []T {
 	return values
 }
 
+func referencePositions(refs []sherpa.Reference) []sherpa.Position {
+	positions := make([]sherpa.Position, 0, len(refs))
+	for _, ref := range refs {
+		positions = append(positions, ref.Position)
+	}
+
+	return positions
+}
+
+func callerPositions(callers []sherpa.Caller) []sherpa.Position {
+	positions := make([]sherpa.Position, 0, len(callers))
+	for _, caller := range callers {
+		positions = append(positions, caller.Position)
+	}
+
+	return positions
+}
+
+func calleePositions(callees []sherpa.Callee) []sherpa.Position {
+	positions := make([]sherpa.Position, 0, len(callees))
+	for _, callee := range callees {
+		positions = append(positions, callee.Position)
+	}
+
+	return positions
+}
+
 func resolveRootPath(root string, stderr io.Writer) (string, bool) {
 	repositoryRoot, err := sherpa.ResolveRepositoryRoot(root)
 	if err != nil {
@@ -1352,13 +1446,14 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "global options:")
 	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
+	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
-	fmt.Fprintln(writer, "  symbol <target>")
+	fmt.Fprintln(writer, "  symbol <target> [--context]")
 	fmt.Fprintln(writer, "  search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
-	fmt.Fprintln(writer, "  refs <name>")
+	fmt.Fprintln(writer, "  refs <name> [--context]")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact file <file>")
 	fmt.Fprintln(writer, "  impact package <package>")
@@ -1371,8 +1466,8 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  interfaces <type>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
-	fmt.Fprintln(writer, "  callers <function-or-method> [--tests]")
-	fmt.Fprintln(writer, "  callees <function-or-method>")
+	fmt.Fprintln(writer, "  callers <function-or-method> [--tests] [--context]")
+	fmt.Fprintln(writer, "  callees <function-or-method> [--context]")
 }
 
 func printImpactUsage(writer io.Writer) {

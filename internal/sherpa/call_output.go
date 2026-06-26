@@ -6,6 +6,14 @@ import (
 )
 
 func FormatCallees(result CalleesResult) string {
+	return formatCallees(result, nil)
+}
+
+func FormatCalleesWithContext(result CalleesResult, contexts []SourceContext) string {
+	return formatCallees(result, contexts)
+}
+
+func formatCallees(result CalleesResult, contexts []SourceContext) string {
 	if len(result.Callees) == 0 {
 		return fmt.Sprintf("no callees found: %s\n", result.Target)
 	}
@@ -18,7 +26,7 @@ func FormatCallees(result CalleesResult) string {
 	builder.WriteString("\n")
 	builder.WriteString("\n")
 
-	for _, callee := range result.Callees {
+	for index, callee := range result.Callees {
 		fmt.Fprintf(
 			&builder,
 			"  %-36s %s:%d\n",
@@ -26,6 +34,12 @@ func FormatCallees(result CalleesResult) string {
 			callee.Position.File,
 			callee.Position.Line,
 		)
+		if index < len(contexts) {
+			builder.WriteString(FormatSourceContext(contexts[index], "    "))
+			if index < len(result.Callees)-1 {
+				builder.WriteString("\n")
+			}
+		}
 	}
 
 	builder.WriteString("\n")
@@ -39,6 +53,14 @@ func PrintCallees(result CalleesResult) {
 }
 
 func FormatCallers(result CallersResult) string {
+	return formatCallers(result, nil)
+}
+
+func FormatCallersWithContext(result CallersResult, contexts []SourceContext) string {
+	return formatCallers(result, contexts)
+}
+
+func formatCallers(result CallersResult, contexts []SourceContext) string {
 	if len(result.Callers) == 0 {
 		return fmt.Sprintf("no callers found: %s\n", result.Target)
 	}
@@ -51,7 +73,7 @@ func FormatCallers(result CallersResult) string {
 	builder.WriteString("\n")
 	builder.WriteString("\n")
 
-	for _, caller := range result.Callers {
+	for index, caller := range result.Callers {
 		fmt.Fprintf(
 			&builder,
 			"  %-36s %s:%d\n",
@@ -59,6 +81,12 @@ func FormatCallers(result CallersResult) string {
 			caller.Position.File,
 			caller.Position.Line,
 		)
+		if index < len(contexts) {
+			builder.WriteString(FormatSourceContext(contexts[index], "    "))
+			if index < len(result.Callers)-1 {
+				builder.WriteString("\n")
+			}
+		}
 	}
 
 	builder.WriteString("\n")

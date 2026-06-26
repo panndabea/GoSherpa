@@ -42,6 +42,47 @@ Found 2 callees
 	}
 }
 
+func TestFormatCalleesWithContext(t *testing.T) {
+	result := CalleesResult{
+		Target: "Run",
+		Callees: []Callee{
+			{
+				Name: "Step",
+				Position: Position{
+					File: "service.go",
+					Line: 4,
+				},
+			},
+		},
+	}
+	contexts := []SourceContext{
+		{
+			Lines: []SourceContextLine{
+				{Number: 3, Text: "func Run() {"},
+				{Number: 4, Text: "\tStep()", Target: true},
+				{Number: 5, Text: "}"},
+			},
+		},
+	}
+
+	got := FormatCalleesWithContext(result, contexts)
+	want := fmt.Sprintf(`CALLEES
+
+Run
+
+  %-36s service.go:4
+      3 | func Run() {
+    > 4 | 	Step()
+      5 | }
+
+Found 1 callees
+`, "Step")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatCalleesWithEmptyList(t *testing.T) {
 	result := CalleesResult{Target: "Empty"}
 
@@ -84,6 +125,47 @@ ParseFile
 
 Found 2 callers
 `
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatCallersWithContext(t *testing.T) {
+	result := CallersResult{
+		Target: "Step",
+		Callers: []Caller{
+			{
+				Name: "Run",
+				Position: Position{
+					File: "service.go",
+					Line: 4,
+				},
+			},
+		},
+	}
+	contexts := []SourceContext{
+		{
+			Lines: []SourceContextLine{
+				{Number: 3, Text: "func Run() {"},
+				{Number: 4, Text: "\tStep()", Target: true},
+				{Number: 5, Text: "}"},
+			},
+		},
+	}
+
+	got := FormatCallersWithContext(result, contexts)
+	want := fmt.Sprintf(`CALLERS
+
+Step
+
+  %-36s service.go:4
+      3 | func Run() {
+    > 4 | 	Step()
+      5 | }
+
+Found 1 callers
+`, "Run")
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
