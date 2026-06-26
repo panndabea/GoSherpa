@@ -42,6 +42,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | --- | --- | --- |
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
+| Symbol explanation | `gosherpa explain ParseFile` | Combines definition, references, callers, callees, impact signals, and tests |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
@@ -82,6 +83,8 @@ Then explore the repository:
 ./gosherpa symbols --json
 ./gosherpa symbol ParseFile
 ./gosherpa symbol ParseFile --json
+./gosherpa explain ParseFile
+./gosherpa explain ParseFile --json
 ./gosherpa refs ParseFile
 ./gosherpa refs ParseFile --json
 ./gosherpa impact ParseFile
@@ -134,6 +137,7 @@ Prefer not to build a binary yet?
 
 ```bash
 go run ./cmd/gosherpa symbols
+go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
 go run ./cmd/gosherpa impact file internal/sherpa/impact.go
@@ -170,6 +174,7 @@ Implemented:
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
 - Symbol lookup and Go-aware reference lookup
+- Initial `gosherpa explain <symbol>` profile with human and JSON output
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands
 - Package dependency analysis
@@ -197,7 +202,7 @@ Release notes:
 
 Planned next:
 
-- `gosherpa explain` from [PRD_V02.md](PRD_V02.md)
+- deepen `gosherpa explain` from [PRD_V02.md](PRD_V02.md) with richer purpose, risk, and reading-order signals
 
 Known MVP limitations:
 

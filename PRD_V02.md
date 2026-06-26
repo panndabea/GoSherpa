@@ -1,5 +1,24 @@
 # PRD — GoSherpa Symbol Intelligence (v0.5)
 
+## Implementation Status
+
+Status: started.
+
+Implemented first slice:
+
+* `gosherpa explain <symbol>`
+* human and JSON output
+* definition, references, callers, callees, affected packages, interface and
+  implementation impact, related tests, and suggested test commands
+
+Next:
+
+* richer purpose/risk/architecture-role sections
+* suggested reading order
+* stronger package-qualified caller/callee handling
+
+---
+
 ## Hintergrund
 
 Version 0.1 liefert Package-basierte Impact Analysis.

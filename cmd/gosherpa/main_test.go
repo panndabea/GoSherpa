@@ -938,6 +938,57 @@ func TestMainRunsImpactSymbolCommand(t *testing.T) {
 	}
 }
 
+func TestMainRunsExplainCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "explain", "Target"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsExplainCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "explain", "Target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "explain", "Target", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+	assertMainTestJSONArrayHasLength(t, data, "callees", 0)
+	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
 func TestMainRunsImpactDiffCommand(t *testing.T) {
 	tmp := t.TempDir()
 	initMainTestGitRepository(t, tmp)

@@ -63,6 +63,8 @@ Implemented:
 - Method discovery.
 - Symbol lookup.
 - Go-aware reference lookup.
+- Initial `gosherpa explain <symbol>` profile with definition, references,
+  callers, callees, impact signals, tests, and JSON output.
 - Direct symbol and package impact analysis.
 - Related test discovery with suggested `go test` commands.
 - Package dependency analysis.

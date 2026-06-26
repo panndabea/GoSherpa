@@ -43,6 +43,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"impact", "symbol", "Target", "--json"},
 		},
 		{
+			name: "explain",
+			args: []string{"explain", "Target", "--json"},
+		},
+		{
 			name: "tests",
 			args: []string{"tests", "Target", "--json"},
 		},

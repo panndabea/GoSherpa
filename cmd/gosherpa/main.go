@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
 	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
@@ -103,6 +104,19 @@ type callPathsJSONData struct {
 	From  string            `json:"from"`
 	To    string            `json:"to"`
 	Paths []sherpa.CallPath `json:"paths"`
+}
+
+type explainJSONData struct {
+	Target                  string               `json:"target"`
+	Symbol                  sherpa.Symbol        `json:"symbol"`
+	References              []sherpa.Reference   `json:"references"`
+	Callers                 []sherpa.Caller      `json:"callers"`
+	Callees                 []sherpa.Callee      `json:"callees"`
+	AffectedPackages        []string             `json:"affectedPackages"`
+	AffectedInterfaces      []string             `json:"affectedInterfaces"`
+	AffectedImplementations []string             `json:"affectedImplementations"`
+	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
+	TestCommands            []string             `json:"testCommands"`
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -300,6 +314,39 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	switch invocation.Command {
+	case "explain":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol>")
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		target := invocation.CommandArgs[0]
+
+		report, err := explainengine.Analyze(root, target)
+		if err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return exitFailure
+		}
+
+		if invocation.JSON {
+			normalizedReport := explainJSONResult(report)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"explain",
+				normalizedReport.Target,
+				normalizedReport.Warnings,
+				explainJSONDataFromReport(normalizedReport),
+			))
+		}
+
+		fmt.Fprint(stdout, explainengine.Format(report))
+		return exitSuccess
+
 	case "symbol":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <name>")
@@ -690,7 +737,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
+	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -699,7 +746,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees":
+	case "symbol", "symbols", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -917,6 +964,35 @@ func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONDat
 	}
 }
 
+func explainJSONResult(report explainengine.Report) explainengine.Report {
+	report.References = nonNilSlice(report.References)
+	report.Callers = nonNilSlice(report.Callers)
+	report.Callees = nonNilSlice(report.Callees)
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.RelatedTests = nonNilSlice(report.RelatedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
+func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
+	return explainJSONData{
+		Target:                  report.Target,
+		Symbol:                  report.Symbol,
+		References:              report.References,
+		Callers:                 report.Callers,
+		Callees:                 report.Callees,
+		AffectedPackages:        report.AffectedPackages,
+		AffectedInterfaces:      report.AffectedInterfaces,
+		AffectedImplementations: report.AffectedImplementations,
+		RelatedTests:            report.RelatedTests,
+		TestCommands:            report.TestCommands,
+	}
+}
+
 func nonNilSlice[T any](values []T) []T {
 	if values == nil {
 		return []T{}
@@ -943,6 +1019,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
+	fmt.Fprintln(writer, "  explain <symbol>")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <name>")
 	fmt.Fprintln(writer, "  refs <name>")
