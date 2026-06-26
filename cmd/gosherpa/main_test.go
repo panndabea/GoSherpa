@@ -1535,6 +1535,71 @@ func Target() {}
 	}
 }
 
+func TestMainPrintsAmbiguousCallersCandidatesAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "auth.go"), `package auth
+
+func Target() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "billing", "billing.go"), `package billing
+
+func Target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Target", "--json"})
+
+	if result.ExitCode != exitFailure {
+		t.Fatalf("expected exit %d, got %d", exitFailure, result.ExitCode)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stderr)
+	if payload["schemaVersion"] != float64(jsonSchemaVersion) {
+		t.Fatalf("expected schemaVersion %d, got %v", jsonSchemaVersion, payload["schemaVersion"])
+	}
+	if payload["command"] != "callers" {
+		t.Fatalf("expected callers command, got %v", payload["command"])
+	}
+	if payload["target"] != "Target" {
+		t.Fatalf("expected target Target, got %v", payload["target"])
+	}
+	if payload["root"] != filepath.Clean(tmp) {
+		t.Fatalf("expected root %s, got %v", filepath.Clean(tmp), payload["root"])
+	}
+	if payload["modulePath"] != "example.com/app" {
+		t.Fatalf("expected modulePath example.com/app, got %v", payload["modulePath"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	errorPayload, ok := payload["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected error object, got %T", payload["error"])
+	}
+	if errorPayload["code"] != "ambiguous_target" {
+		t.Fatalf("expected ambiguous_target code, got %v", errorPayload["code"])
+	}
+	if errorPayload["kind"] != "function" {
+		t.Fatalf("expected function kind, got %v", errorPayload["kind"])
+	}
+	if errorPayload["target"] != "Target" {
+		t.Fatalf("expected error target Target, got %v", errorPayload["target"])
+	}
+
+	message, ok := errorPayload["message"].(string)
+	if !ok || !strings.Contains(message, "ambiguous function target: Target") {
+		t.Fatalf("expected ambiguous message, got %v", errorPayload["message"])
+	}
+
+	candidates := assertMainTestJSONArrayHasLength(t, errorPayload, "candidates", 2)
+	assertMainTestAmbiguousCandidate(t, candidates[0], "./internal/auth", "Target", "internal/auth/auth.go", float64(3), "./internal/auth.Target")
+	assertMainTestAmbiguousCandidate(t, candidates[1], "./internal/billing", "Target", "internal/billing/billing.go", float64(3), "./internal/billing.Target")
+}
+
 func TestMainRunsCallersCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2191,4 +2256,33 @@ func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key 
 	}
 
 	return values
+}
+
+func assertMainTestAmbiguousCandidate(t *testing.T, value any, packagePath string, symbol string, file string, line float64, example string) {
+	t.Helper()
+
+	candidate, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("expected candidate object, got %T", value)
+	}
+	if candidate["package"] != packagePath {
+		t.Fatalf("expected package %s, got %v", packagePath, candidate["package"])
+	}
+	if candidate["symbol"] != symbol {
+		t.Fatalf("expected symbol %s, got %v", symbol, candidate["symbol"])
+	}
+	if candidate["example"] != example {
+		t.Fatalf("expected example %s, got %v", example, candidate["example"])
+	}
+
+	position, ok := candidate["position"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected position object, got %T", candidate["position"])
+	}
+	if position["file"] != file {
+		t.Fatalf("expected file %s, got %v", file, position["file"])
+	}
+	if position["line"] != line {
+		t.Fatalf("expected line %v, got %v", line, position["line"])
+	}
 }

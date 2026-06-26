@@ -82,7 +82,8 @@ Implemented:
 - Opt-in test callers for `gosherpa callers --tests` and
   `gosherpa explain --tests`.
 - Ambiguity errors for duplicate unqualified targets show candidate packages,
-  files, lines, and package-qualified examples.
+  files, lines, package-qualified examples, and structured JSON diagnostics
+  when `--json` is used.
 - Machine-readable JSON output for all commands with a stable response envelope.
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
@@ -1171,7 +1172,8 @@ Requirements:
   - analysis mode
   - warnings
 - Keep stdout pure JSON on success.
-- Print non-JSON diagnostics to stderr.
+- Print diagnostics to stderr; ambiguous target errors use structured JSON when
+  `--json` is set.
 
 Done when:
 

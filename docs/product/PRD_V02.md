@@ -20,7 +20,8 @@ Implemented first slice:
 * opt-in test callers for `gosherpa callers --tests` and
   `gosherpa explain --tests`
 * ambiguity handling for duplicate unqualified symbol/function targets, with
-  candidate package/file/line details and package-qualified examples
+  candidate package/file/line details, package-qualified examples, and
+  structured JSON diagnostics when `--json` is used
 
 ---
 

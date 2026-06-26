@@ -7,10 +7,10 @@ import (
 )
 
 type TargetCandidate struct {
-	Package  string
-	Symbol   string
-	Position Position
-	Example  string
+	Package  string   `json:"package"`
+	Symbol   string   `json:"symbol"`
+	Position Position `json:"position"`
+	Example  string   `json:"example"`
 }
 
 type AmbiguousTargetError struct {

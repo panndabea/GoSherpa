@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,6 +43,24 @@ type jsonResponse[T any] struct {
 	ModulePath    string   `json:"modulePath"`
 	Warnings      []string `json:"warnings"`
 	Data          T        `json:"data"`
+}
+
+type jsonErrorResponse struct {
+	SchemaVersion int           `json:"schemaVersion"`
+	Command       string        `json:"command"`
+	Target        string        `json:"target"`
+	Root          string        `json:"root"`
+	ModulePath    string        `json:"modulePath"`
+	Warnings      []string      `json:"warnings"`
+	Error         jsonErrorData `json:"error"`
+}
+
+type jsonErrorData struct {
+	Code       string                   `json:"code"`
+	Message    string                   `json:"message"`
+	Kind       string                   `json:"kind,omitempty"`
+	Target     string                   `json:"target,omitempty"`
+	Candidates []sherpa.TargetCandidate `json:"candidates,omitempty"`
 }
 
 type referencesJSONData struct {
@@ -348,8 +367,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			IncludeTests: invocation.IncludeTests,
 		})
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "explain", target, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -381,8 +399,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "symbol", name, stderr, err)
 		}
 
 		symbol := sherpa.FindSymbol(symbols, name)
@@ -411,8 +428,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "symbols", "", stderr, err)
 		}
 
 		if invocation.JSON {
@@ -439,8 +455,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		refs, err := sherpa.FindReferences(root, name)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "refs", name, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -471,8 +486,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
 			if err != nil {
-				fmt.Fprintln(stderr, "error:", err)
-				return exitFailure
+				return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
 			}
 
 			if invocation.JSON {
@@ -505,8 +519,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := analyzeImpactSubcommand(root, kind, target)
 			if err != nil {
-				fmt.Fprintln(stderr, "error:", err)
-				return exitFailure
+				return writeCommandError(invocation.JSON, root, "impact "+kind, target, stderr, err)
 			}
 
 			if invocation.JSON {
@@ -533,8 +546,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result, err := sherpa.FindImpact(root, target)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "impact", target, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -570,8 +582,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
 			if err != nil {
-				fmt.Fprintln(stderr, "error:", err)
-				return exitFailure
+				return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
 			}
 
 			if invocation.JSON {
@@ -598,8 +609,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result, err := sherpa.FindTests(root, target)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "tests", target, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -631,8 +641,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		deps, err := sherpa.FindPackageDependencies(root, targetPackage)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "deps", targetPackage, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -666,8 +675,14 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result, err := sherpa.FindCallPaths(root, invocation.CommandArgs[0], invocation.CommandArgs[1], options)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(
+				invocation.JSON,
+				root,
+				invocation.Command,
+				invocation.CommandArgs[0]+" -> "+invocation.CommandArgs[1],
+				stderr,
+				err,
+			)
 		}
 
 		if invocation.JSON {
@@ -700,8 +715,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			IncludeTests: invocation.IncludeTests,
 		})
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "callers", target, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -732,8 +746,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result, err := sherpa.FindCallees(root, target)
 		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return exitFailure
+			return writeCommandError(invocation.JSON, root, "callees", target, stderr, err)
 		}
 
 		if invocation.JSON {
@@ -831,16 +844,20 @@ func formatImpactSubcommandReport(kind string, report impactengine.ImpactReport)
 }
 
 func writeJSON(stdout io.Writer, stderr io.Writer, value any) int {
-	encoder := json.NewEncoder(stdout)
-	encoder.SetIndent("", "  ")
-	encoder.SetEscapeHTML(false)
-
-	if err := encoder.Encode(value); err != nil {
+	if err := encodeJSON(stdout, value); err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return exitFailure
 	}
 
 	return exitSuccess
+}
+
+func encodeJSON(writer io.Writer, value any) error {
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+
+	return encoder.Encode(value)
 }
 
 func newJSONResponse[T any](root string, command string, target string, warnings []string, data T) jsonResponse[T] {
@@ -857,6 +874,54 @@ func newJSONResponse[T any](root string, command string, target string, warnings
 		ModulePath:    modulePath,
 		Warnings:      nonNilSlice(warnings),
 		Data:          data,
+	}
+}
+
+func writeCommandError(jsonOutput bool, root string, command string, target string, stderr io.Writer, err error) int {
+	if jsonOutput && writeTypedJSONError(stderr, root, command, target, err) {
+		return exitFailure
+	}
+
+	fmt.Fprintln(stderr, "error:", err)
+	return exitFailure
+}
+
+func writeTypedJSONError(stderr io.Writer, root string, command string, target string, err error) bool {
+	var ambiguous *sherpa.AmbiguousTargetError
+	if !errors.As(err, &ambiguous) {
+		return false
+	}
+
+	response := newJSONErrorResponse(root, command, target, jsonErrorData{
+		Code:       "ambiguous_target",
+		Message:    err.Error(),
+		Kind:       ambiguous.Kind,
+		Target:     ambiguous.Target,
+		Candidates: nonNilSlice(ambiguous.Candidates),
+	})
+
+	if encodeErr := encodeJSON(stderr, response); encodeErr != nil {
+		fmt.Fprintln(stderr, "error:", encodeErr)
+	}
+
+	return true
+}
+
+func newJSONErrorResponse(root string, command string, target string, errorData jsonErrorData) jsonErrorResponse {
+	var warnings []string
+	modulePath, err := sherpa.ModulePath(root)
+	if err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	return jsonErrorResponse{
+		SchemaVersion: jsonSchemaVersion,
+		Command:       command,
+		Target:        target,
+		Root:          root,
+		ModulePath:    modulePath,
+		Warnings:      nonNilSlice(warnings),
+		Error:         errorData,
 	}
 }
 

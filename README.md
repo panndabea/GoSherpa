@@ -142,6 +142,10 @@ JSON output for all commands uses a stable envelope:
 }
 ```
 
+When `--json` is used with an ambiguous target, GoSherpa keeps stdout empty and
+emits a structured diagnostic to stderr with `error.code: "ambiguous_target"`
+and candidate package/file/line details.
+
 Prefer not to build a binary yet?
 
 ```bash
