@@ -7,6 +7,8 @@ the code, README, and license.
 
 - [Feature Roadmap](product/FEATURE_ROADMAP.md) - current product direction and
   implementation status.
+- [Agent Priority List](product/AGENT_PRIORITY_LIST.md) - prioritized features
+  that would make GoSherpa useful as a default coding-agent tool.
 - [PRD v0.1: Impact Engine](product/PRD_V01.md) - completed MVP scope.
 - [PRD v0.5: Symbol Intelligence](product/PRD_V02.md) - active product track.
 - [PRD v1.0: Intelligence Platform](product/PRD_V03.md) - longer-term vision.
