@@ -54,6 +54,8 @@ As Go projects grow, the important answer is often spread across files, packages
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
+| Interface implementers | `gosherpa implementers ./internal/auth.Authenticator` | Lists concrete local types satisfying an interface |
+| Satisfied interfaces | `gosherpa interfaces ./internal/jwt.JWTAuthenticator` | Lists local interfaces satisfied by a type |
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct callers of a function or method |
 | Test callers | `gosherpa callers ./internal/sherpa.ParseFile --tests` | Includes direct callers from `_test.go` files on demand |
@@ -112,6 +114,10 @@ Then explore the repository:
 ./gosherpa tests affected --base HEAD --json
 ./gosherpa deps ./internal/sherpa
 ./gosherpa deps ./internal/sherpa --json
+./gosherpa implementers ./internal/auth.Authenticator
+./gosherpa implementers ./internal/auth.Authenticator --json
+./gosherpa interfaces ./internal/jwt.JWTAuthenticator
+./gosherpa interfaces ./internal/jwt.JWTAuthenticator --json
 ./gosherpa callees ParseFile
 ./gosherpa callees ./internal/sherpa.ParseFile
 ./gosherpa callees ParseFile --json
@@ -203,6 +209,7 @@ Implemented:
 - Shortest and limited repository-local call path analysis
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
+- Standalone interface navigation with `implementers` and `interfaces`
 - Opt-in test callers for `gosherpa callers --tests` and `gosherpa explain --tests`
 - Ambiguity errors for duplicate unqualified symbols include candidate packages, files, lines, and package-qualified examples
 - Machine-readable JSON output for all commands with a stable response envelope

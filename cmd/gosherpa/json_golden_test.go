@@ -108,6 +108,50 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 	}
 }
 
+func TestMainInterfaceJSONGoldenFiles(t *testing.T) {
+	fixtureRoot := filepath.Join("testdata", "interface_project")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "implementers",
+			args: []string{"implementers", "./internal/auth.Authenticator", "--json"},
+		},
+		{
+			name: "interfaces",
+			args: []string{"interfaces", "./internal/jwt.JWTAuthenticator", "--json"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"gosherpa", "--root", fixtureRoot}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+
+			actual := canonicalGoldenActualJSON(t, result.Stdout, fixtureRoot)
+			expectedPath := filepath.Join("testdata", "golden-json", test.name+".json")
+			expectedBytes, err := os.ReadFile(expectedPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := canonicalGoldenJSON(t, expectedBytes)
+
+			if actual != expected {
+				t.Fatalf("golden JSON mismatch for %s\nexpected:\n%s\nactual:\n%s", test.name, expected, actual)
+			}
+		})
+	}
+}
+
 func TestMainImpactDiffJSONGoldenFile(t *testing.T) {
 	sourceFixtureRoot := filepath.Join("testdata", "json_project")
 	fixtureRoot := t.TempDir()

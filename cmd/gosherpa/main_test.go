@@ -447,6 +447,20 @@ func TestPrintUsageIncludesCallers(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesInterfaceNavigation(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	for _, want := range []string{
+		"implementers <interface>",
+		"interfaces <type>",
+	} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
+		}
+	}
+}
+
 func TestPrintUsageIncludesSearch(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -1560,6 +1574,160 @@ func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 	}
 }
 
+func TestMainPrintsImplementersUsageWhenArgumentIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "implementers"})
+
+	want := "usage: gosherpa [--root <path>] implementers <interface>\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsImplementersCommand(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "implementers", "./internal/auth.Authenticator"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"IMPLEMENTERS",
+		"./internal/auth.Authenticator",
+		"./internal/jwt.JWTAuthenticator",
+		"internal/jwt/jwt.go",
+		"Found 1 implementers",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImplementersCommandAsJSON(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "implementers", "./internal/auth.Authenticator", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "implementers", "./internal/auth.Authenticator", "example.com/app")
+
+	implementers := assertMainTestJSONArrayHasLength(t, data, "implementers", 1)
+	implementer, ok := implementers[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected implementer object, got %T", implementers[0])
+	}
+	if implementer["name"] != "./internal/jwt.JWTAuthenticator" {
+		t.Fatalf("expected JWTAuthenticator implementer, got %v", implementer["name"])
+	}
+
+	if strings.Contains(result.Stdout, "IMPLEMENTERS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainPrintsInterfacesUsageWhenArgumentIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "interfaces"})
+
+	want := "usage: gosherpa [--root <path>] interfaces <type>\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsInterfacesCommand(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interfaces", "./internal/jwt.JWTAuthenticator"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"INTERFACES",
+		"./internal/jwt.JWTAuthenticator",
+		"./internal/auth.Authenticator",
+		"internal/auth/auth.go",
+		"Found 1 interfaces",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsInterfacesCommandAsJSON(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interfaces", "./internal/jwt.JWTAuthenticator", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "interfaces", "./internal/jwt.JWTAuthenticator", "example.com/app")
+
+	interfaces := assertMainTestJSONArrayHasLength(t, data, "interfaces", 1)
+	iface, ok := interfaces[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected interface object, got %T", interfaces[0])
+	}
+	if iface["name"] != "./internal/auth.Authenticator" {
+		t.Fatalf("expected Authenticator interface, got %v", iface["name"])
+	}
+
+	if strings.Contains(result.Stdout, "INTERFACES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsCallersCommand(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2439,6 +2607,29 @@ import "example.com/app"
 
 func Run() {
 	service.Entry()
+}
+`)
+
+	return tmp
+}
+
+func writeMainInterfaceProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "auth.go"), `package auth
+
+type Authenticator interface {
+	Authenticate() error
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "jwt", "jwt.go"), `package jwt
+
+type JWTAuthenticator struct{}
+
+func (JWTAuthenticator) Authenticate() error {
+	return nil
 }
 `)
 

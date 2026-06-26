@@ -96,6 +96,8 @@ Implemented:
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
   import-aware signature matching and embedded-interface expansion.
+- Standalone `implementers <interface>` and `interfaces <type>` navigation
+  commands backed by the local interface graph.
 - Changed-symbol extraction from git diff hunks, including deleted symbols from
   base files.
 - Package-qualified symbol impact for references and affected tests.
@@ -533,6 +535,9 @@ Goal: answer the most Go-specific architecture questions.
 
 ### 3.1 Implementers of an Interface
 
+Status: implemented as `gosherpa implementers <interface>` using the local
+interface graph.
+
 Human question:
 
 ```text
@@ -542,8 +547,8 @@ Who implements this interface?
 Command sketch:
 
 ```bash
-gosherpa implements UserRepository
-gosherpa implements ./internal/user.UserRepository
+gosherpa implementers UserRepository
+gosherpa implementers ./internal/user.UserRepository
 ```
 
 MVP behavior:
@@ -560,6 +565,9 @@ Done when:
 - Developers can understand interface boundaries without manual method matching.
 
 ### 3.2 Interfaces Satisfied by a Type
+
+Status: implemented as `gosherpa interfaces <type>` using the local interface
+graph.
 
 Human question:
 
@@ -1239,7 +1247,7 @@ Potential tools:
 - `callees`
 - `path`
 - `deps`
-- `implements`
+- `implementers`
 - `tests`
 - `impact`
 
@@ -1434,7 +1442,7 @@ Theme: answer core Go architecture questions.
 
 Included:
 
-- `implements`
+- `implementers`
 - `interfaces`
 - richer interface details
 - interface method usage where practical
@@ -1515,7 +1523,7 @@ Included:
 | `search` | High | Low | Immediate |
 | Rich `symbol` details | High | Medium | Near-term |
 | Type-aware `refs` | Very high | High | Near-term |
-| `implements` | Very high | Medium | Near-term |
+| `implementers` | Very high | Medium | Near-term |
 | Type-aware callers/callees | Very high | High | Mid-term |
 | `path` | High | High | Mid-term |
 | `tests` | Very high | Medium | Mid-term |
@@ -1561,7 +1569,7 @@ sequence is:
    - Preserve a simple human output shape.
    - Add reference kinds incrementally.
 
-7. Add `implements`.
+7. Add `implementers`.
    - Reuse type information from the semantic loader.
    - Keep output compact and concrete.
 

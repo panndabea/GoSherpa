@@ -124,6 +124,14 @@ type dependenciesJSONData struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+type implementersJSONData struct {
+	Implementers []impactengine.Implementer `json:"implementers"`
+}
+
+type interfacesJSONData struct {
+	Interfaces []impactengine.SatisfiedInterface `json:"interfaces"`
+}
+
 type callersJSONData struct {
 	Callers []sherpa.Caller `json:"callers"`
 }
@@ -790,6 +798,68 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		fmt.Fprint(stdout, sherpa.FormatPackageDependencies(deps))
 		return exitSuccess
+	case "implementers":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] implementers <interface>")
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		target := invocation.CommandArgs[0]
+
+		result, err := impactengine.FindImplementers(root, target)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
+		}
+
+		if invocation.JSON {
+			normalizedResult := implementersJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"implementers",
+				normalizedResult.Target,
+				nil,
+				implementersJSONDataFromResult(normalizedResult),
+			))
+		}
+
+		fmt.Fprint(stdout, impactengine.FormatImplementers(result))
+		return exitSuccess
+	case "interfaces":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] interfaces <type>")
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		target := invocation.CommandArgs[0]
+
+		result, err := impactengine.FindInterfaces(root, target)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
+		}
+
+		if invocation.JSON {
+			normalizedResult := interfacesJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"interfaces",
+				normalizedResult.Target,
+				nil,
+				interfacesJSONDataFromResult(normalizedResult),
+			))
+		}
+
+		fmt.Fprint(stdout, impactengine.FormatInterfaces(result))
+		return exitSuccess
 	case "path", "paths":
 		if len(invocation.CommandArgs) < 2 {
 			fmt.Fprintf(stderr, "usage: gosherpa [--root <path>] %s <from> <to> [--limit <n>] [--max-depth <n>]\n", invocation.Command)
@@ -904,7 +974,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -913,7 +983,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain":
 		return true
 	default:
 		return false
@@ -1155,6 +1225,30 @@ func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenc
 	}
 }
 
+func implementersJSONResult(result impactengine.ImplementersResult) impactengine.ImplementersResult {
+	result.Implementers = nonNilSlice(result.Implementers)
+
+	return result
+}
+
+func implementersJSONDataFromResult(result impactengine.ImplementersResult) implementersJSONData {
+	return implementersJSONData{
+		Implementers: result.Implementers,
+	}
+}
+
+func interfacesJSONResult(result impactengine.InterfacesResult) impactengine.InterfacesResult {
+	result.Interfaces = nonNilSlice(result.Interfaces)
+
+	return result
+}
+
+func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfacesJSONData {
+	return interfacesJSONData{
+		Interfaces: result.Interfaces,
+	}
+}
+
 func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 	result.Callers = nonNilSlice(result.Callers)
 
@@ -1273,6 +1367,8 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  tests <symbol-or-package>")
 	fmt.Fprintln(writer, "  tests affected --base <ref>")
 	fmt.Fprintln(writer, "  deps <package>")
+	fmt.Fprintln(writer, "  implementers <interface>")
+	fmt.Fprintln(writer, "  interfaces <type>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
 	fmt.Fprintln(writer, "  callers <function-or-method> [--tests]")

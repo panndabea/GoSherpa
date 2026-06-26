@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "command": "implementers",
+  "target": "./internal/auth.Authenticator",
+  "root": "<ROOT>",
+  "modulePath": "example.com/interfaces",
+  "warnings": [],
+  "data": {
+    "implementers": [
+      {
+        "name": "./internal/jwt.JWTAuthenticator",
+        "position": {
+          "file": "internal/jwt/jwt.go",
+          "line": 3,
+          "column": 6
+        }
+      }
+    ]
+  }
+}

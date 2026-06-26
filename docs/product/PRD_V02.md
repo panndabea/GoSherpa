@@ -17,6 +17,8 @@ Implemented first slice:
   `path`, and `paths`
 * receiver-variable method calls in standalone call graph commands, resolved
   with package-level type information
+* standalone `implementers <interface>` and `interfaces <type>` commands
+  backed by the local interface graph
 * opt-in test callers for `gosherpa callers --tests` and
   `gosherpa explain --tests`
 * ambiguity handling for duplicate unqualified symbol/function targets, with
