@@ -175,6 +175,7 @@ Implemented:
 - Struct, interface, function, and method discovery
 - Symbol lookup and Go-aware reference lookup
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
+- Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands
 - Package dependency analysis
@@ -202,7 +203,7 @@ Release notes:
 
 Planned next:
 
-- strengthen package-qualified caller/callee handling for `gosherpa explain` from [PRD_V02.md](PRD_V02.md)
+- extend package-qualified caller/callee handling to the standalone call graph commands from [PRD_V02.md](PRD_V02.md)
 
 Known MVP limitations:
 
@@ -215,8 +216,8 @@ Known MVP limitations:
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
-- One-segment function targets can produce selector-call false positives.
-- Function names can be ambiguous across packages.
+- One-segment standalone call targets can produce selector-call false positives.
+- Standalone call graph commands can still be ambiguous across packages.
 
 ## Philosophy
 

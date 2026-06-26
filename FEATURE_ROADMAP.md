@@ -66,6 +66,8 @@ Implemented:
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture
   role, definition, reading order, references, callers, callees, impact signals,
   tests, and JSON output.
+- Package-aware caller/callee signals for package-qualified `gosherpa explain`
+  targets.
 - Direct symbol and package impact analysis.
 - Related test discovery with suggested `go test` commands.
 - Package dependency analysis.
@@ -108,7 +110,7 @@ Current limitations:
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
-- Function names can be ambiguous across packages.
+- Standalone call graph commands can still be ambiguous across packages.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -607,7 +609,9 @@ gosherpa callees Handler.CreateUser
 
 Improvements over current MVP:
 
-- Resolve package-qualified function calls.
+- Resolve package-qualified function calls in standalone call graph commands.
+  Package-qualified `explain` targets already use package-aware caller/callee
+  signals.
 - Resolve receiver-variable method calls.
 - Include test callers with `--tests`.
 - Include or exclude external package calls.

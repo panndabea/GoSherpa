@@ -99,22 +99,10 @@ func Analyze(root string, target string) (Report, error) {
 		report.Warnings = append(report.Warnings, impactReport.Warnings...)
 	}
 
-	callTarget := callTargetForSymbol(symbol)
-	if callTarget != "" {
-		callers, err := sherpa.FindCallers(root, callTarget)
-		if err != nil {
-			report.Warnings = append(report.Warnings, "callers: "+err.Error())
-		} else {
-			report.Callers = callers.Callers
-		}
-
-		callees, err := sherpa.FindCallees(root, callTarget)
-		if err != nil {
-			report.Warnings = append(report.Warnings, "callees: "+err.Error())
-		} else {
-			report.Callees = callees.Callees
-		}
-	}
+	callers, callees, warnings := callSignalsForSymbol(root, impactResult.Target, symbol)
+	report.Callers = callers
+	report.Callees = callees
+	report.Warnings = append(report.Warnings, warnings...)
 
 	report.Risk = riskSummary(report)
 	report.ArchitectureRole = architectureRole(report)
@@ -241,21 +229,6 @@ func symbolPackage(root string, symbol sherpa.Symbol) string {
 	}
 
 	return "./" + dir
-}
-
-func callTargetForSymbol(symbol sherpa.Symbol) string {
-	switch symbol.Kind {
-	case sherpa.SymbolKindFunction:
-		return symbol.Name
-	case sherpa.SymbolKindMethod:
-		if symbol.Receiver == "" {
-			return symbol.Name
-		}
-
-		return symbol.Receiver + "." + symbol.Name
-	default:
-		return ""
-	}
 }
 
 func symbolPurpose(root string, symbol sherpa.Symbol) (string, error) {

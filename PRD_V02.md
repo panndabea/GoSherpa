@@ -11,10 +11,14 @@ Implemented first slice:
 * purpose from Go doc comments, risk summary, architecture role, definition,
   reading order, references, callers, callees, affected packages, interface and
   implementation impact, related tests, and suggested test commands
+* package-qualified `explain` caller/callee signals that avoid mixing same-name
+  functions across local packages
 
 Next:
 
-* stronger package-qualified caller/callee handling
+* extend package-qualified caller/callee handling to standalone call graph
+  commands
+* resolve receiver-variable method calls with type information
 
 ---
 

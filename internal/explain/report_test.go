@@ -49,6 +49,27 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 	})
 }
 
+func TestAnalyzeUsesPackageQualifiedCallSignals(t *testing.T) {
+	root := writePackageQualifiedExplainProject(t)
+
+	report, err := Analyze(root, "./internal/auth.Target")
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+
+	if report.Symbol.Position.File != "internal/auth/auth.go" {
+		t.Fatalf("symbol file = %q, want internal/auth/auth.go", report.Symbol.Position.File)
+	}
+
+	assertNames(t, callerNames(report.Callers), []string{"Run", "Entry"})
+	assertNames(t, callerFiles(report.Callers), []string{
+		"cmd/app/main.go",
+		"internal/auth/auth.go",
+	})
+	assertNames(t, calleeNames(report.Callees), []string{"Helper"})
+	assertNames(t, calleeFiles(report.Callees), []string{"internal/auth/auth.go"})
+}
+
 func TestAnalyzeRejectsPackageTargets(t *testing.T) {
 	root := writeExplainProject(t)
 
@@ -88,6 +109,51 @@ func TestTarget(t *testing.T) {
 	return root
 }
 
+func writePackageQualifiedExplainProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeExplainTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeExplainTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+func Entry() {
+	Target()
+}
+
+func Target() {
+	Helper()
+}
+
+func Helper() {}
+`)
+	writeExplainTestFile(t, filepath.Join(root, "internal", "billing", "billing.go"), `package billing
+
+func Entry() {
+	Target()
+}
+
+func Target() {
+	Helper()
+}
+
+func Helper() {}
+`)
+	writeExplainTestFile(t, filepath.Join(root, "cmd", "app", "main.go"), `package main
+
+import (
+	authpkg "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func Run() {
+	authpkg.Target()
+	billing.Target()
+}
+`)
+
+	return root
+}
+
 func writeExplainTestFile(t *testing.T, path string, contents string) {
 	t.Helper()
 
@@ -108,6 +174,15 @@ func callerNames(callers []sherpa.Caller) []string {
 	return names
 }
 
+func callerFiles(callers []sherpa.Caller) []string {
+	files := make([]string, 0, len(callers))
+	for _, caller := range callers {
+		files = append(files, caller.Position.File)
+	}
+
+	return files
+}
+
 func calleeNames(callees []sherpa.Callee) []string {
 	names := make([]string, 0, len(callees))
 	for _, callee := range callees {
@@ -115,6 +190,15 @@ func calleeNames(callees []sherpa.Callee) []string {
 	}
 
 	return names
+}
+
+func calleeFiles(callees []sherpa.Callee) []string {
+	files := make([]string, 0, len(callees))
+	for _, callee := range callees {
+		files = append(files, callee.Position.File)
+	}
+
+	return files
 }
 
 func testNames(tests []sherpa.RelatedTest) []string {
