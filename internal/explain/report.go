@@ -18,6 +18,8 @@ type Report struct {
 	Target                  string               `json:"target"`
 	Symbol                  sherpa.Symbol        `json:"symbol"`
 	Purpose                 string               `json:"purpose"`
+	Risk                    RiskSummary          `json:"risk"`
+	ArchitectureRole        ArchitectureRole     `json:"architectureRole"`
 	References              []sherpa.Reference   `json:"references"`
 	Callers                 []sherpa.Caller      `json:"callers"`
 	Callees                 []sherpa.Callee      `json:"callees"`
@@ -28,6 +30,16 @@ type Report struct {
 	TestCommands            []string             `json:"testCommands"`
 	ReadingOrder            []ReadingStep        `json:"readingOrder"`
 	Warnings                []string             `json:"warnings"`
+}
+
+type RiskSummary struct {
+	Level   string   `json:"level"`
+	Reasons []string `json:"reasons"`
+}
+
+type ArchitectureRole struct {
+	Role    string   `json:"role"`
+	Reasons []string `json:"reasons"`
 }
 
 type ReadingStep struct {
@@ -104,6 +116,8 @@ func Analyze(root string, target string) (Report, error) {
 		}
 	}
 
+	report.Risk = riskSummary(report)
+	report.ArchitectureRole = architectureRole(report)
 	report.ReadingOrder = readingOrder(report)
 
 	return normalizeReport(report), nil
@@ -384,6 +398,103 @@ func readingOrder(report Report) []ReadingStep {
 	return steps
 }
 
+func riskSummary(report Report) RiskSummary {
+	score := 0
+	var reasons []string
+
+	if ast.IsExported(report.Symbol.Name) {
+		score++
+		reasons = append(reasons, "Symbol is exported.")
+	}
+
+	if len(report.AffectedPackages) > 1 {
+		score += 2
+		reasons = append(reasons, fmt.Sprintf("Impact reaches %d packages.", len(report.AffectedPackages)))
+	}
+
+	if len(report.Callers) >= 3 {
+		score += 2
+		reasons = append(reasons, fmt.Sprintf("Called by %d functions or methods.", len(report.Callers)))
+	} else if len(report.Callers) > 0 {
+		score++
+		reasons = append(reasons, calledByReason(len(report.Callers)))
+	}
+
+	interfaceSignals := len(report.AffectedInterfaces) + len(report.AffectedImplementations)
+	if interfaceSignals > 0 {
+		score += 2
+		reasons = append(reasons, fmt.Sprintf("Touches %d interface or implementation signals.", interfaceSignals))
+	}
+
+	if len(report.RelatedTests) == 0 {
+		score++
+		reasons = append(reasons, "No related tests found.")
+	} else {
+		reasons = append(reasons, fmt.Sprintf("Related tests found: %d.", len(report.RelatedTests)))
+	}
+
+	level := "low"
+	if score >= 5 {
+		level = "high"
+	} else if score >= 2 {
+		level = "medium"
+	}
+
+	if len(reasons) == 0 {
+		reasons = append(reasons, "No broad impact signals found.")
+	}
+
+	return RiskSummary{
+		Level:   level,
+		Reasons: uniqueStrings(reasons),
+	}
+}
+
+func calledByReason(count int) string {
+	if count == 1 {
+		return "Called by 1 function or method."
+	}
+
+	return fmt.Sprintf("Called by %d functions or methods.", count)
+}
+
+func architectureRole(report Report) ArchitectureRole {
+	role := "local_symbol"
+	var reasons []string
+
+	switch {
+	case report.Symbol.Kind == sherpa.SymbolKindInterface:
+		role = "interface_contract"
+		reasons = append(reasons, "Symbol is an interface definition.")
+	case len(report.AffectedInterfaces)+len(report.AffectedImplementations) > 0:
+		role = "interface_boundary"
+		reasons = append(reasons, "Symbol participates in interface or implementation impact.")
+	case report.Symbol.Kind == sherpa.SymbolKindStruct:
+		role = "data_type"
+		reasons = append(reasons, "Symbol is a struct type used by references or impact analysis.")
+	case len(report.Callers) > 0 && len(report.Callees) > 0:
+		role = "connector"
+		reasons = append(reasons, "Symbol is called by upstream code and calls downstream code.")
+	case len(report.Callers) > 0:
+		role = "leaf_dependency"
+		reasons = append(reasons, "Symbol is depended on by callers but has no direct callees.")
+	case len(report.Callees) > 0:
+		role = "entry_point"
+		reasons = append(reasons, "Symbol calls downstream code but has no direct callers.")
+	default:
+		reasons = append(reasons, "No call-graph role detected yet.")
+	}
+
+	if len(report.AffectedPackages) > 1 {
+		reasons = append(reasons, fmt.Sprintf("Impact crosses %d packages.", len(report.AffectedPackages)))
+	}
+
+	return ArchitectureRole{
+		Role:    role,
+		Reasons: uniqueStrings(reasons),
+	}
+}
+
 func limitCallees(values []sherpa.Callee, limit int) []sherpa.Callee {
 	if len(values) <= limit {
 		return values
@@ -409,6 +520,8 @@ func limitRelatedTests(values []sherpa.RelatedTest, limit int) []sherpa.RelatedT
 }
 
 func normalizeReport(report Report) Report {
+	report.Risk.Reasons = nonNil(uniqueStrings(report.Risk.Reasons))
+	report.ArchitectureRole.Reasons = nonNil(uniqueStrings(report.ArchitectureRole.Reasons))
 	report.References = nonNil(report.References)
 	report.Callers = nonNil(report.Callers)
 	report.Callees = nonNil(report.Callees)
@@ -448,6 +561,25 @@ func uniqueSorted(values []string) []string {
 	}
 
 	sort.Strings(result)
+
+	return result
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
 
 	return result
 }

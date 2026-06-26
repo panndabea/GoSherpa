@@ -57,6 +57,22 @@
     ],
     "callees": [],
     "purpose": "",
+    "risk": {
+      "level": "medium",
+      "reasons": [
+        "Symbol is exported.",
+        "Impact reaches 2 packages.",
+        "Called by 2 functions or methods.",
+        "Related tests found: 1."
+      ]
+    },
+    "architectureRole": {
+      "role": "leaf_dependency",
+      "reasons": [
+        "Symbol is depended on by callers but has no direct callees.",
+        "Impact crosses 2 packages."
+      ]
+    },
     "readingOrder": [
       {
         "title": "Definition",

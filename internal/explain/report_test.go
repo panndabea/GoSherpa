@@ -29,6 +29,12 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 	if report.Purpose != "Target handles the main service step." {
 		t.Fatalf("purpose = %q, want doc comment", report.Purpose)
 	}
+	if report.Risk.Level != "medium" {
+		t.Fatalf("risk level = %q, want medium", report.Risk.Level)
+	}
+	if report.ArchitectureRole.Role != "connector" {
+		t.Fatalf("architecture role = %q, want connector", report.ArchitectureRole.Role)
+	}
 
 	assertNames(t, callerNames(report.Callers), []string{"Entry"})
 	assertNames(t, calleeNames(report.Callees), []string{"Helper"})

@@ -22,6 +22,10 @@ func Format(report Report) string {
 
 	writePurpose(&builder, report.Purpose)
 	builder.WriteString("\n")
+	writeRisk(&builder, report.Risk)
+	builder.WriteString("\n")
+	writeArchitectureRole(&builder, report.ArchitectureRole)
+	builder.WriteString("\n")
 	writeReadingOrder(&builder, report.ReadingOrder)
 	builder.WriteString("\n")
 	writeCallers(&builder, report.Callers)
@@ -61,6 +65,43 @@ func writePurpose(builder *strings.Builder, purpose string) {
 
 		builder.WriteString("  ")
 		builder.WriteString(line)
+		builder.WriteString("\n")
+	}
+}
+
+func writeRisk(builder *strings.Builder, risk RiskSummary) {
+	builder.WriteString("RISK\n")
+	level := strings.TrimSpace(risk.Level)
+	if level == "" {
+		level = "unknown"
+	}
+	builder.WriteString("  ")
+	builder.WriteString(level)
+	builder.WriteString("\n")
+	writeReasons(builder, risk.Reasons)
+}
+
+func writeArchitectureRole(builder *strings.Builder, role ArchitectureRole) {
+	builder.WriteString("ARCHITECTURE ROLE\n")
+	value := strings.TrimSpace(role.Role)
+	if value == "" {
+		value = "unknown"
+	}
+	builder.WriteString("  ")
+	builder.WriteString(value)
+	builder.WriteString("\n")
+	writeReasons(builder, role.Reasons)
+}
+
+func writeReasons(builder *strings.Builder, reasons []string) {
+	for _, reason := range reasons {
+		reason = strings.TrimSpace(reason)
+		if reason == "" {
+			continue
+		}
+
+		builder.WriteString("  - ")
+		builder.WriteString(reason)
 		builder.WriteString("\n")
 	}
 }

@@ -107,18 +107,20 @@ type callPathsJSONData struct {
 }
 
 type explainJSONData struct {
-	Target                  string                      `json:"target"`
-	Symbol                  sherpa.Symbol               `json:"symbol"`
-	Purpose                 string                      `json:"purpose"`
-	References              []sherpa.Reference          `json:"references"`
-	Callers                 []sherpa.Caller             `json:"callers"`
-	Callees                 []sherpa.Callee             `json:"callees"`
-	AffectedPackages        []string                    `json:"affectedPackages"`
-	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
-	AffectedImplementations []string                    `json:"affectedImplementations"`
-	RelatedTests            []sherpa.RelatedTest        `json:"relatedTests"`
-	TestCommands            []string                    `json:"testCommands"`
-	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
+	Target                  string                         `json:"target"`
+	Symbol                  sherpa.Symbol                  `json:"symbol"`
+	Purpose                 string                         `json:"purpose"`
+	Risk                    explainengine.RiskSummary      `json:"risk"`
+	ArchitectureRole        explainengine.ArchitectureRole `json:"architectureRole"`
+	References              []sherpa.Reference             `json:"references"`
+	Callers                 []sherpa.Caller                `json:"callers"`
+	Callees                 []sherpa.Callee                `json:"callees"`
+	AffectedPackages        []string                       `json:"affectedPackages"`
+	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
+	AffectedImplementations []string                       `json:"affectedImplementations"`
+	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
+	TestCommands            []string                       `json:"testCommands"`
+	ReadingOrder            []explainengine.ReadingStep    `json:"readingOrder"`
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -986,6 +988,8 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		Target:                  report.Target,
 		Symbol:                  report.Symbol,
 		Purpose:                 report.Purpose,
+		Risk:                    report.Risk,
+		ArchitectureRole:        report.ArchitectureRole,
 		References:              report.References,
 		Callers:                 report.Callers,
 		Callees:                 report.Callees,

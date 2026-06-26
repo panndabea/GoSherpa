@@ -951,7 +951,7 @@ func TestMainRunsExplainCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "PURPOSE", "READING ORDER", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "PURPOSE", "RISK", "medium", "ARCHITECTURE ROLE", "leaf_dependency", "READING ORDER", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -987,6 +987,21 @@ func TestMainRunsExplainCommandAsJSON(t *testing.T) {
 
 	if data["purpose"] != "" {
 		t.Fatalf("expected empty purpose, got %v", data["purpose"])
+	}
+	risk, ok := data["risk"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected risk object, got %T", data["risk"])
+	}
+	if risk["level"] != "medium" {
+		t.Fatalf("expected medium risk, got %v", risk["level"])
+	}
+
+	architectureRole, ok := data["architectureRole"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected architectureRole object, got %T", data["architectureRole"])
+	}
+	if architectureRole["role"] != "leaf_dependency" {
+		t.Fatalf("expected leaf_dependency role, got %v", architectureRole["role"])
 	}
 
 	if _, ok := data["warnings"]; ok {

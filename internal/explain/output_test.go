@@ -19,6 +19,19 @@ func TestFormat(t *testing.T) {
 			},
 		},
 		Purpose: "Target handles the main service step.",
+		Risk: RiskSummary{
+			Level: "medium",
+			Reasons: []string{
+				"Symbol is exported.",
+				"Called by 1 function or method.",
+			},
+		},
+		ArchitectureRole: ArchitectureRole{
+			Role: "connector",
+			Reasons: []string{
+				"Symbol is called by upstream code and calls downstream code.",
+			},
+		},
 		Callers: []sherpa.Caller{
 			{Name: "Entry", Position: sherpa.Position{File: "service.go", Line: 3}},
 		},
@@ -56,6 +69,10 @@ func TestFormat(t *testing.T) {
 		"service.go:7",
 		"PURPOSE",
 		"Target handles the main service step.",
+		"RISK",
+		"medium",
+		"ARCHITECTURE ROLE",
+		"connector",
 		"READING ORDER",
 		"Definition - service.go:7",
 		"Test: TestTarget",
