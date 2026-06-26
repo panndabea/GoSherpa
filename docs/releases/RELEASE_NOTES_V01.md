@@ -3,9 +3,10 @@
 Status: MVP completed on 2026-06-26.
 
 GoSherpa v0.1 turns the existing code explorer into a conservative Change
-Intelligence CLI for Go repositories. The release answers the core PRD_V01
-questions: what changed, which packages are affected, which interfaces or
-implementations may be involved, and which tests are worth running.
+Intelligence CLI for Go repositories. The release answers the core
+[PRD_V01](../product/PRD_V01.md) questions: what changed, which packages are
+affected, which interfaces or implementations may be involved, and which tests
+are worth running.
 
 ## Implemented
 
@@ -48,7 +49,7 @@ implementations may be involved, and which tests are worth running.
 
 ## Next
 
-PRD_V02 moves GoSherpa from impact reports toward Symbol Intelligence. The
-highest-leverage next command is `gosherpa explain`, a compact profile for one
-symbol that can serve humans and AI coding tools without making GoSherpa a
-code generator.
+[PRD_V02](../product/PRD_V02.md) moves GoSherpa from impact reports toward
+Symbol Intelligence. The highest-leverage next command is `gosherpa explain`, a
+compact profile for one symbol that can serve humans and AI coding tools without
+making GoSherpa a code generator.

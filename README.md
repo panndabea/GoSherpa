@@ -13,6 +13,7 @@
     <img alt="Status: Early MVP" src="https://img.shields.io/badge/status-early%20MVP-2F855A?style=for-the-badge">
     <img alt="Interface: CLI" src="https://img.shields.io/badge/interface-CLI-111827?style=for-the-badge">
     <img alt="Analysis: AST based" src="https://img.shields.io/badge/analysis-AST%20based-F6AD55?style=for-the-badge">
+    <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563EB?style=for-the-badge">
   </p>
 </div>
 
@@ -22,7 +23,7 @@
 
 GoSherpa is a fast command-line companion for understanding Go repositories without opening half the project in your editor. It gives you just enough structure to navigate confidently: where a symbol lives, who references it, which packages depend on it, and how functions connect.
 
-The Impact Engine described in [PRD_V01.md](PRD_V01.md) is implemented as the v0.1 MVP: change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff. The next product track is Symbol Intelligence from [PRD_V02.md](PRD_V02.md), with `gosherpa explain` as the likely center of gravity.
+The Impact Engine described in [PRD_V01.md](docs/product/PRD_V01.md) is implemented as the v0.1 MVP: change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff. The next product track is Symbol Intelligence from [PRD_V02.md](docs/product/PRD_V02.md), with `gosherpa explain` as the likely center of gravity.
 
 ## Why It Exists
 
@@ -163,13 +164,13 @@ go run ./cmd/gosherpa path main FindCallers
 
 ## Roadmap
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](PRD_V01.md) is complete; the next work is Symbol Intelligence from [PRD_V02.md](PRD_V02.md).
+GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](docs/product/PRD_V01.md) is complete; the next work is Symbol Intelligence from [PRD_V02.md](docs/product/PRD_V02.md).
 
 | Next | Goal |
 | --- | --- |
 | Symbol Intelligence | Start `gosherpa explain` as the focused entry point for PRD v0.5 |
 
-Read the full product plan in [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md).
+Read the full product plan in [FEATURE_ROADMAP.md](docs/product/FEATURE_ROADMAP.md), or start from the [docs index](docs/README.md).
 
 ## Status
 
@@ -205,7 +206,7 @@ Implemented:
 
 Release notes:
 
-- [GoSherpa Impact Engine v0.1](RELEASE_NOTES_V01.md)
+- [GoSherpa Impact Engine v0.1](docs/releases/RELEASE_NOTES_V01.md)
 
 Planned next:
 
@@ -228,3 +229,7 @@ Known MVP limitations:
 GoSherpa focuses on visibility, not magic.
 
 It does not try to become your IDE, rewrite your project, or infer more certainty than it has. It reads the code you already have and returns compact answers that help you keep moving.
+
+## License
+
+GoSherpa is available under the [MIT License](LICENSE).

@@ -26,7 +26,7 @@ Conservative MVP boundaries:
 * test selection is package-oriented plus existing direct-reference signals
 * no SSA, pointer analysis, GitHub Action, MCP, IDE, or AI integration
 
-Release notes: [RELEASE_NOTES_V01.md](RELEASE_NOTES_V01.md)
+Release notes: [RELEASE_NOTES_V01.md](../releases/RELEASE_NOTES_V01.md)
 
 ---
 
