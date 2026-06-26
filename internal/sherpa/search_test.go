@@ -166,6 +166,119 @@ func TestSearchSymbolsUsesStableSortForTies(t *testing.T) {
 	assertSearchTestResultNames(t, results, []string{"ArchiveUser", "UpdateUser"})
 }
 
+func TestSearchSymbolsFiltersByKind(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "UserService",
+			Kind: SymbolKindStruct,
+		},
+		{
+			Name: "UserRepository",
+			Kind: SymbolKindInterface,
+		},
+	}
+
+	results := SearchSymbolsWithOptions(symbols, []string{"user"}, SymbolSearchOptions{
+		Kind: SymbolKindInterface,
+	})
+
+	assertSearchTestResultNames(t, results, []string{"UserRepository"})
+}
+
+func TestSearchSymbolsFiltersByPackage(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name:    "CreateUser",
+			Kind:    SymbolKindFunction,
+			Package: "./internal/service",
+		},
+		{
+			Name:    "CreateUserHandler",
+			Kind:    SymbolKindFunction,
+			Package: "./internal/http",
+		},
+	}
+
+	results := SearchSymbolsWithOptions(symbols, []string{"user"}, SymbolSearchOptions{
+		Package: "./internal/service",
+	})
+
+	assertSearchTestResultNames(t, results, []string{"CreateUser"})
+}
+
+func TestSearchSymbolsFiltersToTests(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "TestCreateUser",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbolsWithOptions(symbols, []string{"user"}, SymbolSearchOptions{
+		TestsOnly: true,
+	})
+
+	assertSearchTestResultNames(t, results, []string{"TestCreateUser"})
+}
+
+func TestSearchSymbolsFiltersToTestFiles(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUserHelper",
+			Kind: SymbolKindFunction,
+			Position: Position{
+				File: "internal/service/service.go",
+			},
+		},
+		{
+			Name: "CreateUserHelper",
+			Kind: SymbolKindFunction,
+			Position: Position{
+				File: "internal/service/service_test.go",
+			},
+		},
+	}
+
+	results := SearchSymbolsWithOptions(symbols, []string{"helper"}, SymbolSearchOptions{
+		TestsOnly: true,
+	})
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d: %#v", len(results), results)
+	}
+
+	if results[0].Symbol.Position.File != "internal/service/service_test.go" {
+		t.Fatalf("expected test-file helper, got %s", results[0].Symbol.Position.File)
+	}
+}
+
+func TestSearchSymbolsLimitsResultsAfterRanking(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name: "CreateUserCommand",
+			Kind: SymbolKindStruct,
+		},
+		{
+			Name: "CreateUser",
+			Kind: SymbolKindFunction,
+		},
+		{
+			Name: "EnsureCreateUser",
+			Kind: SymbolKindFunction,
+		},
+	}
+
+	results := SearchSymbolsWithOptions(symbols, []string{"CreateUser"}, SymbolSearchOptions{
+		Limit: 2,
+	})
+
+	assertSearchTestResultNames(t, results, []string{"CreateUser", "CreateUserCommand"})
+}
+
 func TestFindSymbolTargetUsesPackageQualifiedTarget(t *testing.T) {
 	symbols := []Symbol{
 		{

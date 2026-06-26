@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
 func TestParseCLIArgsDefaultsRootToCurrentDirectory(t *testing.T) {
@@ -279,6 +281,14 @@ func TestParseCLIArgsAcceptsCallPathOptions(t *testing.T) {
 	if !got.HasCallPathOption {
 		t.Fatal("expected call path option marker")
 	}
+
+	if !got.HasLimitOption {
+		t.Fatal("expected limit option marker")
+	}
+
+	if !got.HasMaxDepthOption {
+		t.Fatal("expected max-depth option marker")
+	}
 }
 
 func TestParseCLIArgsRejectsInvalidCallPathOptions(t *testing.T) {
@@ -287,6 +297,66 @@ func TestParseCLIArgsRejectsInvalidCallPathOptions(t *testing.T) {
 		{"paths", "Entry", "Target", "--limit="},
 		{"paths", "Entry", "Target", "--limit", "0"},
 		{"paths", "Entry", "Target", "--max-depth", "nope"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestParseCLIArgsAcceptsSearchFilters(t *testing.T) {
+	got, err := parseCLIArgs([]string{"search", "user", "--kind", "Function", "--package=./internal/service", "--tests", "--limit", "2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Command != "search" {
+		t.Fatalf("expected command search, got %s", got.Command)
+	}
+
+	assertMainTestStrings(t, got.CommandArgs, []string{"user"})
+
+	if got.SearchKind != sherpa.SymbolKindFunction {
+		t.Fatalf("expected function kind, got %s", got.SearchKind)
+	}
+
+	if !got.HasKindOption {
+		t.Fatal("expected kind option marker")
+	}
+
+	if got.SearchPackage != "./internal/service" {
+		t.Fatalf("expected package ./internal/service, got %s", got.SearchPackage)
+	}
+
+	if !got.HasPackageOption {
+		t.Fatal("expected package option marker")
+	}
+
+	if !got.IncludeTests || !got.HasTestsOption {
+		t.Fatal("expected tests option")
+	}
+
+	if got.CallPathLimit != 2 {
+		t.Fatalf("expected limit 2, got %d", got.CallPathLimit)
+	}
+
+	if !got.HasLimitOption {
+		t.Fatal("expected limit option marker")
+	}
+}
+
+func TestParseCLIArgsRejectsInvalidSearchFilters(t *testing.T) {
+	tests := [][]string{
+		{"search", "user", "--kind"},
+		{"search", "user", "--kind="},
+		{"search", "user", "--kind", "package"},
+		{"search", "user", "--package"},
+		{"search", "user", "--package="},
 	}
 
 	for _, test := range tests {
@@ -780,8 +850,65 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by callers and explain") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by search, callers, and explain") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsSearchFilterFlagsForOtherCommands(t *testing.T) {
+	tests := [][]string{
+		{"gosherpa", "symbols", "--kind", "function"},
+		{"gosherpa", "symbols", "--package", "."},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			result := runMainTest(t, test)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+
+			if !strings.Contains(result.Stderr, "error: --kind and --package are only supported by search") {
+				t.Fatalf("expected search filter flag error, got:\n%s", result.Stderr)
+			}
+
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
+	}
+}
+
+func TestMainRejectsLimitFlagForUnsupportedCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "symbols", "--limit", "2"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --limit is only supported by search and path commands") {
+		t.Fatalf("expected limit flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsMaxDepthFlagForUnsupportedCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "search", "user", "--max-depth", "2"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --max-depth is only supported by path commands") {
+		t.Fatalf("expected max-depth flag error, got:\n%s", result.Stderr)
 	}
 
 	if result.Stdout != "" {
@@ -1748,7 +1875,7 @@ func TestMainPrintsSearchUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "search"})
 
-	want := "usage: gosherpa [--root <path>] search <terms>\n"
+	want := "usage: gosherpa [--root <path>] search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1879,6 +2006,61 @@ func CreateTeam() {}
 	}
 
 	for _, unwanted := range []string{"CreateTeam", "UserRepository", tmp} {
+		if strings.Contains(result.Stdout, unwanted) {
+			t.Fatalf("expected output not to contain %s, got:\n%s", unwanted, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsSearchCommandWithFilters(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type UserRepository interface{}
+
+func CreateUser() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service
+
+func TestCreateUser() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "http", "handler.go"), `package http
+
+func CreateUserHandler() {}
+`)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root",
+		tmp,
+		"search",
+		"user",
+		"--kind",
+		"function",
+		"--package",
+		"./internal/service",
+		"--tests",
+		"--limit",
+		"1",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"SYMBOL SEARCH", "Found 1 match", "TestCreateUser"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	for _, unwanted := range []string{"CreateUserHandler", "UserRepository"} {
 		if strings.Contains(result.Stdout, unwanted) {
 			t.Fatalf("expected output not to contain %s, got:\n%s", unwanted, result.Stdout)
 		}

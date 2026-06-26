@@ -27,6 +27,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"search", "Target", "--json"},
 		},
 		{
+			name: "search-filtered",
+			args: []string{"search", "Target", "--kind", "function", "--package", ".", "--tests", "--limit", "1", "--json"},
+		},
+		{
 			name: "refs",
 			args: []string{"refs", "Target", "--json"},
 		},

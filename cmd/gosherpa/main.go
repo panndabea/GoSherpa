@@ -29,10 +29,16 @@ type cliInvocation struct {
 	CallPathLimit     int
 	CallPathMaxDepth  int
 	HasCallPathOption bool
+	HasLimitOption    bool
+	HasMaxDepthOption bool
 	BaseRef           string
 	HasBaseOption     bool
 	IncludeTests      bool
 	HasTestsOption    bool
+	SearchKind        sherpa.SymbolKind
+	HasKindOption     bool
+	SearchPackage     string
+	HasPackageOption  bool
 }
 
 type jsonResponse[T any] struct {
@@ -215,6 +221,52 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			continue
 		}
 
+		if arg == "--kind" {
+			value, err := parseSymbolKindFlagValue("--kind", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.SearchKind = value
+			invocation.HasKindOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--kind=") {
+			value, err := parseSymbolKindFlag("--kind", strings.TrimPrefix(arg, "--kind="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.SearchKind = value
+			invocation.HasKindOption = true
+			continue
+		}
+
+		if arg == "--package" {
+			value, err := parseStringFlagValue("--package", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.SearchPackage = value
+			invocation.HasPackageOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--package=") {
+			value, err := parseStringFlag("--package", strings.TrimPrefix(arg, "--package="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.SearchPackage = value
+			invocation.HasPackageOption = true
+			continue
+		}
+
 		if arg == "--limit" {
 			value, err := parsePositiveFlagValue("--limit", args, i)
 			if err != nil {
@@ -222,6 +274,7 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			}
 
 			invocation.CallPathLimit = value
+			invocation.HasLimitOption = true
 			invocation.HasCallPathOption = true
 			i++
 			continue
@@ -234,6 +287,7 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			}
 
 			invocation.CallPathLimit = value
+			invocation.HasLimitOption = true
 			invocation.HasCallPathOption = true
 			continue
 		}
@@ -246,6 +300,7 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 
 			invocation.CallPathMaxDepth = value
 			invocation.HasCallPathOption = true
+			invocation.HasMaxDepthOption = true
 			i++
 			continue
 		}
@@ -258,6 +313,7 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 
 			invocation.CallPathMaxDepth = value
 			invocation.HasCallPathOption = true
+			invocation.HasMaxDepthOption = true
 			continue
 		}
 
@@ -318,6 +374,37 @@ func parsePositiveInteger(flag string, value string) (int, error) {
 	return parsed, nil
 }
 
+func parseSymbolKindFlagValue(flag string, args []string, index int) (sherpa.SymbolKind, error) {
+	if index+1 >= len(args) {
+		return "", fmt.Errorf("missing value for %s", flag)
+	}
+
+	return parseSymbolKindFlag(flag, args[index+1])
+}
+
+func parseSymbolKindFlag(flag string, value string) (sherpa.SymbolKind, error) {
+	trimmed, err := parseStringFlag(flag, value)
+	if err != nil {
+		return "", err
+	}
+
+	kind := sherpa.SymbolKind(strings.ToLower(trimmed))
+	if isSupportedSearchKind(kind) {
+		return kind, nil
+	}
+
+	return "", fmt.Errorf("invalid value for %s: %s", flag, trimmed)
+}
+
+func isSupportedSearchKind(kind sherpa.SymbolKind) bool {
+	switch kind {
+	case sherpa.SymbolKindStruct, sherpa.SymbolKindInterface, sherpa.SymbolKindFunction, sherpa.SymbolKindMethod:
+		return true
+	default:
+		return false
+	}
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -334,8 +421,18 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasCallPathOption && invocation.Command != "path" && invocation.Command != "paths" {
-		fmt.Fprintln(stderr, "error: --limit and --max-depth are only supported by path commands")
+	if invocation.HasLimitOption && !supportsLimitOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --limit is only supported by search and path commands")
+		return exitUsage
+	}
+
+	if invocation.HasMaxDepthOption && !isPathCommand(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --max-depth is only supported by path commands")
+		return exitUsage
+	}
+
+	if (invocation.HasKindOption || invocation.HasPackageOption) && invocation.Command != "search" {
+		fmt.Fprintln(stderr, "error: --kind and --package are only supported by search")
 		return exitUsage
 	}
 
@@ -345,7 +442,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --tests is only supported by callers and explain")
+		fmt.Fprintln(stderr, "error: --tests is only supported by search, callers, and explain")
 		return exitUsage
 	}
 
@@ -423,7 +520,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "search":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] search <terms>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
 			return exitUsage
 		}
 
@@ -440,7 +537,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return writeCommandError(invocation.JSON, root, "search", target, stderr, err)
 		}
 
-		results := sherpa.SearchSymbols(symbols, terms)
+		results := sherpa.SearchSymbolsWithOptions(symbols, terms, sherpa.SymbolSearchOptions{
+			Kind:      invocation.SearchKind,
+			Package:   invocation.SearchPackage,
+			TestsOnly: invocation.IncludeTests,
+			Limit:     invocation.CallPathLimit,
+		})
 		if invocation.JSON {
 			return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, nil, searchJSONData{
 				Terms:   nonNilSlice(terms),
@@ -822,9 +924,17 @@ func isBaseAwareInvocation(invocation cliInvocation) bool {
 	return isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
 }
 
+func supportsLimitOption(command string) bool {
+	return command == "search" || isPathCommand(command)
+}
+
+func isPathCommand(command string) bool {
+	return command == "path" || command == "paths"
+}
+
 func supportsTestsOption(command string) bool {
 	switch command {
-	case "callers", "explain":
+	case "search", "callers", "explain":
 		return true
 	default:
 		return false
@@ -1153,7 +1263,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target>")
-	fmt.Fprintln(writer, "  search <terms>")
+	fmt.Fprintln(writer, "  search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
 	fmt.Fprintln(writer, "  refs <name>")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact file <file>")

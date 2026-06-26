@@ -13,6 +13,13 @@ type SymbolSearchResult struct {
 	MatchedTerms []string `json:"matchedTerms"`
 }
 
+type SymbolSearchOptions struct {
+	Kind      SymbolKind
+	Package   string
+	TestsOnly bool
+	Limit     int
+}
+
 func FindSymbol(symbols []Symbol, name string) *Symbol {
 	for i := range symbols {
 		if symbols[i].Name == name {
@@ -24,6 +31,10 @@ func FindSymbol(symbols []Symbol, name string) *Symbol {
 }
 
 func SearchSymbols(symbols []Symbol, terms []string) []SymbolSearchResult {
+	return SearchSymbolsWithOptions(symbols, terms, SymbolSearchOptions{})
+}
+
+func SearchSymbolsWithOptions(symbols []Symbol, terms []string, options SymbolSearchOptions) []SymbolSearchResult {
 	queryTerms := normalizeSearchTerms(terms)
 	if len(queryTerms) == 0 {
 		return nil
@@ -31,6 +42,10 @@ func SearchSymbols(symbols []Symbol, terms []string) []SymbolSearchResult {
 
 	var results []SymbolSearchResult
 	for _, symbol := range symbols {
+		if !symbolMatchesSearchOptions(symbol, options) {
+			continue
+		}
+
 		score, matchedTerms := scoreSymbolSearchResult(symbol, queryTerms)
 		if len(matchedTerms) != len(queryTerms) {
 			continue
@@ -50,6 +65,10 @@ func SearchSymbols(symbols []Symbol, terms []string) []SymbolSearchResult {
 
 		return symbolSearchSortKey(results[i].Symbol) < symbolSearchSortKey(results[j].Symbol)
 	})
+
+	if options.Limit > 0 && len(results) > options.Limit {
+		results = results[:options.Limit]
+	}
 
 	return results
 }
@@ -120,6 +139,30 @@ func scoreSymbolSearchResult(symbol Symbol, terms []string) (int, []string) {
 	}
 
 	return score, matchedTerms
+}
+
+func symbolMatchesSearchOptions(symbol Symbol, options SymbolSearchOptions) bool {
+	if options.Kind != "" && symbol.Kind != options.Kind {
+		return false
+	}
+
+	if options.Package != "" && symbol.Package != options.Package {
+		return false
+	}
+
+	if options.TestsOnly && !isTestSymbol(symbol) {
+		return false
+	}
+
+	return true
+}
+
+func isTestSymbol(symbol Symbol) bool {
+	if symbol.Kind != SymbolKindFunction {
+		return false
+	}
+
+	return strings.HasPrefix(symbol.Name, "Test") || strings.HasSuffix(symbol.Position.File, "_test.go")
 }
 
 func scoreSearchTerm(term string, name string, displayName string, qualifiedName string, packagePath string, packageName string, segments []string) int {

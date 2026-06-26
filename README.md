@@ -43,7 +43,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | --- | --- | --- |
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
-| Symbol search | `gosherpa search parse file` | Finds symbols by ranked, partial, case-insensitive matches |
+| Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
@@ -88,6 +88,9 @@ Then explore the repository:
 ./gosherpa symbol ParseFile
 ./gosherpa symbol ParseFile --json
 ./gosherpa search parse file
+./gosherpa search parse file --kind function --limit 5
+./gosherpa search ParseFile --package ./internal/sherpa
+./gosherpa search ParseFile --tests
 ./gosherpa search parse file --json
 ./gosherpa explain ParseFile
 ./gosherpa explain ParseFile --tests
@@ -190,7 +193,7 @@ Implemented:
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
-- Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery
+- Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis

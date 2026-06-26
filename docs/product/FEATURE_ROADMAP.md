@@ -282,9 +282,9 @@ Goal: make GoSherpa useful at the very beginning of a coding session.
 
 ### 1.1 Search
 
-Status: first slice implemented with `gosherpa search <terms>` for ranked,
-partial, case-insensitive symbol search and JSON output. Filters remain future
-work.
+Status: implemented with `gosherpa search <terms>` for ranked, partial,
+case-insensitive symbol search, JSON output, and filters for kind, package,
+tests, and result limit.
 
 Human question:
 
@@ -298,6 +298,7 @@ Command sketch:
 gosherpa search user create
 gosherpa search repository --kind interface
 gosherpa search handler --package ./internal/http
+gosherpa search target --tests --limit 5
 ```
 
 MVP behavior:
@@ -306,7 +307,7 @@ MVP behavior:
   currently indexed structs, interfaces, functions, methods, and tests.
 - Match multiple query terms. Implemented.
 - Return ranked human and JSON output. Implemented.
-- Support filters. Future:
+- Support filters. Implemented:
   - `--kind`
   - `--package`
   - `--tests`
