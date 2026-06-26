@@ -178,6 +178,9 @@ func symbolMatchesTarget(root string, symbol sherpa.Symbol, target symbolTarget)
 	if target.Receiver != "" {
 		return symbol.Receiver == target.Receiver && symbol.Name == target.Name
 	}
+	if target.Package != "" {
+		return symbol.Receiver == "" && symbol.Name == target.Name
+	}
 
 	return symbol.Name == target.Name
 }
@@ -245,6 +248,10 @@ func normalizePackagePath(root string, packagePath string) string {
 }
 
 func symbolPackage(root string, symbol sherpa.Symbol) string {
+	if strings.TrimSpace(symbol.Package) != "" {
+		return symbol.Package
+	}
+
 	file := strings.TrimSpace(filepath.ToSlash(symbol.Position.File))
 	if file == "" {
 		return ""

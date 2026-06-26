@@ -105,6 +105,31 @@ func TestAnalyzeReportsAmbiguousSymbolCandidates(t *testing.T) {
 	}
 }
 
+func TestFindSymbolPackageQualifiedNameDoesNotMatchMethods(t *testing.T) {
+	symbols := []sherpa.Symbol{
+		{
+			Name:    "Symbol",
+			Kind:    sherpa.SymbolKindStruct,
+			Package: "./internal/sherpa",
+		},
+		{
+			Name:     "Symbol",
+			Kind:     sherpa.SymbolKindMethod,
+			Package:  "./internal/sherpa",
+			Receiver: "callTarget",
+		},
+	}
+
+	symbol, err := findSymbol("", symbols, "./internal/sherpa.Symbol")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if symbol.Kind != sherpa.SymbolKindStruct {
+		t.Fatalf("expected struct symbol, got %s", symbol.Kind)
+	}
+}
+
 func TestAnalyzeRejectsPackageTargets(t *testing.T) {
 	root := writeExplainProject(t)
 

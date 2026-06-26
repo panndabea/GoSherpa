@@ -323,6 +323,10 @@ Done when:
 
 ### 1.2 Rich Symbol Details
 
+Status: first slice implemented with package paths, package-qualified symbol
+targets, signatures, doc comments, struct fields, interface methods, columns,
+and source ranges. Source context remains future work.
+
 Human question:
 
 ```text

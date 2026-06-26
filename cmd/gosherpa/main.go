@@ -386,7 +386,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "symbol":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <name>")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <target>")
 			return exitUsage
 		}
 
@@ -395,29 +395,25 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitFailure
 		}
 
-		name := invocation.CommandArgs[0]
+		target := invocation.CommandArgs[0]
 
 		symbols, err := sherpa.ParseRepository(root)
 		if err != nil {
-			return writeCommandError(invocation.JSON, root, "symbol", name, stderr, err)
+			return writeCommandError(invocation.JSON, root, "symbol", target, stderr, err)
 		}
 
-		symbol := sherpa.FindSymbol(symbols, name)
-		if symbol == nil {
-			fmt.Fprintln(stderr, "symbol not found:", name)
-			return exitFailure
+		symbol, err := sherpa.FindSymbolTarget(root, symbols, target)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "symbol", target, stderr, err)
 		}
 
 		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", name, nil, symbolJSONData{
-				Symbol: *symbol,
+			return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, nil, symbolJSONData{
+				Symbol: symbol,
 			}))
 		}
 
-		fmt.Fprintln(stdout, "Name:", symbol.Name)
-		fmt.Fprintln(stdout, "Kind:", symbol.Kind)
-		fmt.Fprintln(stdout, "File:", symbol.Position.File)
-		fmt.Fprintln(stdout, "Line:", symbol.Position.Line)
+		fmt.Fprint(stdout, sherpa.FormatSymbol(symbol))
 		return exitSuccess
 
 	case "symbols":
@@ -1121,7 +1117,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
-	fmt.Fprintln(writer, "  symbol <name>")
+	fmt.Fprintln(writer, "  symbol <target>")
 	fmt.Fprintln(writer, "  refs <name>")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact file <file>")

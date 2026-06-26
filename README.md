@@ -42,7 +42,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Capability | Command | Result |
 | --- | --- | --- |
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
-| Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
+| Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
@@ -186,7 +186,7 @@ Implemented:
 
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
-- Symbol lookup and Go-aware reference lookup
+- Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis

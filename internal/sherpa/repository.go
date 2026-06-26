@@ -12,6 +12,7 @@ func ParseRepository(root string) ([]Symbol, error) {
 	}
 
 	var symbols []Symbol
+	modulePath := readModulePath(rootPath)
 
 	for _, file := range files {
 		fileSymbols, err := ParseFile(file)
@@ -19,12 +20,29 @@ func ParseRepository(root string) ([]Symbol, error) {
 			return nil, err
 		}
 
+		packagePath, err := packagePathForFile(rootPath, file)
+		if err != nil {
+			return nil, err
+		}
+
 		for i := range fileSymbols {
-			fileSymbols[i].Position = positionRelativeToRoot(rootPath, fileSymbols[i].Position)
+			fileSymbols[i] = symbolRelativeToRoot(rootPath, packagePath, modulePath, fileSymbols[i])
 		}
 
 		symbols = append(symbols, fileSymbols...)
 	}
 
 	return symbols, nil
+}
+
+func symbolRelativeToRoot(root string, packagePath string, modulePath string, symbol Symbol) Symbol {
+	symbol.Package = packagePath
+	symbol.QualifiedName = FormatPackageQualifiedTarget(packagePath, symbol.DisplayName(), modulePath)
+	symbol.Position = positionRelativeToRoot(root, symbol.Position)
+	if symbol.Range != nil {
+		symbol.Range.Start = positionRelativeToRoot(root, symbol.Range.Start)
+		symbol.Range.End = positionRelativeToRoot(root, symbol.Range.End)
+	}
+
+	return symbol
 }

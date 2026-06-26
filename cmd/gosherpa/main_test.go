@@ -1822,6 +1822,43 @@ func Run() {}
 	}
 }
 
+func TestMainRunsSymbolCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+// Run starts the service.
+func Run(name string) error {
+	return nil
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbol", "./internal/service.Run"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"SYMBOL",
+		"Name: Run",
+		"Package: ./internal/service",
+		"Qualified: ./internal/service.Run",
+		"Signature: func Run(name string) error",
+		"DOCUMENTATION",
+		"Run starts the service.",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+}
+
 func TestMainRunsSymbolCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
