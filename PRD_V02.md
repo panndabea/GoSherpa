@@ -8,13 +8,13 @@ Implemented first slice:
 
 * `gosherpa explain <symbol>`
 * human and JSON output
-* definition, references, callers, callees, affected packages, interface and
-  implementation impact, related tests, and suggested test commands
+* purpose from Go doc comments, definition, reading order, references, callers,
+  callees, affected packages, interface and implementation impact, related
+  tests, and suggested test commands
 
 Next:
 
-* richer purpose/risk/architecture-role sections
-* suggested reading order
+* risk and architecture-role sections
 * stronger package-qualified caller/callee handling
 
 ---

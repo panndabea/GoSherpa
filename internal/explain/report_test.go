@@ -26,12 +26,21 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 	if report.Symbol.Position.File != "service.go" {
 		t.Fatalf("symbol file = %q, want service.go", report.Symbol.Position.File)
 	}
+	if report.Purpose != "Target handles the main service step." {
+		t.Fatalf("purpose = %q, want doc comment", report.Purpose)
+	}
 
 	assertNames(t, callerNames(report.Callers), []string{"Entry"})
 	assertNames(t, calleeNames(report.Callees), []string{"Helper"})
 	assertNames(t, report.AffectedPackages, []string{"."})
 	assertNames(t, testNames(report.RelatedTests), []string{"TestTarget"})
 	assertNames(t, report.TestCommands, []string{"go test ."})
+	assertNames(t, readingStepTitles(report.ReadingOrder), []string{
+		"Definition",
+		"Callee: Helper",
+		"Caller: Entry",
+		"Test: TestTarget",
+	})
 }
 
 func TestAnalyzeRejectsPackageTargets(t *testing.T) {
@@ -54,6 +63,7 @@ func Entry() {
 	Target()
 }
 
+// Target handles the main service step.
 func Target() {
 	Helper()
 }
@@ -108,6 +118,15 @@ func testNames(tests []sherpa.RelatedTest) []string {
 	}
 
 	return names
+}
+
+func readingStepTitles(steps []ReadingStep) []string {
+	titles := make([]string, 0, len(steps))
+	for _, step := range steps {
+		titles = append(titles, step.Title)
+	}
+
+	return titles
 }
 
 func assertNames(t *testing.T, got []string, want []string) {

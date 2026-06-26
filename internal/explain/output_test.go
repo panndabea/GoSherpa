@@ -18,6 +18,7 @@ func TestFormat(t *testing.T) {
 				Line: 7,
 			},
 		},
+		Purpose: "Target handles the main service step.",
 		Callers: []sherpa.Caller{
 			{Name: "Entry", Position: sherpa.Position{File: "service.go", Line: 3}},
 		},
@@ -32,6 +33,18 @@ func TestFormat(t *testing.T) {
 			{Name: "TestTarget", Position: sherpa.Position{File: "service_test.go", Line: 5}, DirectReference: true},
 		},
 		TestCommands: []string{"go test ."},
+		ReadingOrder: []ReadingStep{
+			{
+				Title:    "Definition",
+				Reason:   "Start with the symbol declaration and nearby implementation.",
+				Position: sherpa.Position{File: "service.go", Line: 7},
+			},
+			{
+				Title:    "Test: TestTarget",
+				Reason:   "Check expected behavior and regression coverage.",
+				Position: sherpa.Position{File: "service_test.go", Line: 5},
+			},
+		},
 	}
 
 	output := Format(report)
@@ -41,6 +54,11 @@ func TestFormat(t *testing.T) {
 		"Target (function)",
 		"DEFINITION",
 		"service.go:7",
+		"PURPOSE",
+		"Target handles the main service step.",
+		"READING ORDER",
+		"Definition - service.go:7",
+		"Test: TestTarget",
 		"CALLED BY",
 		"Entry",
 		"CALLS",

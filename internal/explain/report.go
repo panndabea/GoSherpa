@@ -2,6 +2,9 @@ package explain
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"path"
 	"path/filepath"
 	"sort"
@@ -14,6 +17,7 @@ import (
 type Report struct {
 	Target                  string               `json:"target"`
 	Symbol                  sherpa.Symbol        `json:"symbol"`
+	Purpose                 string               `json:"purpose"`
 	References              []sherpa.Reference   `json:"references"`
 	Callers                 []sherpa.Caller      `json:"callers"`
 	Callees                 []sherpa.Callee      `json:"callees"`
@@ -22,7 +26,14 @@ type Report struct {
 	AffectedImplementations []string             `json:"affectedImplementations"`
 	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
 	TestCommands            []string             `json:"testCommands"`
+	ReadingOrder            []ReadingStep        `json:"readingOrder"`
 	Warnings                []string             `json:"warnings"`
+}
+
+type ReadingStep struct {
+	Title    string          `json:"title"`
+	Reason   string          `json:"reason"`
+	Position sherpa.Position `json:"position"`
 }
 
 type symbolTarget struct {
@@ -60,6 +71,13 @@ func Analyze(root string, target string) (Report, error) {
 		Warnings:         impactResult.Warnings,
 	}
 
+	purpose, err := symbolPurpose(root, symbol)
+	if err != nil {
+		report.Warnings = append(report.Warnings, err.Error())
+	} else {
+		report.Purpose = purpose
+	}
+
 	impactReport, err := impactengine.AnalyzeSymbol(root, target)
 	if err != nil {
 		report.Warnings = append(report.Warnings, err.Error())
@@ -85,6 +103,8 @@ func Analyze(root string, target string) (Report, error) {
 			report.Callees = callees.Callees
 		}
 	}
+
+	report.ReadingOrder = readingOrder(report)
 
 	return normalizeReport(report), nil
 }
@@ -224,6 +244,170 @@ func callTargetForSymbol(symbol sherpa.Symbol) string {
 	}
 }
 
+func symbolPurpose(root string, symbol sherpa.Symbol) (string, error) {
+	filePath := symbolSourcePath(root, symbol)
+	if filePath == "" {
+		return "", nil
+	}
+
+	fileSet := token.NewFileSet()
+	file, err := parser.ParseFile(fileSet, filePath, nil, parser.ParseComments)
+	if err != nil {
+		return "", fmt.Errorf("purpose: parse %s: %w", symbol.Position.File, err)
+	}
+
+	for _, decl := range file.Decls {
+		switch decl := decl.(type) {
+		case *ast.FuncDecl:
+			if !functionDeclMatchesSymbol(decl, symbol) {
+				continue
+			}
+
+			return docText(decl.Doc), nil
+		case *ast.GenDecl:
+			if decl.Tok != token.TYPE {
+				continue
+			}
+
+			for _, spec := range decl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != symbol.Name {
+					continue
+				}
+
+				if typeSpec.Doc != nil {
+					return docText(typeSpec.Doc), nil
+				}
+
+				return docText(decl.Doc), nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func symbolSourcePath(root string, symbol sherpa.Symbol) string {
+	file := strings.TrimSpace(symbol.Position.File)
+	if file == "" {
+		return ""
+	}
+
+	if filepath.IsAbs(file) {
+		return file
+	}
+
+	return filepath.Join(root, filepath.FromSlash(file))
+}
+
+func functionDeclMatchesSymbol(funcDecl *ast.FuncDecl, symbol sherpa.Symbol) bool {
+	if funcDecl.Name.Name != symbol.Name {
+		return false
+	}
+
+	switch symbol.Kind {
+	case sherpa.SymbolKindFunction:
+		return funcDecl.Recv == nil
+	case sherpa.SymbolKindMethod:
+		return receiverName(funcDecl) == symbol.Receiver
+	default:
+		return false
+	}
+}
+
+func receiverName(funcDecl *ast.FuncDecl) string {
+	if funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
+		return ""
+	}
+
+	return receiverBaseName(funcDecl.Recv.List[0].Type)
+}
+
+func receiverBaseName(expr ast.Expr) string {
+	switch expr := expr.(type) {
+	case *ast.Ident:
+		return expr.Name
+	case *ast.StarExpr:
+		return receiverBaseName(expr.X)
+	case *ast.IndexExpr:
+		return receiverBaseName(expr.X)
+	case *ast.IndexListExpr:
+		return receiverBaseName(expr.X)
+	case *ast.ParenExpr:
+		return receiverBaseName(expr.X)
+	default:
+		return ""
+	}
+}
+
+func docText(commentGroup *ast.CommentGroup) string {
+	if commentGroup == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(commentGroup.Text())
+}
+
+func readingOrder(report Report) []ReadingStep {
+	var steps []ReadingStep
+
+	steps = append(steps, ReadingStep{
+		Title:    "Definition",
+		Reason:   "Start with the symbol declaration and nearby implementation.",
+		Position: report.Symbol.Position,
+	})
+
+	for _, callee := range limitCallees(report.Callees, 3) {
+		steps = append(steps, ReadingStep{
+			Title:    "Callee: " + callee.Name,
+			Reason:   "Understand direct work delegated by this symbol.",
+			Position: callee.Position,
+		})
+	}
+
+	for _, caller := range limitCallers(report.Callers, 3) {
+		steps = append(steps, ReadingStep{
+			Title:    "Caller: " + caller.Name,
+			Reason:   "See how callers depend on this symbol.",
+			Position: caller.Position,
+		})
+	}
+
+	for _, test := range limitRelatedTests(report.RelatedTests, 3) {
+		steps = append(steps, ReadingStep{
+			Title:    "Test: " + test.Name,
+			Reason:   "Check expected behavior and regression coverage.",
+			Position: test.Position,
+		})
+	}
+
+	return steps
+}
+
+func limitCallees(values []sherpa.Callee, limit int) []sherpa.Callee {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
+}
+
+func limitCallers(values []sherpa.Caller, limit int) []sherpa.Caller {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
+}
+
+func limitRelatedTests(values []sherpa.RelatedTest, limit int) []sherpa.RelatedTest {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
+}
+
 func normalizeReport(report Report) Report {
 	report.References = nonNil(report.References)
 	report.Callers = nonNil(report.Callers)
@@ -233,6 +417,7 @@ func normalizeReport(report Report) Report {
 	report.AffectedImplementations = nonNil(report.AffectedImplementations)
 	report.RelatedTests = nonNil(report.RelatedTests)
 	report.TestCommands = nonNil(report.TestCommands)
+	report.ReadingOrder = nonNil(report.ReadingOrder)
 	report.Warnings = uniqueSorted(report.Warnings)
 
 	return report

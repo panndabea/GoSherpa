@@ -951,7 +951,7 @@ func TestMainRunsExplainCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "PURPOSE", "READING ORDER", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -983,6 +983,11 @@ func TestMainRunsExplainCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "callees", 0)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
+
+	if data["purpose"] != "" {
+		t.Fatalf("expected empty purpose, got %v", data["purpose"])
+	}
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])

@@ -107,16 +107,18 @@ type callPathsJSONData struct {
 }
 
 type explainJSONData struct {
-	Target                  string               `json:"target"`
-	Symbol                  sherpa.Symbol        `json:"symbol"`
-	References              []sherpa.Reference   `json:"references"`
-	Callers                 []sherpa.Caller      `json:"callers"`
-	Callees                 []sherpa.Callee      `json:"callees"`
-	AffectedPackages        []string             `json:"affectedPackages"`
-	AffectedInterfaces      []string             `json:"affectedInterfaces"`
-	AffectedImplementations []string             `json:"affectedImplementations"`
-	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
-	TestCommands            []string             `json:"testCommands"`
+	Target                  string                      `json:"target"`
+	Symbol                  sherpa.Symbol               `json:"symbol"`
+	Purpose                 string                      `json:"purpose"`
+	References              []sherpa.Reference          `json:"references"`
+	Callers                 []sherpa.Caller             `json:"callers"`
+	Callees                 []sherpa.Callee             `json:"callees"`
+	AffectedPackages        []string                    `json:"affectedPackages"`
+	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
+	AffectedImplementations []string                    `json:"affectedImplementations"`
+	RelatedTests            []sherpa.RelatedTest        `json:"relatedTests"`
+	TestCommands            []string                    `json:"testCommands"`
+	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -973,6 +975,7 @@ func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Warnings = nonNilSlice(report.Warnings)
 
 	return report
@@ -982,6 +985,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 	return explainJSONData{
 		Target:                  report.Target,
 		Symbol:                  report.Symbol,
+		Purpose:                 report.Purpose,
 		References:              report.References,
 		Callers:                 report.Callers,
 		Callees:                 report.Callees,
@@ -990,6 +994,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		AffectedImplementations: report.AffectedImplementations,
 		RelatedTests:            report.RelatedTests,
 		TestCommands:            report.TestCommands,
+		ReadingOrder:            report.ReadingOrder,
 	}
 }
 

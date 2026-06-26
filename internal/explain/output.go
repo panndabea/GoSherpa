@@ -20,6 +20,10 @@ func Format(report Report) string {
 	fmt.Fprintf(&builder, "  %s:%d\n", report.Symbol.Position.File, report.Symbol.Position.Line)
 	builder.WriteString("\n")
 
+	writePurpose(&builder, report.Purpose)
+	builder.WriteString("\n")
+	writeReadingOrder(&builder, report.ReadingOrder)
+	builder.WriteString("\n")
 	writeCallers(&builder, report.Callers)
 	builder.WriteString("\n")
 	writeCallees(&builder, report.Callees)
@@ -38,6 +42,46 @@ func Format(report Report) string {
 	writeWarnings(&builder, report.Warnings)
 
 	return builder.String()
+}
+
+func writePurpose(builder *strings.Builder, purpose string) {
+	builder.WriteString("PURPOSE\n")
+	purpose = strings.TrimSpace(purpose)
+	if purpose == "" {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for _, line := range strings.Split(purpose, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			builder.WriteString("\n")
+			continue
+		}
+
+		builder.WriteString("  ")
+		builder.WriteString(line)
+		builder.WriteString("\n")
+	}
+}
+
+func writeReadingOrder(builder *strings.Builder, steps []ReadingStep) {
+	builder.WriteString("READING ORDER\n")
+	if len(steps) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for i, step := range steps {
+		fmt.Fprintf(builder, "  %d. %s", i+1, step.Title)
+		if step.Position.File != "" {
+			fmt.Fprintf(builder, " - %s:%d", step.Position.File, step.Position.Line)
+		}
+		builder.WriteString("\n")
+		if step.Reason != "" {
+			fmt.Fprintf(builder, "     %s\n", step.Reason)
+		}
+	}
 }
 
 func writeCallers(builder *strings.Builder, callers []sherpa.Caller) {

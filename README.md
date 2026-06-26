@@ -42,7 +42,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | --- | --- | --- |
 | Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows a definition with kind, file, and line |
-| Symbol explanation | `gosherpa explain ParseFile` | Combines definition, references, callers, callees, impact signals, and tests |
+| Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, definition, reading order, callers/callees, impact signals, and tests |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
@@ -174,7 +174,7 @@ Implemented:
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
 - Symbol lookup and Go-aware reference lookup
-- Initial `gosherpa explain <symbol>` profile with human and JSON output
+- Initial `gosherpa explain <symbol>` profile with purpose, reading order, human output, and JSON output
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands
 - Package dependency analysis
@@ -202,7 +202,7 @@ Release notes:
 
 Planned next:
 
-- deepen `gosherpa explain` from [PRD_V02.md](PRD_V02.md) with richer purpose, risk, and reading-order signals
+- deepen `gosherpa explain` from [PRD_V02.md](PRD_V02.md) with risk and architecture-role signals
 
 Known MVP limitations:
 

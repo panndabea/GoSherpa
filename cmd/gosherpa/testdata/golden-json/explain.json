@@ -56,6 +56,41 @@
       }
     ],
     "callees": [],
+    "purpose": "",
+    "readingOrder": [
+      {
+        "title": "Definition",
+        "reason": "Start with the symbol declaration and nearby implementation.",
+        "position": {
+          "file": "service.go",
+          "line": 18
+        }
+      },
+      {
+        "title": "Caller: First",
+        "reason": "See how callers depend on this symbol.",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "title": "Caller: Second",
+        "reason": "See how callers depend on this symbol.",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        }
+      }
+    ],
     "affectedPackages": [
       ".",
       "./cmd/app"
