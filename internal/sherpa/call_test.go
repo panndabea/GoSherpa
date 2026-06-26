@@ -425,6 +425,31 @@ func Listen() {}
 	assertContainsString(t, names, "Listen")
 }
 
+func TestFindCalleesReportsReceiverVariableMethodCallees(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func Run(server *Server) {
+	server.Start()
+}
+
+func (s *Server) Start() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(names, []string{"Server.Start"}) {
+		t.Fatalf("expected receiver method callee, got %v", names)
+	}
+}
+
 func TestFindCalleesReturnsErrorForMissingFunction(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -609,7 +634,7 @@ func (s *Server) Start() {}
 	assertContainsString(t, names, "Run")
 }
 
-func TestFindCallersDoesNotMatchReceiverVariableCallsToMethodTargets(t *testing.T) {
+func TestFindCallersMatchesReceiverVariableCallsToMethodTargets(t *testing.T) {
 	tmp := t.TempDir()
 
 	writeFile(t, filepath.Join(tmp, "service.go"), `package service
@@ -628,8 +653,9 @@ func (s *Server) Start() {}
 		t.Fatal(err)
 	}
 
-	if len(result.Callers) != 0 {
-		t.Fatalf("expected no callers, got %v", result.Callers)
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected receiver method caller, got %v", names)
 	}
 }
 
@@ -713,6 +739,25 @@ func TestFindCallersUsesPackageQualifiedTarget(t *testing.T) {
 	wantFiles := []string{"cmd/app/main.go", "internal/auth/auth.go"}
 	if !reflect.DeepEqual(files, wantFiles) {
 		t.Fatalf("expected %v, got %v", wantFiles, files)
+	}
+}
+
+func TestFindCallersUsesTypeInfoForPackageQualifiedReceiverVariableCalls(t *testing.T) {
+	tmp := writePackageQualifiedReceiverCallProject(t)
+
+	result, err := FindCallers(tmp, "./internal/auth.Server.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Entry"}) {
+		t.Fatalf("expected auth Entry only, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"internal/auth/auth.go"}) {
+		t.Fatalf("expected auth caller file only, got %v", files)
 	}
 }
 
@@ -974,6 +1019,36 @@ func Entry() {
 	}
 }
 
+func TestFindCallPathsMatchesReceiverVariableMethodCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct{}
+
+func Entry(server *Server) {
+	server.Start()
+}
+
+func (s *Server) Start() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Server.Start", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Server.Start"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
 func TestFindCallPathsUsesPackageQualifiedTargets(t *testing.T) {
 	tmp := writePackageQualifiedCallProject(t)
 
@@ -1175,6 +1250,35 @@ func Run() {
 	authpkg.Target()
 	billing.Target()
 }
+`)
+
+	return root
+}
+
+func writePackageQualifiedReceiverCallProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+type Server struct{}
+
+func Entry(server *Server) {
+	server.Start()
+}
+
+func (s *Server) Start() {}
+`)
+	writeFile(t, filepath.Join(root, "internal", "billing", "billing.go"), `package billing
+
+type Server struct{}
+
+func Entry(server *Server) {
+	server.Start()
+}
+
+func (s *Server) Start() {}
 `)
 
 	return root

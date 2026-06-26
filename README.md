@@ -52,9 +52,9 @@ As Go projects grow, the important answer is often spread across files, packages
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
-| Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct syntactic callers of a function or method |
+| Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct callers of a function or method |
 | Call path | `gosherpa path Run ./internal/sherpa.ParseFile` | Shows the shortest repository-local call path between functions or methods |
-| Call paths | `gosherpa paths Run ./internal/sherpa.ParseFile --limit 3` | Shows multiple call paths with optional limit and max depth |
+| Call paths | `gosherpa paths Run ./internal/sherpa.ParseFile --limit 3` | Shows multiple repository-local call paths with optional limit and max depth |
 
 ```text
 REFERENCES
@@ -183,9 +183,10 @@ Implemented:
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands
 - Package dependency analysis
-- Direct syntactic caller and callee analysis
+- Direct caller and callee analysis with package-aware targets and receiver-variable method calls
 - Shortest and limited repository-local call path analysis
 - Package-aware standalone call graph commands for package-qualified targets
+- Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
 - Machine-readable JSON output for all commands with a stable response envelope
 - Golden JSON fixtures for all commands
 - Repository root selection with `--root`
@@ -208,19 +209,18 @@ Release notes:
 
 Planned next:
 
-- resolve receiver-variable method calls with type information
+- include test callers with an opt-in flag
 
 Known MVP limitations:
 
-- Reference search is type-aware inside packages and recognizes local package selector calls, but it does not yet use full module/package loading.
+- Reference search and receiver-variable call resolution are type-aware inside packages and recognize local package selector calls, but they do not yet use full module/package loading.
 - Test files are skipped by reference, caller, and callee analysis.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets can still be ambiguous across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet run the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
-- Caller and callee analysis is AST-based and can miss receiver-variable method calls.
-- Call path analysis inherits the current AST-based caller and callee limitations.
+- Caller, callee, and path analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
 - Unqualified standalone call targets can still be ambiguous across packages; use package-qualified targets such as `./internal/auth.Target` to disambiguate.
 
 ## Philosophy

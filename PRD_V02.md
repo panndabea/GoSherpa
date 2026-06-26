@@ -15,10 +15,12 @@ Implemented first slice:
   functions across local packages
 * package-qualified standalone call graph commands for `callers`, `callees`,
   `path`, and `paths`
+* receiver-variable method calls in standalone call graph commands, resolved
+  with package-level type information
 
 Next:
 
-* resolve receiver-variable method calls with type information
+* include test callers with an opt-in flag
 
 ---
 

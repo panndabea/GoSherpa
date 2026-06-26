@@ -71,10 +71,14 @@ Implemented:
 - Direct symbol and package impact analysis.
 - Related test discovery with suggested `go test` commands.
 - Package dependency analysis.
-- Direct syntactic callee analysis.
-- Direct syntactic caller analysis.
+- Direct callee analysis with package-aware targets and receiver-variable method
+  calls.
+- Direct caller analysis with package-aware targets and receiver-variable method
+  calls.
 - Shortest and limited repository-local call path analysis.
 - Package-aware standalone call graph commands for package-qualified targets.
+- Receiver-variable method calls in standalone call graph commands, resolved
+  with package-level type information.
 - Machine-readable JSON output for all commands with a stable response envelope.
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
@@ -95,8 +99,9 @@ Implemented:
 
 Current limitations:
 
-- References are type-aware inside packages and recognize local package selector
-  calls, but do not yet use full module/package loading.
+- References and receiver-variable call resolution are type-aware inside
+  packages and recognize local package selector calls, but do not yet use full
+  module/package loading.
 - Symbol impact includes transitive callers and package tests for affected
   caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level
@@ -109,8 +114,8 @@ Current limitations:
   the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
-- Callers and callees are AST-based and can miss receiver-variable method calls.
-- Call paths inherit the current AST-based caller and callee limitations.
+- Callers, callees, and paths still do not resolve dynamic dispatch,
+  reflection, function values, or every imported-package receiver call.
 - Unqualified standalone call graph targets can still be ambiguous across
   packages; package-qualified targets disambiguate local functions and methods.
 - Positions only expose file and line, not columns or ranges.
@@ -614,6 +619,7 @@ Improvements over current MVP:
 - Resolve package-qualified function calls in standalone call graph commands.
   Implemented for `callers`, `callees`, `path`, and `paths`.
 - Resolve receiver-variable method calls.
+  Implemented for standalone call graph commands within type-checked packages.
 - Include test callers with `--tests`.
 - Include or exclude external package calls.
 - Group output by package.
@@ -627,7 +633,8 @@ Done when:
 
 ### 4.2 Call Paths
 
-Status: MVP implemented with a syntactic repository-local call graph.
+Status: MVP implemented with a package-aware, partially type-aware
+repository-local call graph.
 
 Human question:
 

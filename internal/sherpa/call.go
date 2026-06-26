@@ -3,8 +3,10 @@ package sherpa
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path"
 	"sort"
 	"strconv"
@@ -59,15 +61,18 @@ type callTarget struct {
 }
 
 type functionInfo struct {
-	Package  string
-	Receiver string
-	Name     string
-	Target   string
-	Decl     *ast.FuncDecl
-	FileSet  *token.FileSet
-	Position Position
-	Root     string
-	Imports  map[string]string
+	Package    string
+	ImportPath string
+	ModulePath string
+	Receiver   string
+	Name       string
+	Target     string
+	Decl       *ast.FuncDecl
+	FileSet    *token.FileSet
+	TypeInfo   *types.Info
+	Position   Position
+	Root       string
+	Imports    map[string]string
 }
 
 type callReference struct {
@@ -329,49 +334,72 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	modulePath := readModulePath(rootPath)
 	sort.Strings(files)
 
+	groups := groupReferenceFiles(files)
+	dirs := sortedReferencePackageDirs(groups)
+
 	var functions []functionInfo
-	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-
+	for _, dir := range dirs {
 		fileSet := token.NewFileSet()
-		parsedFile, err := parser.ParseFile(fileSet, file, nil, 0)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", file, err)
-		}
-
-		packagePath, err := packagePathForFile(rootPath, file)
+		packagePath, err := referencePackagePathForDir(rootPath, dir)
 		if err != nil {
 			return nil, err
 		}
-		imports := callImportAliases(parsedFile, modulePath)
+		importPath := referenceImportPath(rootPath, modulePath, dir)
+		fileImports := make(map[*ast.File]map[string]string)
 
-		for _, decl := range parsedFile.Decls {
-			funcDecl, ok := decl.(*ast.FuncDecl)
-			if !ok {
-				continue
+		var parsedFiles []*ast.File
+		for _, file := range groups[dir] {
+			parsedFile, err := parser.ParseFile(fileSet, file, nil, 0)
+			if err != nil {
+				return nil, fmt.Errorf("parse %s: %w", file, err)
 			}
 
-			receiver := receiverTypeName(funcDecl)
-			name := funcDecl.Name.Name
-			pos := fileSet.Position(funcDecl.Pos())
-			position := positionRelativeToRoot(rootPath, Position{
-				File: pos.Filename,
-				Line: pos.Line,
-			})
+			parsedFiles = append(parsedFiles, parsedFile)
+			fileImports[parsedFile] = callImportAliases(parsedFile, modulePath)
+		}
 
-			functions = append(functions, functionInfo{
-				Package:  packagePath,
-				Receiver: receiver,
-				Name:     name,
-				Target:   functionTargetName(funcDecl),
-				Decl:     funcDecl,
-				FileSet:  fileSet,
-				Position: position,
-				Root:     rootPath,
-				Imports:  imports,
-			})
+		info := &types.Info{
+			Defs:       make(map[*ast.Ident]types.Object),
+			Uses:       make(map[*ast.Ident]types.Object),
+			Selections: make(map[*ast.SelectorExpr]*types.Selection),
+		}
+		config := types.Config{
+			Importer: importer.Default(),
+			Error:    func(error) {},
+		}
+		_, _ = config.Check(importPath, fileSet, parsedFiles, info)
+
+		for _, parsedFile := range parsedFiles {
+			imports := fileImports[parsedFile]
+			for _, decl := range parsedFile.Decls {
+				funcDecl, ok := decl.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+
+				receiver := receiverTypeName(funcDecl)
+				name := funcDecl.Name.Name
+				pos := fileSet.Position(funcDecl.Pos())
+				position := positionRelativeToRoot(rootPath, Position{
+					File: pos.Filename,
+					Line: pos.Line,
+				})
+
+				functions = append(functions, functionInfo{
+					Package:    packagePath,
+					ImportPath: importPath,
+					ModulePath: modulePath,
+					Receiver:   receiver,
+					Name:       name,
+					Target:     functionTargetName(funcDecl),
+					Decl:       funcDecl,
+					FileSet:    fileSet,
+					TypeInfo:   info,
+					Position:   position,
+					Root:       rootPath,
+					Imports:    imports,
+				})
+			}
 		}
 	}
 
@@ -635,6 +663,10 @@ func selectorName(expr ast.Expr) (string, bool) {
 }
 
 func callExprReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
+	if callSelectionReferencesTarget(function, target, expr) {
+		return true
+	}
+
 	if target.Package == "" {
 		name, ok := callName(expr)
 		return ok && callMatchesTarget(name, target.Symbol())
@@ -670,6 +702,103 @@ func callExprReferencesTarget(function functionInfo, target callTarget, expr ast
 	}
 
 	return false
+}
+
+func callSelectionReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
+	if target.Receiver == "" || function.TypeInfo == nil {
+		return false
+	}
+
+	selection := callSelection(function, expr)
+	if selection == nil {
+		return false
+	}
+
+	object := selection.Obj()
+	if object == nil || object.Name() != target.Name {
+		return false
+	}
+
+	if callSelectionReceiverName(selection) != target.Receiver {
+		return false
+	}
+
+	return callObjectPackageMatchesTarget(function, object, target)
+}
+
+func callSelection(function functionInfo, expr ast.Expr) *types.Selection {
+	if function.TypeInfo == nil {
+		return nil
+	}
+
+	selector, ok := callSelectorExpr(expr)
+	if !ok {
+		return nil
+	}
+
+	return function.TypeInfo.Selections[selector]
+}
+
+func callSelectorExpr(expr ast.Expr) (*ast.SelectorExpr, bool) {
+	switch node := expr.(type) {
+	case *ast.SelectorExpr:
+		return node, true
+	case *ast.IndexExpr:
+		return callSelectorExpr(node.X)
+	case *ast.IndexListExpr:
+		return callSelectorExpr(node.X)
+	case *ast.ParenExpr:
+		return callSelectorExpr(node.X)
+	default:
+		return nil, false
+	}
+}
+
+func callSelectionReceiverName(selection *types.Selection) string {
+	function, ok := selection.Obj().(*types.Func)
+	if !ok {
+		return ""
+	}
+
+	signature, ok := function.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return ""
+	}
+
+	return callTypeReceiverName(signature.Recv().Type())
+}
+
+func callTypeReceiverName(typ types.Type) string {
+	switch typ := typ.(type) {
+	case *types.Named:
+		return typ.Obj().Name()
+	case *types.Pointer:
+		return callTypeReceiverName(typ.Elem())
+	default:
+		return ""
+	}
+}
+
+func callObjectPackageMatchesTarget(function functionInfo, object types.Object, target callTarget) bool {
+	if target.Package == "" {
+		return true
+	}
+
+	objectPackage := object.Pkg()
+	if objectPackage == nil {
+		return function.Package == target.Package
+	}
+
+	if objectPackage.Path() == function.ImportPath {
+		return function.Package == target.Package
+	}
+
+	localPackage, ok := callLocalImportPackage(objectPackage.Path(), function.ModulePath)
+	if !ok {
+		return false
+	}
+
+	return localPackage == target.Package
 }
 
 func callImportAliases(file *ast.File, modulePath string) map[string]string {
@@ -754,7 +883,7 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 			return true
 		}
 
-		name, ok := callName(call.Fun)
+		name, ok := callReferenceName(function, call.Fun)
 		if !ok {
 			return true
 		}
@@ -777,6 +906,32 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	sortCallReferences(references)
 
 	return references
+}
+
+func callReferenceName(function functionInfo, expr ast.Expr) (string, bool) {
+	if name, ok := callSelectionName(function, expr); ok {
+		return name, true
+	}
+
+	return callName(expr)
+}
+
+func callSelectionName(function functionInfo, expr ast.Expr) (string, bool) {
+	selection := callSelection(function, expr)
+	if selection == nil {
+		return "", false
+	}
+
+	if _, ok := selection.Obj().(*types.Func); !ok {
+		return "", false
+	}
+
+	receiver := callSelectionReceiverName(selection)
+	if receiver == "" {
+		return "", false
+	}
+
+	return receiver + "." + selection.Obj().Name(), true
 }
 
 func sortCallees(callees []Callee) {
