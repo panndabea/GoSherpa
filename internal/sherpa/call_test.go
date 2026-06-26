@@ -21,17 +21,19 @@ func TestNormalizeCallTarget(t *testing.T) {
 		{name: "method", input: "Server.Start", want: "Server.Start"},
 		{name: "cache method", input: "Cache.Get", want: "Cache.Get"},
 		{name: "package-like method", input: "sherpa.ParseFile", want: "sherpa.ParseFile"},
+		{name: "package-qualified function", input: "./internal/sherpa.ParseFile", want: "./internal/sherpa.ParseFile"},
+		{name: "package-qualified method", input: "./internal/sherpa.Server.Start", want: "./internal/sherpa.Server.Start"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := normalizeCallTarget(test.input)
+			got, err := normalizeCallTarget("", test.input)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if got != test.want {
-				t.Fatalf("expected %s, got %s", test.want, got)
+			if got.String() != test.want {
+				t.Fatalf("expected %s, got %s", test.want, got.String())
 			}
 		})
 	}
@@ -44,7 +46,6 @@ func TestNormalizeCallTargetRejectsInvalidInput(t *testing.T) {
 		"Server.",
 		".Start",
 		"A.B.C",
-		"./internal/sherpa.ParseFile",
 		"github.com/example/app.ParseFile",
 		`C:\repo\Run`,
 		"not valid",
@@ -53,7 +54,7 @@ func TestNormalizeCallTargetRejectsInvalidInput(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
-			_, err := normalizeCallTarget(test)
+			_, err := normalizeCallTarget("", test)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -215,7 +216,7 @@ func Run() {
 }
 `, "Run")
 
-	got := collectCallersFromFunctions([]functionInfo{function}, "Step")
+	got := collectCallersFromFunctions([]functionInfo{function}, callTarget{Name: "Step"})
 
 	if len(got) != 1 {
 		t.Fatalf("expected 1 caller, got %v", got)
@@ -234,7 +235,7 @@ func Run() {
 }
 `, "Run")
 
-	got := collectCallersFromFunctions([]functionInfo{function}, "ParseFile")
+	got := collectCallersFromFunctions([]functionInfo{function}, callTarget{Name: "ParseFile"})
 
 	if len(got) != 1 {
 		t.Fatalf("expected 1 caller, got %v", got)
@@ -256,7 +257,7 @@ func Run() {
 }
 `, "Run")
 
-	got := collectCallersFromFunctions([]functionInfo{function}, "Step")
+	got := collectCallersFromFunctions([]functionInfo{function}, callTarget{Name: "Step"})
 
 	if len(got) != 0 {
 		t.Fatalf("expected no callers, got %v", got)
@@ -277,7 +278,7 @@ func Mid() {
 func Step() {}
 `)
 
-	got, err := collectTransitiveCallersFromFunctions(functions, "Step")
+	got, err := collectTransitiveCallersFromFunctions(functions, callTarget{Name: "Step"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,6 +462,29 @@ func Run() {}
 
 	if !strings.Contains(err.Error(), "ambiguous function target: Run") {
 		t.Fatalf("expected ambiguous function error, got %v", err)
+	}
+}
+
+func TestFindCalleesUsesPackageQualifiedTarget(t *testing.T) {
+	tmp := writePackageQualifiedCallProject(t)
+
+	result, err := FindCallees(tmp, "./internal/auth.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "./internal/auth.Target" {
+		t.Fatalf("expected normalized target, got %s", result.Target)
+	}
+
+	names := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(names, []string{"Helper"}) {
+		t.Fatalf("expected auth Helper only, got %v", names)
+	}
+
+	files := callTestCalleeFiles(result.Callees)
+	if !reflect.DeepEqual(files, []string{"internal/auth/auth.go"}) {
+		t.Fatalf("expected auth callee file only, got %v", files)
 	}
 }
 
@@ -664,6 +688,49 @@ func Run() {}
 
 	if !strings.Contains(err.Error(), "ambiguous function target: Run") {
 		t.Fatalf("expected ambiguous function error, got %v", err)
+	}
+}
+
+func TestFindCallersUsesPackageQualifiedTarget(t *testing.T) {
+	tmp := writePackageQualifiedCallProject(t)
+
+	result, err := FindCallers(tmp, "./internal/auth.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "./internal/auth.Target" {
+		t.Fatalf("expected normalized target, got %s", result.Target)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	wantNames := []string{"Run", "Entry"}
+	if !reflect.DeepEqual(names, wantNames) {
+		t.Fatalf("expected %v, got %v", wantNames, names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	wantFiles := []string{"cmd/app/main.go", "internal/auth/auth.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
+	}
+}
+
+func TestFindCallersNormalizesModulePathTargets(t *testing.T) {
+	tmp := writePackageQualifiedCallProject(t)
+
+	result, err := FindCallers(tmp, "example.com/app/internal/auth.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "./internal/auth.Target" {
+		t.Fatalf("expected module path target to normalize, got %s", result.Target)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if containsString(files, "internal/billing/billing.go") {
+		t.Fatalf("expected auth callers only, got %v", files)
 	}
 }
 
@@ -877,13 +944,18 @@ func Target() {}
 func TestFindCallPathsMatchesSelectorFunctionCalls(t *testing.T) {
 	tmp := t.TempDir()
 
-	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
 
 func Entry() {
 	service.Target()
 }
-
-func Target() {}
 `)
 
 	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
@@ -899,6 +971,35 @@ func Target() {}
 	want := []string{"Target"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsUsesPackageQualifiedTargets(t *testing.T) {
+	tmp := writePackageQualifiedCallProject(t)
+
+	result, err := FindCallPaths(tmp, "Run", "./internal/auth.Helper", CallPathOptions{Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.To != "./internal/auth.Helper" {
+		t.Fatalf("expected normalized target, got %s", result.To)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 auth path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Target", "Helper"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	files := callTestPathFiles(result.Paths[0])
+	wantFiles := []string{"cmd/app/main.go", "internal/auth/auth.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
 	}
 }
 
@@ -988,10 +1089,14 @@ func parseCallTestFunctions(t *testing.T, source string) []functionInfo {
 			continue
 		}
 
+		receiver := receiverTypeName(funcDecl)
+		name := funcDecl.Name.Name
 		functions = append(functions, functionInfo{
-			Target:  functionTargetName(funcDecl),
-			Decl:    funcDecl,
-			FileSet: fileSet,
+			Receiver: receiver,
+			Name:     name,
+			Target:   functionTargetName(funcDecl),
+			Decl:     funcDecl,
+			FileSet:  fileSet,
 		})
 	}
 
@@ -1014,16 +1119,65 @@ func parseCallTestFunction(t *testing.T, source string, target string) functionI
 		}
 
 		if funcDecl.Name.Name == target {
+			receiver := receiverTypeName(funcDecl)
+			name := funcDecl.Name.Name
 			return functionInfo{
-				Target:  functionTargetName(funcDecl),
-				Decl:    funcDecl,
-				FileSet: fileSet,
+				Receiver: receiver,
+				Name:     name,
+				Target:   functionTargetName(funcDecl),
+				Decl:     funcDecl,
+				FileSet:  fileSet,
 			}
 		}
 	}
 
 	t.Fatalf("expected function %s", target)
 	return functionInfo{}
+}
+
+func writePackageQualifiedCallProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+func Entry() {
+	Target()
+}
+
+func Target() {
+	Helper()
+}
+
+func Helper() {}
+`)
+	writeFile(t, filepath.Join(root, "internal", "billing", "billing.go"), `package billing
+
+func Entry() {
+	Target()
+}
+
+func Target() {
+	Helper()
+}
+
+func Helper() {}
+`)
+	writeFile(t, filepath.Join(root, "cmd", "app", "main.go"), `package main
+
+import (
+	authpkg "example.com/app/internal/auth"
+	"example.com/app/internal/billing"
+)
+
+func Run() {
+	authpkg.Target()
+	billing.Target()
+}
+`)
+
+	return root
 }
 
 func callTestNames(calls []*ast.CallExpr) []string {
@@ -1047,6 +1201,15 @@ func callTestCalleeNames(callees []Callee) []string {
 	return names
 }
 
+func callTestCalleeFiles(callees []Callee) []string {
+	var files []string
+	for _, callee := range callees {
+		files = append(files, callee.Position.File)
+	}
+
+	return files
+}
+
 func callTestCallerNames(callers []Caller) []string {
 	var names []string
 	for _, caller := range callers {
@@ -1056,6 +1219,15 @@ func callTestCallerNames(callers []Caller) []string {
 	return names
 }
 
+func callTestCallerFiles(callers []Caller) []string {
+	var files []string
+	for _, caller := range callers {
+		files = append(files, caller.Position.File)
+	}
+
+	return files
+}
+
 func callTestPathCallees(path CallPath) []string {
 	var names []string
 	for _, step := range path.Steps {
@@ -1063,4 +1235,13 @@ func callTestPathCallees(path CallPath) []string {
 	}
 
 	return names
+}
+
+func callTestPathFiles(path CallPath) []string {
+	var files []string
+	for _, step := range path.Steps {
+		files = append(files, step.Position.File)
+	}
+
+	return files
 }

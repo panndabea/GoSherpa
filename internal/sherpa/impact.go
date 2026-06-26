@@ -136,7 +136,7 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 }
 
 func impactSymbolCallers(root string, target string) ([]Caller, error) {
-	normalizedTarget, err := normalizeCallTarget(target)
+	normalizedTarget, err := normalizeCallTarget(root, target)
 	if err != nil {
 		return nil, err
 	}

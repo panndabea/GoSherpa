@@ -13,11 +13,11 @@ Implemented first slice:
   implementation impact, related tests, and suggested test commands
 * package-qualified `explain` caller/callee signals that avoid mixing same-name
   functions across local packages
+* package-qualified standalone call graph commands for `callers`, `callees`,
+  `path`, and `paths`
 
 Next:
 
-* extend package-qualified caller/callee handling to standalone call graph
-  commands
 * resolve receiver-variable method calls with type information
 
 ---

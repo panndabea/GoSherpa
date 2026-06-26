@@ -74,6 +74,7 @@ Implemented:
 - Direct syntactic callee analysis.
 - Direct syntactic caller analysis.
 - Shortest and limited repository-local call path analysis.
+- Package-aware standalone call graph commands for package-qualified targets.
 - Machine-readable JSON output for all commands with a stable response envelope.
 - Golden JSON fixtures for all commands.
 - Repository root selection with `--root`.
@@ -110,7 +111,8 @@ Current limitations:
   matching; table-test names are not extracted yet.
 - Callers and callees are AST-based and can miss receiver-variable method calls.
 - Call paths inherit the current AST-based caller and callee limitations.
-- Standalone call graph commands can still be ambiguous across packages.
+- Unqualified standalone call graph targets can still be ambiguous across
+  packages; package-qualified targets disambiguate local functions and methods.
 - Positions only expose file and line, not columns or ranges.
 - Tests are skipped by some analysis paths and are not yet first-class.
 
@@ -610,8 +612,7 @@ gosherpa callees Handler.CreateUser
 Improvements over current MVP:
 
 - Resolve package-qualified function calls in standalone call graph commands.
-  Package-qualified `explain` targets already use package-aware caller/callee
-  signals.
+  Implemented for `callers`, `callees`, `path`, and `paths`.
 - Resolve receiver-variable method calls.
 - Include test callers with `--tests`.
 - Include or exclude external package calls.

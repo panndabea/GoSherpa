@@ -51,10 +51,10 @@ As Go projects grow, the important answer is often spread across files, packages
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
-| Callees | `gosherpa callees ParseFile` | Lists direct calls made by a function or method |
-| Callers | `gosherpa callers ParseFile` | Lists direct syntactic callers of a function or method |
-| Call path | `gosherpa path Run ParseFile` | Shows the shortest repository-local call path between functions or methods |
-| Call paths | `gosherpa paths Run ParseFile --limit 3` | Shows multiple call paths with optional limit and max depth |
+| Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
+| Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct syntactic callers of a function or method |
+| Call path | `gosherpa path Run ./internal/sherpa.ParseFile` | Shows the shortest repository-local call path between functions or methods |
+| Call paths | `gosherpa paths Run ./internal/sherpa.ParseFile --limit 3` | Shows multiple call paths with optional limit and max depth |
 
 ```text
 REFERENCES
@@ -103,12 +103,16 @@ Then explore the repository:
 ./gosherpa deps ./internal/sherpa
 ./gosherpa deps ./internal/sherpa --json
 ./gosherpa callees ParseFile
+./gosherpa callees ./internal/sherpa.ParseFile
 ./gosherpa callees ParseFile --json
 ./gosherpa callers ParseFile
+./gosherpa callers ./internal/sherpa.ParseFile
 ./gosherpa callers ParseFile --json
 ./gosherpa path main FindCallers
+./gosherpa path main ./internal/sherpa.FindCallers
 ./gosherpa path main FindCallers --json
 ./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6
+./gosherpa paths main ./internal/sherpa.collectCalleesFromFunction --limit 3 --max-depth 6
 ./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6 --json
 ```
 
@@ -181,6 +185,7 @@ Implemented:
 - Package dependency analysis
 - Direct syntactic caller and callee analysis
 - Shortest and limited repository-local call path analysis
+- Package-aware standalone call graph commands for package-qualified targets
 - Machine-readable JSON output for all commands with a stable response envelope
 - Golden JSON fixtures for all commands
 - Repository root selection with `--root`
@@ -203,7 +208,7 @@ Release notes:
 
 Planned next:
 
-- extend package-qualified caller/callee handling to the standalone call graph commands from [PRD_V02.md](PRD_V02.md)
+- resolve receiver-variable method calls with type information
 
 Known MVP limitations:
 
@@ -216,8 +221,7 @@ Known MVP limitations:
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller and callee analysis is AST-based and can miss receiver-variable method calls.
 - Call path analysis inherits the current AST-based caller and callee limitations.
-- One-segment standalone call targets can produce selector-call false positives.
-- Standalone call graph commands can still be ambiguous across packages.
+- Unqualified standalone call targets can still be ambiguous across packages; use package-qualified targets such as `./internal/auth.Target` to disambiguate.
 
 ## Philosophy
 

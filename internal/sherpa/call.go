@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -50,12 +52,28 @@ type CallPathsResult struct {
 	Paths []CallPath `json:"paths"`
 }
 
+type callTarget struct {
+	Package  string
+	Receiver string
+	Name     string
+}
+
 type functionInfo struct {
+	Package  string
+	Receiver string
+	Name     string
 	Target   string
 	Decl     *ast.FuncDecl
 	FileSet  *token.FileSet
 	Position Position
 	Root     string
+	Imports  map[string]string
+}
+
+type callReference struct {
+	Name     string
+	Expr     ast.Expr
+	Position Position
 }
 
 type callGraphNode struct {
@@ -77,82 +95,97 @@ type callPathSearchState struct {
 }
 
 func FindCallees(root string, target string) (CalleesResult, error) {
-	normalizedTarget, err := normalizeCallTarget(target)
+	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return CalleesResult{}, err
 	}
 
-	functions, err := collectFunctionInfos(root)
+	normalizedTarget, err := normalizeCallTarget(rootPath, target)
 	if err != nil {
-		return CalleesResult{Target: normalizedTarget}, err
+		return CalleesResult{}, err
+	}
+
+	functions, err := collectFunctionInfos(rootPath)
+	if err != nil {
+		return CalleesResult{Target: normalizedTarget.String()}, err
 	}
 
 	function, err := findFunctionInfo(functions, normalizedTarget)
 	if err != nil {
-		return CalleesResult{Target: normalizedTarget}, err
+		return CalleesResult{Target: normalizedTarget.String()}, err
 	}
 
 	callees := collectCalleesFromFunction(function)
 
 	return CalleesResult{
-		Target:  normalizedTarget,
+		Target:  normalizedTarget.String(),
 		Callees: callees,
 	}, nil
 }
 
 func FindCallers(root string, target string) (CallersResult, error) {
-	normalizedTarget, err := normalizeCallTarget(target)
+	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return CallersResult{}, err
 	}
 
-	functions, err := collectFunctionInfos(root)
+	normalizedTarget, err := normalizeCallTarget(rootPath, target)
 	if err != nil {
-		return CallersResult{Target: normalizedTarget}, err
+		return CallersResult{}, err
 	}
 
-	_, err = findFunctionInfo(functions, normalizedTarget)
+	functions, err := collectFunctionInfos(rootPath)
 	if err != nil {
-		return CallersResult{Target: normalizedTarget}, err
+		return CallersResult{Target: normalizedTarget.String()}, err
 	}
 
-	callers := collectCallersFromFunctions(functions, normalizedTarget)
+	function, err := findFunctionInfo(functions, normalizedTarget)
+	if err != nil {
+		return CallersResult{Target: normalizedTarget.String()}, err
+	}
+
+	callers := collectCallersFromFunctions(functions, functionCallTarget(function))
 
 	return CallersResult{
-		Target:  normalizedTarget,
+		Target:  normalizedTarget.String(),
 		Callers: callers,
 	}, nil
 }
 
 func FindCallPaths(root string, from string, to string, options CallPathOptions) (CallPathsResult, error) {
-	normalizedFrom, err := normalizeCallTarget(from)
+	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return CallPathsResult{}, err
 	}
 
-	normalizedTo, err := normalizeCallTarget(to)
+	normalizedFrom, err := normalizeCallTarget(rootPath, from)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom}, err
+		return CallPathsResult{}, err
+	}
+
+	normalizedTo, err := normalizeCallTarget(rootPath, to)
+	if err != nil {
+		return CallPathsResult{From: normalizedFrom.String()}, err
 	}
 
 	options, err = normalizeCallPathOptions(options)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
-	functions, err := collectFunctionInfos(root)
+	functions, err := collectFunctionInfos(rootPath)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
 	fromFunction, err := findFunctionInfo(functions, normalizedFrom)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
 	toFunction, err := findFunctionInfo(functions, normalizedTo)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom, To: normalizedTo}, err
+		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
 	graph := buildCallGraph(functions)
@@ -164,8 +197,8 @@ func FindCallPaths(root string, from string, to string, options CallPathOptions)
 	)
 
 	return CallPathsResult{
-		From:  normalizedFrom,
-		To:    normalizedTo,
+		From:  normalizedFrom.String(),
+		To:    normalizedTo.String(),
 		Paths: paths,
 	}, nil
 }
@@ -186,28 +219,57 @@ func normalizeCallPathOptions(options CallPathOptions) (CallPathOptions, error) 
 	return options, nil
 }
 
-func normalizeCallTarget(target string) (string, error) {
+func normalizeCallTarget(root string, target string) (callTarget, error) {
 	value := strings.TrimSpace(target)
 	if value == "" {
-		return "", fmt.Errorf("target is empty")
+		return callTarget{}, fmt.Errorf("target is empty")
 	}
 
-	if strings.Contains(value, "/") || strings.Contains(value, "\\") {
-		return "", fmt.Errorf("package-qualified call targets are not supported: %s", value)
+	packagePath, symbol, hasPackage, err := splitPackageQualifiedTarget(root, value)
+	if err != nil {
+		return callTarget{}, err
+	}
+	if !hasPackage && (strings.Contains(value, "/") || strings.Contains(value, "\\")) {
+		return callTarget{}, fmt.Errorf("invalid call target: %s", value)
 	}
 
-	segments := strings.Split(value, ".")
+	segments := strings.Split(symbol, ".")
 	if len(segments) != 1 && len(segments) != 2 {
-		return "", fmt.Errorf("invalid call target: %s", value)
+		return callTarget{}, fmt.Errorf("invalid call target: %s", value)
 	}
 
 	for _, segment := range segments {
 		if segment == "" || !token.IsIdentifier(segment) {
-			return "", fmt.Errorf("invalid call target: %s", value)
+			return callTarget{}, fmt.Errorf("invalid call target: %s", value)
 		}
 	}
 
-	return value, nil
+	targetInfo := callTarget{
+		Package: packagePath,
+		Name:    segments[len(segments)-1],
+	}
+	if len(segments) == 2 {
+		targetInfo.Receiver = segments[0]
+	}
+
+	return targetInfo, nil
+}
+
+func (target callTarget) String() string {
+	symbol := target.Symbol()
+	if target.Package != "" {
+		return target.Package + "." + symbol
+	}
+
+	return symbol
+}
+
+func (target callTarget) Symbol() string {
+	if target.Receiver == "" {
+		return target.Name
+	}
+
+	return target.Receiver + "." + target.Name
 }
 
 func functionTargetName(funcDecl *ast.FuncDecl) string {
@@ -218,6 +280,14 @@ func functionTargetName(funcDecl *ast.FuncDecl) string {
 	}
 
 	return receiver + "." + name
+}
+
+func functionCallTarget(function functionInfo) callTarget {
+	return callTarget{
+		Package:  function.Package,
+		Receiver: function.Receiver,
+		Name:     function.Name,
+	}
 }
 
 func receiverTypeName(funcDecl *ast.FuncDecl) string {
@@ -256,6 +326,7 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 		return nil, err
 	}
 
+	modulePath := readModulePath(rootPath)
 	sort.Strings(files)
 
 	var functions []functionInfo
@@ -270,12 +341,20 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 			return nil, fmt.Errorf("parse %s: %w", file, err)
 		}
 
+		packagePath, err := packagePathForFile(rootPath, file)
+		if err != nil {
+			return nil, err
+		}
+		imports := callImportAliases(parsedFile, modulePath)
+
 		for _, decl := range parsedFile.Decls {
 			funcDecl, ok := decl.(*ast.FuncDecl)
 			if !ok {
 				continue
 			}
 
+			receiver := receiverTypeName(funcDecl)
+			name := funcDecl.Name.Name
 			pos := fileSet.Position(funcDecl.Pos())
 			position := positionRelativeToRoot(rootPath, Position{
 				File: pos.Filename,
@@ -283,11 +362,15 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 			})
 
 			functions = append(functions, functionInfo{
+				Package:  packagePath,
+				Receiver: receiver,
+				Name:     name,
 				Target:   functionTargetName(funcDecl),
 				Decl:     funcDecl,
 				FileSet:  fileSet,
 				Position: position,
 				Root:     rootPath,
+				Imports:  imports,
 			})
 		}
 	}
@@ -295,23 +378,31 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	return functions, nil
 }
 
-func findFunctionInfo(functions []functionInfo, target string) (functionInfo, error) {
+func findFunctionInfo(functions []functionInfo, target callTarget) (functionInfo, error) {
 	var matches []functionInfo
 	for _, function := range functions {
-		if function.Target == target {
+		if functionMatchesCallTarget(function, target) {
 			matches = append(matches, function)
 		}
 	}
 
 	if len(matches) == 0 {
-		return functionInfo{}, fmt.Errorf("function not found: %s", target)
+		return functionInfo{}, fmt.Errorf("function not found: %s", target.String())
 	}
 
 	if len(matches) > 1 {
-		return functionInfo{}, fmt.Errorf("ambiguous function target: %s", target)
+		return functionInfo{}, fmt.Errorf("ambiguous function target: %s", target.String())
 	}
 
 	return matches[0], nil
+}
+
+func functionMatchesCallTarget(function functionInfo, target callTarget) bool {
+	if target.Package != "" && function.Package != target.Package {
+		return false
+	}
+
+	return function.Receiver == target.Receiver && function.Name == target.Name
 }
 
 func functionNode(function functionInfo) callGraphNode {
@@ -336,14 +427,14 @@ func buildCallGraph(functions []functionInfo) map[string][]callGraphEdge {
 		caller := functionNode(function)
 		graph[caller.Key] = nil
 
-		callees := collectCalleesFromFunction(function)
-		for _, callee := range callees {
-			matches := matchingFunctionInfos(functions, callee.Name)
+		references := collectCallReferencesFromFunction(function)
+		for _, reference := range references {
+			matches := matchingFunctionInfosForCall(functions, function, reference.Expr)
 			for _, match := range matches {
 				graph[caller.Key] = append(graph[caller.Key], callGraphEdge{
 					Caller:   caller,
 					Callee:   functionNode(match),
-					Position: callee.Position,
+					Position: reference.Position,
 				})
 			}
 		}
@@ -354,10 +445,10 @@ func buildCallGraph(functions []functionInfo) map[string][]callGraphEdge {
 	return graph
 }
 
-func matchingFunctionInfos(functions []functionInfo, calleeName string) []functionInfo {
+func matchingFunctionInfosForCall(functions []functionInfo, caller functionInfo, expr ast.Expr) []functionInfo {
 	var matches []functionInfo
 	for _, function := range functions {
-		if callMatchesTarget(calleeName, function.Target) {
+		if callExprReferencesTarget(caller, functionCallTarget(function), expr) {
 			matches = append(matches, function)
 		}
 	}
@@ -471,20 +562,16 @@ func containsCallPathNode(nodes []string, target string) bool {
 }
 
 func callName(expr ast.Expr) (string, bool) {
-	switch node := expr.(type) {
-	case *ast.Ident:
-		return node.Name, true
-	case *ast.SelectorExpr:
-		return selectorName(node)
-	case *ast.IndexExpr:
-		return callName(node.X)
-	case *ast.IndexListExpr:
-		return callName(node.X)
-	case *ast.ParenExpr:
-		return callName(node.X)
-	default:
+	if name, ok := callIdentName(expr); ok {
+		return name, true
+	}
+
+	parts, ok := selectorPath(expr)
+	if !ok || len(parts) == 0 {
 		return "", false
 	}
+
+	return strings.Join(parts, "."), true
 }
 
 func callMatchesTarget(calleeName string, target string) bool {
@@ -499,36 +586,160 @@ func callMatchesTarget(calleeName string, target string) bool {
 	return strings.HasSuffix(calleeName, "."+target)
 }
 
-func selectorName(expr ast.Expr) (string, bool) {
+func callIdentName(expr ast.Expr) (string, bool) {
 	switch node := expr.(type) {
 	case *ast.Ident:
 		return node.Name, true
-	case *ast.SelectorExpr:
-		prefix, ok := selectorName(node.X)
-		if !ok || prefix == "" {
-			return node.Sel.Name, true
-		}
-
-		return prefix + "." + node.Sel.Name, true
 	case *ast.IndexExpr:
-		return selectorName(node.X)
+		return callIdentName(node.X)
 	case *ast.IndexListExpr:
-		return selectorName(node.X)
+		return callIdentName(node.X)
 	case *ast.ParenExpr:
-		return selectorName(node.X)
-	case *ast.StarExpr:
-		return selectorName(node.X)
+		return callIdentName(node.X)
 	default:
 		return "", false
 	}
 }
 
+func selectorPath(expr ast.Expr) ([]string, bool) {
+	switch node := expr.(type) {
+	case *ast.Ident:
+		return []string{node.Name}, true
+	case *ast.SelectorExpr:
+		prefix, ok := selectorPath(node.X)
+		if !ok {
+			return nil, false
+		}
+
+		return append(prefix, node.Sel.Name), true
+	case *ast.IndexExpr:
+		return selectorPath(node.X)
+	case *ast.IndexListExpr:
+		return selectorPath(node.X)
+	case *ast.ParenExpr:
+		return selectorPath(node.X)
+	case *ast.StarExpr:
+		return selectorPath(node.X)
+	default:
+		return nil, false
+	}
+}
+
+func selectorName(expr ast.Expr) (string, bool) {
+	parts, ok := selectorPath(expr)
+	if !ok || len(parts) == 0 {
+		return "", false
+	}
+
+	return strings.Join(parts, "."), true
+}
+
+func callExprReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
+	if target.Package == "" {
+		name, ok := callName(expr)
+		return ok && callMatchesTarget(name, target.Symbol())
+	}
+
+	if target.Receiver == "" {
+		if name, ok := callIdentName(expr); ok && name == target.Name {
+			return function.Package == target.Package || function.Imports["."] == target.Package
+		}
+	}
+
+	parts, ok := selectorPath(expr)
+	if !ok {
+		return false
+	}
+
+	if target.Receiver == "" && len(parts) == 2 {
+		return function.Imports[parts[0]] == target.Package && parts[1] == target.Name
+	}
+
+	if target.Receiver != "" && len(parts) == 2 {
+		if parts[0] != target.Receiver || parts[1] != target.Name {
+			return false
+		}
+
+		return function.Package == target.Package || function.Imports["."] == target.Package
+	}
+
+	if target.Receiver != "" && len(parts) == 3 {
+		return function.Imports[parts[0]] == target.Package &&
+			parts[1] == target.Receiver &&
+			parts[2] == target.Name
+	}
+
+	return false
+}
+
+func callImportAliases(file *ast.File, modulePath string) map[string]string {
+	aliases := make(map[string]string)
+	for _, importSpec := range file.Imports {
+		importPath, err := strconv.Unquote(importSpec.Path.Value)
+		if err != nil {
+			continue
+		}
+
+		packagePath, ok := callLocalImportPackage(importPath, modulePath)
+		if !ok {
+			continue
+		}
+
+		alias := path.Base(importPath)
+		if importSpec.Name != nil {
+			alias = importSpec.Name.Name
+		}
+		if alias == "_" {
+			continue
+		}
+
+		aliases[alias] = packagePath
+	}
+
+	return aliases
+}
+
+func callLocalImportPackage(importPath string, modulePath string) (string, bool) {
+	if modulePath == "" {
+		return "", false
+	}
+	if importPath == modulePath {
+		return ".", true
+	}
+	if !strings.HasPrefix(importPath, modulePath+"/") {
+		return "", false
+	}
+
+	localPath := strings.TrimPrefix(importPath, modulePath+"/")
+	cleaned := path.Clean(localPath)
+	if cleaned == "." {
+		return ".", true
+	}
+
+	return "./" + cleaned, true
+}
+
 func collectCalleesFromFunction(function functionInfo) []Callee {
+	references := collectCallReferencesFromFunction(function)
+	callees := make([]Callee, 0, len(references))
+	for _, reference := range references {
+		callees = append(callees, Callee{
+			Name:     reference.Name,
+			Position: reference.Position,
+		})
+	}
+
+	sortCallees(callees)
+
+	return callees
+}
+
+func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	if function.Decl.Body == nil {
 		return nil
 	}
 
-	var callees []Callee
+	var references []callReference
 	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
 		if node == nil {
 			return true
@@ -554,17 +765,18 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 			Line: pos.Line,
 		})
 
-		callees = append(callees, Callee{
+		references = append(references, callReference{
 			Name:     name,
+			Expr:     call.Fun,
 			Position: position,
 		})
 
 		return true
 	})
 
-	sortCallees(callees)
+	sortCallReferences(references)
 
-	return callees
+	return references
 }
 
 func sortCallees(callees []Callee) {
@@ -578,6 +790,20 @@ func sortCallees(callees []Callee) {
 		}
 
 		return callees[i].Name < callees[j].Name
+	})
+}
+
+func sortCallReferences(references []callReference) {
+	sort.Slice(references, func(i int, j int) bool {
+		if references[i].Position.File != references[j].Position.File {
+			return references[i].Position.File < references[j].Position.File
+		}
+
+		if references[i].Position.Line != references[j].Position.Line {
+			return references[i].Position.Line < references[j].Position.Line
+		}
+
+		return references[i].Name < references[j].Name
 	})
 }
 
@@ -595,19 +821,19 @@ func sortCallers(callers []Caller) {
 	})
 }
 
-func collectCallersFromFunctions(functions []functionInfo, target string) []Caller {
+func collectCallersFromFunctions(functions []functionInfo, target callTarget) []Caller {
 	var callers []Caller
 
 	for _, function := range functions {
-		callees := collectCalleesFromFunction(function)
-		for _, callee := range callees {
-			if !callMatchesTarget(callee.Name, target) {
+		references := collectCallReferencesFromFunction(function)
+		for _, reference := range references {
+			if !callExprReferencesTarget(function, target, reference.Expr) {
 				continue
 			}
 
 			callers = append(callers, Caller{
 				Name:     function.Target,
-				Position: callee.Position,
+				Position: reference.Position,
 			})
 		}
 	}
@@ -617,7 +843,7 @@ func collectCallersFromFunctions(functions []functionInfo, target string) []Call
 	return callers
 }
 
-func collectTransitiveCallersFromFunctions(functions []functionInfo, target string) ([]Caller, error) {
+func collectTransitiveCallersFromFunctions(functions []functionInfo, target callTarget) ([]Caller, error) {
 	targetFunction, err := findFunctionInfo(functions, target)
 	if err != nil {
 		return nil, err
