@@ -7,6 +7,8 @@ the code, README, and license.
 
 - [Feature Roadmap](product/FEATURE_ROADMAP.md) - current product direction and
   implementation status.
+- [Must-Use Readiness](product/MUST_USE_READINESS.md) - near-term decision lens
+  for making GoSherpa a default daily-use tool.
 - [Agent Priority List](product/AGENT_PRIORITY_LIST.md) - prioritized features
   that would make GoSherpa useful as a default coding-agent tool.
 - [PRD v0.1: Impact Engine](product/PRD_V01.md) - completed MVP scope.
