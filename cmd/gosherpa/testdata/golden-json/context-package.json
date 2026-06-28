@@ -1,0 +1,491 @@
+{
+  "schemaVersion": 1,
+  "command": "context package",
+  "target": ".",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "target": ".",
+    "package": ".",
+    "packageName": "golden",
+    "files": [
+      "service.go",
+      "service_test.go"
+    ],
+    "symbols": [
+      {
+        "name": "Worker",
+        "kind": "struct",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.Worker",
+        "position": {
+          "file": "service.go",
+          "line": 3,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 3,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 3,
+            "column": 21
+          }
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Entry",
+        "kind": "function",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.Entry",
+        "signature": "func Entry()",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 8,
+            "column": 2
+          }
+        },
+        "receiver": ""
+      },
+      {
+        "name": "First",
+        "kind": "function",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.First",
+        "signature": "func First()",
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 10,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 12,
+            "column": 2
+          }
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Second",
+        "kind": "function",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.Second",
+        "signature": "func Second()",
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 14,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 16,
+            "column": 2
+          }
+        },
+        "receiver": ""
+      },
+      {
+        "name": "Target",
+        "kind": "function",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.Target",
+        "signature": "func Target()",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 17
+          }
+        },
+        "receiver": ""
+      },
+      {
+        "name": "TestTarget",
+        "kind": "function",
+        "package": ".",
+        "packageName": "golden",
+        "qualifiedName": "example.com/golden.TestTarget",
+        "signature": "func TestTarget(t *testing.T)",
+        "position": {
+          "file": "service_test.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
+        },
+        "receiver": ""
+      }
+    ],
+    "sourceContexts": [
+      {
+        "position": {
+          "file": "service.go",
+          "line": 3,
+          "column": 6
+        },
+        "lines": [
+          {
+            "number": 1,
+            "text": "package golden",
+            "target": false
+          },
+          {
+            "number": 2,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 3,
+            "text": "type Worker struct{}",
+            "target": true
+          },
+          {
+            "number": 4,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 5,
+            "text": "func Entry() {",
+            "target": false
+          }
+        ]
+      },
+      {
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        },
+        "lines": [
+          {
+            "number": 3,
+            "text": "type Worker struct{}",
+            "target": false
+          },
+          {
+            "number": 4,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 5,
+            "text": "func Entry() {",
+            "target": true
+          },
+          {
+            "number": 6,
+            "text": "\tFirst()",
+            "target": false
+          },
+          {
+            "number": 7,
+            "text": "\tSecond()",
+            "target": false
+          }
+        ]
+      },
+      {
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        },
+        "lines": [
+          {
+            "number": 8,
+            "text": "}",
+            "target": false
+          },
+          {
+            "number": 9,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 10,
+            "text": "func First() {",
+            "target": true
+          },
+          {
+            "number": 11,
+            "text": "\tTarget()",
+            "target": false
+          },
+          {
+            "number": 12,
+            "text": "}",
+            "target": false
+          }
+        ]
+      },
+      {
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        },
+        "lines": [
+          {
+            "number": 12,
+            "text": "}",
+            "target": false
+          },
+          {
+            "number": 13,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 14,
+            "text": "func Second() {",
+            "target": true
+          },
+          {
+            "number": 15,
+            "text": "\tTarget()",
+            "target": false
+          },
+          {
+            "number": 16,
+            "text": "}",
+            "target": false
+          }
+        ]
+      },
+      {
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "lines": [
+          {
+            "number": 16,
+            "text": "}",
+            "target": false
+          },
+          {
+            "number": 17,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 18,
+            "text": "func Target() {}",
+            "target": true
+          }
+        ]
+      },
+      {
+        "position": {
+          "file": "service_test.go",
+          "line": 5,
+          "column": 1
+        },
+        "lines": [
+          {
+            "number": 3,
+            "text": "import \"testing\"",
+            "target": false
+          },
+          {
+            "number": 4,
+            "text": "",
+            "target": false
+          },
+          {
+            "number": 5,
+            "text": "func TestTarget(t *testing.T) {",
+            "target": true
+          },
+          {
+            "number": 6,
+            "text": "\tTarget()",
+            "target": false
+          },
+          {
+            "number": 7,
+            "text": "}",
+            "target": false
+          }
+        ]
+      }
+    ],
+    "purpose": "Package . contains 2 Go files declaring 6 supported symbols; impact analysis reaches 2 packages and 1 affected test.",
+    "risk": {
+      "level": "medium",
+      "reasons": [
+        "Package contains 2 Go files.",
+        "Package declares 6 supported symbols.",
+        "Impact reaches 2 packages.",
+        "Affected tests found: 1."
+      ]
+    },
+    "affectedPackages": [
+      ".",
+      "./cmd/app"
+    ],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "affectedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": false,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test ."
+    ],
+    "readingOrder": [
+      {
+        "title": "File: service.go",
+        "reason": "Start with the files in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 1
+        }
+      },
+      {
+        "title": "File: service_test.go",
+        "reason": "Start with the files in the target package.",
+        "position": {
+          "file": "service_test.go",
+          "line": 1
+        }
+      },
+      {
+        "title": "Symbol: Worker",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 3,
+          "column": 6
+        }
+      },
+      {
+        "title": "Symbol: Entry",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        }
+      },
+      {
+        "title": "Symbol: First",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        }
+      },
+      {
+        "title": "Symbol: Second",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        }
+      },
+      {
+        "title": "Symbol: Target",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        }
+      },
+      {
+        "title": "Symbol: TestTarget",
+        "reason": "Inspect the symbols declared in the target package.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5,
+          "column": 1
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        }
+      }
+    ],
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Package context uses package-level impact for affected packages and tests.",
+      "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
+      "Analysis uses syntax plus local type information, not full module loading.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Test discovery uses same-package tests and syntactic direct-reference matching."
+    ]
+  }
+}

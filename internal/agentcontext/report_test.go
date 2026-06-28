@@ -138,6 +138,74 @@ func TestAnalyzeFileNotesTestsOptionInLimitations(t *testing.T) {
 	}
 }
 
+func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if report.Target != "." || report.Package != "." {
+		t.Fatalf("target/package = %q/%q, want . and .", report.Target, report.Package)
+	}
+	if report.PackageName != "app" {
+		t.Fatalf("package name = %q, want app", report.PackageName)
+	}
+	if len(report.Files) != 2 || report.Files[0] != "service.go" || report.Files[1] != "service_test.go" {
+		t.Fatalf("unexpected package files: %#v", report.Files)
+	}
+	if len(report.Symbols) != 4 {
+		t.Fatalf("expected 4 package symbols, got %#v", report.Symbols)
+	}
+	if report.Symbols[0].Name != "Entry" || report.Symbols[1].Name != "Target" || report.Symbols[2].Name != "Helper" || report.Symbols[3].Name != "TestTarget" {
+		t.Fatalf("unexpected symbol order: %#v", report.Symbols)
+	}
+	if len(report.SourceContexts) != 4 {
+		t.Fatalf("expected 4 source contexts, got %#v", report.SourceContexts)
+	}
+	if report.AnalysisMode != AnalysisModeAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	}
+	if report.Confidence != ConfidenceMedium {
+		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
+	}
+	if report.Risk.Level != "medium" {
+		t.Fatalf("risk level = %q, want medium", report.Risk.Level)
+	}
+	if len(report.AffectedPackages) != 1 || report.AffectedPackages[0] != "." {
+		t.Fatalf("expected package impact ., got %#v", report.AffectedPackages)
+	}
+	if len(report.AffectedTests) != 1 || report.AffectedTests[0].Name != "TestTarget" {
+		t.Fatalf("expected TestTarget affected test, got %#v", report.AffectedTests)
+	}
+	if len(report.TestCommands) != 1 || report.TestCommands[0] != "go test ." {
+		t.Fatalf("expected go test . command, got %#v", report.TestCommands)
+	}
+	if len(report.ReadingOrder) != 7 {
+		t.Fatalf("expected 7 reading order steps, got %#v", report.ReadingOrder)
+	}
+	if len(report.Limitations) != 5 {
+		t.Fatalf("expected 5 limitations, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzePackageNotesTestsOptionInLimitations(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if len(report.Limitations) != 6 {
+		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+	if !strings.Contains(report.Limitations[5], "--tests") {
+		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+}
+
 func TestAnalyzeDiffBuildsAgentContext(t *testing.T) {
 	root := initAgentContextGitRepository(t)
 

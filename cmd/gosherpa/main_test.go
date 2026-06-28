@@ -458,6 +458,7 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 	for _, want := range []string{
 		"context symbol <target> [--tests]",
 		"context file <file> [--tests]",
+		"context package <package> [--tests]",
 		"context diff --base <ref> [--tests]",
 	} {
 		if !strings.Contains(output.String(), want) {
@@ -1501,6 +1502,125 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 	}
 
 	if strings.Contains(result.Stdout, "CONTEXT FILE") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainPrintsContextPackageUsageWhenTargetIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "context", "package"})
+
+	want := "usage: gosherpa [--root <path>] context package <package> [--tests]\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsContextPackageCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "package", "."})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"CONTEXT PACKAGE",
+		"PACKAGE",
+		".",
+		"Package name: service",
+		"PURPOSE",
+		"declaring 3 supported symbols",
+		"ANALYSIS",
+		"Mode: ast",
+		"Confidence: medium",
+		"Risk: medium",
+		"PACKAGE FILES",
+		"service.go",
+		"service_test.go",
+		"PACKAGE SYMBOLS",
+		"Entry",
+		"Target",
+		"TestTarget",
+		"SOURCE",
+		"func Entry()",
+		"func TestTarget(t *testing.T)",
+		"AFFECTED PACKAGES",
+		"./cmd/app",
+		"AFFECTED TESTS",
+		"TestTarget",
+		"SUGGESTED COMMANDS",
+		"go test .",
+		"READING ORDER",
+		"File: service.go",
+		"Symbol: Entry",
+		"LIMITATIONS",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "package", ".", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context package", ".", "example.com/app")
+
+	if data["package"] != "." {
+		t.Fatalf("expected package ., got %v", data["package"])
+	}
+	if data["packageName"] != "service" {
+		t.Fatalf("expected package name service, got %v", data["packageName"])
+	}
+	if data["analysisMode"] != "ast" {
+		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != "medium" {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "files", 2)
+	assertMainTestJSONArrayHasLength(t, data, "symbols", 3)
+	assertMainTestJSONArrayHasLength(t, data, "sourceContexts", 3)
+	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 6)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "CONTEXT PACKAGE") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }

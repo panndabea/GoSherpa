@@ -139,8 +139,7 @@ Current limitations:
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
   first-class.
-- Context export currently supports symbol, file, and diff targets; package
-  context export remains future work.
+- Context export currently supports symbol, file, package, and diff targets.
 
 ## Roadmap Overview
 

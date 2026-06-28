@@ -77,6 +77,41 @@ func FormatFile(report FileReport) string {
 	return builder.String()
 }
 
+func FormatPackage(report PackageReport) string {
+	var builder strings.Builder
+
+	builder.WriteString("CONTEXT PACKAGE\n")
+	builder.WriteString("\n")
+	writePackageTarget(&builder, report)
+	builder.WriteString("\n")
+	writePurpose(&builder, report.Purpose)
+	builder.WriteString("\n")
+	writePackageAnalysis(&builder, report)
+	builder.WriteString("\n")
+	writeValues(&builder, "PACKAGE FILES", report.Files)
+	builder.WriteString("\n")
+	writePackageSymbols(&builder, report.Symbols)
+	builder.WriteString("\n")
+	writeFileSourceContexts(&builder, report.Symbols, report.SourceContexts)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED PACKAGES", report.AffectedPackages)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED INTERFACES", report.AffectedInterfaces)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
+	builder.WriteString("\n")
+	writeAffectedTests(&builder, report.AffectedTests)
+	builder.WriteString("\n")
+	writeValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	builder.WriteString("\n")
+	writeReadingOrder(&builder, report.ReadingOrder)
+	builder.WriteString("\n")
+	writeValues(&builder, "LIMITATIONS", report.Limitations)
+	writeWarnings(&builder, report.Warnings)
+
+	return builder.String()
+}
+
 func writeTarget(builder *strings.Builder, report Report) {
 	builder.WriteString("TARGET\n")
 	fmt.Fprintf(builder, "  %s (%s)\n", report.Identity.Target, report.Identity.Kind)
@@ -100,6 +135,18 @@ func writeFileTarget(builder *strings.Builder, report FileReport) {
 	}
 	if report.Package != "" {
 		fmt.Fprintf(builder, "  Package: %s\n", report.Package)
+	}
+	if report.PackageName != "" {
+		fmt.Fprintf(builder, "  Package name: %s\n", report.PackageName)
+	}
+}
+
+func writePackageTarget(builder *strings.Builder, report PackageReport) {
+	builder.WriteString("PACKAGE\n")
+	if strings.TrimSpace(report.Package) == "" {
+		builder.WriteString("  unknown\n")
+	} else {
+		fmt.Fprintf(builder, "  %s\n", report.Package)
 	}
 	if report.PackageName != "" {
 		fmt.Fprintf(builder, "  Package name: %s\n", report.PackageName)
@@ -184,6 +231,27 @@ func writeFileAnalysis(builder *strings.Builder, report FileReport) {
 	}
 }
 
+func writePackageAnalysis(builder *strings.Builder, report PackageReport) {
+	builder.WriteString("ANALYSIS\n")
+	mode := strings.TrimSpace(report.AnalysisMode)
+	if mode == "" {
+		mode = "unknown"
+	}
+	confidence := strings.TrimSpace(report.Confidence)
+	if confidence == "" {
+		confidence = "unknown"
+	}
+
+	fmt.Fprintf(builder, "  Mode: %s\n", mode)
+	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
+	if report.Risk.Level != "" {
+		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
+	}
+	for _, reason := range report.Risk.Reasons {
+		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
+}
+
 func writeCallers(builder *strings.Builder, callers []sherpa.Caller) {
 	builder.WriteString("CALLED BY\n")
 	if len(callers) == 0 {
@@ -210,6 +278,25 @@ func writeCallees(builder *strings.Builder, callees []sherpa.Callee) {
 
 func writeFileSymbols(builder *strings.Builder, symbols []sherpa.Symbol) {
 	builder.WriteString("FILE SYMBOLS\n")
+	if len(symbols) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for _, symbol := range symbols {
+		fmt.Fprintf(
+			builder,
+			"  %-10s %-36s %s:%d\n",
+			symbol.Kind,
+			symbol.DisplayName(),
+			symbol.Position.File,
+			symbol.Position.Line,
+		)
+	}
+}
+
+func writePackageSymbols(builder *strings.Builder, symbols []sherpa.Symbol) {
+	builder.WriteString("PACKAGE SYMBOLS\n")
 	if len(symbols) == 0 {
 		builder.WriteString("  none\n")
 		return

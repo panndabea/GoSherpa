@@ -40,6 +40,8 @@ gosherpa context symbol <target>
 gosherpa context symbol <target> --json
 gosherpa context file <file>
 gosherpa context file <file> --json
+gosherpa context package <package>
+gosherpa context package <package> --json
 gosherpa context diff --base <ref>
 gosherpa context diff --base <ref> --json
 ```
@@ -49,6 +51,9 @@ callers, callees, impact signals, related tests, suggested commands,
 confidence, limitations, and opt-in test callers through `--tests`.
 File context exports file symbols, source excerpts, package-level impact,
 affected tests, suggested commands, reading order, confidence, and limitations.
+Package context exports package files, symbols, source excerpts, package-level
+impact, affected tests, suggested commands, reading order, confidence, and
+limitations.
 Diff context exports changed files, changed packages, changed symbols, affected
 packages, affected tests, suggested commands, reading order, confidence, and
 limitations.
@@ -58,6 +63,7 @@ Command sketches:
 ```bash
 gosherpa context symbol ./internal/auth.ValidateToken
 gosherpa context file internal/auth/token.go
+gosherpa context package ./internal/auth
 gosherpa context diff --base main
 gosherpa prompt ./internal/auth.ValidateToken
 ```

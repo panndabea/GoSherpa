@@ -188,6 +188,96 @@ func TestFormatFile(t *testing.T) {
 	}
 }
 
+func TestFormatPackage(t *testing.T) {
+	report := PackageReport{
+		Target:      "./internal/service",
+		Package:     "./internal/service",
+		PackageName: "service",
+		Files:       []string{"internal/service/service.go", "internal/service/service_test.go"},
+		Symbols: []sherpa.Symbol{
+			{
+				Name:      "Target",
+				Kind:      sherpa.SymbolKindFunction,
+				Package:   "./internal/service",
+				Signature: "func Target()",
+				Position:  sherpa.Position{File: "internal/service/service.go", Line: 7},
+			},
+		},
+		SourceContexts: []sherpa.SourceContext{
+			{
+				Position: sherpa.Position{File: "internal/service/service.go", Line: 7},
+				Lines: []sherpa.SourceContextLine{
+					{Number: 6, Text: "// Target handles the main service step."},
+					{Number: 7, Text: "func Target() {", Target: true},
+					{Number: 8, Text: "\tHelper()"},
+				},
+			},
+		},
+		Purpose: "Package ./internal/service contains 2 Go files declaring 1 supported symbol.",
+		Risk: explainengine.RiskSummary{
+			Level: "medium",
+			Reasons: []string{
+				"Impact reaches 2 packages.",
+			},
+		},
+		AffectedPackages: []string{"./internal/api", "./internal/service"},
+		AffectedTests: []sherpa.RelatedTest{
+			{Name: "TestTarget", Position: sherpa.Position{File: "internal/service/service_test.go", Line: 5}},
+		},
+		TestCommands: []string{"go test ./internal/service"},
+		ReadingOrder: []explainengine.ReadingStep{
+			{
+				Title:  "File: internal/service/service.go",
+				Reason: "Start with the target package.",
+				Position: sherpa.Position{
+					File: "internal/service/service.go",
+					Line: 1,
+				},
+			},
+		},
+		AnalysisMode: AnalysisModeAST,
+		Confidence:   ConfidenceMedium,
+		Limitations: []string{
+			"Package context uses package-level impact for affected packages and tests.",
+		},
+	}
+
+	output := FormatPackage(report)
+	for _, want := range []string{
+		"CONTEXT PACKAGE",
+		"PACKAGE",
+		"./internal/service",
+		"Package name: service",
+		"PURPOSE",
+		"contains 2 Go files",
+		"ANALYSIS",
+		"Mode: ast",
+		"Confidence: medium",
+		"Risk: medium",
+		"Impact reaches 2 packages.",
+		"PACKAGE FILES",
+		"internal/service/service.go",
+		"PACKAGE SYMBOLS",
+		"Target",
+		"SOURCE",
+		"> 7 | func Target() {",
+		"AFFECTED PACKAGES",
+		"./internal/api",
+		"AFFECTED TESTS",
+		"TestTarget",
+		"SUGGESTED COMMANDS",
+		"go test ./internal/service",
+		"READING ORDER",
+		"File: internal/service/service.go",
+		"LIMITATIONS",
+		"Package context uses package-level impact",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, output)
+		}
+	}
+}
+
 func TestFormatDiff(t *testing.T) {
 	report := DiffReport{
 		Target:  "HEAD",
