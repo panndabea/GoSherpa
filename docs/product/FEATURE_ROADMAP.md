@@ -66,6 +66,9 @@ Implemented:
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture
   role, definition, reading order, references, callers, callees, impact signals,
   tests, and JSON output.
+- Initial `gosherpa context symbol <target>` export with disambiguated symbol
+  identity, source excerpt, references, callers, callees, impact signals,
+  related tests, suggested commands, confidence, limitations, and JSON output.
 - Package-aware caller/callee signals for package-qualified `gosherpa explain`
   targets.
 - Direct symbol and package impact analysis.
@@ -130,6 +133,8 @@ Current limitations:
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
   first-class.
+- Context export currently supports symbol targets; file, package, and diff
+  context exports remain future work.
 
 ## Roadmap Overview
 

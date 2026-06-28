@@ -894,7 +894,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by search, callers, and explain") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by search, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 
@@ -1266,6 +1266,104 @@ func TestMainRunsExplainCommandAsJSONWithTests(t *testing.T) {
 	if strings.Contains(result.Stdout, "EXPLAIN") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
+}
+
+func TestMainRunsContextSymbolCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"CONTEXT", "TARGET", "Target (function)", "DEFINITION", "service.go", "SOURCE", "func Target() {}", "ANALYSIS", "Mode: ast", "Confidence: medium", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test .", "LIMITATIONS"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+
+	if data["analysisMode"] != "ast" {
+		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != "medium" {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+
+	identity, ok := data["identity"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected identity object, got %T", data["identity"])
+	}
+	if identity["package"] != "." {
+		t.Fatalf("expected identity package ., got %v", identity["package"])
+	}
+	if identity["signature"] != "func Target()" {
+		t.Fatalf("expected identity signature, got %v", identity["signature"])
+	}
+
+	sourceContext, ok := data["sourceContext"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sourceContext object, got %T", data["sourceContext"])
+	}
+	lines, ok := sourceContext["lines"].([]any)
+	if !ok || len(lines) == 0 {
+		t.Fatalf("expected source context lines, got %v", sourceContext["lines"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
+func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target", "--tests", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
 }
 
 func TestMainRunsImpactDiffCommand(t *testing.T) {

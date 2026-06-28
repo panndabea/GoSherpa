@@ -33,6 +33,17 @@ These are the features that would move GoSherpa from "useful sometimes" to
 
 Add one command that returns the compact context an agent needs before editing.
 
+Implemented first slice:
+
+```bash
+gosherpa context symbol <target>
+gosherpa context symbol <target> --json
+```
+
+This supports symbol targets with source excerpt, symbol identity, references,
+callers, callees, impact signals, related tests, suggested commands,
+confidence, limitations, and opt-in test callers through `--tests`.
+
 Command sketches:
 
 ```bash
@@ -365,4 +376,3 @@ gosherpa tests affected --base main --json
 Those commands need to be fast, deterministic, explicit about uncertainty, and
 accurate enough that they reduce manual search instead of creating verification
 work.
-

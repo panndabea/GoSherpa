@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	agentcontext "github.com/supertabaluga/gosherpa/internal/agentcontext"
 	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
 	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
@@ -458,7 +459,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --tests is only supported by search, callers, and explain")
+		fmt.Fprintln(stderr, "error: --tests is only supported by search, callers, explain, and context")
 		return exitUsage
 	}
 
@@ -478,6 +479,50 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	switch invocation.Command {
+	case "context":
+		if len(invocation.CommandArgs) < 1 {
+			printContextUsage(stderr)
+			return exitUsage
+		}
+
+		switch invocation.CommandArgs[0] {
+		case "symbol":
+			if len(invocation.CommandArgs) != 2 {
+				printContextSymbolUsage(stderr)
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			target := invocation.CommandArgs[1]
+			report, err := agentcontext.AnalyzeSymbol(root, target, agentcontext.AnalyzeOptions{
+				IncludeTests: invocation.IncludeTests,
+			})
+			if err != nil {
+				return writeCommandError(invocation.JSON, root, "context symbol", target, stderr, err)
+			}
+
+			if invocation.JSON {
+				normalizedReport := contextSymbolJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"context symbol",
+					normalizedReport.Target,
+					normalizedReport.Warnings,
+					normalizedReport,
+				))
+			}
+
+			fmt.Fprint(stdout, agentcontext.Format(report))
+			return exitSuccess
+		default:
+			printContextUsage(stderr)
+			return exitUsage
+		}
+
 	case "explain":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol> [--tests]")
@@ -1032,7 +1077,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context":
 		return true
 	default:
 		return false
@@ -1041,7 +1086,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context":
 		return true
 	default:
 		return false
@@ -1062,7 +1107,7 @@ func isPathCommand(command string) bool {
 
 func supportsTestsOption(command string) bool {
 	switch command {
-	case "search", "callers", "explain":
+	case "search", "callers", "explain", "context":
 		return true
 	default:
 		return false
@@ -1361,6 +1406,23 @@ func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONDat
 	}
 }
 
+func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
+	report.References = nonNilSlice(report.References)
+	report.Callers = nonNilSlice(report.Callers)
+	report.Callees = nonNilSlice(report.Callees)
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.RelatedTests = nonNilSlice(report.RelatedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
+	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
 func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.References = nonNilSlice(report.References)
 	report.Callers = nonNilSlice(report.Callers)
@@ -1449,6 +1511,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
+	fmt.Fprintln(writer, "  context symbol <target> [--tests]")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
@@ -1468,6 +1531,14 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
 	fmt.Fprintln(writer, "  callers <function-or-method> [--tests] [--context]")
 	fmt.Fprintln(writer, "  callees <function-or-method> [--context]")
+}
+
+func printContextUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+}
+
+func printContextSymbolUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
 }
 
 func printImpactUsage(writer io.Writer) {

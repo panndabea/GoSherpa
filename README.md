@@ -45,6 +45,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
+| Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, confidence, and limitations |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -94,6 +95,9 @@ Then explore the repository:
 ./gosherpa search ParseFile --package ./internal/sherpa
 ./gosherpa search ParseFile --tests
 ./gosherpa search parse file --json
+./gosherpa context symbol ParseFile
+./gosherpa context symbol ParseFile --tests
+./gosherpa context symbol ParseFile --json
 ./gosherpa explain ParseFile
 ./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json
@@ -162,6 +166,7 @@ Prefer not to build a binary yet?
 
 ```bash
 go run ./cmd/gosherpa symbols
+go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
@@ -201,6 +206,7 @@ Implemented:
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
+- Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, confidence, limitations, and JSON output
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands

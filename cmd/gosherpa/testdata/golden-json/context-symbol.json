@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "command": "context symbol",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "target": "Target",
+    "identity": {
+      "target": "Target",
+      "package": ".",
+      "packageName": "golden",
+      "symbol": "Target",
+      "kind": "function",
+      "qualifiedName": "example.com/golden.Target",
+      "signature": "func Target()",
+      "definition": {
+        "file": "service.go",
+        "line": 18,
+        "column": 1
+      }
+    },
+    "symbol": {
+      "name": "Target",
+      "kind": "function",
+      "package": ".",
+      "packageName": "golden",
+      "qualifiedName": "example.com/golden.Target",
+      "signature": "func Target()",
+      "position": {
+        "file": "service.go",
+        "line": 18,
+        "column": 1
+      },
+      "range": {
+        "start": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "end": {
+          "file": "service.go",
+          "line": 18,
+          "column": 17
+        }
+      },
+      "receiver": ""
+    },
+    "sourceContext": {
+      "position": {
+        "file": "service.go",
+        "line": 18,
+        "column": 1
+      },
+      "lines": [
+        {
+          "number": 16,
+          "text": "}",
+          "target": false
+        },
+        {
+          "number": 17,
+          "text": "",
+          "target": false
+        },
+        {
+          "number": 18,
+          "text": "func Target() {}",
+          "target": true
+        }
+      ]
+    },
+    "purpose": "",
+    "risk": {
+      "level": "medium",
+      "reasons": [
+        "Symbol is exported.",
+        "Impact reaches 2 packages.",
+        "Called by 2 functions or methods.",
+        "Related tests found: 1."
+      ]
+    },
+    "architectureRole": {
+      "role": "leaf_dependency",
+      "reasons": [
+        "Symbol is depended on by callers but has no direct callees.",
+        "Impact crosses 2 packages."
+      ]
+    },
+    "references": [
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      },
+      {
+        "name": "Target",
+        "position": {
+          "file": "service.go",
+          "line": 18
+        }
+      }
+    ],
+    "callers": [
+      {
+        "name": "First",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "name": "Second",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      }
+    ],
+    "callees": [],
+    "affectedPackages": [
+      ".",
+      "./cmd/app"
+    ],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "relatedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": true,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test ."
+    ],
+    "readingOrder": [
+      {
+        "title": "Definition",
+        "reason": "Start with the symbol declaration and nearby implementation.",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        }
+      },
+      {
+        "title": "Caller: First",
+        "reason": "See how callers depend on this symbol.",
+        "position": {
+          "file": "service.go",
+          "line": 11
+        }
+      },
+      {
+        "title": "Caller: Second",
+        "reason": "See how callers depend on this symbol.",
+        "position": {
+          "file": "service.go",
+          "line": 15
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        }
+      }
+    ],
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Analysis uses syntax plus local type information, not full module loading.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Call graph results are repository-local and may miss some imported-package receiver calls.",
+      "Test discovery uses same-package tests and syntactic direct-reference matching.",
+      "Test callers are included only when --tests is used."
+    ]
+  }
+}

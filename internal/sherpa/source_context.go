@@ -11,14 +11,14 @@ import (
 const DefaultSourceContextRadius = 2
 
 type SourceContext struct {
-	Position Position
-	Lines    []SourceContextLine
+	Position Position            `json:"position"`
+	Lines    []SourceContextLine `json:"lines"`
 }
 
 type SourceContextLine struct {
-	Number int
-	Text   string
-	Target bool
+	Number int    `json:"number"`
+	Text   string `json:"text"`
+	Target bool   `json:"target"`
 }
 
 func ReadSourceContext(root string, position Position, radius int) (SourceContext, error) {
