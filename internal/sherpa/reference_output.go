@@ -32,7 +32,8 @@ func formatReferences(name string, refs []Reference, contexts []SourceContext) s
 	for index, ref := range refs {
 		fmt.Fprintf(
 			&builder,
-			"  %s:%d\n",
+			"  %-12s %s:%d\n",
+			formatReferenceKind(ref.Kind),
 			ref.Position.File,
 			ref.Position.Line,
 		)
@@ -48,6 +49,14 @@ func formatReferences(name string, refs []Reference, contexts []SourceContext) s
 	fmt.Fprintf(&builder, "Found %d references\n", len(refs))
 
 	return builder.String()
+}
+
+func formatReferenceKind(kind ReferenceKind) string {
+	if kind == "" {
+		return string(ReferenceKindUsage)
+	}
+
+	return string(kind)
 }
 
 func PrintReferences(name string, refs []Reference) {

@@ -90,6 +90,7 @@
     },
     "references": [
       {
+        "kind": "call",
         "name": "Target",
         "position": {
           "file": "service.go",
@@ -97,6 +98,7 @@
         }
       },
       {
+        "kind": "call",
         "name": "Target",
         "position": {
           "file": "service.go",
@@ -104,6 +106,7 @@
         }
       },
       {
+        "kind": "definition",
         "name": "Target",
         "position": {
           "file": "service.go",

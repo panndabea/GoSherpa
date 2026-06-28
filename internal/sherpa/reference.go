@@ -16,8 +16,23 @@ import (
 )
 
 type Reference struct {
-	Name     string   `json:"name"`
-	Position Position `json:"position"`
+	Name     string        `json:"name"`
+	Kind     ReferenceKind `json:"kind,omitempty"`
+	Position Position      `json:"position"`
+}
+
+type ReferenceKind string
+
+const (
+	ReferenceKindDefinition  ReferenceKind = "definition"
+	ReferenceKindCall        ReferenceKind = "call"
+	ReferenceKindTypeUsage   ReferenceKind = "type_usage"
+	ReferenceKindFieldAccess ReferenceKind = "field_access"
+	ReferenceKindUsage       ReferenceKind = "usage"
+)
+
+type ReferenceOptions struct {
+	Kind ReferenceKind
 }
 
 type referenceTarget struct {
@@ -36,6 +51,10 @@ type referencePackage struct {
 }
 
 func FindReferences(root string, name string) ([]Reference, error) {
+	return FindReferencesWithOptions(root, name, ReferenceOptions{})
+}
+
+func FindReferencesWithOptions(root string, name string, options ReferenceOptions) ([]Reference, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return nil, err
@@ -66,6 +85,7 @@ func FindReferences(root string, name string) ([]Reference, error) {
 		refs = append(refs, findReferencesInPackage(rootPath, pkg, target, targetPackages, packageNames)...)
 	}
 
+	refs = filterReferences(refs, options)
 	sortReferences(refs)
 
 	return refs, nil
@@ -126,6 +146,26 @@ func (target referenceTarget) Symbol() string {
 	}
 
 	return target.Receiver + "." + target.Name
+}
+
+func ParseReferenceKind(value string) (ReferenceKind, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+
+	switch normalized {
+	case string(ReferenceKindDefinition), "def":
+		return ReferenceKindDefinition, true
+	case string(ReferenceKindCall):
+		return ReferenceKindCall, true
+	case string(ReferenceKindTypeUsage), "type":
+		return ReferenceKindTypeUsage, true
+	case string(ReferenceKindFieldAccess), "field":
+		return ReferenceKindFieldAccess, true
+	case string(ReferenceKindUsage), "reference":
+		return ReferenceKindUsage, true
+	default:
+		return "", false
+	}
 }
 
 func parseReferencePackages(root string, files []string) ([]referencePackage, error) {
@@ -375,7 +415,7 @@ func findReferencesInPackage(
 	seen := make(map[token.Pos]struct{})
 
 	var refs []Reference
-	addReference := func(pos token.Pos) {
+	addReference := func(pos token.Pos, kind ReferenceKind) {
 		if !pos.IsValid() {
 			return
 		}
@@ -388,6 +428,7 @@ func findReferencesInPackage(
 		position := pkg.FileSet.Position(pos)
 		refs = append(refs, Reference{
 			Name: target.String(),
+			Kind: kind,
 			Position: positionRelativeToRoot(root, Position{
 				File: position.Filename,
 				Line: position.Line,
@@ -397,20 +438,34 @@ func findReferencesInPackage(
 
 	for _, file := range pkg.Files {
 		imports := referenceFileImports(file, packageNames)
+		var stack []ast.Node
 
 		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				stack = stack[:len(stack)-1]
+				return false
+			}
+
+			parent := ast.Node(nil)
+			if len(stack) > 0 {
+				parent = stack[len(stack)-1]
+			}
+			stack = append(stack, node)
+
 			switch node := node.(type) {
 			case *ast.Ident:
-				if referenceObjectMatchesTarget(referenceIdentObject(pkg.Info, node), targetObjects) {
-					addReference(node.Pos())
+				object, definition := referenceIdentObject(pkg.Info, node)
+				if referenceObjectMatchesTarget(object, targetObjects) {
+					addReference(node.Pos(), referenceKindForIdent(object, definition, parent, node))
 				}
 			case *ast.SelectorExpr:
-				if referenceSelectionMatchesTarget(pkg.Info.Selections[node], targetObjects) {
-					addReference(node.Sel.Pos())
+				selection := pkg.Info.Selections[node]
+				if referenceSelectionMatchesTarget(selection, targetObjects) {
+					addReference(node.Sel.Pos(), referenceKindForSelector(selection, parent, node))
 				}
 
 				if referenceSelectorMatchesImportedTarget(pkg.Info, node, target, targetPackages, imports) {
-					addReference(node.Sel.Pos())
+					addReference(node.Sel.Pos(), referenceKindForImportedSelector(parent, node))
 				}
 			}
 
@@ -457,6 +512,7 @@ func addReferenceTargetObjects(objects map[types.Object]struct{}, info types.Inf
 			if target.Receiver == "" && spec.Name.Name == target.Name {
 				addReferenceTargetObject(objects, info.Defs[spec.Name])
 			}
+			addStructFieldReferenceTargetObjects(objects, info, spec, target)
 		case *ast.ValueSpec:
 			if target.Receiver != "" {
 				continue
@@ -466,6 +522,25 @@ func addReferenceTargetObjects(objects map[types.Object]struct{}, info types.Inf
 				if name.Name == target.Name {
 					addReferenceTargetObject(objects, info.Defs[name])
 				}
+			}
+		}
+	}
+}
+
+func addStructFieldReferenceTargetObjects(objects map[types.Object]struct{}, info types.Info, spec *ast.TypeSpec, target referenceTarget) {
+	if target.Receiver == "" || spec.Name.Name != target.Receiver {
+		return
+	}
+
+	structType, ok := spec.Type.(*ast.StructType)
+	if !ok {
+		return
+	}
+
+	for _, field := range structType.Fields.List {
+		for _, name := range field.Names {
+			if name.Name == target.Name {
+				addReferenceTargetObject(objects, info.Defs[name])
 			}
 		}
 	}
@@ -525,12 +600,12 @@ func funcDeclDefinesReferenceTarget(funcDecl *ast.FuncDecl, target referenceTarg
 	return receiver == target.Receiver
 }
 
-func referenceIdentObject(info types.Info, ident *ast.Ident) types.Object {
+func referenceIdentObject(info types.Info, ident *ast.Ident) (types.Object, bool) {
 	if object := info.Defs[ident]; object != nil {
-		return object
+		return object, true
 	}
 
-	return info.Uses[ident]
+	return info.Uses[ident], false
 }
 
 func referenceObjectMatchesTarget(object types.Object, targetObjects map[types.Object]struct{}) bool {
@@ -548,6 +623,78 @@ func referenceSelectionMatchesTarget(selection *types.Selection, targetObjects m
 	}
 
 	return referenceObjectMatchesTarget(selection.Obj(), targetObjects)
+}
+
+func referenceKindForIdent(object types.Object, definition bool, parent ast.Node, ident *ast.Ident) ReferenceKind {
+	if definition {
+		return ReferenceKindDefinition
+	}
+
+	if _, ok := object.(*types.TypeName); ok {
+		return ReferenceKindTypeUsage
+	}
+
+	if referenceNodeIsCall(parent, ident) {
+		return ReferenceKindCall
+	}
+
+	return ReferenceKindUsage
+}
+
+func referenceKindForSelector(selection *types.Selection, parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
+	if selection != nil && selection.Kind() == types.FieldVal {
+		return ReferenceKindFieldAccess
+	}
+
+	if referenceNodeIsTypeUsage(parent, selector) {
+		return ReferenceKindTypeUsage
+	}
+
+	if referenceNodeIsCall(parent, selector) {
+		return ReferenceKindCall
+	}
+
+	return ReferenceKindUsage
+}
+
+func referenceKindForImportedSelector(parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
+	if referenceNodeIsTypeUsage(parent, selector) {
+		return ReferenceKindTypeUsage
+	}
+
+	if referenceNodeIsCall(parent, selector) {
+		return ReferenceKindCall
+	}
+
+	return ReferenceKindUsage
+}
+
+func referenceNodeIsCall(parent ast.Node, expr ast.Expr) bool {
+	call, ok := parent.(*ast.CallExpr)
+	return ok && call.Fun == expr
+}
+
+func referenceNodeIsTypeUsage(parent ast.Node, expr ast.Expr) bool {
+	switch parent := parent.(type) {
+	case *ast.ArrayType:
+		return parent.Elt == expr
+	case *ast.ChanType:
+		return parent.Value == expr
+	case *ast.CompositeLit:
+		return parent.Type == expr
+	case *ast.Field:
+		return parent.Type == expr
+	case *ast.MapType:
+		return parent.Key == expr || parent.Value == expr
+	case *ast.TypeAssertExpr:
+		return parent.Type == expr
+	case *ast.TypeSpec:
+		return parent.Type == expr
+	case *ast.ValueSpec:
+		return parent.Type == expr
+	default:
+		return false
+	}
 }
 
 func referenceFileImports(file *ast.File, packageNames map[string]string) map[string]string {
@@ -611,6 +758,21 @@ func referenceSelectorMatchesImportedTarget(
 	return importedPackage.Imported().Path() == importPath
 }
 
+func filterReferences(refs []Reference, options ReferenceOptions) []Reference {
+	if options.Kind == "" {
+		return refs
+	}
+
+	filtered := refs[:0]
+	for _, ref := range refs {
+		if ref.Kind == options.Kind {
+			filtered = append(filtered, ref)
+		}
+	}
+
+	return filtered
+}
+
 func sortReferences(refs []Reference) {
 	sort.Slice(refs, func(i int, j int) bool {
 		if refs[i].Position.File != refs[j].Position.File {
@@ -619,6 +781,10 @@ func sortReferences(refs []Reference) {
 
 		if refs[i].Position.Line != refs[j].Position.Line {
 			return refs[i].Position.Line < refs[j].Position.Line
+		}
+
+		if refs[i].Kind != refs[j].Kind {
+			return refs[i].Kind < refs[j].Kind
 		}
 
 		return refs[i].Name < refs[j].Name

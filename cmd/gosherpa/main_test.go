@@ -386,6 +386,27 @@ func TestParseCLIArgsAcceptsSearchFilters(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsRefsKindFilter(t *testing.T) {
+	got, err := parseCLIArgs([]string{"refs", "ParseFile", "--kind", "call"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Command != "refs" {
+		t.Fatalf("expected command refs, got %s", got.Command)
+	}
+
+	assertMainTestStrings(t, got.CommandArgs, []string{"ParseFile"})
+
+	if got.ReferenceKind != sherpa.ReferenceKindCall {
+		t.Fatalf("expected call reference kind, got %s", got.ReferenceKind)
+	}
+
+	if !got.HasKindOption {
+		t.Fatal("expected kind option marker")
+	}
+}
+
 func TestParseCLIArgsRejectsInvalidSearchFilters(t *testing.T) {
 	tests := [][]string{
 		{"search", "user", "--kind"},
@@ -393,6 +414,23 @@ func TestParseCLIArgsRejectsInvalidSearchFilters(t *testing.T) {
 		{"search", "user", "--kind", "package"},
 		{"search", "user", "--package"},
 		{"search", "user", "--package="},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestParseCLIArgsRejectsInvalidRefsKindFilters(t *testing.T) {
+	tests := [][]string{
+		{"refs", "ParseFile", "--kind"},
+		{"refs", "ParseFile", "--kind="},
+		{"refs", "ParseFile", "--kind", "function"},
 	}
 
 	for _, test := range tests {
@@ -955,7 +993,7 @@ func TestMainRejectsSearchFilterFlagsForOtherCommands(t *testing.T) {
 				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 			}
 
-			if !strings.Contains(result.Stderr, "error: --kind and --package are only supported by search") {
+			if !strings.Contains(result.Stderr, "only supported") {
 				t.Fatalf("expected search filter flag error, got:\n%s", result.Stderr)
 			}
 
@@ -2696,7 +2734,7 @@ func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "refs"})
 
-	want := "usage: gosherpa [--root <path>] refs <name> [--context]\n"
+	want := "usage: gosherpa [--root <path>] refs <name> [--kind <kind>] [--context]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -3093,7 +3131,7 @@ func Run() {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"REFERENCES", "ParseFile", "internal/service/service.go", "Found 2 references"} {
+	for _, want := range []string{"REFERENCES", "ParseFile", "definition", "call", "internal/service/service.go", "Found 2 references"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -3101,6 +3139,41 @@ func Run() {
 
 	if strings.Contains(result.Stdout, tmp) {
 		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsRefsCommandWithKindFilter(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func ParseFile() {
+}
+
+func Run() {
+	ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "refs", "ParseFile", "--kind", "call", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"REFERENCES", "ParseFile", "call", "internal/service/service.go:7", "Found 1 references"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, "definition") {
+		t.Fatalf("expected filtered output to omit definition, got:\n%s", result.Stdout)
 	}
 }
 
@@ -3130,9 +3203,9 @@ func Run() {
 
 	for _, want := range []string{
 		"REFERENCES",
-		"internal/service/service.go:3",
+		"definition   internal/service/service.go:3",
 		"> 3 | func ParseFile() {",
-		"internal/service/service.go:7",
+		"call         internal/service/service.go:7",
 		"> 7 | \tParseFile()",
 		"Found 2 references",
 	} {
@@ -3173,7 +3246,21 @@ func Run() {
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "refs", "ParseFile", "example.com/app")
 
-	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	references := assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	firstReference, ok := references[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first reference object, got %#v", references[0])
+	}
+	if firstReference["kind"] != string(sherpa.ReferenceKindDefinition) {
+		t.Fatalf("expected first reference kind definition, got %#v", firstReference["kind"])
+	}
+	secondReference, ok := references[1].(map[string]any)
+	if !ok {
+		t.Fatalf("expected second reference object, got %#v", references[1])
+	}
+	if secondReference["kind"] != string(sherpa.ReferenceKindCall) {
+		t.Fatalf("expected second reference kind call, got %#v", secondReference["kind"])
+	}
 
 	if strings.Contains(result.Stdout, "REFERENCES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)

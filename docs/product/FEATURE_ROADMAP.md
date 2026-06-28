@@ -112,6 +112,8 @@ Implemented:
 - Package-qualified symbol impact for references and affected tests.
 - Transitive caller impact for symbol changes.
 - Affected-test planning for transitive caller packages.
+- Reference kind classification for definitions, calls, type usages, field
+  accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
 
 Current limitations:
 
@@ -469,6 +471,9 @@ Done when:
 
 ### 2.2 Reference Kinds
 
+Status: first slice implemented for `gosherpa refs` and shared JSON reference
+payloads.
+
 Human question:
 
 ```text
@@ -497,7 +502,9 @@ Reference kinds:
 
 MVP:
 
-- Start with definition, call, type usage, field access, and import.
+- Start with definition, call, type usage, field access, and import. First
+  slice implemented for definition, call, type usage, field access, and
+  fallback usage.
 - Add read/write classification later.
 
 Done when:

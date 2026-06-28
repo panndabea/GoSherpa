@@ -34,6 +34,8 @@ func Run() {
 	if len(refs) != 2 {
 		t.Fatalf("expected 2 references, got %d", len(refs))
 	}
+
+	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindDefinition, ReferenceKindCall})
 }
 
 func TestFindReferencesReturnsRootRelativeFilePositions(t *testing.T) {
@@ -125,6 +127,12 @@ func Run(server Server) Server {
 	if len(refs) != 3 {
 		t.Fatalf("expected 3 references, got %d: %v", len(refs), refs)
 	}
+
+	assertReferenceKinds(t, refs, []ReferenceKind{
+		ReferenceKindDefinition,
+		ReferenceKindTypeUsage,
+		ReferenceKindTypeUsage,
+	})
 }
 
 func TestFindReferencesFindsMethodReferences(t *testing.T) {
@@ -148,6 +156,59 @@ func Run(server Server) {
 
 	if len(refs) != 2 {
 		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+
+	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindDefinition, ReferenceKindCall})
+}
+
+func TestFindReferencesFindsFieldAccessReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct {
+	Name string
+}
+
+func Run(server Server) string {
+	return server.Name
+}
+`)
+
+	refs, err := FindReferences(tmp, "Server.Name")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+
+	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindDefinition, ReferenceKindFieldAccess})
+}
+
+func TestFindReferencesFiltersByKind(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func ParseFile() {}
+
+func Run() {
+	ParseFile()
+}
+`)
+
+	refs, err := FindReferencesWithOptions(tmp, "ParseFile", ReferenceOptions{Kind: ReferenceKindCall})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 1 {
+		t.Fatalf("expected 1 reference, got %d: %v", len(refs), refs)
+	}
+	if refs[0].Kind != ReferenceKindCall {
+		t.Fatalf("expected call reference, got %s", refs[0].Kind)
 	}
 }
 
@@ -180,6 +241,7 @@ func Run() {
 	files := referenceTestFiles(refs)
 	assertContainsString(t, files, "internal/parser/parser.go")
 	assertContainsString(t, files, "cmd/app/main.go")
+	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindCall, ReferenceKindDefinition})
 }
 
 func TestFindReferencesHonorsPackageQualifiedTargets(t *testing.T) {
@@ -276,4 +338,23 @@ func referenceTestFiles(refs []Reference) []string {
 	}
 
 	return files
+}
+
+func assertReferenceKinds(t *testing.T, refs []Reference, want []ReferenceKind) {
+	t.Helper()
+
+	var got []ReferenceKind
+	for _, ref := range refs {
+		got = append(got, ref.Kind)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected kinds %v, got %v", want, got)
+	}
+
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("expected kinds %v, got %v", want, got)
+		}
+	}
 }

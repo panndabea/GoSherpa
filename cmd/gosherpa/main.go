@@ -38,7 +38,9 @@ type cliInvocation struct {
 	HasTestsOption    bool
 	ShowContext       bool
 	HasContextOption  bool
+	KindFilter        string
 	SearchKind        sherpa.SymbolKind
+	ReferenceKind     sherpa.ReferenceKind
 	HasKindOption     bool
 	SearchPackage     string
 	HasPackageOption  bool
@@ -239,24 +241,24 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 		}
 
 		if arg == "--kind" {
-			value, err := parseSymbolKindFlagValue("--kind", args, i)
+			value, err := parseStringFlagValue("--kind", args, i)
 			if err != nil {
 				return cliInvocation{}, err
 			}
 
-			invocation.SearchKind = value
+			invocation.KindFilter = value
 			invocation.HasKindOption = true
 			i++
 			continue
 		}
 
 		if strings.HasPrefix(arg, "--kind=") {
-			value, err := parseSymbolKindFlag("--kind", strings.TrimPrefix(arg, "--kind="))
+			value, err := parseStringFlag("--kind", strings.TrimPrefix(arg, "--kind="))
 			if err != nil {
 				return cliInvocation{}, err
 			}
 
-			invocation.SearchKind = value
+			invocation.KindFilter = value
 			invocation.HasKindOption = true
 			continue
 		}
@@ -349,6 +351,12 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 		invocation.CommandArgs = positionals[1:]
 	}
 
+	if invocation.HasKindOption {
+		if err := parseKindFilter(&invocation); err != nil {
+			return cliInvocation{}, err
+		}
+	}
+
 	return invocation, nil
 }
 
@@ -391,12 +399,23 @@ func parsePositiveInteger(flag string, value string) (int, error) {
 	return parsed, nil
 }
 
-func parseSymbolKindFlagValue(flag string, args []string, index int) (sherpa.SymbolKind, error) {
-	if index+1 >= len(args) {
-		return "", fmt.Errorf("missing value for %s", flag)
+func parseKindFilter(invocation *cliInvocation) error {
+	switch invocation.Command {
+	case "search":
+		kind, err := parseSymbolKindFlag("--kind", invocation.KindFilter)
+		if err != nil {
+			return err
+		}
+		invocation.SearchKind = kind
+	case "refs":
+		kind, err := parseReferenceKindFlag("--kind", invocation.KindFilter)
+		if err != nil {
+			return err
+		}
+		invocation.ReferenceKind = kind
 	}
 
-	return parseSymbolKindFlag(flag, args[index+1])
+	return nil
 }
 
 func parseSymbolKindFlag(flag string, value string) (sherpa.SymbolKind, error) {
@@ -420,6 +439,19 @@ func isSupportedSearchKind(kind sherpa.SymbolKind) bool {
 	default:
 		return false
 	}
+}
+
+func parseReferenceKindFlag(flag string, value string) (sherpa.ReferenceKind, error) {
+	trimmed, err := parseStringFlag(flag, value)
+	if err != nil {
+		return "", err
+	}
+
+	if kind, ok := sherpa.ParseReferenceKind(trimmed); ok {
+		return kind, nil
+	}
+
+	return "", fmt.Errorf("invalid value for %s: %s", flag, trimmed)
 }
 
 func main() {
@@ -448,8 +480,13 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if (invocation.HasKindOption || invocation.HasPackageOption) && invocation.Command != "search" {
-		fmt.Fprintln(stderr, "error: --kind and --package are only supported by search")
+	if invocation.HasPackageOption && invocation.Command != "search" {
+		fmt.Fprintln(stderr, "error: --package is only supported by search")
+		return exitUsage
+	}
+
+	if invocation.HasKindOption && invocation.Command != "search" && invocation.Command != "refs" {
+		fmt.Fprintln(stderr, "error: --kind is only supported by search and refs")
 		return exitUsage
 	}
 
@@ -751,7 +788,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	case "refs":
 		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name> [--context]")
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name> [--kind <kind>] [--context]")
 			return exitUsage
 		}
 
@@ -762,7 +799,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		name := invocation.CommandArgs[0]
 
-		refs, err := sherpa.FindReferences(root, name)
+		refs, err := sherpa.FindReferencesWithOptions(root, name, sherpa.ReferenceOptions{
+			Kind: invocation.ReferenceKind,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "refs", name, stderr, err)
 		}
@@ -1674,7 +1713,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
 	fmt.Fprintln(writer, "  search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
-	fmt.Fprintln(writer, "  refs <name> [--context]")
+	fmt.Fprintln(writer, "  refs <name> [--kind <kind>] [--context]")
 	fmt.Fprintln(writer, "  impact <symbol-or-package>")
 	fmt.Fprintln(writer, "  impact file <file>")
 	fmt.Fprintln(writer, "  impact package <package>")

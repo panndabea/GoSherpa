@@ -6,6 +6,7 @@ func TestFormatReferences(t *testing.T) {
 	refs := []Reference{
 		{
 			Name: "ParseFile",
+			Kind: ReferenceKindDefinition,
 			Position: Position{
 				File: "internal/sherpa/parse.go",
 				Line: 11,
@@ -13,6 +14,7 @@ func TestFormatReferences(t *testing.T) {
 		},
 		{
 			Name: "ParseFile",
+			Kind: ReferenceKindCall,
 			Position: Position{
 				File: "internal/sherpa/repository.go",
 				Line: 8,
@@ -25,8 +27,8 @@ func TestFormatReferences(t *testing.T) {
 
 ParseFile
 
-  internal/sherpa/parse.go:11
-  internal/sherpa/repository.go:8
+  definition   internal/sherpa/parse.go:11
+  call         internal/sherpa/repository.go:8
 
 Found 2 references
 `
@@ -40,6 +42,7 @@ func TestFormatReferencesWithContext(t *testing.T) {
 	refs := []Reference{
 		{
 			Name: "Run",
+			Kind: ReferenceKindDefinition,
 			Position: Position{
 				File: "service.go",
 				Line: 3,
@@ -47,6 +50,7 @@ func TestFormatReferencesWithContext(t *testing.T) {
 		},
 		{
 			Name: "Run",
+			Kind: ReferenceKindCall,
 			Position: Position{
 				File: "service.go",
 				Line: 7,
@@ -75,12 +79,12 @@ func TestFormatReferencesWithContext(t *testing.T) {
 
 Run
 
-  service.go:3
+  definition   service.go:3
       2 | func helper() {}
     > 3 | func Run() {
       4 | }
 
-  service.go:7
+  call         service.go:7
       6 | func caller() {
     > 7 | 	Run()
       8 | }

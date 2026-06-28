@@ -50,7 +50,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, affected packages/tests, reading order, confidence, and limitations |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
-| Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
+| Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
@@ -111,6 +111,7 @@ Then explore the repository:
 ./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json
 ./gosherpa refs ParseFile
+./gosherpa refs ParseFile --kind call
 ./gosherpa refs ParseFile --json
 ./gosherpa impact ParseFile
 ./gosherpa impact ParseFile --json
@@ -246,6 +247,7 @@ Implemented:
 - Package-qualified symbol impact for references and affected tests
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
+- Reference kind classification and `gosherpa refs --kind <kind>` filtering
 
 Release notes:
 
