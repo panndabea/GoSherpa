@@ -1,0 +1,342 @@
+package agentcontext
+
+import (
+	"fmt"
+	"go/parser"
+	"go/token"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
+	"github.com/supertabaluga/gosherpa/internal/sherpa"
+)
+
+type FileAnalyzeOptions struct {
+	IncludeTests bool `json:"includeTests"`
+	SourceRadius int  `json:"sourceRadius"`
+}
+
+type FileReport struct {
+	Target                  string                      `json:"target"`
+	File                    string                      `json:"file"`
+	Package                 string                      `json:"package"`
+	PackageName             string                      `json:"packageName,omitempty"`
+	Symbols                 []sherpa.Symbol             `json:"symbols"`
+	SourceContexts          []sherpa.SourceContext      `json:"sourceContexts"`
+	Purpose                 string                      `json:"purpose"`
+	Risk                    explainengine.RiskSummary   `json:"risk"`
+	AffectedPackages        []string                    `json:"affectedPackages"`
+	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
+	AffectedImplementations []string                    `json:"affectedImplementations"`
+	AffectedTests           []impactengine.RelatedTest  `json:"affectedTests"`
+	TestCommands            []string                    `json:"testCommands"`
+	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
+	AnalysisMode            string                      `json:"analysisMode"`
+	Confidence              string                      `json:"confidence"`
+	Limitations             []string                    `json:"limitations"`
+	Warnings                []string                    `json:"-"`
+}
+
+func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileReport, error) {
+	file, err := normalizeFileTarget(root, target)
+	if err != nil {
+		return FileReport{}, err
+	}
+
+	impactReport, err := impactengine.AnalyzeFile(root, file)
+	if err != nil {
+		return FileReport{}, err
+	}
+
+	packageName, err := filePackageName(root, file)
+	if err != nil {
+		return FileReport{}, err
+	}
+
+	allSymbols, err := sherpa.ParseRepository(root)
+	if err != nil {
+		return FileReport{}, err
+	}
+	symbols := symbolsInFile(allSymbols, file)
+
+	radius := options.SourceRadius
+	if radius == 0 {
+		radius = sherpa.DefaultSourceContextRadius
+	}
+
+	warnings := append([]string{}, impactReport.Warnings...)
+	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
+	if err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	report := FileReport{
+		Target:                  file,
+		File:                    file,
+		Package:                 firstString(impactReport.ChangedPackages),
+		PackageName:             packageName,
+		Symbols:                 symbols,
+		SourceContexts:          sourceContexts,
+		AffectedPackages:        impactReport.AffectedPackages,
+		AffectedInterfaces:      impactReport.AffectedInterfaces,
+		AffectedImplementations: impactReport.AffectedImplementations,
+		AffectedTests:           impactReport.AffectedTests,
+		TestCommands:            impactReport.TestCommands,
+		AnalysisMode:            AnalysisModeAST,
+		Warnings:                warnings,
+	}
+	report.Purpose = filePurpose(report)
+	report.Risk = fileRiskSummary(report)
+	report.ReadingOrder = fileReadingOrder(report)
+	report.Limitations = fileLimitations(options.IncludeTests)
+	report.Confidence = fileConfidence(report)
+
+	return normalizeFileReport(report), nil
+}
+
+func normalizeFileTarget(root string, target string) (string, error) {
+	value := strings.TrimSpace(target)
+	if value == "" {
+		return "", fmt.Errorf("file path is empty")
+	}
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("absolute file paths are not supported: %s", target)
+	}
+
+	value = path.Clean(filepath.ToSlash(value))
+	if value == "." || path.IsAbs(value) || value == ".." || strings.HasPrefix(value, "../") {
+		return "", fmt.Errorf("context file target must be a repository-local Go file: %s", target)
+	}
+	if path.Ext(value) != ".go" {
+		return "", fmt.Errorf("context file target must be a repository-local Go file: %s", target)
+	}
+
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve repository root %s: %w", root, err)
+	}
+
+	filePath := filepath.Join(rootPath, filepath.FromSlash(value))
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("context file target not found: %s", value)
+		}
+		return "", fmt.Errorf("stat context file %s: %w", value, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("context file target is a directory: %s", value)
+	}
+
+	return value, nil
+}
+
+func filePackageName(root string, file string) (string, error) {
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve repository root %s: %w", root, err)
+	}
+
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, filepath.Join(rootPath, filepath.FromSlash(file)), nil, parser.PackageClauseOnly)
+	if err != nil {
+		return "", fmt.Errorf("parse package clause %s: %w", file, err)
+	}
+	if parsed.Name == nil {
+		return "", fmt.Errorf("parse package clause %s: missing package name", file)
+	}
+
+	return parsed.Name.Name, nil
+}
+
+func symbolsInFile(symbols []sherpa.Symbol, file string) []sherpa.Symbol {
+	var result []sherpa.Symbol
+	for _, symbol := range symbols {
+		if symbol.Position.File == file {
+			result = append(result, symbol)
+		}
+	}
+
+	sort.SliceStable(result, func(i int, j int) bool {
+		if result[i].Position.Line != result[j].Position.Line {
+			return result[i].Position.Line < result[j].Position.Line
+		}
+		if result[i].Position.Column != result[j].Position.Column {
+			return result[i].Position.Column < result[j].Position.Column
+		}
+
+		return result[i].DisplayName() < result[j].DisplayName()
+	})
+
+	return result
+}
+
+func sourceContextsForSymbols(root string, symbols []sherpa.Symbol, radius int) ([]sherpa.SourceContext, error) {
+	if len(symbols) == 0 {
+		return []sherpa.SourceContext{}, nil
+	}
+
+	positions := make([]sherpa.Position, 0, len(symbols))
+	for _, symbol := range symbols {
+		positions = append(positions, symbol.Position)
+	}
+
+	return sherpa.ReadSourceContexts(root, positions, radius)
+}
+
+func filePurpose(report FileReport) string {
+	if report.Package == "" {
+		return fmt.Sprintf("File %s could not be mapped to a repository-local Go package.", report.File)
+	}
+	if len(report.Symbols) == 0 {
+		return fmt.Sprintf(
+			"File %s belongs to package %s; no supported top-level symbols were found.",
+			report.File,
+			report.Package,
+		)
+	}
+
+	return fmt.Sprintf(
+		"File %s declares %s in package %s; impact analysis reaches %s and %s.",
+		report.File,
+		countNoun(len(report.Symbols), "supported symbol"),
+		report.Package,
+		countNoun(len(report.AffectedPackages), "package"),
+		countNoun(len(report.AffectedTests), "affected test"),
+	)
+}
+
+func fileRiskSummary(report FileReport) explainengine.RiskSummary {
+	score := 0
+	var reasons []string
+
+	if len(report.Symbols) == 0 {
+		reasons = append(reasons, "No supported top-level symbols found in the file.")
+	} else {
+		reasons = append(reasons, fmt.Sprintf("File declares %d supported symbols.", len(report.Symbols)))
+		if len(report.Symbols) > 5 {
+			score += 2
+		} else if len(report.Symbols) > 2 {
+			score++
+		}
+	}
+
+	if len(report.AffectedPackages) > 1 {
+		score += 2
+		reasons = append(reasons, fmt.Sprintf("Impact reaches %d packages.", len(report.AffectedPackages)))
+	} else if len(report.AffectedPackages) == 1 {
+		score++
+		reasons = append(reasons, "Impact stays within 1 package.")
+	}
+
+	interfaceSignals := len(report.AffectedInterfaces) + len(report.AffectedImplementations)
+	if interfaceSignals > 0 {
+		score += 2
+		reasons = append(reasons, fmt.Sprintf("Touches %d interface or implementation signals.", interfaceSignals))
+	}
+
+	if len(report.AffectedTests) == 0 && report.Package != "" {
+		score++
+		reasons = append(reasons, "No affected tests found.")
+	} else if len(report.AffectedTests) > 0 {
+		reasons = append(reasons, fmt.Sprintf("Affected tests found: %d.", len(report.AffectedTests)))
+	}
+
+	level := "low"
+	if score >= 5 {
+		level = "high"
+	} else if score >= 2 {
+		level = "medium"
+	}
+
+	return explainengine.RiskSummary{
+		Level:   level,
+		Reasons: uniqueStrings(reasons),
+	}
+}
+
+func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
+	steps := []explainengine.ReadingStep{
+		{
+			Title:  "File: " + report.File,
+			Reason: "Start with the target file and its package-level shape.",
+			Position: sherpa.Position{
+				File: report.File,
+				Line: 1,
+			},
+		},
+	}
+
+	for _, symbol := range report.Symbols {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Symbol: " + symbol.DisplayName(),
+			Reason:   "Inspect the symbols declared in the target file.",
+			Position: symbol.Position,
+		})
+	}
+
+	for _, test := range report.AffectedTests {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Test: " + test.Name,
+			Reason:   "Check expected behavior and regression coverage.",
+			Position: test.Position,
+		})
+	}
+
+	return steps
+}
+
+func fileLimitations(includeTests bool) []string {
+	values := []string{
+		"File context uses package-level impact for affected packages and tests.",
+		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
+		"Analysis uses syntax plus local type information, not full module loading.",
+		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Test discovery uses same-package tests and syntactic direct-reference matching.",
+	}
+
+	if includeTests {
+		values = append(values, "--tests is accepted for workflow symmetry; file context always includes affected tests from impact analysis.")
+	}
+
+	return values
+}
+
+func fileConfidence(report FileReport) string {
+	if len(report.Warnings) > 0 || report.File == "" || report.Package == "" {
+		return ConfidenceLow
+	}
+
+	return ConfidenceMedium
+}
+
+func normalizeFileReport(report FileReport) FileReport {
+	report.Symbols = nonNilSlice(report.Symbols)
+	report.SourceContexts = nonNilSlice(report.SourceContexts)
+	for i := range report.SourceContexts {
+		report.SourceContexts[i].Lines = nonNilSlice(report.SourceContexts[i].Lines)
+	}
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.AffectedTests = nonNilSlice(report.AffectedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+
+	return values[0]
+}

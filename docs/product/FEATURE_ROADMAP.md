@@ -69,6 +69,9 @@ Implemented:
 - Initial `gosherpa context symbol <target>` export with disambiguated symbol
   identity, source excerpt, references, callers, callees, impact signals,
   related tests, suggested commands, confidence, limitations, and JSON output.
+- Initial `gosherpa context file <file>` export with file symbols, source
+  excerpts, affected packages, affected tests, suggested commands, reading
+  order, confidence, limitations, and JSON output.
 - Initial `gosherpa context diff --base <ref>` export with changed files,
   changed packages, changed symbols, affected packages, affected tests, reading
   order, confidence, limitations, and JSON output.
@@ -136,8 +139,8 @@ Current limitations:
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
   first-class.
-- Context export currently supports symbol and diff targets; file and package
-  context exports remain future work.
+- Context export currently supports symbol, file, and diff targets; package
+  context export remains future work.
 
 ## Roadmap Overview
 

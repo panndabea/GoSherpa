@@ -44,6 +44,39 @@ func Format(report Report) string {
 	return builder.String()
 }
 
+func FormatFile(report FileReport) string {
+	var builder strings.Builder
+
+	builder.WriteString("CONTEXT FILE\n")
+	builder.WriteString("\n")
+	writeFileTarget(&builder, report)
+	builder.WriteString("\n")
+	writePurpose(&builder, report.Purpose)
+	builder.WriteString("\n")
+	writeFileAnalysis(&builder, report)
+	builder.WriteString("\n")
+	writeFileSymbols(&builder, report.Symbols)
+	builder.WriteString("\n")
+	writeFileSourceContexts(&builder, report.Symbols, report.SourceContexts)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED PACKAGES", report.AffectedPackages)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED INTERFACES", report.AffectedInterfaces)
+	builder.WriteString("\n")
+	writeValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
+	builder.WriteString("\n")
+	writeAffectedTests(&builder, report.AffectedTests)
+	builder.WriteString("\n")
+	writeValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	builder.WriteString("\n")
+	writeReadingOrder(&builder, report.ReadingOrder)
+	builder.WriteString("\n")
+	writeValues(&builder, "LIMITATIONS", report.Limitations)
+	writeWarnings(&builder, report.Warnings)
+
+	return builder.String()
+}
+
 func writeTarget(builder *strings.Builder, report Report) {
 	builder.WriteString("TARGET\n")
 	fmt.Fprintf(builder, "  %s (%s)\n", report.Identity.Target, report.Identity.Kind)
@@ -55,6 +88,21 @@ func writeTarget(builder *strings.Builder, report Report) {
 	}
 	if report.Identity.Signature != "" {
 		fmt.Fprintf(builder, "  Signature: %s\n", report.Identity.Signature)
+	}
+}
+
+func writeFileTarget(builder *strings.Builder, report FileReport) {
+	builder.WriteString("FILE\n")
+	if strings.TrimSpace(report.File) == "" {
+		builder.WriteString("  unknown\n")
+	} else {
+		fmt.Fprintf(builder, "  %s\n", report.File)
+	}
+	if report.Package != "" {
+		fmt.Fprintf(builder, "  Package: %s\n", report.Package)
+	}
+	if report.PackageName != "" {
+		fmt.Fprintf(builder, "  Package name: %s\n", report.PackageName)
 	}
 }
 
@@ -115,6 +163,27 @@ func writeAnalysis(builder *strings.Builder, report Report) {
 	}
 }
 
+func writeFileAnalysis(builder *strings.Builder, report FileReport) {
+	builder.WriteString("ANALYSIS\n")
+	mode := strings.TrimSpace(report.AnalysisMode)
+	if mode == "" {
+		mode = "unknown"
+	}
+	confidence := strings.TrimSpace(report.Confidence)
+	if confidence == "" {
+		confidence = "unknown"
+	}
+
+	fmt.Fprintf(builder, "  Mode: %s\n", mode)
+	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
+	if report.Risk.Level != "" {
+		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
+	}
+	for _, reason := range report.Risk.Reasons {
+		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
+}
+
 func writeCallers(builder *strings.Builder, callers []sherpa.Caller) {
 	builder.WriteString("CALLED BY\n")
 	if len(callers) == 0 {
@@ -136,6 +205,46 @@ func writeCallees(builder *strings.Builder, callees []sherpa.Callee) {
 
 	for _, callee := range callees {
 		fmt.Fprintf(builder, "  %-36s %s:%d\n", callee.Name, callee.Position.File, callee.Position.Line)
+	}
+}
+
+func writeFileSymbols(builder *strings.Builder, symbols []sherpa.Symbol) {
+	builder.WriteString("FILE SYMBOLS\n")
+	if len(symbols) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for _, symbol := range symbols {
+		fmt.Fprintf(
+			builder,
+			"  %-10s %-36s %s:%d\n",
+			symbol.Kind,
+			symbol.DisplayName(),
+			symbol.Position.File,
+			symbol.Position.Line,
+		)
+	}
+}
+
+func writeFileSourceContexts(builder *strings.Builder, symbols []sherpa.Symbol, contexts []sherpa.SourceContext) {
+	builder.WriteString("SOURCE\n")
+	if len(contexts) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for index, context := range contexts {
+		title := context.Position.File
+		if context.Position.Line > 0 {
+			title = fmt.Sprintf("%s:%d", context.Position.File, context.Position.Line)
+		}
+		if index < len(symbols) {
+			title = fmt.Sprintf("%s %s", symbols[index].DisplayName(), title)
+		}
+
+		fmt.Fprintf(builder, "  %s\n", title)
+		builder.WriteString(sherpa.FormatSourceContext(context, "    "))
 	}
 }
 

@@ -518,6 +518,38 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			fmt.Fprint(stdout, agentcontext.Format(report))
 			return exitSuccess
+		case "file":
+			if len(invocation.CommandArgs) != 2 {
+				printContextFileUsage(stderr)
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			target := invocation.CommandArgs[1]
+			report, err := agentcontext.AnalyzeFile(root, target, agentcontext.FileAnalyzeOptions{
+				IncludeTests: invocation.IncludeTests,
+			})
+			if err != nil {
+				return writeCommandError(invocation.JSON, root, "context file", target, stderr, err)
+			}
+
+			if invocation.JSON {
+				normalizedReport := contextFileJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"context file",
+					normalizedReport.Target,
+					normalizedReport.Warnings,
+					normalizedReport,
+				))
+			}
+
+			fmt.Fprint(stdout, agentcontext.FormatFile(report))
+			return exitSuccess
 		case "diff":
 			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
 				printContextDiffUsage(stderr)
@@ -1458,6 +1490,25 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	return report
 }
 
+func contextFileJSONResult(report agentcontext.FileReport) agentcontext.FileReport {
+	report.Symbols = nonNilSlice(report.Symbols)
+	report.SourceContexts = nonNilSlice(report.SourceContexts)
+	for i := range report.SourceContexts {
+		report.SourceContexts[i].Lines = nonNilSlice(report.SourceContexts[i].Lines)
+	}
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.AffectedTests = nonNilSlice(report.AffectedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
 func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffReport {
 	report.ChangedFiles = nonNilSlice(report.ChangedFiles)
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
@@ -1564,6 +1615,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  context symbol <target> [--tests]")
+	fmt.Fprintln(writer, "  context file <file> [--tests]")
 	fmt.Fprintln(writer, "  context diff --base <ref> [--tests]")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
@@ -1588,11 +1640,16 @@ func printUsage(writer io.Writer) {
 
 func printContextUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests]")
 	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests]")
 }
 
 func printContextSymbolUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+}
+
+func printContextFileUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests]")
 }
 
 func printContextDiffUsage(writer io.Writer) {

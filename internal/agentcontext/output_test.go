@@ -99,6 +99,95 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestFormatFile(t *testing.T) {
+	report := FileReport{
+		Target:      "service.go",
+		File:        "service.go",
+		Package:     ".",
+		PackageName: "app",
+		Symbols: []sherpa.Symbol{
+			{
+				Name:      "Target",
+				Kind:      sherpa.SymbolKindFunction,
+				Package:   ".",
+				Signature: "func Target()",
+				Position:  sherpa.Position{File: "service.go", Line: 7},
+			},
+		},
+		SourceContexts: []sherpa.SourceContext{
+			{
+				Position: sherpa.Position{File: "service.go", Line: 7},
+				Lines: []sherpa.SourceContextLine{
+					{Number: 6, Text: "// Target handles the main service step."},
+					{Number: 7, Text: "func Target() {", Target: true},
+					{Number: 8, Text: "\tHelper()"},
+				},
+			},
+		},
+		Purpose: "File service.go declares 1 supported symbol in package .",
+		Risk: explainengine.RiskSummary{
+			Level: "medium",
+			Reasons: []string{
+				"Impact reaches 2 packages.",
+			},
+		},
+		AffectedPackages: []string{".", "./internal/api"},
+		AffectedTests: []sherpa.RelatedTest{
+			{Name: "TestTarget", Position: sherpa.Position{File: "service_test.go", Line: 5}},
+		},
+		TestCommands: []string{"go test ."},
+		ReadingOrder: []explainengine.ReadingStep{
+			{
+				Title:  "File: service.go",
+				Reason: "Start with the target file.",
+				Position: sherpa.Position{
+					File: "service.go",
+					Line: 1,
+				},
+			},
+		},
+		AnalysisMode: AnalysisModeAST,
+		Confidence:   ConfidenceMedium,
+		Limitations: []string{
+			"File context uses package-level impact for affected packages and tests.",
+		},
+	}
+
+	output := FormatFile(report)
+	for _, want := range []string{
+		"CONTEXT FILE",
+		"FILE",
+		"service.go",
+		"Package: .",
+		"Package name: app",
+		"PURPOSE",
+		"declares 1 supported symbol",
+		"ANALYSIS",
+		"Mode: ast",
+		"Confidence: medium",
+		"Risk: medium",
+		"Impact reaches 2 packages.",
+		"FILE SYMBOLS",
+		"Target",
+		"SOURCE",
+		"> 7 | func Target() {",
+		"AFFECTED PACKAGES",
+		"./internal/api",
+		"AFFECTED TESTS",
+		"TestTarget",
+		"SUGGESTED COMMANDS",
+		"go test .",
+		"READING ORDER",
+		"File: service.go",
+		"LIMITATIONS",
+		"File context uses package-level impact",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, output)
+		}
+	}
+}
+
 func TestFormatDiff(t *testing.T) {
 	report := DiffReport{
 		Target:  "HEAD",

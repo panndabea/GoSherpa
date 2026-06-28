@@ -70,6 +70,74 @@ func TestAnalyzeSymbolIncludesTestCallersWithOption(t *testing.T) {
 	}
 }
 
+func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if report.Target != "service.go" || report.File != "service.go" {
+		t.Fatalf("target/file = %q/%q, want service.go/service.go", report.Target, report.File)
+	}
+	if report.Package != "." {
+		t.Fatalf("package = %q, want .", report.Package)
+	}
+	if report.PackageName != "app" {
+		t.Fatalf("package name = %q, want app", report.PackageName)
+	}
+	if len(report.Symbols) != 3 {
+		t.Fatalf("expected 3 file symbols, got %#v", report.Symbols)
+	}
+	if report.Symbols[0].Name != "Entry" || report.Symbols[1].Name != "Target" || report.Symbols[2].Name != "Helper" {
+		t.Fatalf("unexpected symbol order: %#v", report.Symbols)
+	}
+	if len(report.SourceContexts) != 3 {
+		t.Fatalf("expected 3 source contexts, got %#v", report.SourceContexts)
+	}
+	if report.AnalysisMode != AnalysisModeAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	}
+	if report.Confidence != ConfidenceMedium {
+		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
+	}
+	if report.Risk.Level != "medium" {
+		t.Fatalf("risk level = %q, want medium", report.Risk.Level)
+	}
+	if len(report.AffectedPackages) != 1 || report.AffectedPackages[0] != "." {
+		t.Fatalf("expected package impact ., got %#v", report.AffectedPackages)
+	}
+	if len(report.AffectedTests) != 1 || report.AffectedTests[0].Name != "TestTarget" {
+		t.Fatalf("expected TestTarget affected test, got %#v", report.AffectedTests)
+	}
+	if len(report.TestCommands) != 1 || report.TestCommands[0] != "go test ." {
+		t.Fatalf("expected go test . command, got %#v", report.TestCommands)
+	}
+	if len(report.ReadingOrder) != 5 {
+		t.Fatalf("expected 5 reading order steps, got %#v", report.ReadingOrder)
+	}
+	if len(report.Limitations) != 5 {
+		t.Fatalf("expected 5 limitations, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzeFileNotesTestsOptionInLimitations(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if len(report.Limitations) != 6 {
+		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+	if !strings.Contains(report.Limitations[5], "--tests") {
+		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+}
+
 func TestAnalyzeDiffBuildsAgentContext(t *testing.T) {
 	root := initAgentContextGitRepository(t)
 

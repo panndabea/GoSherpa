@@ -457,6 +457,7 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 
 	for _, want := range []string{
 		"context symbol <target> [--tests]",
+		"context file <file> [--tests]",
 		"context diff --base <ref> [--tests]",
 	} {
 		if !strings.Contains(output.String(), want) {
@@ -1384,6 +1385,124 @@ func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 
 	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+}
+
+func TestMainPrintsContextFileUsageWhenTargetIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "context", "file"})
+
+	want := "usage: gosherpa [--root <path>] context file <file> [--tests]\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsContextFileCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "file", "service.go"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"CONTEXT FILE",
+		"FILE",
+		"service.go",
+		"Package: .",
+		"Package name: service",
+		"PURPOSE",
+		"declares 2 supported symbols",
+		"ANALYSIS",
+		"Mode: ast",
+		"Confidence: medium",
+		"Risk: medium",
+		"FILE SYMBOLS",
+		"Entry",
+		"Target",
+		"SOURCE",
+		"func Entry()",
+		"func Target() {}",
+		"AFFECTED PACKAGES",
+		"./cmd/app",
+		"AFFECTED TESTS",
+		"TestTarget",
+		"SUGGESTED COMMANDS",
+		"go test .",
+		"READING ORDER",
+		"File: service.go",
+		"Symbol: Entry",
+		"LIMITATIONS",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "file", "service.go", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context file", "service.go", "example.com/app")
+
+	if data["file"] != "service.go" {
+		t.Fatalf("expected service.go file, got %v", data["file"])
+	}
+	if data["package"] != "." {
+		t.Fatalf("expected package ., got %v", data["package"])
+	}
+	if data["packageName"] != "service" {
+		t.Fatalf("expected package name service, got %v", data["packageName"])
+	}
+	if data["analysisMode"] != "ast" {
+		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != "medium" {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "symbols", 2)
+	assertMainTestJSONArrayHasLength(t, data, "sourceContexts", 2)
+	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 4)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "CONTEXT FILE") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
 }
 
 func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {

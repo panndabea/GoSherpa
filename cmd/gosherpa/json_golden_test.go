@@ -59,6 +59,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"context", "symbol", "Target", "--json"},
 		},
 		{
+			name: "context-file",
+			args: []string{"context", "file", "service.go", "--json"},
+		},
+		{
 			name: "tests",
 			args: []string{"tests", "Target", "--json"},
 		},

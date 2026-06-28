@@ -38,6 +38,8 @@ Implemented first slices:
 ```bash
 gosherpa context symbol <target>
 gosherpa context symbol <target> --json
+gosherpa context file <file>
+gosherpa context file <file> --json
 gosherpa context diff --base <ref>
 gosherpa context diff --base <ref> --json
 ```
@@ -45,6 +47,8 @@ gosherpa context diff --base <ref> --json
 This supports symbol targets with source excerpt, symbol identity, references,
 callers, callees, impact signals, related tests, suggested commands,
 confidence, limitations, and opt-in test callers through `--tests`.
+File context exports file symbols, source excerpts, package-level impact,
+affected tests, suggested commands, reading order, confidence, and limitations.
 Diff context exports changed files, changed packages, changed symbols, affected
 packages, affected tests, suggested commands, reading order, confidence, and
 limitations.
@@ -357,7 +361,7 @@ Done when:
 
 ## Suggested Build Order
 
-1. Agent context export for symbols and diffs.
+1. Agent context export for symbols, files, and diffs.
 2. Confidence, limitations, and analysis-mode fields.
 3. Typechecked loading for the most important relationships.
 4. Structured test planning with reasons.

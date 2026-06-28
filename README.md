@@ -46,6 +46,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
 | Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, confidence, and limitations |
+| File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, affected packages/tests, reading order, confidence, and limitations |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile` | Finds Go-aware definitions and references across the repository |
@@ -99,6 +100,8 @@ Then explore the repository:
 ./gosherpa context symbol ParseFile
 ./gosherpa context symbol ParseFile --tests
 ./gosherpa context symbol ParseFile --json
+./gosherpa context file internal/sherpa/impact.go
+./gosherpa context file internal/sherpa/impact.go --json
 ./gosherpa context diff --base HEAD
 ./gosherpa context diff --base HEAD --json
 ./gosherpa explain ParseFile
@@ -170,6 +173,7 @@ Prefer not to build a binary yet?
 ```bash
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa context symbol ParseFile
+go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
@@ -210,6 +214,7 @@ Implemented:
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
 - Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, confidence, limitations, and JSON output
+- Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
@@ -252,7 +257,7 @@ Known MVP limitations:
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet run the full Go type checker for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller, callee, and path analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
-- Context export currently supports symbol and diff targets; file and package context exports remain future work.
+- Context export currently supports symbol, file, and diff targets; package context export remains future work.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
 
 ## Philosophy
