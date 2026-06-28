@@ -205,6 +205,85 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestFindTestsIncludesLiteralSubtestsForDirectReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/service"
+)
+
+func TestTargetCases(t *testing.T) {
+	t.Run("uses target", func(t *testing.T) {
+		service.Target()
+	})
+	t.Run("unrelated", func(t *testing.T) {})
+	t.Run(testName(), func(t *testing.T) {
+		service.Target()
+	})
+}
+
+func testName() string {
+	return "dynamic"
+}
+`)
+
+	result, err := FindTests(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestTargetCases")
+	assertContainsString(t, names, "TestTargetCases/uses target")
+	if containsString(names, "TestTargetCases/unrelated") || containsString(names, "TestTargetCases/dynamic") {
+		t.Fatalf("expected only directly related literal subtests, got %v", names)
+	}
+
+	subtest := findRelatedTest(result.Tests, "TestTargetCases/uses target")
+	if subtest == nil || !subtest.DirectReference {
+		t.Fatalf("expected direct literal subtest marker, got %v", subtest)
+	}
+}
+
+func TestFindTestsIncludesNestedLiteralSubtests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTargetCases(t *testing.T) {
+	t.Run("group", func(t *testing.T) {
+		t.Run("leaf", func(t *testing.T) {
+			Target()
+		})
+	})
+}
+`)
+
+	result, err := FindTests(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestTargetCases/group")
+	assertContainsString(t, names, "TestTargetCases/group/leaf")
+}
+
 func TestFindTestsReturnsEmptyForMissingSymbol(t *testing.T) {
 	tmp := t.TempDir()
 

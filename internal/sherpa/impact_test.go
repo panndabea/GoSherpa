@@ -169,6 +169,39 @@ func Run(server Server) {}
 	}
 }
 
+func TestFindImpactIncludesLiteralSubtestsInSuggestedTests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/service"
+)
+
+func TestTargetCases(t *testing.T) {
+	t.Run("uses target", func(t *testing.T) {
+		service.Target()
+	})
+}
+`)
+
+	result, err := FindImpact(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := relatedTestNames(result.RelatedTests)
+	assertContainsString(t, tests, "TestTargetCases")
+	assertContainsString(t, tests, "TestTargetCases/uses target")
+}
+
 func TestFindImpactHonorsPackageQualifiedSymbolTargets(t *testing.T) {
 	tmp := t.TempDir()
 

@@ -41,6 +41,12 @@ type testFileInfo struct {
 	File        *ast.File
 }
 
+type literalSubtest struct {
+	Name string
+	Pos  token.Pos
+	Func *ast.FuncLit
+}
+
 func FindTests(root string, target string) (TestsResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
@@ -234,6 +240,27 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				DirectReference: directReference,
 				ExternalPackage: isExternalTestPackage(testFile.PackageName),
 			})
+
+			for _, subtest := range literalSubtests(funcDecl) {
+				subtestDirectReference := false
+				if target.Name != "" {
+					subtestDirectReference = nodeReferencesTarget(subtest.Func.Body, target, packageMatches, imports)
+				}
+
+				if !packageMatches && !subtestDirectReference {
+					continue
+				}
+
+				pos := testFile.FileSet.Position(subtest.Pos)
+				tests = append(tests, RelatedTest{
+					Name:            funcDecl.Name.Name + "/" + subtest.Name,
+					Package:         testFile.Package,
+					PackageName:     testFile.PackageName,
+					Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line}),
+					DirectReference: subtestDirectReference,
+					ExternalPackage: isExternalTestPackage(testFile.PackageName),
+				})
+			}
 		}
 	}
 
@@ -282,8 +309,12 @@ func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget, sa
 		return false
 	}
 
+	return nodeReferencesTarget(funcDecl.Body, target, samePackage, imports)
+}
+
+func nodeReferencesTarget(node ast.Node, target referenceTarget, samePackage bool, imports map[string]string) bool {
 	found := false
-	ast.Inspect(funcDecl.Body, func(node ast.Node) bool {
+	ast.Inspect(node, func(node ast.Node) bool {
 		if found {
 			return false
 		}
@@ -305,6 +336,151 @@ func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget, sa
 	})
 
 	return found
+}
+
+func literalSubtests(funcDecl *ast.FuncDecl) []literalSubtest {
+	if funcDecl.Body == nil {
+		return nil
+	}
+
+	testParamNames := testingTParamNames(funcDecl.Type)
+	if len(testParamNames) == 0 {
+		return nil
+	}
+
+	return collectLiteralSubtests(funcDecl.Body, testParamNames)
+}
+
+func collectLiteralSubtests(body *ast.BlockStmt, testParamNames map[string]struct{}) []literalSubtest {
+	if body == nil {
+		return nil
+	}
+
+	var subtests []literalSubtest
+	ast.Inspect(body, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case nil:
+			return true
+		case *ast.FuncLit:
+			return false
+		case *ast.CallExpr:
+			name, funcLit, ok := literalSubtestCall(node, testParamNames)
+			if !ok {
+				return true
+			}
+
+			subtests = append(subtests, literalSubtest{
+				Name: name,
+				Pos:  node.Pos(),
+				Func: funcLit,
+			})
+
+			nestedParamNames := mergeStringSets(testParamNames, testingTParamNames(funcLit.Type))
+			nestedSubtests := collectLiteralSubtests(funcLit.Body, nestedParamNames)
+			for _, nested := range nestedSubtests {
+				nested.Name = name + "/" + nested.Name
+				subtests = append(subtests, nested)
+			}
+
+			return false
+		default:
+			return true
+		}
+	})
+
+	return subtests
+}
+
+func literalSubtestCall(call *ast.CallExpr, testParamNames map[string]struct{}) (string, *ast.FuncLit, bool) {
+	if len(call.Args) < 2 {
+		return "", nil, false
+	}
+
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || selector.Sel.Name != "Run" {
+		return "", nil, false
+	}
+
+	receiver, ok := selector.X.(*ast.Ident)
+	if !ok {
+		return "", nil, false
+	}
+	if _, ok := testParamNames[receiver.Name]; !ok {
+		return "", nil, false
+	}
+
+	name, ok := stringLiteralValue(call.Args[0])
+	if !ok {
+		return "", nil, false
+	}
+
+	funcLit, ok := call.Args[1].(*ast.FuncLit)
+	if !ok {
+		return "", nil, false
+	}
+
+	return name, funcLit, true
+}
+
+func stringLiteralValue(expr ast.Expr) (string, bool) {
+	lit, ok := expr.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", false
+	}
+
+	value, err := strconv.Unquote(lit.Value)
+	if err != nil {
+		return "", false
+	}
+
+	return value, true
+}
+
+func testingTParamNames(funcType *ast.FuncType) map[string]struct{} {
+	names := make(map[string]struct{})
+	if funcType == nil || funcType.Params == nil {
+		return names
+	}
+
+	for _, field := range funcType.Params.List {
+		if !isTestingTType(field.Type) {
+			continue
+		}
+		for _, name := range field.Names {
+			if name.Name != "" {
+				names[name.Name] = struct{}{}
+			}
+		}
+	}
+
+	return names
+}
+
+func isTestingTType(expr ast.Expr) bool {
+	starExpr, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+
+	selector, ok := starExpr.X.(*ast.SelectorExpr)
+	if !ok || selector.Sel.Name != "T" {
+		return false
+	}
+
+	ident, ok := selector.X.(*ast.Ident)
+	return ok && ident.Name == "testing"
+}
+
+func mergeStringSets(first map[string]struct{}, second map[string]struct{}) map[string]struct{} {
+	merged := make(map[string]struct{}, len(first)+len(second))
+	for value := range first {
+		merged[value] = struct{}{}
+	}
+	for value := range second {
+		merged[value] = struct{}{}
+	}
+
+	return merged
 }
 
 func selectorReferencesTarget(selector *ast.SelectorExpr, target referenceTarget, samePackage bool, imports map[string]string) bool {
