@@ -11,6 +11,8 @@ Implemented first slice:
 * purpose from Go doc comments, risk summary, architecture role, definition,
   reading order, references, callers, callees, affected packages, interface and
   implementation impact, related tests, and suggested test commands
+* `go/packages`-backed typechecked reference analysis with an AST/per-package
+  fallback when semantic loading is unavailable
 * package-qualified `explain` caller/callee signals that avoid mixing same-name
   functions across local packages
 * package-qualified standalone call graph commands for `callers`, `callees`,
@@ -78,7 +80,7 @@ Neue Fähigkeiten:
 
 ---
 
-# Neue CLI
+# Aktuelle CLI-Oberfläche
 
 ```bash
 gosherpa callers auth.ValidateToken
@@ -93,7 +95,7 @@ gosherpa implementers auth.Authenticator
 
 gosherpa explain auth.ValidateToken
 
-gosherpa tests affected --symbol auth.ValidateToken
+gosherpa tests auth.ValidateToken
 ```
 
 ---
@@ -154,15 +156,24 @@ integration/login_test.go
 
 ---
 
-# Neue Engine
+# Engine-Skizze
 
-Neue Package
+Der urspruengliche Entwurf sah ein neues Package vor:
 
 ```text
 internal/symbolgraph
 ```
 
-Diese enthält
+Die aktuelle erste Slice ist stattdessen auf bestehende Packages verteilt:
+
+```text
+internal/sherpa
+internal/impact
+internal/explain
+internal/semantics
+```
+
+Diese liefern gemeinsam:
 
 Definition Graph
 
@@ -234,7 +245,7 @@ Direkte Aufrufe
 
 Keine vollständige SSA nötig.
 
-Normale AST-Analyse reicht zunächst.
+AST-Analyse plus lokale Go-Typinformationen reicht zunächst.
 
 ---
 
@@ -430,13 +441,23 @@ liefert
 
 ```json
 {
-  "symbol": "...",
-  "callers": [],
-  "callees": [],
-  "interfaces": [],
-  "implementations": [],
-  "affected_packages": [],
-  "affected_tests": []
+  "schemaVersion": 1,
+  "command": "impact symbol",
+  "target": "auth.ValidateToken",
+  "root": "/path/to/repo",
+  "modulePath": "example.com/project",
+  "warnings": [],
+  "data": {
+    "changedFiles": [],
+    "changedPackages": [],
+    "affectedPackages": [],
+    "affectedSymbols": [],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "affectedTests": [],
+    "testCommands": [],
+    "testPlan": {}
+  }
 }
 ```
 
@@ -444,7 +465,7 @@ liefert
 
 # Architektur
 
-Neue Module
+Der urspruengliche Entwurf nannte separate Module:
 
 ```text
 internal/symbolgraph
@@ -453,6 +474,10 @@ internal/callgraph
 
 internal/interfacegraph
 ```
+
+Die aktuelle erste Slice nutzt noch keine separaten Graph-Packages; sie
+komponiert die vorhandenen Analysebausteine in `internal/sherpa`,
+`internal/impact`, `internal/explain` und `internal/semantics`.
 
 Impact Engine verwendet jetzt
 
@@ -482,9 +507,9 @@ internal/explain
 
 liefert strukturierte Reports.
 
-Alle Informationen kommen aus bestehenden Graphen.
-
-Keine Sonderlogik.
+Die Engine komponiert vorhandene Symbol-, Reference-, Impact-, Test- und
+Call-Signale und ergaenzt leichte Report-Logik fuer Purpose, Risk,
+Architecture Role und Reading Order.
 
 ---
 

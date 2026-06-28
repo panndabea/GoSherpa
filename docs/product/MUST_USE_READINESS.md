@@ -17,7 +17,8 @@ GoSherpa already has real MVP substance:
 - interface implementer and satisfied-interface navigation
 - file, package, symbol, and diff impact analysis
 - affected test suggestions
-- context export for symbols, files, packages, and diffs
+- context export for symbols, files, packages, and diffs, including confidence,
+  analysis mode, and limitations fields
 - stable JSON output for commands
 - ambiguity diagnostics and package-qualified target support
 
@@ -58,6 +59,10 @@ default tool.
 Move the highest-risk analysis paths from AST-first heuristics toward Go
 semantics using `go/packages` and the Go type checker.
 
+Current status: `gosherpa refs` has a `go/packages`-backed typechecked path
+with AST/per-package fallback. Call graph, interface, context, and impact
+analysis still need broader shared semantic loading.
+
 Focus areas:
 
 - `go.work`
@@ -97,7 +102,8 @@ Needed next:
 - documented JSON schemas
 - output size controls such as `--max-files`, `--max-references`, and
   `--max-bytes`
-- `confidence`, `analysisMode`, and `limitations` in JSON output
+- broader and documented `confidence`, `analysisMode`, and `limitations`
+  behavior beyond the existing context reports
 - concise human warnings without noisy terminal output
 - consistent behavior for symbol, file, package, and diff targets
 
@@ -199,6 +205,9 @@ Done when:
 ### 6. Source Snippet Ranges
 
 Expose enough position data for tools to open the exact source occurrence.
+
+Current status: symbol definitions include columns and source ranges. References,
+call sites, and tests still need exact occurrence ranges.
 
 Done when:
 

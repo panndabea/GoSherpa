@@ -29,9 +29,10 @@ impact questions inside a repository.
 
 The Impact Engine direction from [PRD_V01.md](PRD_V01.md) is implemented as the
 v0.1 MVP: a conservative Change Intelligence CLI with diff-based impact
-analysis, package-level affected tests, and interface impact signals. The next
+analysis, package-level affected tests, and interface impact signals. The active
 product direction is Symbol Intelligence from [PRD_V02.md](PRD_V02.md), centered
-on richer symbol profiles and `gosherpa explain`.
+on richer symbol profiles, `gosherpa explain`, context export, and semantic
+reference accuracy.
 
 Core promise:
 
@@ -63,6 +64,8 @@ Implemented:
 - Method discovery.
 - Symbol lookup.
 - Go-aware reference lookup.
+- `go/packages`-backed typechecked reference analysis with AST/per-package
+  fallback when semantic loading is unavailable.
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture
   role, definition, reading order, references, callers, callees, impact signals,
   tests, and JSON output.
@@ -72,6 +75,9 @@ Implemented:
 - Initial `gosherpa context file <file>` export with file symbols, source
   excerpts, affected packages, affected tests, suggested commands, reading
   order, confidence, limitations, and JSON output.
+- Initial `gosherpa context package <package>` export with package files,
+  symbols, source excerpts, affected packages, affected tests, suggested
+  commands, reading order, confidence, limitations, and JSON output.
 - Initial `gosherpa context diff --base <ref>` export with changed files,
   changed packages, changed symbols, affected packages, affected tests, reading
   order, confidence, limitations, and JSON output.
@@ -117,9 +123,9 @@ Implemented:
 
 Current limitations:
 
-- References and receiver-variable call resolution are type-aware inside
-  packages and recognize local package selector calls, but do not yet use full
-  module/package loading.
+- References use `go/packages`-backed typechecked loading when available and
+  fall back to AST/per-package type information; caller, callee, path, and
+  interface impact analysis remain conservative and mostly local.
 - Symbol impact includes transitive callers and package tests for affected
   caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level
@@ -128,8 +134,9 @@ Current limitations:
 - Package-qualified symbol impact disambiguates references and affected tests;
   unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in
-  method signatures and resolves local embedded interfaces, but does not yet run
-  the full Go type checker for aliases, build tags, or generic edge cases.
+  method signatures and resolves local embedded interfaces, but does not yet use
+  full module-level typechecked analysis for aliases, build tags, or generic
+  edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers, callees, and paths still do not resolve dynamic dispatch,
@@ -137,7 +144,8 @@ Current limitations:
 - Unqualified standalone call graph targets can be ambiguous across packages;
   GoSherpa reports candidates and package-qualified examples for
   disambiguation.
-- Positions only expose file and line, not columns or ranges.
+- Symbol definitions include file, line, column, and source ranges; references,
+  calls, and tests still mostly expose file and line only.
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
   first-class.
@@ -166,8 +174,9 @@ Recommended phases:
 | 3 | Interfaces and implementations | GoSherpa answers core Go design questions. |
 | 4 | Call graph and paths | Developers can move through execution relationships. |
 | 5 | Tests and impact | GoSherpa helps plan safe changes. |
-| 6 | Interactive navigation | Bigger explorations become comfortable. |
-| 7 | Machine-readable surfaces | Agents and scripts can consume the same intelligence reliably. |
+| 6 | Package and architecture navigation | Developers can inspect repository structure as a system. |
+| 7 | Interactive navigation | Bigger explorations become comfortable. |
+| 8 | Machine-readable surfaces | Agents and scripts can consume the same intelligence reliably. |
 
 ## Phase 0: CLI and Data Foundations
 
@@ -343,7 +352,7 @@ Done when:
 
 Status: first slice implemented with package paths, package-qualified symbol
 targets, signatures, doc comments, struct fields, interface methods, columns,
-and source ranges. Source context remains future work.
+source ranges, and source context through `--context`.
 
 Human question:
 
@@ -416,7 +425,7 @@ Command sketch:
 
 ```bash
 gosherpa refs ParseFile --context
-gosherpa callers UserService.Create --context 3
+gosherpa callers UserService.Create --context
 ```
 
 Requirements:
@@ -424,7 +433,7 @@ Requirements:
 - Add optional context lines around locations.
 - Highlight or mark the relevant line in plain text.
 - Keep context disabled by default for compact output.
-- Allow a numeric value for number of surrounding lines.
+- Allow a numeric value for number of surrounding lines later.
 
 Done when:
 
@@ -433,8 +442,9 @@ Done when:
 
 ## Phase 2: Semantic References
 
-Status: MVP implemented with per-package `go/types` object matching and local
-module import selector matching.
+Status: MVP implemented for `gosherpa refs` with `go/packages`-backed
+typechecked loading, plus AST/per-package fallback and local module import
+selector matching when semantic loading is unavailable.
 
 Goal: replace fragile text-like references with Go-aware relationships.
 
@@ -930,8 +940,10 @@ Architecture:
 - `internal/git` reads diffs, changed files, changed hunk line ranges, and file
   contents at refs; it knows no Go semantics. `ChangedFiles`, hunk range
   parsing, and `FileAtRef` are implemented.
-- `internal/index` builds repository graphs; it knows no Git semantics.
-- `internal/impact` consumes index data and produces `ImpactReport`.
+- `internal/semantics` provides the current `go/packages` loader for
+  typechecked repository data. The broader shared index remains future work.
+- `internal/sherpa` and `internal/impact` consume repository data and produce
+  navigation, test, and `ImpactReport` results.
   `ChangedPackages` maps changed Go files to local package paths first, and
   `ChangedSymbols` maps hunk ranges to current-file Go symbols plus deleted
   symbols from base-file ranges. `AnalyzeDiff`, `AnalyzeFile`,
@@ -1197,13 +1209,13 @@ Requirements:
 - Extend `--json` to all commands. Implemented.
 - Define stable schemas per command.
 - Include schema version. Implemented for the current JSON commands.
-- Include command metadata. Implemented for the current JSON commands:
+- Include common command metadata. Implemented in the response envelope:
   - root
   - module path
   - target
-  - include tests
-  - analysis mode
   - warnings
+- Include analysis-specific fields, such as `analysisMode`, where the command
+  result exposes them.
 - Keep stdout pure JSON on success.
 - Print diagnostics to stderr; ambiguous target errors use structured JSON when
   `--json` is set.
@@ -1384,7 +1396,8 @@ Test layers:
 - Unit tests for normalization, formatting, and symbol identity.
 - Fixture-based tests for references, calls, interfaces, and packages.
 - Golden output tests for human-readable command output.
-- JSON schema tests once JSON exists.
+- Golden JSON fixture tests for current command outputs, plus schema tests when
+  schemas are documented as compatibility contracts.
 - Integration tests for CLI behavior and exit codes.
 
 Important fixtures:
@@ -1414,7 +1427,11 @@ Needed docs:
 
 ## Suggested Release Milestones
 
-### v0.1: Current MVP
+This milestone section is a historical planning sketch. Several early and
+mid-stage items now have first slices implemented, while later integration work
+such as snapshots, MCP, shell completion, and TUI remains future work.
+
+### v0.1: Historical MVP Baseline
 
 Theme: basic repository visibility.
 
@@ -1540,21 +1557,25 @@ Included:
 | `search` | High | Low | Immediate |
 | Rich `symbol` details | High | Medium | Near-term |
 | Type-aware `refs` | Very high | High | Near-term |
-| `implementers` | Very high | Medium | Near-term |
-| Type-aware callers/callees | Very high | High | Mid-term |
-| `path` | High | High | Mid-term |
-| `tests` | Very high | Medium | Mid-term |
-| `impact` | Very high | High | Mid-term |
+| `implementers` | Very high | Medium | Implemented first slice |
+| Type-aware callers/callees | Very high | High | Implemented first slice |
+| `path` | High | High | Implemented first slice |
+| `tests` | Very high | Medium | Implemented first slice |
+| `impact` | Very high | High | Implemented first slice |
 | `packages` | Medium | Low | Mid-term |
 | `cycles` | Medium | Low | Later |
 | TUI | Medium | Medium | Later |
-| JSON | High for tools | Low after result model | In progress |
+| JSON | High for tools | Low after result model | Implemented MVP |
 | MCP server | High for agents | Medium | Later |
 
 ## Near-Term Implementation Plan
 
+This section records the original near-term build path. Items 1-7 now have
+first slices implemented; the next work is hardening semantics, schemas,
+confidence fields, and test planning around the current commands.
+
 If the next goal is to make GoSherpa noticeably better for humans, the best
-sequence is:
+sequence was:
 
 1. Add global command plumbing.
    - Introduce shared options.

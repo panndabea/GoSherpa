@@ -317,9 +317,23 @@ liefert
 
 ```
 {
-  "changed_packages": [],
-  "affected_packages": [],
-  "affected_tests": []
+  "schemaVersion": 1,
+  "command": "impact diff",
+  "target": "origin/main",
+  "root": "/path/to/repo",
+  "modulePath": "example.com/project",
+  "warnings": [],
+  "data": {
+    "changedFiles": [],
+    "changedPackages": [],
+    "affectedPackages": [],
+    "affectedSymbols": [],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "affectedTests": [],
+    "testCommands": [],
+    "testPlan": {}
+  }
 }
 ```
 
@@ -332,20 +346,19 @@ Neue Packages
 ```
 internal/git
 
-internal/index
-
 internal/impact
 
-internal/tests
+internal/sherpa
 ```
 
 Keine zyklischen Abhängigkeiten.
 
-Impact Engine verwendet ausschließlich den bestehenden Index.
+Impact Engine komponiert Git-Diff-Daten mit den bestehenden
+Repository-, Reference-, Test- und Package-Helfern aus `internal/sherpa`.
 
 Git kennt keine Go-Logik.
 
-Index kennt kein Git.
+Die Repository-Analyse kennt kein Git.
 
 ---
 

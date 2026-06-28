@@ -12,7 +12,7 @@
     <img alt="Go 1.24.4" src="https://img.shields.io/badge/Go-1.24.4-00ADD8?style=for-the-badge&amp;logo=go&amp;logoColor=white">
     <img alt="Status: Early MVP" src="https://img.shields.io/badge/status-early%20MVP-2F855A?style=for-the-badge">
     <img alt="Interface: CLI" src="https://img.shields.io/badge/interface-CLI-111827?style=for-the-badge">
-    <img alt="Analysis: AST based" src="https://img.shields.io/badge/analysis-AST%20based-F6AD55?style=for-the-badge">
+    <img alt="Analysis: Go semantics + AST" src="https://img.shields.io/badge/analysis-Go%20semantics%20%2B%20AST-F6AD55?style=for-the-badge">
     <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563EB?style=for-the-badge">
   </p>
 </div>
@@ -23,7 +23,7 @@
 
 GoSherpa is a fast command-line companion for understanding Go repositories without opening half the project in your editor. It gives you just enough structure to navigate confidently: where a symbol lives, who references it, which packages depend on it, and how functions connect.
 
-The Impact Engine described in [PRD_V01.md](docs/product/PRD_V01.md) is implemented as the v0.1 MVP: change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff. The next product track is Symbol Intelligence from [PRD_V02.md](docs/product/PRD_V02.md), with `gosherpa explain` as the likely center of gravity.
+The Impact Engine described in [PRD_V01.md](docs/product/PRD_V01.md) is implemented as the v0.1 MVP: change-aware analysis for answering which packages, interfaces, implementations, and tests are affected by a file, package, symbol, or git diff. The active product track is Symbol Intelligence from [PRD_V02.md](docs/product/PRD_V02.md), expanding `gosherpa explain`, agent context exports, and semantic reference accuracy.
 
 ## Why It Exists
 
@@ -200,11 +200,11 @@ go run ./cmd/gosherpa path main FindCallers
 
 ## Roadmap
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](docs/product/PRD_V01.md) is complete; the next work is Symbol Intelligence from [PRD_V02.md](docs/product/PRD_V02.md).
+GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](docs/product/PRD_V01.md) is complete; current work continues the Symbol Intelligence track from [PRD_V02.md](docs/product/PRD_V02.md).
 
 | Next | Goal |
 | --- | --- |
-| Symbol Intelligence | Start `gosherpa explain` as the focused entry point for PRD v0.5 |
+| Symbol Intelligence | Deepen typechecked relationships, context output, and structured test planning around `gosherpa explain` |
 
 Read the full product plan in [FEATURE_ROADMAP.md](docs/product/FEATURE_ROADMAP.md), or start from the [docs index](docs/README.md).
 
@@ -215,6 +215,7 @@ Implemented:
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
+- Typechecked reference analysis via `go/packages`, with an AST/per-package fallback when semantic loading is unavailable
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
 - Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, confidence, limitations, and JSON output
@@ -255,12 +256,12 @@ Release notes:
 
 Known MVP limitations:
 
-- Reference search and receiver-variable call resolution are type-aware inside packages and recognize local package selector calls, but they do not yet use full module/package loading.
+- Reference search uses `go/packages`-backed typechecked loading when available and falls back to AST/per-package type information; caller, callee, path, and interface impact analysis remain conservative and mostly local.
 - Test files are skipped by reference, callee, path, and default caller analysis; `callers --tests` and `explain --tests` include test-file callers on demand.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
-- Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet run the full Go type checker for aliases, build tags, or generic edge cases.
+- Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
 - Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
 - Caller, callee, and path analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
 - Context export currently supports symbol, file, package, and diff targets.

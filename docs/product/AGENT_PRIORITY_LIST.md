@@ -58,6 +58,10 @@ Diff context exports changed files, changed packages, changed symbols, affected
 packages, affected tests, suggested commands, reading order, confidence, and
 limitations.
 
+The current context JSON already includes `analysisMode`, `confidence`, and
+`limitations`. The remaining hardening work is documented schemas, explicit
+size controls, and broader consistency across agent-facing commands.
+
 Command sketches:
 
 ```bash
@@ -108,6 +112,10 @@ Done when:
 
 Move the highest-risk analysis paths from AST-only heuristics toward Go
 semantics using `go/packages` and the Go type checker.
+
+Current status: `gosherpa refs` has a `go/packages`-backed typechecked path
+with AST/per-package fallback. Call graph, interface, context, and impact
+analysis still need broader shared semantic loading.
 
 Focus areas:
 
@@ -164,7 +172,8 @@ than an overconfident incomplete one.
 Done when:
 
 - JSON output includes `confidence`, `analysisMode`, and `limitations` for
-  context, impact, callers, callees, interfaces, and tests.
+  context, impact, callers, callees, interfaces, and tests. Context has the
+  first slice.
 - Human output shows warnings without becoming noisy.
 - Confidence is rule-based and deterministic.
 
@@ -367,8 +376,8 @@ Done when:
 
 ## Suggested Build Order
 
-1. Agent context export for symbols, files, and diffs.
-2. Confidence, limitations, and analysis-mode fields.
+1. Harden agent context export for symbols, files, packages, and diffs.
+2. Extend confidence, limitations, and analysis-mode fields beyond context.
 3. Typechecked loading for the most important relationships.
 4. Structured test planning with reasons.
 5. Incremental snapshot.
