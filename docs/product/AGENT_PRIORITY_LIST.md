@@ -33,16 +33,21 @@ These are the features that would move GoSherpa from "useful sometimes" to
 
 Add one command that returns the compact context an agent needs before editing.
 
-Implemented first slice:
+Implemented first slices:
 
 ```bash
 gosherpa context symbol <target>
 gosherpa context symbol <target> --json
+gosherpa context diff --base <ref>
+gosherpa context diff --base <ref> --json
 ```
 
 This supports symbol targets with source excerpt, symbol identity, references,
 callers, callees, impact signals, related tests, suggested commands,
 confidence, limitations, and opt-in test callers through `--tests`.
+Diff context exports changed files, changed packages, changed symbols, affected
+packages, affected tests, suggested commands, reading order, confidence, and
+limitations.
 
 Command sketches:
 

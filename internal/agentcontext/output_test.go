@@ -98,3 +98,74 @@ func TestFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatDiff(t *testing.T) {
+	report := DiffReport{
+		Target:  "HEAD",
+		Base:    "HEAD",
+		Purpose: "Diff changes 1 file across 1 Go package.",
+		Risk: explainengine.RiskSummary{
+			Level: "medium",
+			Reasons: []string{
+				"Impact reaches 2 packages.",
+			},
+		},
+		ChangedFiles:     []string{"internal/auth/session.go"},
+		ChangedPackages:  []string{"./internal/auth"},
+		AffectedPackages: []string{"./internal/api", "./internal/auth"},
+		AffectedSymbols:  []string{"NewSession"},
+		AffectedTests: []sherpa.RelatedTest{
+			{Name: "TestSession", Position: sherpa.Position{File: "internal/auth/session_test.go", Line: 5}},
+		},
+		TestCommands: []string{"go test ./internal/auth"},
+		ReadingOrder: []explainengine.ReadingStep{
+			{
+				Title:  "Changed file: internal/auth/session.go",
+				Reason: "Start with the files changed by the diff.",
+				Position: sherpa.Position{
+					File: "internal/auth/session.go",
+					Line: 1,
+				},
+			},
+		},
+		AnalysisMode: AnalysisModeDiff,
+		Confidence:   ConfidenceMedium,
+		Limitations: []string{
+			"Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
+		},
+	}
+
+	output := FormatDiff(report)
+	for _, want := range []string{
+		"CONTEXT DIFF",
+		"BASE",
+		"HEAD",
+		"PURPOSE",
+		"Diff changes 1 file",
+		"ANALYSIS",
+		"Mode: git-diff+ast",
+		"Confidence: medium",
+		"Risk: medium",
+		"Impact reaches 2 packages.",
+		"CHANGED FILES",
+		"internal/auth/session.go",
+		"CHANGED PACKAGES",
+		"./internal/auth",
+		"AFFECTED SYMBOLS",
+		"NewSession",
+		"AFFECTED PACKAGES",
+		"./internal/api",
+		"AFFECTED TESTS",
+		"TestSession",
+		"SUGGESTED COMMANDS",
+		"go test ./internal/auth",
+		"READING ORDER",
+		"Changed file: internal/auth/session.go",
+		"LIMITATIONS",
+		"Diff context uses git diff",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, output)
+		}
+	}
+}

@@ -454,7 +454,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasBaseOption && !isBaseAwareInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --base is only supported by impact diff and tests affected")
+		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, and tests affected")
 		return exitUsage
 	}
 
@@ -517,6 +517,37 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 
 			fmt.Fprint(stdout, agentcontext.Format(report))
+			return exitSuccess
+		case "diff":
+			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
+				printContextDiffUsage(stderr)
+				return exitUsage
+			}
+
+			root, ok := resolveRootPath(invocation.Root, stderr)
+			if !ok {
+				return exitFailure
+			}
+
+			report, err := agentcontext.AnalyzeDiff(root, invocation.BaseRef, agentcontext.DiffAnalyzeOptions{
+				IncludeTests: invocation.IncludeTests,
+			})
+			if err != nil {
+				return writeCommandError(invocation.JSON, root, "context diff", invocation.BaseRef, stderr, err)
+			}
+
+			if invocation.JSON {
+				normalizedReport := contextDiffJSONResult(report)
+				return writeJSON(stdout, stderr, newJSONResponse(
+					root,
+					"context diff",
+					normalizedReport.Target,
+					normalizedReport.Warnings,
+					normalizedReport,
+				))
+			}
+
+			fmt.Fprint(stdout, agentcontext.FormatDiff(report))
 			return exitSuccess
 		default:
 			printContextUsage(stderr)
@@ -1094,7 +1125,7 @@ func supportsJSON(command string) bool {
 }
 
 func isBaseAwareInvocation(invocation cliInvocation) bool {
-	return isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
+	return isContextDiffInvocation(invocation) || isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
 }
 
 func supportsLimitOption(command string) bool {
@@ -1125,6 +1156,10 @@ func supportsContextOption(command string) bool {
 
 func isImpactDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
+}
+
+func isContextDiffInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "context" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
 }
 
 func isTestsAffectedInvocation(invocation cliInvocation) bool {
@@ -1423,6 +1458,23 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	return report
 }
 
+func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffReport {
+	report.ChangedFiles = nonNilSlice(report.ChangedFiles)
+	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
+	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
+	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.AffectedTests = nonNilSlice(report.AffectedTests)
+	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
 func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.References = nonNilSlice(report.References)
 	report.Callers = nonNilSlice(report.Callers)
@@ -1512,6 +1564,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	fmt.Fprintln(writer, "  context symbol <target> [--tests]")
+	fmt.Fprintln(writer, "  context diff --base <ref> [--tests]")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
@@ -1535,10 +1588,15 @@ func printUsage(writer io.Writer) {
 
 func printContextUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests]")
 }
 
 func printContextSymbolUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+}
+
+func printContextDiffUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests]")
 }
 
 func printImpactUsage(writer io.Writer) {

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "command": "context diff",
+  "target": "HEAD",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "target": "HEAD",
+    "base": "HEAD",
+    "purpose": "Diff changes 1 file across 1 Go package. Impact analysis reaches 2 packages, 1 symbol, and 1 affected test.",
+    "risk": {
+      "level": "medium",
+      "reasons": [
+        "Changed Go packages: 1.",
+        "Impact reaches 2 packages.",
+        "Affected symbols found: 1.",
+        "Affected tests found: 1."
+      ]
+    },
+    "changedFiles": [
+      "service.go"
+    ],
+    "changedPackages": [
+      "."
+    ],
+    "affectedPackages": [
+      ".",
+      "./cmd/app"
+    ],
+    "affectedSymbols": [
+      "Added"
+    ],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "affectedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": false,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test ."
+    ],
+    "readingOrder": [
+      {
+        "title": "Changed file: service.go",
+        "reason": "Start with the files changed by the diff.",
+        "position": {
+          "file": "service.go",
+          "line": 1
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        }
+      }
+    ],
+    "analysisMode": "git-diff+ast",
+    "confidence": "medium",
+    "limitations": [
+      "Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
+      "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
+      "Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
+      "Test discovery uses same-package tests and syntactic direct-reference matching."
+    ]
+  }
+}

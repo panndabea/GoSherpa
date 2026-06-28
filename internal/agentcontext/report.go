@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	AnalysisModeAST = "ast"
+	AnalysisModeAST  = "ast"
+	AnalysisModeDiff = "git-diff+ast"
 
 	ConfidenceMedium = "medium"
 	ConfidenceLow    = "low"

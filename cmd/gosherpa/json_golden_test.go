@@ -193,6 +193,43 @@ func TestMainImpactDiffJSONGoldenFile(t *testing.T) {
 	}
 }
 
+func TestMainContextDiffJSONGoldenFile(t *testing.T) {
+	sourceFixtureRoot := filepath.Join("testdata", "json_project")
+	fixtureRoot := t.TempDir()
+	copyMainTestTree(t, sourceFixtureRoot, fixtureRoot)
+	initMainTestGitRepository(t, fixtureRoot)
+	runMainTestGit(t, fixtureRoot, "add", ".")
+	runMainTestGit(t, fixtureRoot, "commit", "-m", "initial")
+
+	servicePath := filepath.Join(fixtureRoot, "service.go")
+	serviceSource, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeMainTestFile(t, servicePath, string(serviceSource)+"\nfunc Added() {}\n")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", fixtureRoot, "context", "diff", "--base", "HEAD", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	actual := canonicalGoldenActualJSON(t, result.Stdout, fixtureRoot)
+	expectedPath := filepath.Join("testdata", "golden-json", "context-diff.json")
+	expectedBytes, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := canonicalGoldenJSON(t, expectedBytes)
+
+	if actual != expected {
+		t.Fatalf("golden JSON mismatch for context-diff\nexpected:\n%s\nactual:\n%s", expected, actual)
+	}
+}
+
 func TestMainTestsAffectedJSONGoldenFile(t *testing.T) {
 	sourceFixtureRoot := filepath.Join("testdata", "json_project")
 	fixtureRoot := t.TempDir()
