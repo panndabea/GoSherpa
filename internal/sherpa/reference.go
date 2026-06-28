@@ -13,12 +13,26 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 )
 
 type Reference struct {
 	Name     string        `json:"name"`
 	Kind     ReferenceKind `json:"kind,omitempty"`
 	Position Position      `json:"position"`
+}
+
+const (
+	ReferenceAnalysisModeTypechecked = "typechecked"
+	ReferenceAnalysisModeASTFallback = "ast-fallback"
+)
+
+type ReferenceReport struct {
+	Target       string      `json:"target"`
+	References   []Reference `json:"references"`
+	AnalysisMode string      `json:"analysisMode"`
+	Warnings     []string    `json:"warnings"`
 }
 
 type ReferenceKind string
@@ -34,6 +48,8 @@ const (
 type ReferenceOptions struct {
 	Kind ReferenceKind
 }
+
+var loadSemanticReferenceRepository = semantics.LoadRepository
 
 type referenceTarget struct {
 	Package  string
@@ -55,26 +71,48 @@ func FindReferences(root string, name string) ([]Reference, error) {
 }
 
 func FindReferencesWithOptions(root string, name string, options ReferenceOptions) ([]Reference, error) {
-	rootPath, err := absoluteRootPath(root)
+	report, err := FindReferenceReportWithOptions(root, name, options)
 	if err != nil {
 		return nil, err
+	}
+
+	return report.References, nil
+}
+
+func FindReferenceReport(root string, name string) (ReferenceReport, error) {
+	return FindReferenceReportWithOptions(root, name, ReferenceOptions{})
+}
+
+func FindReferenceReportWithOptions(root string, name string, options ReferenceOptions) (ReferenceReport, error) {
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return ReferenceReport{}, err
 	}
 
 	target, err := normalizeReferenceTarget(rootPath, name)
 	if err != nil {
-		return nil, err
+		return ReferenceReport{}, err
+	}
+
+	var report ReferenceReport
+	if referenceShouldAttemptTypechecked(rootPath) {
+		var ok bool
+		report, ok = findTypecheckedReferenceReport(rootPath, target, options)
+		if ok {
+			return report, nil
+		}
 	}
 
 	files, err := FindGoFiles(rootPath)
 	if err != nil {
-		return nil, err
+		return ReferenceReport{}, err
 	}
 
 	sort.Strings(files)
 
 	packages, err := parseReferencePackages(rootPath, files)
 	if err != nil {
-		return nil, err
+		return ReferenceReport{}, err
 	}
 
 	targetPackages := referenceTargetPackageImports(packages, target)
@@ -88,7 +126,17 @@ func FindReferencesWithOptions(root string, name string, options ReferenceOption
 	refs = filterReferences(refs, options)
 	sortReferences(refs)
 
-	return refs, nil
+	return ReferenceReport{
+		Target:       target.String(),
+		References:   nonNilReferences(refs),
+		AnalysisMode: ReferenceAnalysisModeASTFallback,
+		Warnings:     nonNilStrings(report.Warnings),
+	}, nil
+}
+
+func referenceShouldAttemptTypechecked(root string) bool {
+	info, err := os.Stat(filepath.Join(root, "go.mod"))
+	return err == nil && !info.IsDir()
 }
 
 func normalizeReferenceTarget(root string, name string) (referenceTarget, error) {
@@ -220,6 +268,152 @@ func parseReferencePackages(root string, files []string) ([]referencePackage, er
 	}
 
 	return packages, nil
+}
+
+func findTypecheckedReferenceReport(root string, target referenceTarget, options ReferenceOptions) (ReferenceReport, bool) {
+	repo, err := loadSemanticReferenceRepository(root, semantics.LoadOptions{})
+	if err != nil {
+		return ReferenceReport{
+			Target:       target.String(),
+			AnalysisMode: ReferenceAnalysisModeASTFallback,
+			Warnings:     []string{fmt.Sprintf("typechecked reference analysis unavailable: %v", err)},
+		}, false
+	}
+
+	packages := semanticReferencePackages(repo)
+	if len(packages) == 0 {
+		return ReferenceReport{
+			Target:       target.String(),
+			AnalysisMode: ReferenceAnalysisModeASTFallback,
+			Warnings:     append([]string{"typechecked reference analysis unavailable: no typechecked packages loaded"}, repo.Warnings...),
+		}, false
+	}
+
+	targetObjects := semanticReferenceTargetObjects(packages, target)
+	var refs []Reference
+	for _, pkg := range packages {
+		refs = append(refs, findTypecheckedReferencesInPackage(root, pkg, target, targetObjects)...)
+	}
+
+	refs = filterReferences(refs, options)
+	sortReferences(refs)
+
+	return ReferenceReport{
+		Target:       target.String(),
+		References:   nonNilReferences(refs),
+		AnalysisMode: ReferenceAnalysisModeTypechecked,
+		Warnings:     nonNilStrings(repo.Warnings),
+	}, true
+}
+
+func semanticReferencePackages(repo semantics.Repository) []referencePackage {
+	var packages []referencePackage
+	for _, pkg := range repo.Packages {
+		if pkg.FileSet == nil || pkg.TypesInfo == nil || len(pkg.Files) == 0 {
+			continue
+		}
+
+		packages = append(packages, referencePackage{
+			Package:    pkg.PackagePath,
+			ImportPath: pkg.ImportPath,
+			Name:       pkg.Name,
+			FileSet:    pkg.FileSet,
+			Files:      pkg.Files,
+			Info:       *pkg.TypesInfo,
+		})
+	}
+
+	return packages
+}
+
+func semanticReferenceTargetObjects(packages []referencePackage, target referenceTarget) map[types.Object]struct{} {
+	objects := make(map[types.Object]struct{})
+	for _, pkg := range packages {
+		if target.Package != "" && pkg.Package != target.Package {
+			continue
+		}
+
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				addReferenceTargetObjects(objects, pkg.Info, decl, target)
+			}
+		}
+	}
+
+	return objects
+}
+
+func findTypecheckedReferencesInPackage(root string, pkg referencePackage, target referenceTarget, targetObjects map[types.Object]struct{}) []Reference {
+	seen := make(map[token.Pos]struct{})
+
+	var refs []Reference
+	addReference := func(pos token.Pos, kind ReferenceKind) {
+		if !pos.IsValid() {
+			return
+		}
+
+		if _, ok := seen[pos]; ok {
+			return
+		}
+
+		seen[pos] = struct{}{}
+		position := pkg.FileSet.Position(pos)
+		refs = append(refs, Reference{
+			Name: target.String(),
+			Kind: kind,
+			Position: positionRelativeToRoot(root, Position{
+				File: position.Filename,
+				Line: position.Line,
+			}),
+		})
+	}
+
+	for _, file := range pkg.Files {
+		var stack []ast.Node
+
+		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				stack = stack[:len(stack)-1]
+				return false
+			}
+
+			parent := ast.Node(nil)
+			if len(stack) > 0 {
+				parent = stack[len(stack)-1]
+			}
+			stack = append(stack, node)
+
+			switch node := node.(type) {
+			case *ast.Ident:
+				object, definition := referenceIdentObject(pkg.Info, node)
+				if referenceObjectMatchesTarget(object, targetObjects) {
+					addReference(node.Pos(), referenceKindForIdent(object, definition, parent, node))
+				}
+			case *ast.SelectorExpr:
+				object := pkg.Info.Uses[node.Sel]
+				selection := pkg.Info.Selections[node]
+				if referenceObjectMatchesTarget(object, targetObjects) || referenceSelectionMatchesTarget(selection, targetObjects) {
+					addReference(node.Sel.Pos(), referenceKindForTypecheckedSelector(object, selection, parent, node))
+				}
+			}
+
+			return true
+		})
+	}
+
+	return refs
+}
+
+func referenceKindForTypecheckedSelector(object types.Object, selection *types.Selection, parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
+	if selection != nil && selection.Kind() == types.FieldVal {
+		return ReferenceKindFieldAccess
+	}
+
+	if _, ok := object.(*types.TypeName); ok {
+		return ReferenceKindTypeUsage
+	}
+
+	return referenceKindForSelector(selection, parent, selector)
 }
 
 func splitPackageQualifiedTarget(root string, value string) (string, string, bool, error) {
@@ -789,4 +983,20 @@ func sortReferences(refs []Reference) {
 
 		return refs[i].Name < refs[j].Name
 	})
+}
+
+func nonNilReferences(refs []Reference) []Reference {
+	if refs == nil {
+		return []Reference{}
+	}
+
+	return refs
+}
+
+func nonNilStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+
+	return values
 }

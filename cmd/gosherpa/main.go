@@ -75,7 +75,8 @@ type jsonErrorData struct {
 }
 
 type referencesJSONData struct {
-	References []sherpa.Reference `json:"references"`
+	AnalysisMode string             `json:"analysisMode"`
+	References   []sherpa.Reference `json:"references"`
 }
 
 type symbolJSONData struct {
@@ -799,7 +800,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		name := invocation.CommandArgs[0]
 
-		refs, err := sherpa.FindReferencesWithOptions(root, name, sherpa.ReferenceOptions{
+		report, err := sherpa.FindReferenceReportWithOptions(root, name, sherpa.ReferenceOptions{
 			Kind: invocation.ReferenceKind,
 		})
 		if err != nil {
@@ -807,22 +808,23 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 
 		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, nil, referencesJSONData{
-				References: nonNilSlice(refs),
+			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, report.Warnings, referencesJSONData{
+				AnalysisMode: report.AnalysisMode,
+				References:   nonNilSlice(report.References),
 			}))
 		}
 
 		if invocation.ShowContext {
-			contexts, err := sherpa.ReadSourceContexts(root, referencePositions(refs), sherpa.DefaultSourceContextRadius)
+			contexts, err := sherpa.ReadSourceContexts(root, referencePositions(report.References), sherpa.DefaultSourceContextRadius)
 			if err != nil {
 				return writeCommandError(false, root, "refs", name, stderr, err)
 			}
 
-			fmt.Fprint(stdout, sherpa.FormatReferencesWithContext(name, refs, contexts))
+			fmt.Fprint(stdout, sherpa.FormatReferenceReportWithContext(report, contexts))
 			return exitSuccess
 		}
 
-		fmt.Fprint(stdout, sherpa.FormatReferences(name, refs))
+		fmt.Fprint(stdout, sherpa.FormatReferenceReport(report))
 		return exitSuccess
 
 	case "impact":

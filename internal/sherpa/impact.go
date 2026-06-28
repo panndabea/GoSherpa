@@ -105,7 +105,7 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 		return ImpactResult{}, err
 	}
 
-	refs, err := FindReferences(root, target)
+	referenceReport, err := FindReferenceReport(root, target)
 	if err != nil {
 		return ImpactResult{}, err
 	}
@@ -113,7 +113,8 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 	result := ImpactResult{
 		Target:     normalizedTarget.String(),
 		Kind:       ImpactKindSymbol,
-		References: refs,
+		References: referenceReport.References,
+		Warnings:   referenceReport.Warnings,
 	}
 
 	if normalizedTarget.Package == "" {
@@ -125,7 +126,7 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 		}
 	}
 
-	result.Packages = impactedPackages(root, refs, result.Callers)
+	result.Packages = impactedPackages(root, result.References, result.Callers)
 
 	tests, warnings := impactSymbolTests(root, target, result.Packages)
 	result.RelatedTests = tests.Tests

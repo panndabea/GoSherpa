@@ -97,6 +97,42 @@ Found 2 references
 	}
 }
 
+func TestFormatReferenceReportShowsAnalysisModeAndWarnings(t *testing.T) {
+	report := ReferenceReport{
+		Target:       "Run",
+		AnalysisMode: ReferenceAnalysisModeASTFallback,
+		Warnings:     []string{"typechecked reference analysis unavailable: loader failed"},
+		References: []Reference{
+			{
+				Name: "Run",
+				Kind: ReferenceKindDefinition,
+				Position: Position{
+					File: "service.go",
+					Line: 3,
+				},
+			},
+		},
+	}
+
+	got := FormatReferenceReport(report)
+	want := `REFERENCES
+
+Run
+analysisMode: "ast-fallback"
+
+  definition   service.go:3
+
+WARNINGS
+  typechecked reference analysis unavailable: loader failed
+
+Found 1 references
+`
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatReferencesWithEmptyList(t *testing.T) {
 	got := FormatReferences("Missing", nil)
 	want := `REFERENCES
