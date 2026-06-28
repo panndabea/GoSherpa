@@ -25,6 +25,7 @@ type DiffReport struct {
 	AffectedImplementations []string                    `json:"affectedImplementations"`
 	AffectedTests           []impactengine.RelatedTest  `json:"affectedTests"`
 	TestCommands            []string                    `json:"testCommands"`
+	TestPlan                sherpa.TestPlan             `json:"testPlan"`
 	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
 	AnalysisMode            string                      `json:"analysisMode"`
 	Confidence              string                      `json:"confidence"`
@@ -49,6 +50,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		AffectedImplementations: impactReport.AffectedImplementations,
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
+		TestPlan:                impactReport.TestPlan,
 		AnalysisMode:            AnalysisModeDiff,
 		Warnings:                impactReport.Warnings,
 	}
@@ -186,6 +188,7 @@ func normalizeDiffReport(report DiffReport) DiffReport {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)

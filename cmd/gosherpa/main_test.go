@@ -651,7 +651,7 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"TESTS", "ParseFile (symbol)", "RELATED TESTS", "TestParserPackage", "TestUsesParser", "SUGGESTED COMMANDS", "go test ./cmd/app", "go test ./internal/parser"} {
+	for _, want := range []string{"TESTS", "ParseFile (symbol)", "RELATED TESTS", "TestParserPackage", "TestUsesParser", "TEST PLAN", "DIRECT", "RELATED", "go test ./cmd/app", "go test ./internal/parser"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -708,6 +708,9 @@ func TestUsesParser(t *testing.T) {
 
 	assertMainTestJSONArrayHasLength(t, data, "tests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "commands", 2)
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	assertMainTestJSONArrayHasLength(t, testPlan, "direct", 1)
+	assertMainTestJSONArrayHasLength(t, testPlan, "related", 1)
 
 	if strings.Contains(result.Stdout, "TESTS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
@@ -767,7 +770,7 @@ func NewSession() Session {
 		"AFFECTED TESTS",
 		"TestSession",
 		"TestHandler",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test ./internal/api",
 		"go test ./internal/auth",
 	} {
@@ -1081,7 +1084,7 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "CALLERS", "AFFECTED PACKAGES", "SUGGESTED TESTS", "SUGGESTED COMMANDS", "TestParserPackage", "TestUsesParser", "go test ./cmd/app", "go test ./internal/parser", "./cmd/app", "./internal/parser"} {
+	for _, want := range []string{"IMPACT", "ParseFile (symbol)", "REFERENCES", "CALLERS", "AFFECTED PACKAGES", "SUGGESTED TESTS", "TEST PLAN", "DIRECT", "RELATED", "TestParserPackage", "TestUsesParser", "go test ./cmd/app", "go test ./internal/parser", "./cmd/app", "./internal/parser"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1148,6 +1151,9 @@ func TestUsesParser(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	assertMainTestJSONArrayHasLength(t, testPlan, "direct", 1)
+	assertMainTestJSONArrayHasLength(t, testPlan, "related", 1)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -1179,7 +1185,7 @@ func TestMainRunsImpactFileCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"IMPACT FILE", "CHANGED FILES", "service.go", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"IMPACT FILE", "CHANGED FILES", "service.go", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "TEST PLAN", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1203,7 +1209,7 @@ func TestMainRunsImpactPackageCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"IMPACT PACKAGE", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"IMPACT PACKAGE", "CHANGED PACKAGES", ".", "AFFECTED PACKAGES", "./cmd/app", "AFFECTED TESTS", "TestTarget", "TEST PLAN", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1227,7 +1233,7 @@ func TestMainRunsImpactSymbolCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"IMPACT SYMBOL", "AFFECTED SYMBOLS", "Target", "AFFECTED PACKAGES", ".", "AFFECTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"IMPACT SYMBOL", "AFFECTED SYMBOLS", "Target", "AFFECTED PACKAGES", ".", "AFFECTED TESTS", "TestTarget", "TEST PLAN", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1247,7 +1253,7 @@ func TestMainRunsExplainCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "PURPOSE", "RISK", "medium", "ARCHITECTURE ROLE", "leaf_dependency", "READING ORDER", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test ."} {
+	for _, want := range []string{"EXPLAIN", "TARGET", "Target (function)", "DEFINITION", "service.go", "PURPOSE", "RISK", "medium", "ARCHITECTURE ROLE", "leaf_dependency", "READING ORDER", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "TEST PLAN", "go test ."} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1341,7 +1347,7 @@ func TestMainRunsContextSymbolCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"CONTEXT", "TARGET", "Target (function)", "DEFINITION", "service.go", "SOURCE", "func Target() {}", "ANALYSIS", "Mode: ast", "Confidence: medium", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "SUGGESTED COMMANDS", "go test .", "LIMITATIONS"} {
+	for _, want := range []string{"CONTEXT", "TARGET", "Target (function)", "DEFINITION", "service.go", "SOURCE", "func Target() {}", "ANALYSIS", "Mode: ast", "Confidence: medium", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "TEST PLAN", "go test .", "LIMITATIONS"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1478,7 +1484,7 @@ func TestMainRunsContextFileCommand(t *testing.T) {
 		"./cmd/app",
 		"AFFECTED TESTS",
 		"TestTarget",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test .",
 		"READING ORDER",
 		"File: service.go",
@@ -1531,7 +1537,7 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "sourceContexts", 2)
 	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 4)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
 
@@ -1599,7 +1605,7 @@ func TestMainRunsContextPackageCommand(t *testing.T) {
 		"./cmd/app",
 		"AFFECTED TESTS",
 		"TestTarget",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test .",
 		"READING ORDER",
 		"File: service.go",
@@ -1650,7 +1656,7 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "sourceContexts", 3)
 	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 6)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
 
@@ -1750,7 +1756,7 @@ func NewSession() Session {
 		"AFFECTED TESTS",
 		"TestSession",
 		"TestHandler",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test ./internal/api",
 		"go test ./internal/auth",
 		"READING ORDER",
@@ -1913,7 +1919,7 @@ func NewSession() Session {
 		"AFFECTED TESTS",
 		"TestSession",
 		"TestHandler",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test ./internal/api",
 		"go test ./internal/auth",
 	} {
@@ -3615,6 +3621,17 @@ func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key 
 	}
 
 	return values
+}
+
+func assertMainTestJSONObject(t *testing.T, payload map[string]any, key string) map[string]any {
+	t.Helper()
+
+	value, ok := payload[key].(map[string]any)
+	if !ok {
+		t.Fatalf("expected %s to be a JSON object, got %T", key, payload[key])
+	}
+
+	return value
 }
 
 func assertMainTestAmbiguousCandidate(t *testing.T, value any, packagePath string, symbol string, file string, line float64, example string) {

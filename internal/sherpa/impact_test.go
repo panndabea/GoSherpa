@@ -139,6 +139,12 @@ func TestApp(t *testing.T) {}
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
 	}
+	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/core" {
+		t.Fatalf("expected related plan item for target package, got %#v", result.TestPlan)
+	}
+	if len(result.TestPlan.CallerPackages) != 2 {
+		t.Fatalf("expected caller-package plan items, got %#v", result.TestPlan)
+	}
 }
 
 func TestFindImpactForTypeSymbolDoesNotWarnWhenCallersDoNotApply(t *testing.T) {
@@ -305,7 +311,7 @@ func TestAuth(t *testing.T) {}
 	tests := relatedTestNames(result.RelatedTests)
 	assertContainsString(t, tests, "TestAuth")
 
-	wantCommands := []string{"go test ./internal/auth"}
+	wantCommands := []string{"go test ./cmd/api", "go test ./internal/auth"}
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
 	}

@@ -34,6 +34,7 @@ type Report struct {
 	AffectedImplementations []string                       `json:"affectedImplementations"`
 	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
 	TestCommands            []string                       `json:"testCommands"`
+	TestPlan                sherpa.TestPlan                `json:"testPlan"`
 	ReadingOrder            []explainengine.ReadingStep    `json:"readingOrder"`
 	AnalysisMode            string                         `json:"analysisMode"`
 	Confidence              string                         `json:"confidence"`
@@ -87,6 +88,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		AffectedImplementations: explainReport.AffectedImplementations,
 		RelatedTests:            explainReport.RelatedTests,
 		TestCommands:            explainReport.TestCommands,
+		TestPlan:                explainReport.TestPlan,
 		ReadingOrder:            explainReport.ReadingOrder,
 		AnalysisMode:            AnalysisModeAST,
 		Warnings:                warnings,
@@ -142,6 +144,7 @@ func normalizeReport(report Report) Report {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)
 	report.Limitations = nonNilSlice(report.Limitations)

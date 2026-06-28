@@ -17,6 +17,7 @@ type Analyzer struct {
 }
 
 type RelatedTest = sherpa.RelatedTest
+type TestPlan = sherpa.TestPlan
 
 type ImpactReport struct {
 	ChangedFiles            []string      `json:"changedFiles"`
@@ -27,6 +28,7 @@ type ImpactReport struct {
 	AffectedImplementations []string      `json:"affectedImplementations"`
 	AffectedTests           []RelatedTest `json:"affectedTests"`
 	TestCommands            []string      `json:"testCommands"`
+	TestPlan                TestPlan      `json:"testPlan"`
 	Warnings                []string      `json:"warnings"`
 }
 
@@ -69,7 +71,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 		return ImpactReport{}, err
 	}
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
-	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
 	if err != nil {
 		return ImpactReport{}, err
@@ -108,7 +110,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	report.AffectedTests, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.AffectedPackages, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
 	if err != nil {
 		return ImpactReport{}, err
@@ -145,6 +147,7 @@ func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 		AffectedPackages: result.Packages,
 		AffectedTests:    result.RelatedTests,
 		TestCommands:     result.TestCommands,
+		TestPlan:         result.TestPlan,
 		Warnings:         result.Warnings,
 	}
 }
@@ -201,9 +204,8 @@ func affectedPackagesForChangedPackages(root string, changedPackages []string) (
 	return uniqueSortedStrings(affected), uniqueSortedStrings(warnings)
 }
 
-func affectedTestsForPackages(root string, packages []string, warnings []string) ([]sherpa.RelatedTest, []string, []string) {
+func affectedTestsForPackages(root string, changedPackages []string, packages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
-	var commands []string
 
 	for _, pkg := range packages {
 		tests, err := sherpa.FindTests(root, pkg)
@@ -215,7 +217,6 @@ func affectedTestsForPackages(root string, packages []string, warnings []string)
 		for _, test := range tests.Tests {
 			seen[relatedTestKey(test)] = test
 		}
-		commands = append(commands, tests.Commands...)
 	}
 
 	result := make([]sherpa.RelatedTest, 0, len(seen))
@@ -224,8 +225,15 @@ func affectedTestsForPackages(root string, packages []string, warnings []string)
 	}
 
 	sortRelatedTests(result)
+	plan := sherpa.PlanTests(result, sherpa.TestPlanOptions{
+		Target:           "affected packages",
+		Kind:             sherpa.TestTargetKindPackage,
+		TargetPackages:   changedPackages,
+		CallerPackages:   packageDifference(packages, changedPackages),
+		FallbackPackages: packages,
+	})
 
-	return result, uniqueSortedStrings(commands), uniqueSortedStrings(warnings)
+	return result, plan, sherpa.TestPlanCommands(plan), uniqueSortedStrings(warnings)
 }
 
 func relatedTestKey(test sherpa.RelatedTest) string {
@@ -264,6 +272,7 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilStrings(report.AffectedImplementations)
 	report.TestCommands = nonNilStrings(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Warnings = nonNilStrings(report.Warnings)
 
 	if report.AffectedTests == nil {
@@ -300,6 +309,24 @@ func nonNilStrings(values []string) []string {
 	}
 
 	return values
+}
+
+func packageDifference(values []string, excluded []string) []string {
+	excludedSet := make(map[string]struct{}, len(excluded))
+	for _, value := range excluded {
+		excludedSet[value] = struct{}{}
+	}
+
+	var result []string
+	for _, value := range values {
+		if _, ok := excludedSet[value]; ok {
+			continue
+		}
+
+		result = append(result, value)
+	}
+
+	return uniqueSortedStrings(result)
 }
 
 func intKey(value int) string {

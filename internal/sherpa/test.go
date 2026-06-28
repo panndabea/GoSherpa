@@ -32,6 +32,7 @@ type TestsResult struct {
 	Kind     TestTargetKind `json:"kind"`
 	Tests    []RelatedTest  `json:"tests"`
 	Commands []string       `json:"commands"`
+	TestPlan TestPlan       `json:"testPlan"`
 }
 
 type testFileInfo struct {
@@ -89,12 +90,19 @@ func findPackageTests(root string, target string) (TestsResult, error) {
 		normalizedTarget: {},
 	}
 	tests := collectRelatedTests(root, testFiles, packages, referenceTarget{})
+	plan := PlanTests(tests, TestPlanOptions{
+		Target:           normalizedTarget,
+		Kind:             TestTargetKindPackage,
+		TargetPackages:   []string{normalizedTarget},
+		FallbackPackages: []string{normalizedTarget},
+	})
 
 	return TestsResult{
 		Target:   normalizedTarget,
 		Kind:     TestTargetKindPackage,
 		Tests:    tests,
-		Commands: testCommands(tests),
+		Commands: TestPlanCommands(plan),
+		TestPlan: plan,
 	}, nil
 }
 
@@ -115,12 +123,20 @@ func findSymbolTests(root string, target string) (TestsResult, error) {
 	}
 
 	tests := collectRelatedTests(root, testFiles, packages, normalizedTarget)
+	targetPackages := sortedMapKeys(packages)
+	plan := PlanTests(tests, TestPlanOptions{
+		Target:           normalizedTarget.String(),
+		Kind:             TestTargetKindSymbol,
+		TargetPackages:   targetPackages,
+		FallbackPackages: targetPackages,
+	})
 
 	return TestsResult{
 		Target:   normalizedTarget.String(),
 		Kind:     TestTargetKindSymbol,
 		Tests:    tests,
-		Commands: testCommands(tests),
+		Commands: TestPlanCommands(plan),
+		TestPlan: plan,
 	}, nil
 }
 

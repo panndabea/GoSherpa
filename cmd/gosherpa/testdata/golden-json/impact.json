@@ -9,24 +9,24 @@
     "kind": "symbol",
     "references": [
       {
-        "kind": "call",
         "name": "Target",
+        "kind": "call",
         "position": {
           "file": "service.go",
           "line": 11
         }
       },
       {
-        "kind": "call",
         "name": "Target",
+        "kind": "call",
         "position": {
           "file": "service.go",
           "line": 15
         }
       },
       {
-        "kind": "definition",
         "name": "Target",
+        "kind": "definition",
         "position": {
           "file": "service.go",
           "line": 18
@@ -86,7 +86,27 @@
       }
     ],
     "testCommands": [
-      "go test ."
-    ]
+      "go test .",
+      "go test ./cmd/app"
+    ],
+    "testPlan": {
+      "direct": [
+        {
+          "command": "go test .",
+          "reason": "Direct tests in . reference Target: TestTarget.",
+          "package": ".",
+          "test": "TestTarget"
+        }
+      ],
+      "related": [],
+      "callerPackages": [],
+      "fallback": [
+        {
+          "command": "go test ./cmd/app",
+          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "package": "./cmd/app"
+        }
+      ]
+    }
   }
 }

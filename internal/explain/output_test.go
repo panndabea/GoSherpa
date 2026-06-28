@@ -83,7 +83,7 @@ func TestFormat(t *testing.T) {
 		"REFERENCES",
 		"SUGGESTED TESTS",
 		"TestTarget",
-		"SUGGESTED COMMANDS",
+		"TEST PLAN",
 		"go test .",
 	} {
 		if !strings.Contains(output, want) {

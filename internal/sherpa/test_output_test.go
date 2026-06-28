@@ -30,6 +30,24 @@ func TestFormatTests(t *testing.T) {
 			},
 		},
 		Commands: []string{"go test ./cmd/app", "go test ./internal/parser"},
+		TestPlan: TestPlan{
+			Direct: []TestPlanItem{
+				{
+					Command: "go test ./cmd/app",
+					Reason:  "Direct tests in ./cmd/app reference ParseFile: TestUsesParser.",
+					Package: "./cmd/app",
+					Test:    "TestUsesParser",
+				},
+			},
+			Related: []TestPlanItem{
+				{
+					Command: "go test ./internal/parser",
+					Reason:  "Same-package tests in ./internal/parser are related to ParseFile: TestParserPackage.",
+					Package: "./internal/parser",
+					Test:    "TestParserPackage",
+				},
+			},
+		},
 	}
 
 	got := FormatTests(result)
@@ -42,9 +60,17 @@ RELATED TESTS
   %-36s internal/parser/parser_test.go:5
   %-36s cmd/app/main_test.go:9 (direct, external)
 
-SUGGESTED COMMANDS
-  go test ./cmd/app
-  go test ./internal/parser
+TEST PLAN
+  DIRECT
+    go test ./cmd/app
+      reason: Direct tests in ./cmd/app reference ParseFile: TestUsesParser.
+  RELATED
+    go test ./internal/parser
+      reason: Same-package tests in ./internal/parser are related to ParseFile: TestParserPackage.
+  CALLER PACKAGES
+    none
+  FALLBACK
+    none
 `, "TestParserPackage", "TestUsesParser")
 
 	if got != want {
@@ -67,8 +93,15 @@ TARGET
 RELATED TESTS
   none
 
-SUGGESTED COMMANDS
-  none
+TEST PLAN
+  DIRECT
+    none
+  RELATED
+    none
+  CALLER PACKAGES
+    none
+  FALLBACK
+    none
 `
 
 	if got != want {

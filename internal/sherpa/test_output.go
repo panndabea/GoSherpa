@@ -43,16 +43,7 @@ func FormatTests(result TestsResult) string {
 	}
 	builder.WriteString("\n")
 
-	builder.WriteString("SUGGESTED COMMANDS\n")
-	if len(result.Commands) == 0 {
-		builder.WriteString("  none\n")
-	} else {
-		for _, command := range result.Commands {
-			builder.WriteString("  ")
-			builder.WriteString(command)
-			builder.WriteString("\n")
-		}
-	}
+	WriteTestPlan(&builder, result.TestPlan, result.Commands)
 
 	return builder.String()
 }
@@ -72,4 +63,39 @@ func relatedTestTags(test RelatedTest) string {
 	}
 
 	return strings.Join(tags, ", ")
+}
+
+func WriteTestPlan(builder *strings.Builder, plan TestPlan, fallbackCommands []string) {
+	plan = NormalizeTestPlan(plan)
+	if TestPlanEmpty(plan) && len(fallbackCommands) > 0 {
+		plan = FallbackTestPlan(fallbackCommands)
+	}
+
+	builder.WriteString("TEST PLAN\n")
+	writeTestPlanSection(builder, "DIRECT", plan.Direct)
+	writeTestPlanSection(builder, "RELATED", plan.Related)
+	writeTestPlanSection(builder, "CALLER PACKAGES", plan.CallerPackages)
+	writeTestPlanSection(builder, "FALLBACK", plan.Fallback)
+}
+
+func writeTestPlanSection(builder *strings.Builder, title string, items []TestPlanItem) {
+	builder.WriteString("  ")
+	builder.WriteString(title)
+	builder.WriteString("\n")
+
+	if len(items) == 0 {
+		builder.WriteString("    none\n")
+		return
+	}
+
+	for _, item := range items {
+		builder.WriteString("    ")
+		builder.WriteString(item.Command)
+		builder.WriteString("\n")
+		if item.Reason != "" {
+			builder.WriteString("      reason: ")
+			builder.WriteString(item.Reason)
+			builder.WriteString("\n")
+		}
+	}
 }

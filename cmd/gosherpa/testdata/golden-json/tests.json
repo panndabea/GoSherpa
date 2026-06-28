@@ -22,6 +22,19 @@
     ],
     "commands": [
       "go test ."
-    ]
+    ],
+    "testPlan": {
+      "direct": [
+        {
+          "command": "go test .",
+          "reason": "Direct tests in . reference Target: TestTarget.",
+          "package": ".",
+          "test": "TestTarget"
+        }
+      ],
+      "related": [],
+      "callerPackages": [],
+      "fallback": []
+    }
   }
 }

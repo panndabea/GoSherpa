@@ -100,6 +100,7 @@ type impactJSONData struct {
 	Packages     []string                   `json:"packages"`
 	RelatedTests []sherpa.RelatedTest       `json:"relatedTests"`
 	TestCommands []string                   `json:"testCommands"`
+	TestPlan     sherpa.TestPlan            `json:"testPlan"`
 }
 
 type impactDiffJSONData struct {
@@ -111,17 +112,20 @@ type impactDiffJSONData struct {
 	AffectedImplementations []string                   `json:"affectedImplementations"`
 	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
 	TestCommands            []string                   `json:"testCommands"`
+	TestPlan                sherpa.TestPlan            `json:"testPlan"`
 }
 
 type testsJSONData struct {
 	Kind     sherpa.TestTargetKind `json:"kind"`
 	Tests    []sherpa.RelatedTest  `json:"tests"`
 	Commands []string              `json:"commands"`
+	TestPlan sherpa.TestPlan       `json:"testPlan"`
 }
 
 type testsAffectedJSONData struct {
 	AffectedTests []impactengine.RelatedTest `json:"affectedTests"`
 	Commands      []string                   `json:"commands"`
+	TestPlan      sherpa.TestPlan            `json:"testPlan"`
 }
 
 type dependenciesJSONData struct {
@@ -166,6 +170,7 @@ type explainJSONData struct {
 	AffectedImplementations []string                       `json:"affectedImplementations"`
 	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
 	TestCommands            []string                       `json:"testCommands"`
+	TestPlan                sherpa.TestPlan                `json:"testPlan"`
 	ReadingOrder            []explainengine.ReadingStep    `json:"readingOrder"`
 }
 
@@ -1396,6 +1401,7 @@ func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	result.Packages = nonNilSlice(result.Packages)
 	result.RelatedTests = nonNilSlice(result.RelatedTests)
 	result.TestCommands = nonNilSlice(result.TestCommands)
+	result.TestPlan = sherpa.NormalizeTestPlan(result.TestPlan)
 	result.Warnings = nonNilSlice(result.Warnings)
 
 	return result
@@ -1410,6 +1416,7 @@ func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
 		Packages:     result.Packages,
 		RelatedTests: result.RelatedTests,
 		TestCommands: result.TestCommands,
+		TestPlan:     result.TestPlan,
 	}
 }
 
@@ -1422,6 +1429,7 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Warnings = nonNilSlice(report.Warnings)
 
 	return report
@@ -1437,12 +1445,14 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport) impactDiffJS
 		AffectedImplementations: report.AffectedImplementations,
 		AffectedTests:           report.AffectedTests,
 		TestCommands:            report.TestCommands,
+		TestPlan:                report.TestPlan,
 	}
 }
 
 func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
 	result.Tests = nonNilSlice(result.Tests)
 	result.Commands = nonNilSlice(result.Commands)
+	result.TestPlan = sherpa.NormalizeTestPlan(result.TestPlan)
 
 	return result
 }
@@ -1452,6 +1462,7 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 		Kind:     result.Kind,
 		Tests:    result.Tests,
 		Commands: result.Commands,
+		TestPlan: result.TestPlan,
 	}
 }
 
@@ -1459,6 +1470,7 @@ func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffe
 	return testsAffectedJSONData{
 		AffectedTests: report.AffectedTests,
 		Commands:      report.TestCommands,
+		TestPlan:      report.TestPlan,
 	}
 }
 
@@ -1555,6 +1567,7 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)
 	report.Limitations = nonNilSlice(report.Limitations)
@@ -1574,6 +1587,7 @@ func contextFileJSONResult(report agentcontext.FileReport) agentcontext.FileRepo
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
@@ -1594,6 +1608,7 @@ func contextPackageJSONResult(report agentcontext.PackageReport) agentcontext.Pa
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
@@ -1611,6 +1626,7 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
@@ -1628,6 +1644,7 @@ func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Warnings = nonNilSlice(report.Warnings)
 
@@ -1649,6 +1666,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		AffectedImplementations: report.AffectedImplementations,
 		RelatedTests:            report.RelatedTests,
 		TestCommands:            report.TestCommands,
+		TestPlan:                report.TestPlan,
 		ReadingOrder:            report.ReadingOrder,
 	}
 }

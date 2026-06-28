@@ -33,7 +33,7 @@ func FormatDiff(report DiffReport) string {
 	builder.WriteString("\n")
 	writeAffectedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
-	writeValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
 	builder.WriteString("\n")
 	writeReadingOrder(&builder, report.ReadingOrder)
 	builder.WriteString("\n")

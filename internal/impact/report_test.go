@@ -127,7 +127,7 @@ func TestAnalyzeSymbolHonorsPackageQualifiedTargets(t *testing.T) {
 	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Session"})
 	assertStrings(t, report.AffectedPackages, []string{"./cmd/app", "./internal/auth"})
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestAuthSession"})
-	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+	assertStrings(t, report.TestCommands, []string{"go test ./cmd/app", "go test ./internal/auth"})
 }
 
 func TestAnalyzeFileRejectsNonGoFiles(t *testing.T) {

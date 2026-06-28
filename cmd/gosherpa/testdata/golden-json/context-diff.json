@@ -47,8 +47,28 @@
       }
     ],
     "testCommands": [
-      "go test ."
+      "go test .",
+      "go test ./cmd/app"
     ],
+    "testPlan": {
+      "direct": [],
+      "related": [
+        {
+          "command": "go test .",
+          "reason": "Tests in target package .: TestTarget.",
+          "package": ".",
+          "test": "TestTarget"
+        }
+      ],
+      "callerPackages": [],
+      "fallback": [
+        {
+          "command": "go test ./cmd/app",
+          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "package": "./cmd/app"
+        }
+      ]
+    },
     "readingOrder": [
       {
         "title": "Changed file: service.go",

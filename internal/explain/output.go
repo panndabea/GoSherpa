@@ -42,7 +42,7 @@ func Format(report Report) string {
 	builder.WriteString("\n")
 	writeRelatedTests(&builder, report.RelatedTests)
 	builder.WriteString("\n")
-	writeValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
 	writeWarnings(&builder, report.Warnings)
 
 	return builder.String()

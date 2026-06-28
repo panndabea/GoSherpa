@@ -21,7 +21,7 @@ func FormatImpact(result ImpactResult) string {
 		builder.WriteString("\n")
 		writeImpactRelatedTests(&builder, result.RelatedTests)
 		builder.WriteString("\n")
-		writeImpactValues(&builder, "SUGGESTED COMMANDS", result.TestCommands)
+		WriteTestPlan(&builder, result.TestPlan, result.TestCommands)
 		writeImpactWarnings(&builder, result.Warnings)
 		return builder.String()
 	}
@@ -34,7 +34,7 @@ func FormatImpact(result ImpactResult) string {
 	builder.WriteString("\n")
 	writeImpactRelatedTests(&builder, result.RelatedTests)
 	builder.WriteString("\n")
-	writeImpactValues(&builder, "SUGGESTED COMMANDS", result.TestCommands)
+	WriteTestPlan(&builder, result.TestPlan, result.TestCommands)
 	writeImpactWarnings(&builder, result.Warnings)
 
 	return builder.String()

@@ -3,6 +3,8 @@ package impact
 import (
 	"fmt"
 	"strings"
+
+	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
 func FormatDiffReport(report ImpactReport) string {
@@ -26,7 +28,7 @@ func FormatAffectedTestsReport(report ImpactReport) string {
 
 	writeReportRelatedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
-	writeReportValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
 
 	if len(report.Warnings) > 0 {
 		builder.WriteString("\n")
@@ -64,7 +66,7 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 	builder.WriteString("\n")
 	writeReportRelatedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
-	writeReportValues(&builder, "SUGGESTED COMMANDS", report.TestCommands)
+	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
 
 	if len(report.Warnings) > 0 {
 		builder.WriteString("\n")

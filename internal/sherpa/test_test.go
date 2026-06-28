@@ -105,6 +105,12 @@ func TestUsesParser(t *testing.T) {
 	if !reflect.DeepEqual(result.Commands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.Commands)
 	}
+	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./cmd/app" {
+		t.Fatalf("expected direct test plan item for ./cmd/app, got %#v", result.TestPlan)
+	}
+	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/parser" {
+		t.Fatalf("expected related test plan item for ./internal/parser, got %#v", result.TestPlan)
+	}
 }
 
 func TestFindTestsHonorsPackageQualifiedSymbolTargets(t *testing.T) {
@@ -282,6 +288,40 @@ func TestTargetCases(t *testing.T) {
 	names := relatedTestNames(result.Tests)
 	assertContainsString(t, names, "TestTargetCases/group")
 	assertContainsString(t, names, "TestTargetCases/group/leaf")
+}
+
+func TestFindTestsAddsFallbackForSymbolPackageWithoutTests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+
+	result, err := FindTests(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Tests) != 0 {
+		t.Fatalf("expected no related tests, got %#v", result.Tests)
+	}
+
+	wantCommands := []string{"go test ."}
+	if !reflect.DeepEqual(result.Commands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.Commands)
+	}
+
+	if len(result.TestPlan.Fallback) != 1 {
+		t.Fatalf("expected fallback test plan item, got %#v", result.TestPlan)
+	}
+	item := result.TestPlan.Fallback[0]
+	if item.Command != "go test ." || item.Package != "." {
+		t.Fatalf("unexpected fallback item: %#v", item)
+	}
+	if item.Reason == "" {
+		t.Fatalf("expected fallback reason, got %#v", item)
+	}
 }
 
 func TestFindTestsReturnsEmptyForMissingSymbol(t *testing.T) {

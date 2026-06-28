@@ -23,6 +23,7 @@ type ImpactResult struct {
 	Packages     []string            `json:"packages"`
 	RelatedTests []RelatedTest       `json:"relatedTests"`
 	TestCommands []string            `json:"testCommands"`
+	TestPlan     TestPlan            `json:"testPlan"`
 	Warnings     []string            `json:"warnings"`
 }
 
@@ -86,15 +87,23 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 	}
 
 	packages := uniqueSorted(append([]string{deps.Package}, deps.UsedBy...))
-	tests, warnings := impactTests(root, target)
+	tests, warnings := impactTestsForPackages(root, packages)
+	plan := PlanTests(tests, TestPlanOptions{
+		Target:           deps.Package,
+		Kind:             TestTargetKindPackage,
+		TargetPackages:   []string{deps.Package},
+		CallerPackages:   deps.UsedBy,
+		FallbackPackages: packages,
+	})
 
 	return ImpactResult{
 		Target:       deps.Package,
 		Kind:         ImpactKindPackage,
 		Dependencies: deps,
 		Packages:     packages,
-		RelatedTests: tests.Tests,
-		TestCommands: tests.Commands,
+		RelatedTests: tests,
+		TestCommands: TestPlanCommands(plan),
+		TestPlan:     plan,
 		Warnings:     warnings,
 	}, nil
 }
@@ -128,9 +137,18 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 
 	result.Packages = impactedPackages(root, result.References, result.Callers)
 
-	tests, warnings := impactSymbolTests(root, target, result.Packages)
+	targetPackageSet, err := referenceTargetPackages(root, normalizedTarget)
+	var targetPackages []string
+	if err == nil {
+		targetPackages = sortedMapKeys(targetPackageSet)
+	} else {
+		result.Warnings = append(result.Warnings, err.Error())
+	}
+
+	tests, warnings := impactSymbolTests(root, target, result.Packages, targetPackages)
 	result.RelatedTests = tests.Tests
 	result.TestCommands = tests.Commands
+	result.TestPlan = tests.TestPlan
 	result.Warnings = append(result.Warnings, warnings...)
 
 	return result, nil
@@ -150,23 +168,33 @@ func impactSymbolCallers(root string, target string) ([]Caller, error) {
 	return collectTransitiveCallersFromFunctions(functions, normalizedTarget)
 }
 
-func impactSymbolTests(root string, target string, packages []string) (TestsResult, []string) {
+func impactSymbolTests(root string, target string, packages []string, targetPackages []string) (TestsResult, []string) {
 	symbolTests, warnings := impactTests(root, target)
 	mergedTests := symbolTests.Tests
-	commands := symbolTests.Commands
 
 	packageTests, packageWarnings := impactTestsForPackages(root, packages)
 	warnings = append(warnings, packageWarnings...)
 	mergedTests = mergeRelatedTests(mergedTests, packageTests)
-	commands = append(commands, testCommands(packageTests)...)
 
 	sortRelatedTests(mergedTests)
+	if len(targetPackages) == 0 {
+		targetPackages = sortedTestPackages(symbolTests.Tests)
+	}
+	fallbackPackages := uniqueSorted(append(append([]string{}, targetPackages...), packages...))
+	plan := PlanTests(mergedTests, TestPlanOptions{
+		Target:           firstNonEmptyString(symbolTests.Target, target),
+		Kind:             TestTargetKindSymbol,
+		TargetPackages:   targetPackages,
+		CallerPackages:   packageDifference(packages, targetPackages),
+		FallbackPackages: fallbackPackages,
+	})
 
 	return TestsResult{
 		Target:   symbolTests.Target,
 		Kind:     TestTargetKindSymbol,
 		Tests:    mergedTests,
-		Commands: uniqueSorted(commands),
+		Commands: TestPlanCommands(plan),
+		TestPlan: plan,
 	}, uniqueSorted(warnings)
 }
 

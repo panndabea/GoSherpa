@@ -28,6 +28,7 @@ type Report struct {
 	AffectedImplementations []string             `json:"affectedImplementations"`
 	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
 	TestCommands            []string             `json:"testCommands"`
+	TestPlan                sherpa.TestPlan      `json:"testPlan"`
 	ReadingOrder            []ReadingStep        `json:"readingOrder"`
 	Warnings                []string             `json:"warnings"`
 }
@@ -88,6 +89,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		AffectedPackages: impactResult.Packages,
 		RelatedTests:     impactResult.RelatedTests,
 		TestCommands:     impactResult.TestCommands,
+		TestPlan:         impactResult.TestPlan,
 		Warnings:         impactResult.Warnings,
 	}
 
@@ -544,6 +546,7 @@ func normalizeReport(report Report) Report {
 	report.AffectedImplementations = nonNil(report.AffectedImplementations)
 	report.RelatedTests = nonNil(report.RelatedTests)
 	report.TestCommands = nonNil(report.TestCommands)
+	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.ReadingOrder = nonNil(report.ReadingOrder)
 	report.Warnings = uniqueSorted(report.Warnings)
 
