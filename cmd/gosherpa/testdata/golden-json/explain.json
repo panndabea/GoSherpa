@@ -7,6 +7,19 @@
   "warnings": [],
   "data": {
     "target": "Target",
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
+      "Purpose, risk, architecture role, and reading order are deterministic heuristics.",
+      "Call analysis used typechecked package loading where available.",
+      "Call graph results are repository-local.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Imported-package receiver calls may be incomplete.",
+      "Test discovery uses same-package tests and syntactic direct-reference matching.",
+      "Table-test and subtest names are not extracted.",
+      "Fallback commands are package-level when direct test functions are not known."
+    ],
     "symbol": {
       "name": "Target",
       "kind": "function",

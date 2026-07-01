@@ -132,6 +132,28 @@ Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
 `{ "title": string, "reason": string, "position": position }`.
 
+## Common Analysis Metadata
+
+Agent-facing analysis data objects include:
+
+```json
+{
+  "analysisMode": "ast",
+  "confidence": "medium",
+  "limitations": []
+}
+```
+
+- `analysisMode`: deterministic label describing how the command assembled its
+  result.
+- `confidence`: deterministic trust label, currently `medium` or `low`.
+- `limitations`: known blind spots and conservative boundaries for the command.
+
+`confidence` is `low` when warnings were emitted or a typechecked path fell
+back to AST analysis. Otherwise, current agent-facing commands report
+`medium`. `limitations` is always present on the documented agent-facing data
+objects below.
+
 ## Analysis Modes
 
 Call analysis mode values:
@@ -140,6 +162,12 @@ Call analysis mode values:
   available.
 - `ast-fallback`: GoSherpa fell back to AST-only call analysis because
   typechecked loading was unavailable.
+
+Reference analysis uses the same `typechecked` and `ast-fallback` labels.
+Broader context, impact, test, interface, and path commands currently use:
+
+- `ast`: syntax plus local type information and repository-local heuristics.
+- `git-diff+ast`: git diff discovery plus AST/local repository analysis.
 
 `callers.data.analysisMode` and `callees.data.analysisMode` use these values.
 `explain.data.callAnalysisMode` and `context symbol.data.callAnalysisMode` use
@@ -161,12 +189,16 @@ Data:
 ```json
 {
   "analysisMode": "typechecked",
+  "confidence": "medium",
+  "limitations": [],
   "callers": []
 }
 ```
 
 - `analysisMode`: call analysis trust mode, either `typechecked` or
   `ast-fallback`.
+- `confidence`: deterministic trust label.
+- `limitations`: call-graph blind spots and scope boundaries.
 - `callers`: array of caller entries. The array is present even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
@@ -183,13 +215,44 @@ Data:
 ```json
 {
   "analysisMode": "typechecked",
+  "confidence": "medium",
+  "limitations": [],
   "callees": []
 }
 ```
 
 - `analysisMode`: call analysis trust mode, either `typechecked` or
   `ast-fallback`.
+- `confidence`: deterministic trust label.
+- `limitations`: call-graph blind spots and scope boundaries.
 - `callees`: array of callee entries. The array is present even when empty.
+
+`data.warnings` is absent; use envelope `warnings`.
+
+## `refs` Data
+
+Envelope:
+
+- `command`: `refs`
+- `target`: resolved reference target
+
+Data:
+
+```json
+{
+  "analysisMode": "typechecked",
+  "confidence": "medium",
+  "limitations": [],
+  "references": []
+}
+```
+
+- `analysisMode`: reference analysis trust mode, either `typechecked` or
+  `ast-fallback`.
+- `confidence`: deterministic trust label.
+- `limitations`: reference-analysis blind spots and scope boundaries.
+- `references`: array of reference entries. The array is present even when
+  empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 
@@ -205,6 +268,9 @@ Data:
 ```json
 {
   "target": "Target",
+  "analysisMode": "ast",
+  "confidence": "medium",
+  "limitations": [],
   "symbol": {},
   "purpose": "",
   "risk": {
@@ -235,6 +301,9 @@ Data:
 ```
 
 - `target`: normalized symbol target.
+- `analysisMode`: broader explain-bundle mode, currently `ast`.
+- `confidence`: deterministic trust label.
+- `limitations`: explain, call, and test-planning blind spots.
 - `symbol`: symbol profile object.
 - `purpose`: extracted symbol purpose, or an empty string when none is found.
 - `risk`: deterministic risk summary.
@@ -255,12 +324,40 @@ Data:
 
 `data.warnings` is absent; use envelope `warnings`.
 
+## Impact And Test Data
+
+`impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`,
+`tests`, and `tests affected` data objects include the common metadata fields:
+
+- `analysisMode`: `ast` for direct impact/test queries, `git-diff+ast` for
+  diff-based queries.
+- `confidence`: deterministic trust label.
+- `limitations`: command-specific impact or test-planning blind spots.
+
+Impact data keeps its existing arrays such as `references`, `callers`,
+`affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
+keeps `tests` or `affectedTests`, `commands`, and `testPlan`.
+
+## Interface And Path Data
+
+`implementers`, `interfaces`, `path`, and `paths` data objects include the
+common metadata fields:
+
+- `analysisMode`: currently `ast`.
+- `confidence`: deterministic trust label.
+- `limitations`: command-specific interface or path-analysis blind spots.
+
+Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
+`to`, and `paths`.
+
 ## `context symbol` Call Metadata
 
 `context symbol` data is the symbol context bundle documented in
 `docs/product/CONTEXT_SCHEMA_V1.md`, plus explicit call analysis trust metadata:
 
 - `analysisMode`: broader context analysis mode, currently `ast`.
+- `confidence`: deterministic trust label.
+- `limitations`: context, call, and test-planning blind spots.
 - `callAnalysisMode`: call graph trust mode, either `typechecked` or
   `ast-fallback`.
 - `callers`: repository-local callers.

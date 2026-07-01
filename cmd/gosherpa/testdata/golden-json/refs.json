@@ -7,26 +7,32 @@
   "warnings": [],
   "data": {
     "analysisMode": "typechecked",
+    "confidence": "medium",
+    "limitations": [
+      "Reference analysis used typechecked package loading where available.",
+      "References are repository-local and may not include generated or build-tagged code outside the loaded package set.",
+      "Dynamic dispatch, reflection, and function values are not resolved."
+    ],
     "references": [
       {
-        "kind": "call",
         "name": "Target",
+        "kind": "call",
         "position": {
           "file": "service.go",
           "line": 11
         }
       },
       {
-        "kind": "call",
         "name": "Target",
+        "kind": "call",
         "position": {
           "file": "service.go",
           "line": 15
         }
       },
       {
-        "kind": "definition",
         "name": "Target",
+        "kind": "definition",
         "position": {
           "file": "service.go",
           "line": 18

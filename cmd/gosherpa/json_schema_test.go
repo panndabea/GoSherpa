@@ -26,8 +26,9 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			target:  "Target",
 			wantFields: map[string]string{
 				"analysisMode": sherpa.CallAnalysisModeTypechecked,
+				"confidence":   agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"callers"},
+			wantArrays: []string{"callers", "limitations"},
 		},
 		{
 			name:    "callees",
@@ -36,8 +37,9 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			target:  "Entry",
 			wantFields: map[string]string{
 				"analysisMode": sherpa.CallAnalysisModeTypechecked,
+				"confidence":   agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"callees"},
+			wantArrays: []string{"callees", "limitations"},
 		},
 		{
 			name:    "explain",
@@ -45,9 +47,33 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "explain",
 			target:  "Target",
 			wantFields: map[string]string{
+				"analysisMode":     agentcontext.AnalysisModeAST,
 				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
+				"confidence":       agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"references", "callers", "callees", "readingOrder"},
+			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
+		},
+		{
+			name:    "impact",
+			args:    []string{"impact", "Target", "--json"},
+			command: "impact",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode": agentcontext.AnalysisModeAST,
+				"confidence":   agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"references", "callers", "limitations", "relatedTests"},
+		},
+		{
+			name:    "tests",
+			args:    []string{"tests", "Target", "--json"},
+			command: "tests",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode": agentcontext.AnalysisModeAST,
+				"confidence":   agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"tests", "commands", "limitations"},
 		},
 		{
 			name:    "context symbol",
@@ -57,8 +83,9 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantFields: map[string]string{
 				"analysisMode":     agentcontext.AnalysisModeAST,
 				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
+				"confidence":       agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"references", "callers", "callees", "readingOrder"},
+			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
 		},
 	}
 

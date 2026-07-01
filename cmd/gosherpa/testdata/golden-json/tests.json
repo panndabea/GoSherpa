@@ -6,6 +6,13 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Test discovery uses same-package tests and syntactic direct-reference matching.",
+      "Table-test and subtest names are not extracted.",
+      "Fallback commands are package-level when direct test functions are not known."
+    ],
     "kind": "symbol",
     "tests": [
       {

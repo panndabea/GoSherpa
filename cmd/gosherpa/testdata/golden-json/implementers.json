@@ -6,6 +6,13 @@
   "modulePath": "example.com/interfaces",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Interface analysis uses local method-set matching.",
+      "Embedded local interfaces are expanded, but full module typechecking is not used for every alias, build-tag, or generic edge case.",
+      "External implementations outside the repository are not reported."
+    ],
     "implementers": [
       {
         "name": "./internal/jwt.JWTAuthenticator",

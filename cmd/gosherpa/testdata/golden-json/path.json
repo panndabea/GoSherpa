@@ -6,6 +6,13 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Path analysis uses repository-local call graph edges from syntax plus local type information.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Only bounded shortest paths requested by the command are returned."
+    ],
     "from": "Entry",
     "to": "Target",
     "paths": [

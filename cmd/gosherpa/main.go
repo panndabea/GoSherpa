@@ -20,6 +20,11 @@ const (
 	exitFailure       = 1
 	exitUsage         = 2
 	jsonSchemaVersion = 1
+
+	analysisModeAST  = agentcontext.AnalysisModeAST
+	analysisModeDiff = agentcontext.AnalysisModeDiff
+	confidenceMedium = agentcontext.ConfidenceMedium
+	confidenceLow    = agentcontext.ConfidenceLow
 )
 
 type cliInvocation struct {
@@ -79,6 +84,8 @@ type jsonErrorData struct {
 
 type referencesJSONData struct {
 	AnalysisMode string             `json:"analysisMode"`
+	Confidence   string             `json:"confidence"`
+	Limitations  []string           `json:"limitations"`
 	References   []sherpa.Reference `json:"references"`
 }
 
@@ -96,6 +103,9 @@ type searchJSONData struct {
 }
 
 type impactJSONData struct {
+	AnalysisMode string                     `json:"analysisMode"`
+	Confidence   string                     `json:"confidence"`
+	Limitations  []string                   `json:"limitations"`
 	Kind         sherpa.ImpactKind          `json:"kind"`
 	References   []sherpa.Reference         `json:"references"`
 	Callers      []sherpa.Caller            `json:"callers"`
@@ -107,6 +117,9 @@ type impactJSONData struct {
 }
 
 type impactDiffJSONData struct {
+	AnalysisMode            string                     `json:"analysisMode"`
+	Confidence              string                     `json:"confidence"`
+	Limitations             []string                   `json:"limitations"`
 	ChangedFiles            []string                   `json:"changedFiles"`
 	ChangedPackages         []string                   `json:"changedPackages"`
 	AffectedPackages        []string                   `json:"affectedPackages"`
@@ -119,13 +132,19 @@ type impactDiffJSONData struct {
 }
 
 type testsJSONData struct {
-	Kind     sherpa.TestTargetKind `json:"kind"`
-	Tests    []sherpa.RelatedTest  `json:"tests"`
-	Commands []string              `json:"commands"`
-	TestPlan sherpa.TestPlan       `json:"testPlan"`
+	AnalysisMode string                `json:"analysisMode"`
+	Confidence   string                `json:"confidence"`
+	Limitations  []string              `json:"limitations"`
+	Kind         sherpa.TestTargetKind `json:"kind"`
+	Tests        []sherpa.RelatedTest  `json:"tests"`
+	Commands     []string              `json:"commands"`
+	TestPlan     sherpa.TestPlan       `json:"testPlan"`
 }
 
 type testsAffectedJSONData struct {
+	AnalysisMode  string                     `json:"analysisMode"`
+	Confidence    string                     `json:"confidence"`
+	Limitations   []string                   `json:"limitations"`
 	AffectedTests []impactengine.RelatedTest `json:"affectedTests"`
 	Commands      []string                   `json:"commands"`
 	TestPlan      sherpa.TestPlan            `json:"testPlan"`
@@ -138,31 +157,47 @@ type dependenciesJSONData struct {
 }
 
 type implementersJSONData struct {
+	AnalysisMode string                     `json:"analysisMode"`
+	Confidence   string                     `json:"confidence"`
+	Limitations  []string                   `json:"limitations"`
 	Implementers []impactengine.Implementer `json:"implementers"`
 }
 
 type interfacesJSONData struct {
-	Interfaces []impactengine.SatisfiedInterface `json:"interfaces"`
+	AnalysisMode string                            `json:"analysisMode"`
+	Confidence   string                            `json:"confidence"`
+	Limitations  []string                          `json:"limitations"`
+	Interfaces   []impactengine.SatisfiedInterface `json:"interfaces"`
 }
 
 type callersJSONData struct {
 	AnalysisMode string          `json:"analysisMode"`
+	Confidence   string          `json:"confidence"`
+	Limitations  []string        `json:"limitations"`
 	Callers      []sherpa.Caller `json:"callers"`
 }
 
 type calleesJSONData struct {
 	AnalysisMode string          `json:"analysisMode"`
+	Confidence   string          `json:"confidence"`
+	Limitations  []string        `json:"limitations"`
 	Callees      []sherpa.Callee `json:"callees"`
 }
 
 type callPathsJSONData struct {
-	From  string            `json:"from"`
-	To    string            `json:"to"`
-	Paths []sherpa.CallPath `json:"paths"`
+	AnalysisMode string            `json:"analysisMode"`
+	Confidence   string            `json:"confidence"`
+	Limitations  []string          `json:"limitations"`
+	From         string            `json:"from"`
+	To           string            `json:"to"`
+	Paths        []sherpa.CallPath `json:"paths"`
 }
 
 type explainJSONData struct {
 	Target                  string                         `json:"target"`
+	AnalysisMode            string                         `json:"analysisMode"`
+	Confidence              string                         `json:"confidence"`
+	Limitations             []string                       `json:"limitations"`
 	Symbol                  sherpa.Symbol                  `json:"symbol"`
 	Purpose                 string                         `json:"purpose"`
 	Risk                    explainengine.RiskSummary      `json:"risk"`
@@ -974,6 +1009,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if invocation.JSON {
 			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, report.Warnings, referencesJSONData{
 				AnalysisMode: report.AnalysisMode,
+				Confidence:   jsonConfidence(report.Warnings, report.AnalysisMode),
+				Limitations:  referenceLimitations(report.AnalysisMode),
 				References:   nonNilSlice(report.References),
 			}))
 		}
@@ -1020,7 +1057,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 					"impact diff",
 					invocation.BaseRef,
 					normalizedReport.Warnings,
-					impactDiffJSONDataFromReport(normalizedReport),
+					impactDiffJSONDataFromReport(normalizedReport, analysisModeDiff),
 				))
 			}
 
@@ -1053,7 +1090,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 					"impact "+kind,
 					target,
 					normalizedReport.Warnings,
-					impactDiffJSONDataFromReport(normalizedReport),
+					impactDiffJSONDataFromReport(normalizedReport, analysisModeAST),
 				))
 			}
 
@@ -1609,6 +1646,9 @@ func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 
 func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
 	return impactJSONData{
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(result.Warnings, analysisModeAST),
+		Limitations:  impactLimitations(analysisModeAST),
 		Kind:         result.Kind,
 		References:   result.References,
 		Callers:      result.Callers,
@@ -1635,8 +1675,11 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	return report
 }
 
-func impactDiffJSONDataFromReport(report impactengine.ImpactReport) impactDiffJSONData {
+func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode string) impactDiffJSONData {
 	return impactDiffJSONData{
+		AnalysisMode:            analysisMode,
+		Confidence:              jsonConfidence(report.Warnings, analysisMode),
+		Limitations:             impactLimitations(analysisMode),
 		ChangedFiles:            report.ChangedFiles,
 		ChangedPackages:         report.ChangedPackages,
 		AffectedPackages:        report.AffectedPackages,
@@ -1659,15 +1702,21 @@ func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
 
 func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 	return testsJSONData{
-		Kind:     result.Kind,
-		Tests:    result.Tests,
-		Commands: result.Commands,
-		TestPlan: result.TestPlan,
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  testLimitations(analysisModeAST),
+		Kind:         result.Kind,
+		Tests:        result.Tests,
+		Commands:     result.Commands,
+		TestPlan:     result.TestPlan,
 	}
 }
 
 func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffectedJSONData {
 	return testsAffectedJSONData{
+		AnalysisMode:  analysisModeDiff,
+		Confidence:    jsonConfidence(report.Warnings, analysisModeDiff),
+		Limitations:   testLimitations(analysisModeDiff),
 		AffectedTests: report.AffectedTests,
 		Commands:      report.TestCommands,
 		TestPlan:      report.TestPlan,
@@ -1697,6 +1746,9 @@ func implementersJSONResult(result impactengine.ImplementersResult) impactengine
 
 func implementersJSONDataFromResult(result impactengine.ImplementersResult) implementersJSONData {
 	return implementersJSONData{
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  interfaceLimitations(),
 		Implementers: result.Implementers,
 	}
 }
@@ -1709,7 +1761,10 @@ func interfacesJSONResult(result impactengine.InterfacesResult) impactengine.Int
 
 func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfacesJSONData {
 	return interfacesJSONData{
-		Interfaces: result.Interfaces,
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  interfaceLimitations(),
+		Interfaces:   result.Interfaces,
 	}
 }
 
@@ -1723,6 +1778,8 @@ func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
 	return callersJSONData{
 		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  callLimitations(result.AnalysisMode),
 		Callers:      result.Callers,
 	}
 }
@@ -1737,6 +1794,8 @@ func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
 func calleesJSONDataFromResult(result sherpa.CalleesResult) calleesJSONData {
 	return calleesJSONData{
 		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  callLimitations(result.AnalysisMode),
 		Callees:      result.Callees,
 	}
 }
@@ -1756,9 +1815,12 @@ func callPathJSONTarget(result sherpa.CallPathsResult) string {
 
 func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONData {
 	return callPathsJSONData{
-		From:  result.From,
-		To:    result.To,
-		Paths: result.Paths,
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  callPathLimitations(),
+		From:         result.From,
+		To:           result.To,
+		Paths:        result.Paths,
 	}
 }
 
@@ -1858,6 +1920,9 @@ func explainJSONResult(report explainengine.Report) explainengine.Report {
 func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 	return explainJSONData{
 		Target:                  report.Target,
+		AnalysisMode:            analysisModeAST,
+		Confidence:              jsonConfidence(report.Warnings, analysisModeAST, report.CallAnalysisMode),
+		Limitations:             explainLimitations(report.CallAnalysisMode),
 		Symbol:                  report.Symbol,
 		Purpose:                 report.Purpose,
 		Risk:                    report.Risk,
@@ -1873,6 +1938,120 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		TestCommands:            report.TestCommands,
 		TestPlan:                report.TestPlan,
 		ReadingOrder:            report.ReadingOrder,
+	}
+}
+
+func jsonConfidence(warnings []string, analysisModes ...string) string {
+	if len(warnings) > 0 {
+		return confidenceLow
+	}
+
+	for _, mode := range analysisModes {
+		if mode == sherpa.CallAnalysisModeASTFallback {
+			return confidenceLow
+		}
+	}
+
+	return confidenceMedium
+}
+
+func referenceLimitations(analysisMode string) []string {
+	return []string{
+		referenceAnalysisLimitation(analysisMode),
+		"References are repository-local and may not include generated or build-tagged code outside the loaded package set.",
+		"Dynamic dispatch, reflection, and function values are not resolved.",
+	}
+}
+
+func referenceAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case sherpa.ReferenceAnalysisModeTypechecked:
+		return "Reference analysis used typechecked package loading where available."
+	case sherpa.ReferenceAnalysisModeASTFallback:
+		return "Reference analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Reference analysis used syntax plus local type information."
+	}
+}
+
+func callLimitations(analysisMode string) []string {
+	return []string{
+		callAnalysisLimitation(analysisMode),
+		"Call graph results are repository-local.",
+		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Imported-package receiver calls may be incomplete.",
+	}
+}
+
+func callAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case sherpa.CallAnalysisModeTypechecked:
+		return "Call analysis used typechecked package loading where available."
+	case sherpa.CallAnalysisModeASTFallback:
+		return "Call analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Call analysis used syntax plus local type information."
+	}
+}
+
+func callPathLimitations() []string {
+	return []string{
+		"Path analysis uses repository-local call graph edges from syntax plus local type information.",
+		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Only bounded shortest paths requested by the command are returned.",
+	}
+}
+
+func explainLimitations(callAnalysisMode string) []string {
+	limitations := []string{
+		"Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
+		"Purpose, risk, architecture role, and reading order are deterministic heuristics.",
+	}
+	limitations = append(limitations, callLimitations(callAnalysisMode)...)
+	limitations = append(limitations, testLimitations(analysisModeAST)...)
+
+	return limitations
+}
+
+func impactLimitations(analysisMode string) []string {
+	if analysisMode == analysisModeDiff {
+		return []string{
+			"Diff impact is based on git changed files and hunk-level changed symbol extraction.",
+			"Impact analysis uses syntax plus local package dependency and interface signals.",
+			"Statement-level semantic consequences are not fully inferred.",
+			"Dynamic dispatch, reflection, and function values are not resolved.",
+		}
+	}
+
+	return []string{
+		"Impact analysis uses syntax plus local package dependency and interface signals.",
+		"Symbol impact includes references and conservative caller-package propagation.",
+		"Interface impact uses local method-set matching and may miss alias, build-tag, or generic edge cases.",
+		"Dynamic dispatch, reflection, and function values are not resolved.",
+	}
+}
+
+func testLimitations(analysisMode string) []string {
+	if analysisMode == analysisModeDiff {
+		return []string{
+			"Affected test planning is based on changed packages, affected packages, and syntactic test references.",
+			"Table-test and subtest names are not extracted.",
+			"Fallback commands are package-level when direct test functions are not known.",
+		}
+	}
+
+	return []string{
+		"Test discovery uses same-package tests and syntactic direct-reference matching.",
+		"Table-test and subtest names are not extracted.",
+		"Fallback commands are package-level when direct test functions are not known.",
+	}
+}
+
+func interfaceLimitations() []string {
+	return []string{
+		"Interface analysis uses local method-set matching.",
+		"Embedded local interfaces are expanded, but full module typechecking is not used for every alias, build-tag, or generic edge case.",
+		"External implementations outside the repository are not reported.",
 	}
 }
 

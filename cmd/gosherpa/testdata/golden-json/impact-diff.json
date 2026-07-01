@@ -6,6 +6,14 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "git-diff+ast",
+    "confidence": "medium",
+    "limitations": [
+      "Diff impact is based on git changed files and hunk-level changed symbol extraction.",
+      "Impact analysis uses syntax plus local package dependency and interface signals.",
+      "Statement-level semantic consequences are not fully inferred.",
+      "Dynamic dispatch, reflection, and function values are not resolved."
+    ],
     "changedFiles": [
       "service.go"
     ],

@@ -6,6 +6,14 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Impact analysis uses syntax plus local package dependency and interface signals.",
+      "Symbol impact includes references and conservative caller-package propagation.",
+      "Interface impact uses local method-set matching and may miss alias, build-tag, or generic edge cases.",
+      "Dynamic dispatch, reflection, and function values are not resolved."
+    ],
     "changedFiles": [],
     "changedPackages": [
       "."

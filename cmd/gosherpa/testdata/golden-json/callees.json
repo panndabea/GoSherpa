@@ -7,6 +7,13 @@
   "warnings": [],
   "data": {
     "analysisMode": "typechecked",
+    "confidence": "medium",
+    "limitations": [
+      "Call analysis used typechecked package loading where available.",
+      "Call graph results are repository-local.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Imported-package receiver calls may be incomplete."
+    ],
     "callees": [
       {
         "name": "First",
