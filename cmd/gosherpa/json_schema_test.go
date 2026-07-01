@@ -1,0 +1,102 @@
+package main
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/supertabaluga/gosherpa/internal/agentcontext"
+	"github.com/supertabaluga/gosherpa/internal/sherpa"
+)
+
+func TestMainAgentJSONSchemaContracts(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	tests := []struct {
+		name       string
+		args       []string
+		command    string
+		target     string
+		wantFields map[string]string
+		wantArrays []string
+	}{
+		{
+			name:    "callers",
+			args:    []string{"callers", "Target", "--json"},
+			command: "callers",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode": sherpa.CallAnalysisModeTypechecked,
+			},
+			wantArrays: []string{"callers"},
+		},
+		{
+			name:    "callees",
+			args:    []string{"callees", "Entry", "--json"},
+			command: "callees",
+			target:  "Entry",
+			wantFields: map[string]string{
+				"analysisMode": sherpa.CallAnalysisModeTypechecked,
+			},
+			wantArrays: []string{"callees"},
+		},
+		{
+			name:    "explain",
+			args:    []string{"explain", "Target", "--json"},
+			command: "explain",
+			target:  "Target",
+			wantFields: map[string]string{
+				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
+			},
+			wantArrays: []string{"references", "callers", "callees", "readingOrder"},
+		},
+		{
+			name:    "context symbol",
+			args:    []string{"context", "symbol", "Target", "--json"},
+			command: "context symbol",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode":     agentcontext.AnalysisModeAST,
+				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
+			},
+			wantArrays: []string{"references", "callers", "callees", "readingOrder"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"gosherpa", "--root", tmp}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+
+			payload := decodeMainTestJSON(t, result.Stdout)
+			data := assertMainTestJSONEnvelope(t, payload, tmp, test.command, test.target, "example.com/app")
+
+			for field, want := range test.wantFields {
+				if data[field] != want {
+					t.Fatalf("expected data.%s %q, got %v", field, want, data[field])
+				}
+			}
+
+			for _, field := range test.wantArrays {
+				if _, ok := data[field].([]any); !ok {
+					t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
+				}
+			}
+
+			if _, ok := data["warnings"]; ok {
+				t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+			}
+
+			if strings.Contains(result.Stdout, strings.ToUpper(test.command)) {
+				t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+			}
+		})
+	}
+}
