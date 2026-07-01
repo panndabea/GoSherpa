@@ -1,6 +1,7 @@
 package sherpa
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -8,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 )
 
 func TestNormalizeCallTarget(t *testing.T) {
@@ -541,6 +544,36 @@ func TestFindCalleesUsesPackageQualifiedTarget(t *testing.T) {
 	}
 }
 
+func TestFindCalleesUsesSemanticLoaderForCrossPackageReceiverMethodCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+
+	result, err := FindCallees(tmp, "./cmd/app.Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(names, []string{"Client.Start"}) {
+		t.Fatalf("expected semantic receiver method callee, got %v", names)
+	}
+}
+
 func TestFindCalleesIgnoresTestFiles(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -815,6 +848,112 @@ func TestFindCallersNormalizesModulePathTargets(t *testing.T) {
 	files := callTestCallerFiles(result.Callers)
 	if containsString(files, "internal/billing/billing.go") {
 		t.Fatalf("expected auth callers only, got %v", files)
+	}
+}
+
+func TestFindCallersUsesSemanticLoaderForPackageNameSelectorCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "adapter", "target.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/adapter"
+
+func Run() {
+	service.Target()
+}
+`)
+
+	result, err := FindCallers(tmp, "./internal/adapter.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected semantic package selector caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", files)
+	}
+}
+
+func TestFindCallersUsesSemanticLoaderForCrossPackageReceiverMethodCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+
+	result, err := FindCallers(tmp, "./internal/service.Client.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected semantic receiver method caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", files)
+	}
+}
+
+func TestFindCallsFallBackToASTWhenSemanticLoaderFails(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	oldLoader := loadSemanticCallRepository
+	loadSemanticCallRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, fmt.Errorf("loader failed")
+	}
+	t.Cleanup(func() {
+		loadSemanticCallRepository = oldLoader
+	})
+
+	callees, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(callTestCalleeNames(callees.Callees), []string{"Target"}) {
+		t.Fatalf("expected AST fallback callee, got %v", callees.Callees)
+	}
+
+	callers, err := FindCallers(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(callTestCallerNames(callers.Callers), []string{"Run"}) {
+		t.Fatalf("expected AST fallback caller, got %v", callers.Callers)
 	}
 }
 

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 )
 
 type Callee struct {
@@ -109,6 +111,8 @@ type callPathSearchState struct {
 	Steps []CallPathStep
 }
 
+var loadSemanticCallRepository = semantics.LoadRepository
+
 func FindCallees(root string, target string) (CalleesResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
@@ -120,20 +124,28 @@ func FindCallees(root string, target string) (CalleesResult, error) {
 		return CalleesResult{}, err
 	}
 
+	if functions, ok := collectTypecheckedCallFunctionInfos(rootPath); ok {
+		return findCalleesInFunctions(functions, normalizedTarget)
+	}
+
 	functions, err := collectFunctionInfos(rootPath)
 	if err != nil {
 		return CalleesResult{Target: normalizedTarget.String()}, err
 	}
 
-	function, err := findFunctionInfo(functions, normalizedTarget)
+	return findCalleesInFunctions(functions, normalizedTarget)
+}
+
+func findCalleesInFunctions(functions []functionInfo, target callTarget) (CalleesResult, error) {
+	function, err := findFunctionInfo(functions, target)
 	if err != nil {
-		return CalleesResult{Target: normalizedTarget.String()}, err
+		return CalleesResult{Target: target.String()}, err
 	}
 
 	callees := collectCalleesFromFunction(function)
 
 	return CalleesResult{
-		Target:  normalizedTarget.String(),
+		Target:  target.String(),
 		Callees: callees,
 	}, nil
 }
@@ -153,21 +165,33 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 		return CallersResult{}, err
 	}
 
+	if functions, ok := collectTypecheckedCallFunctionInfos(rootPath); ok {
+		return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options)
+	}
+
 	functions, err := collectFunctionInfos(rootPath)
 	if err != nil {
 		return CallersResult{Target: normalizedTarget.String()}, err
 	}
 
-	function, err := findFunctionInfo(functions, normalizedTarget)
+	return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options)
+}
+
+func findCallersInFunctions(functions []functionInfo, target callTarget) (CallersResult, error) {
+	return findCallersInFunctionsWithOptions("", functions, target, CallOptions{})
+}
+
+func findCallersInFunctionsWithOptions(root string, functions []functionInfo, target callTarget, options CallOptions) (CallersResult, error) {
+	function, err := findFunctionInfo(functions, target)
 	if err != nil {
-		return CallersResult{Target: normalizedTarget.String()}, err
+		return CallersResult{Target: target.String()}, err
 	}
 
 	callerFunctions := functions
 	if options.IncludeTests {
-		testFunctions, err := collectTestCallerFunctionInfos(rootPath)
+		testFunctions, err := collectTestCallerFunctionInfos(root)
 		if err != nil {
-			return CallersResult{Target: normalizedTarget.String()}, err
+			return CallersResult{Target: target.String()}, err
 		}
 
 		callerFunctions = append(callerFunctions, testFunctions...)
@@ -176,7 +200,7 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 	callers := collectCallersFromFunctions(callerFunctions, functionCallTarget(function))
 
 	return CallersResult{
-		Target:  normalizedTarget.String(),
+		Target:  target.String(),
 		Callers: callers,
 	}, nil
 }
@@ -431,6 +455,76 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	}
 
 	return functions, nil
+}
+
+func collectTypecheckedCallFunctionInfos(root string) ([]functionInfo, bool) {
+	if !referenceShouldAttemptTypechecked(root) {
+		return nil, false
+	}
+
+	repo, err := loadSemanticCallRepository(root, semantics.LoadOptions{})
+	if err != nil {
+		return nil, false
+	}
+
+	functions := semanticCallFunctionInfos(repo)
+	if len(functions) == 0 {
+		return nil, false
+	}
+
+	return functions, true
+}
+
+func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {
+	modulePath := readModulePath(repo.Root)
+
+	var functions []functionInfo
+	for _, pkg := range repo.Packages {
+		if !semanticCallPackageUsable(pkg) {
+			continue
+		}
+
+		for _, parsedFile := range pkg.Files {
+			imports := callImportAliases(parsedFile, modulePath)
+			for _, decl := range parsedFile.Decls {
+				funcDecl, ok := decl.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+
+				receiver := receiverTypeName(funcDecl)
+				name := funcDecl.Name.Name
+				pos := pkg.FileSet.Position(funcDecl.Pos())
+				position := positionRelativeToRoot(repo.Root, Position{
+					File: pos.Filename,
+					Line: pos.Line,
+				})
+
+				functions = append(functions, functionInfo{
+					Package:    pkg.PackagePath,
+					ImportPath: pkg.ImportPath,
+					ModulePath: modulePath,
+					Receiver:   receiver,
+					Name:       name,
+					Target:     functionTargetName(funcDecl),
+					Decl:       funcDecl,
+					FileSet:    pkg.FileSet,
+					TypeInfo:   pkg.TypesInfo,
+					Position:   position,
+					Root:       repo.Root,
+					Imports:    imports,
+				})
+			}
+		}
+	}
+
+	sortFunctionInfos(functions)
+
+	return functions
+}
+
+func semanticCallPackageUsable(pkg semantics.Package) bool {
+	return pkg.FileSet != nil && pkg.TypesInfo != nil && len(pkg.Files) > 0
 }
 
 func collectTestCallerFunctionInfos(root string) ([]functionInfo, error) {
@@ -868,6 +962,10 @@ func selectorName(expr ast.Expr) (string, bool) {
 }
 
 func callExprReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
+	if callObjectReferencesTarget(function, target, expr) {
+		return true
+	}
+
 	if callSelectionReferencesTarget(function, target, expr) {
 		return true
 	}
@@ -907,6 +1005,49 @@ func callExprReferencesTarget(function functionInfo, target callTarget, expr ast
 	}
 
 	return false
+}
+
+func callObjectReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
+	object := callObject(function, expr)
+	return callFunctionObjectReferencesTarget(function, object, target)
+}
+
+func callObject(function functionInfo, expr ast.Expr) types.Object {
+	if function.TypeInfo == nil {
+		return nil
+	}
+
+	switch node := expr.(type) {
+	case *ast.Ident:
+		return function.TypeInfo.Uses[node]
+	case *ast.SelectorExpr:
+		return function.TypeInfo.Uses[node.Sel]
+	case *ast.IndexExpr:
+		return callObject(function, node.X)
+	case *ast.IndexListExpr:
+		return callObject(function, node.X)
+	case *ast.ParenExpr:
+		return callObject(function, node.X)
+	default:
+		return nil
+	}
+}
+
+func callFunctionObjectReferencesTarget(function functionInfo, object types.Object, target callTarget) bool {
+	called, ok := object.(*types.Func)
+	if !ok {
+		return false
+	}
+
+	if called.Name() != target.Name {
+		return false
+	}
+
+	if callFuncReceiverName(called) != target.Receiver {
+		return false
+	}
+
+	return callObjectPackageMatchesTarget(function, called, target)
 }
 
 func callSelectionReferencesTarget(function functionInfo, target callTarget, expr ast.Expr) bool {
@@ -965,6 +1106,10 @@ func callSelectionReceiverName(selection *types.Selection) string {
 		return ""
 	}
 
+	return callFuncReceiverName(function)
+}
+
+func callFuncReceiverName(function *types.Func) string {
 	signature, ok := function.Type().(*types.Signature)
 	if !ok || signature.Recv() == nil {
 		return ""
