@@ -161,13 +161,41 @@ func packageWarnings(root string, pkg *packages.Package) []string {
 	label := packageLabel(pkg)
 	var warnings []string
 	for _, packageErr := range pkg.Errors {
-		warnings = append(warnings, fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, packageErr.Error())))
+		message := packageErr.Error()
+		if !packageLoadWarningIsActionable(pkg, message) {
+			continue
+		}
+
+		warnings = append(warnings, fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, message)))
 	}
 	for _, typeErr := range pkg.TypeErrors {
 		warnings = append(warnings, fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, typeErr.Error())))
 	}
 
 	return warnings
+}
+
+func packageLoadWarningIsActionable(pkg *packages.Package, message string) bool {
+	if packageLoadWarningIsTransientCacheMiss(message) && packageHasUsableSemanticData(pkg) {
+		return false
+	}
+
+	return true
+}
+
+func packageLoadWarningIsTransientCacheMiss(message string) bool {
+	value := strings.ToLower(filepath.ToSlash(message))
+
+	return strings.Contains(value, "loading compiled go files from cache") &&
+		strings.Contains(value, "reading srcfiles list") &&
+		strings.Contains(value, "cache entry not found")
+}
+
+func packageHasUsableSemanticData(pkg *packages.Package) bool {
+	return pkg != nil &&
+		len(pkg.Syntax) > 0 &&
+		pkg.Types != nil &&
+		pkg.TypesInfo != nil
 }
 
 func packageLabel(pkg *packages.Package) string {

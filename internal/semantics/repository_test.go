@@ -1,10 +1,14 @@
 package semantics
 
 import (
+	"go/ast"
+	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func TestLoadRepositoryLoadsLocalPackages(t *testing.T) {
@@ -61,6 +65,44 @@ func Broken() {
 	}
 	if !strings.Contains(strings.Join(repo.Warnings, "\n"), "Missing") {
 		t.Fatalf("expected warning to mention Missing, got %v", repo.Warnings)
+	}
+}
+
+func TestPackageWarningsIgnoresTransientGoBuildCacheMissWithUsableData(t *testing.T) {
+	pkg := &packages.Package{
+		PkgPath:   "example.com/app",
+		Syntax:    []*ast.File{{}},
+		Types:     types.NewPackage("example.com/app", "app"),
+		TypesInfo: &types.Info{},
+		Errors: []packages.Error{
+			{
+				Msg: "-: loading compiled Go files from cache: reading srcfiles list: cache entry not found: open /Users/example/Library/Caches/go-build/07/cache-a: no such file or directory",
+			},
+		},
+	}
+
+	warnings := packageWarnings(t.TempDir(), pkg)
+	if len(warnings) != 0 {
+		t.Fatalf("expected transient cache miss to be ignored, got %v", warnings)
+	}
+}
+
+func TestPackageWarningsKeepsCacheMissWithoutUsableData(t *testing.T) {
+	pkg := &packages.Package{
+		PkgPath: "example.com/app",
+		Errors: []packages.Error{
+			{
+				Msg: "-: loading compiled Go files from cache: reading srcfiles list: cache entry not found: open /Users/example/Library/Caches/go-build/07/cache-a: no such file or directory",
+			},
+		},
+	}
+
+	warnings := packageWarnings(t.TempDir(), pkg)
+	if len(warnings) == 0 {
+		t.Fatal("expected cache miss to remain visible when semantic data is unavailable")
+	}
+	if !strings.Contains(warnings[0], "cache entry not found") {
+		t.Fatalf("expected cache warning, got %v", warnings)
 	}
 }
 
