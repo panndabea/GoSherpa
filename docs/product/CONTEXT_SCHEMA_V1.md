@@ -72,8 +72,8 @@ explains what was omitted from the bounded context bundle.
 ## Context Kinds
 
 `context symbol` adds symbol identity, definition, source context, references,
-callers, callees, affected packages, interface signals, related tests, and test
-planning.
+callers, callees, `callAnalysisMode`, affected packages, interface signals,
+related tests, and test planning.
 
 `context file` adds file identity, package identity, file symbols, source
 contexts, package-level impact, affected tests, and test planning.

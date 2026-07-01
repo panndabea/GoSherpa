@@ -21,9 +21,16 @@ type Callee struct {
 	Position Position `json:"position"`
 }
 
+const (
+	CallAnalysisModeTypechecked = "typechecked"
+	CallAnalysisModeASTFallback = "ast-fallback"
+)
+
 type CalleesResult struct {
-	Target  string   `json:"target"`
-	Callees []Callee `json:"callees"`
+	Target       string   `json:"target"`
+	AnalysisMode string   `json:"analysisMode"`
+	Warnings     []string `json:"warnings"`
+	Callees      []Callee `json:"callees"`
 }
 
 type Caller struct {
@@ -32,8 +39,10 @@ type Caller struct {
 }
 
 type CallersResult struct {
-	Target  string   `json:"target"`
-	Callers []Caller `json:"callers"`
+	Target       string   `json:"target"`
+	AnalysisMode string   `json:"analysisMode"`
+	Warnings     []string `json:"warnings"`
+	Callers      []Caller `json:"callers"`
 }
 
 type CallOptions struct {
@@ -124,29 +133,35 @@ func FindCallees(root string, target string) (CalleesResult, error) {
 		return CalleesResult{}, err
 	}
 
-	if functions, ok := collectTypecheckedCallFunctionInfos(rootPath); ok {
-		return findCalleesInFunctions(functions, normalizedTarget)
-	}
-
-	functions, err := collectFunctionInfos(rootPath)
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath)
 	if err != nil {
-		return CalleesResult{Target: normalizedTarget.String()}, err
+		return CalleesResult{
+			Target:       normalizedTarget.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
-	return findCalleesInFunctions(functions, normalizedTarget)
+	return findCalleesInFunctions(functions, normalizedTarget, analysisMode, warnings)
 }
 
-func findCalleesInFunctions(functions []functionInfo, target callTarget) (CalleesResult, error) {
+func findCalleesInFunctions(functions []functionInfo, target callTarget, analysisMode string, warnings []string) (CalleesResult, error) {
 	function, err := findFunctionInfo(functions, target)
 	if err != nil {
-		return CalleesResult{Target: target.String()}, err
+		return CalleesResult{
+			Target:       target.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
 	callees := collectCalleesFromFunction(function)
 
 	return CalleesResult{
-		Target:  target.String(),
-		Callees: callees,
+		Target:       target.String(),
+		AnalysisMode: analysisMode,
+		Warnings:     nonNilStrings(warnings),
+		Callees:      callees,
 	}, nil
 }
 
@@ -165,33 +180,41 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 		return CallersResult{}, err
 	}
 
-	if functions, ok := collectTypecheckedCallFunctionInfos(rootPath); ok {
-		return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options)
-	}
-
-	functions, err := collectFunctionInfos(rootPath)
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath)
 	if err != nil {
-		return CallersResult{Target: normalizedTarget.String()}, err
+		return CallersResult{
+			Target:       normalizedTarget.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
-	return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options)
+	return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options, analysisMode, warnings)
 }
 
 func findCallersInFunctions(functions []functionInfo, target callTarget) (CallersResult, error) {
-	return findCallersInFunctionsWithOptions("", functions, target, CallOptions{})
+	return findCallersInFunctionsWithOptions("", functions, target, CallOptions{}, "", nil)
 }
 
-func findCallersInFunctionsWithOptions(root string, functions []functionInfo, target callTarget, options CallOptions) (CallersResult, error) {
+func findCallersInFunctionsWithOptions(root string, functions []functionInfo, target callTarget, options CallOptions, analysisMode string, warnings []string) (CallersResult, error) {
 	function, err := findFunctionInfo(functions, target)
 	if err != nil {
-		return CallersResult{Target: target.String()}, err
+		return CallersResult{
+			Target:       target.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
 	callerFunctions := functions
 	if options.IncludeTests {
 		testFunctions, err := collectTestCallerFunctionInfos(root)
 		if err != nil {
-			return CallersResult{Target: target.String()}, err
+			return CallersResult{
+				Target:       target.String(),
+				AnalysisMode: analysisMode,
+				Warnings:     nonNilStrings(warnings),
+			}, err
 		}
 
 		callerFunctions = append(callerFunctions, testFunctions...)
@@ -200,8 +223,10 @@ func findCallersInFunctionsWithOptions(root string, functions []functionInfo, ta
 	callers := collectCallersFromFunctions(callerFunctions, functionCallTarget(function))
 
 	return CallersResult{
-		Target:  target.String(),
-		Callers: callers,
+		Target:       target.String(),
+		AnalysisMode: analysisMode,
+		Warnings:     nonNilStrings(warnings),
+		Callers:      callers,
 	}, nil
 }
 
@@ -457,22 +482,36 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	return functions, nil
 }
 
-func collectTypecheckedCallFunctionInfos(root string) ([]functionInfo, bool) {
+func collectCallFunctionInfos(root string) ([]functionInfo, string, []string, error) {
+	functions, warnings, ok := collectTypecheckedCallFunctionInfos(root)
+	if ok {
+		return functions, CallAnalysisModeTypechecked, warnings, nil
+	}
+
+	functions, err := collectFunctionInfos(root)
+	if err != nil {
+		return nil, CallAnalysisModeASTFallback, warnings, err
+	}
+
+	return functions, CallAnalysisModeASTFallback, warnings, nil
+}
+
+func collectTypecheckedCallFunctionInfos(root string) ([]functionInfo, []string, bool) {
 	if !referenceShouldAttemptTypechecked(root) {
-		return nil, false
+		return nil, nil, false
 	}
 
 	repo, err := loadSemanticCallRepository(root, semantics.LoadOptions{})
 	if err != nil {
-		return nil, false
+		return nil, []string{fmt.Sprintf("typechecked call analysis unavailable: %v", err)}, false
 	}
 
 	functions := semanticCallFunctionInfos(repo)
 	if len(functions) == 0 {
-		return nil, false
+		return nil, append([]string{"typechecked call analysis unavailable: no typechecked packages loaded"}, repo.Warnings...), false
 	}
 
-	return functions, true
+	return functions, nonNilStrings(repo.Warnings), true
 }
 
 func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {

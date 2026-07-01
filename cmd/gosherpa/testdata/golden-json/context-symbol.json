@@ -131,6 +131,7 @@
       }
     ],
     "callees": [],
+    "callAnalysisMode": "typechecked",
     "affectedPackages": [
       ".",
       "./cmd/app"
@@ -211,7 +212,7 @@
     "analysisMode": "ast",
     "confidence": "medium",
     "limitations": [
-      "Analysis uses syntax plus local type information, not full module loading.",
+      "Call analysis used typechecked package loading where available.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Call graph results are repository-local and may miss some imported-package receiver calls.",
       "Test discovery uses same-package tests and syntactic direct-reference matching.",

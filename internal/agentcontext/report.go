@@ -30,6 +30,7 @@ type Report struct {
 	References              []sherpa.Reference             `json:"references"`
 	Callers                 []sherpa.Caller                `json:"callers"`
 	Callees                 []sherpa.Callee                `json:"callees"`
+	CallAnalysisMode        string                         `json:"callAnalysisMode"`
 	AffectedPackages        []string                       `json:"affectedPackages"`
 	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
 	AffectedImplementations []string                       `json:"affectedImplementations"`
@@ -84,6 +85,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		References:              explainReport.References,
 		Callers:                 explainReport.Callers,
 		Callees:                 explainReport.Callees,
+		CallAnalysisMode:        explainReport.CallAnalysisMode,
 		AffectedPackages:        explainReport.AffectedPackages,
 		AffectedInterfaces:      explainReport.AffectedInterfaces,
 		AffectedImplementations: explainReport.AffectedImplementations,
@@ -95,7 +97,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
-	report.Limitations = limitations(options.IncludeTests)
+	report.Limitations = limitations(options.IncludeTests, report.CallAnalysisMode)
 	report.Confidence = confidence(report)
 	report = applySymbolLimits(report, limits)
 
@@ -193,9 +195,9 @@ func identityFromSymbol(target string, symbol sherpa.Symbol) Identity {
 	}
 }
 
-func limitations(includeTestCallers bool) []string {
+func limitations(includeTestCallers bool, callAnalysisMode string) []string {
 	values := []string{
-		"Analysis uses syntax plus local type information, not full module loading.",
+		callAnalysisLimitation(callAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
 		"Test discovery uses same-package tests and syntactic direct-reference matching.",
@@ -206,6 +208,17 @@ func limitations(includeTestCallers bool) []string {
 	}
 
 	return values
+}
+
+func callAnalysisLimitation(callAnalysisMode string) string {
+	switch callAnalysisMode {
+	case sherpa.CallAnalysisModeTypechecked:
+		return "Call analysis used typechecked package loading where available."
+	case sherpa.CallAnalysisModeASTFallback:
+		return "Call analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Analysis uses syntax plus local type information, not full module loading."
+	}
 }
 
 func confidence(report Report) string {

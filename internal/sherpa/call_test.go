@@ -574,6 +574,42 @@ func Run(client *service.Client) {
 	}
 }
 
+func TestFindCallsReportTypecheckedAnalysisMode(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	callees, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callees.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked callee analysis mode, got %q", callees.AnalysisMode)
+	}
+	if len(callees.Warnings) != 0 {
+		t.Fatalf("expected no callee warnings, got %v", callees.Warnings)
+	}
+
+	callers, err := FindCallers(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callers.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked caller analysis mode, got %q", callers.AnalysisMode)
+	}
+	if len(callers.Warnings) != 0 {
+		t.Fatalf("expected no caller warnings, got %v", callers.Warnings)
+	}
+}
+
 func TestFindCalleesIgnoresTestFiles(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -947,6 +983,12 @@ func Target() {}
 	if !reflect.DeepEqual(callTestCalleeNames(callees.Callees), []string{"Target"}) {
 		t.Fatalf("expected AST fallback callee, got %v", callees.Callees)
 	}
+	if callees.AnalysisMode != CallAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback callee analysis mode, got %q", callees.AnalysisMode)
+	}
+	if !reflect.DeepEqual(callees.Warnings, []string{"typechecked call analysis unavailable: loader failed"}) {
+		t.Fatalf("expected fallback callee warning, got %v", callees.Warnings)
+	}
 
 	callers, err := FindCallers(tmp, "Target")
 	if err != nil {
@@ -954,6 +996,12 @@ func Target() {}
 	}
 	if !reflect.DeepEqual(callTestCallerNames(callers.Callers), []string{"Run"}) {
 		t.Fatalf("expected AST fallback caller, got %v", callers.Callers)
+	}
+	if callers.AnalysisMode != CallAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback caller analysis mode, got %q", callers.AnalysisMode)
+	}
+	if !reflect.DeepEqual(callers.Warnings, []string{"typechecked call analysis unavailable: loader failed"}) {
+		t.Fatalf("expected fallback caller warning, got %v", callers.Warnings)
 	}
 }
 

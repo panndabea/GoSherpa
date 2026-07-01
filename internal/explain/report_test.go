@@ -39,6 +39,9 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 
 	assertNames(t, callerNames(report.Callers), []string{"Entry"})
 	assertNames(t, calleeNames(report.Callees), []string{"Helper"})
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
 	assertNames(t, report.AffectedPackages, []string{"."})
 	assertNames(t, testNames(report.RelatedTests), []string{"TestTarget"})
 	assertNames(t, report.TestCommands, []string{"go test ."})

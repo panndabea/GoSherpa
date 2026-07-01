@@ -94,6 +94,41 @@ func TestFormatCalleesWithEmptyList(t *testing.T) {
 	}
 }
 
+func TestFormatCalleesShowsAnalysisModeAndWarnings(t *testing.T) {
+	result := CalleesResult{
+		Target:       "Run",
+		AnalysisMode: CallAnalysisModeASTFallback,
+		Warnings:     []string{"typechecked call analysis unavailable: loader failed"},
+		Callees: []Callee{
+			{
+				Name: "Step",
+				Position: Position{
+					File: "service.go",
+					Line: 4,
+				},
+			},
+		},
+	}
+
+	got := FormatCallees(result)
+	want := fmt.Sprintf(`CALLEES
+
+Run
+Analysis: ast-fallback
+
+  %-36s service.go:4
+
+WARNINGS
+  typechecked call analysis unavailable: loader failed
+
+Found 1 callees
+`, "Step")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatCallers(t *testing.T) {
 	result := CallersResult{
 		Target: "ParseFile",

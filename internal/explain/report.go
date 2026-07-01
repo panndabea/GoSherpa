@@ -23,6 +23,7 @@ type Report struct {
 	References              []sherpa.Reference   `json:"references"`
 	Callers                 []sherpa.Caller      `json:"callers"`
 	Callees                 []sherpa.Callee      `json:"callees"`
+	CallAnalysisMode        string               `json:"callAnalysisMode"`
 	AffectedPackages        []string             `json:"affectedPackages"`
 	AffectedInterfaces      []string             `json:"affectedInterfaces"`
 	AffectedImplementations []string             `json:"affectedImplementations"`
@@ -109,10 +110,11 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		report.Warnings = append(report.Warnings, impactReport.Warnings...)
 	}
 
-	callers, callees, warnings := callSignalsForSymbol(root, impactResult.Target, symbol, options)
-	report.Callers = callers
-	report.Callees = callees
-	report.Warnings = append(report.Warnings, warnings...)
+	callSignals := callSignalsForSymbol(root, impactResult.Target, symbol, options)
+	report.Callers = callSignals.Callers
+	report.Callees = callSignals.Callees
+	report.CallAnalysisMode = callSignals.AnalysisMode
+	report.Warnings = append(report.Warnings, callSignals.Warnings...)
 
 	report.Risk = riskSummary(report)
 	report.ArchitectureRole = architectureRole(report)

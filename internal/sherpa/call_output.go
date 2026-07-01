@@ -15,7 +15,11 @@ func FormatCalleesWithContext(result CalleesResult, contexts []SourceContext) st
 
 func formatCallees(result CalleesResult, contexts []SourceContext) string {
 	if len(result.Callees) == 0 {
-		return fmt.Sprintf("no callees found: %s\n", result.Target)
+		var builder strings.Builder
+		fmt.Fprintf(&builder, "no callees found: %s\n", result.Target)
+		writeCallAnalysis(&builder, result.AnalysisMode)
+		writeCallWarnings(&builder, result.Warnings)
+		return builder.String()
 	}
 
 	var builder strings.Builder
@@ -24,6 +28,7 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 	builder.WriteString("\n")
 	builder.WriteString(result.Target)
 	builder.WriteString("\n")
+	writeCallAnalysis(&builder, result.AnalysisMode)
 	builder.WriteString("\n")
 
 	for index, callee := range result.Callees {
@@ -43,6 +48,7 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 	}
 
 	builder.WriteString("\n")
+	writeCallWarnings(&builder, result.Warnings)
 	fmt.Fprintf(&builder, "Found %d callees\n", len(result.Callees))
 
 	return builder.String()
@@ -62,7 +68,11 @@ func FormatCallersWithContext(result CallersResult, contexts []SourceContext) st
 
 func formatCallers(result CallersResult, contexts []SourceContext) string {
 	if len(result.Callers) == 0 {
-		return fmt.Sprintf("no callers found: %s\n", result.Target)
+		var builder strings.Builder
+		fmt.Fprintf(&builder, "no callers found: %s\n", result.Target)
+		writeCallAnalysis(&builder, result.AnalysisMode)
+		writeCallWarnings(&builder, result.Warnings)
+		return builder.String()
 	}
 
 	var builder strings.Builder
@@ -71,6 +81,7 @@ func formatCallers(result CallersResult, contexts []SourceContext) string {
 	builder.WriteString("\n")
 	builder.WriteString(result.Target)
 	builder.WriteString("\n")
+	writeCallAnalysis(&builder, result.AnalysisMode)
 	builder.WriteString("\n")
 
 	for index, caller := range result.Callers {
@@ -90,6 +101,7 @@ func formatCallers(result CallersResult, contexts []SourceContext) string {
 	}
 
 	builder.WriteString("\n")
+	writeCallWarnings(&builder, result.Warnings)
 	fmt.Fprintf(&builder, "Found %d callers\n", len(result.Callers))
 
 	return builder.String()
@@ -97,6 +109,32 @@ func formatCallers(result CallersResult, contexts []SourceContext) string {
 
 func PrintCallers(result CallersResult) {
 	fmt.Print(FormatCallers(result))
+}
+
+func writeCallAnalysis(builder *strings.Builder, analysisMode string) {
+	analysisMode = strings.TrimSpace(analysisMode)
+	if analysisMode == "" {
+		return
+	}
+
+	fmt.Fprintf(builder, "Analysis: %s\n", analysisMode)
+}
+
+func writeCallWarnings(builder *strings.Builder, warnings []string) {
+	if len(warnings) == 0 {
+		return
+	}
+
+	builder.WriteString("WARNINGS\n")
+	for _, warning := range warnings {
+		warning = strings.TrimSpace(warning)
+		if warning == "" {
+			continue
+		}
+
+		fmt.Fprintf(builder, "  %s\n", warning)
+	}
+	builder.WriteString("\n")
 }
 
 func FormatCallPaths(result CallPathsResult) string {

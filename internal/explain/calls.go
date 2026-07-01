@@ -33,18 +33,69 @@ type explainFunctionInfo struct {
 	Imports    map[string]string
 }
 
-func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) ([]sherpa.Caller, []sherpa.Callee, []string) {
+type callSignalsResult struct {
+	Callers      []sherpa.Caller
+	Callees      []sherpa.Callee
+	AnalysisMode string
+	Warnings     []string
+}
+
+func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) callSignalsResult {
 	callTarget := callSignalTargetForSymbol(root, target, symbol)
 	if callTarget.Name == "" {
-		return nil, nil, nil
+		return callSignalsResult{}
 	}
 
-	callers, callees, err := findCallSignals(root, callTarget, options)
-	if err != nil {
-		return nil, nil, []string{"calls: " + err.Error()}
+	targetName := callTarget.Display()
+	callers, callersErr := sherpa.FindCallersWithOptions(root, targetName, sherpa.CallOptions{
+		IncludeTests: options.IncludeTests,
+	})
+	callees, calleesErr := sherpa.FindCallees(root, targetName)
+
+	result := callSignalsResult{
+		AnalysisMode: mergeCallAnalysisModes(callers.AnalysisMode, callees.AnalysisMode),
+		Warnings:     append([]string{}, callers.Warnings...),
+	}
+	result.Warnings = append(result.Warnings, callees.Warnings...)
+
+	if callersErr != nil {
+		result.Warnings = append(result.Warnings, "callers: "+callersErr.Error())
+	} else {
+		result.Callers = callers.Callers
 	}
 
-	return callers, callees, nil
+	if calleesErr != nil {
+		result.Warnings = append(result.Warnings, "callees: "+calleesErr.Error())
+	} else {
+		result.Callees = callees.Callees
+	}
+
+	if callersErr != nil || calleesErr != nil {
+		fallbackCallers, fallbackCallees, fallbackErr := findCallSignals(root, callTarget, options)
+		if fallbackErr == nil {
+			if callersErr != nil {
+				result.Callers = fallbackCallers
+			}
+			if calleesErr != nil {
+				result.Callees = fallbackCallees
+			}
+		}
+	}
+
+	return result
+}
+
+func mergeCallAnalysisModes(first string, second string) string {
+	first = strings.TrimSpace(first)
+	second = strings.TrimSpace(second)
+	if first == "" {
+		return second
+	}
+	if second == "" || first == second {
+		return first
+	}
+
+	return first + "/" + second
 }
 
 func callSignalTargetForSymbol(root string, target string, symbol sherpa.Symbol) callSignalTarget {

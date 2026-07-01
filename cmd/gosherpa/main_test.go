@@ -2475,7 +2475,7 @@ func Step() {}
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"CALLERS", "Step", "Run", "Found 1 callers"} {
+	for _, want := range []string{"CALLERS", "Step", "Analysis: typechecked", "Run", "Found 1 callers"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -2694,6 +2694,9 @@ func Step() {}
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "callers", "Step", "example.com/app")
 
+	if data["analysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %v", data["analysisMode"])
+	}
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 
 	if strings.Contains(result.Stdout, "CALLERS") {
@@ -2741,7 +2744,7 @@ func Step() {}
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"CALLEES", "Run", "Step", "Found 1 callees"} {
+	for _, want := range []string{"CALLEES", "Run", "Analysis: typechecked", "Step", "Found 1 callees"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -2818,6 +2821,9 @@ func Step() {}
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "callees", "Run", "example.com/app")
 
+	if data["analysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %v", data["analysisMode"])
+	}
 	assertMainTestJSONArrayHasLength(t, data, "callees", 1)
 
 	if strings.Contains(result.Stdout, "CALLEES") {

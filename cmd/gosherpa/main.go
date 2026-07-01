@@ -146,11 +146,13 @@ type interfacesJSONData struct {
 }
 
 type callersJSONData struct {
-	Callers []sherpa.Caller `json:"callers"`
+	AnalysisMode string          `json:"analysisMode"`
+	Callers      []sherpa.Caller `json:"callers"`
 }
 
 type calleesJSONData struct {
-	Callees []sherpa.Callee `json:"callees"`
+	AnalysisMode string          `json:"analysisMode"`
+	Callees      []sherpa.Callee `json:"callees"`
 }
 
 type callPathsJSONData struct {
@@ -168,6 +170,7 @@ type explainJSONData struct {
 	References              []sherpa.Reference             `json:"references"`
 	Callers                 []sherpa.Caller                `json:"callers"`
 	Callees                 []sherpa.Callee                `json:"callees"`
+	CallAnalysisMode        string                         `json:"callAnalysisMode"`
 	AffectedPackages        []string                       `json:"affectedPackages"`
 	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
 	AffectedImplementations []string                       `json:"affectedImplementations"`
@@ -1307,7 +1310,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				root,
 				"callers",
 				normalizedResult.Target,
-				nil,
+				normalizedResult.Warnings,
 				callersJSONDataFromResult(normalizedResult),
 			))
 		}
@@ -1348,7 +1351,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				root,
 				"callees",
 				normalizedResult.Target,
-				nil,
+				normalizedResult.Warnings,
 				calleesJSONDataFromResult(normalizedResult),
 			))
 		}
@@ -1712,25 +1715,29 @@ func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfac
 
 func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 	result.Callers = nonNilSlice(result.Callers)
+	result.Warnings = nonNilSlice(result.Warnings)
 
 	return result
 }
 
 func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
 	return callersJSONData{
-		Callers: result.Callers,
+		AnalysisMode: result.AnalysisMode,
+		Callers:      result.Callers,
 	}
 }
 
 func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
 	result.Callees = nonNilSlice(result.Callees)
+	result.Warnings = nonNilSlice(result.Warnings)
 
 	return result
 }
 
 func calleesJSONDataFromResult(result sherpa.CalleesResult) calleesJSONData {
 	return calleesJSONData{
-		Callees: result.Callees,
+		AnalysisMode: result.AnalysisMode,
+		Callees:      result.Callees,
 	}
 }
 
@@ -1858,6 +1865,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		References:              report.References,
 		Callers:                 report.Callers,
 		Callees:                 report.Callees,
+		CallAnalysisMode:        report.CallAnalysisMode,
 		AffectedPackages:        report.AffectedPackages,
 		AffectedInterfaces:      report.AffectedInterfaces,
 		AffectedImplementations: report.AffectedImplementations,

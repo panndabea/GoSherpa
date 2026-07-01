@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
 func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
@@ -37,11 +39,17 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	if report.AnalysisMode != AnalysisModeAST {
 		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
 	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
 	if report.Confidence != ConfidenceMedium {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
 	}
 	if len(report.Limitations) == 0 {
 		t.Fatal("expected limitations")
+	}
+	if !strings.Contains(report.Limitations[0], "typechecked") {
+		t.Fatalf("expected typechecked call limitation, got %#v", report.Limitations)
 	}
 	if len(report.Callers) != 1 || report.Callers[0].Name != "Entry" {
 		t.Fatalf("expected Entry caller, got %#v", report.Callers)

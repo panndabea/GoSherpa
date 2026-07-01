@@ -93,6 +93,7 @@
       }
     ],
     "callees": [],
+    "callAnalysisMode": "typechecked",
     "affectedPackages": [
       ".",
       "./cmd/app"

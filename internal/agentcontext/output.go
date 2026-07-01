@@ -204,6 +204,9 @@ func writeAnalysis(builder *strings.Builder, report Report) {
 	}
 
 	fmt.Fprintf(builder, "  Mode: %s\n", mode)
+	if strings.TrimSpace(report.CallAnalysisMode) != "" {
+		fmt.Fprintf(builder, "  Call analysis: %s\n", report.CallAnalysisMode)
+	}
 	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
