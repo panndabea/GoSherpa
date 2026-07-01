@@ -8,6 +8,7 @@
   "data": {
     "analysisMode": "git-diff+ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Diff impact is based on git changed files and hunk-level changed symbol extraction.",
       "Impact analysis uses syntax plus local package dependency and interface signals.",

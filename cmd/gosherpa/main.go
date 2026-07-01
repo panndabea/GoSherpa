@@ -126,6 +126,7 @@ type impactDiffJSONData struct {
 	AffectedSymbols         []string                   `json:"affectedSymbols"`
 	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
 	AffectedImplementations []string                   `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
 	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
 	TestCommands            []string                   `json:"testCommands"`
 	TestPlan                sherpa.TestPlan            `json:"testPlan"`
@@ -209,6 +210,7 @@ type explainJSONData struct {
 	AffectedPackages        []string                       `json:"affectedPackages"`
 	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
 	AffectedImplementations []string                       `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                         `json:"interfaceAnalysisMode,omitempty"`
 	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
 	TestCommands            []string                       `json:"testCommands"`
 	TestPlan                sherpa.TestPlan                `json:"testPlan"`
@@ -1667,6 +1669,7 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1678,7 +1681,7 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode string) impactDiffJSONData {
 	return impactDiffJSONData{
 		AnalysisMode:            analysisMode,
-		Confidence:              jsonConfidence(report.Warnings, analysisMode),
+		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.InterfaceAnalysisMode),
 		Limitations:             impactLimitations(analysisMode),
 		ChangedFiles:            report.ChangedFiles,
 		ChangedPackages:         report.ChangedPackages,
@@ -1686,6 +1689,7 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 		AffectedSymbols:         report.AffectedSymbols,
 		AffectedInterfaces:      report.AffectedInterfaces,
 		AffectedImplementations: report.AffectedImplementations,
+		InterfaceAnalysisMode:   report.InterfaceAnalysisMode,
 		AffectedTests:           report.AffectedTests,
 		TestCommands:            report.TestCommands,
 		TestPlan:                report.TestPlan,
@@ -1839,6 +1843,7 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1859,6 +1864,7 @@ func contextFileJSONResult(report agentcontext.FileReport) agentcontext.FileRepo
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1880,6 +1886,7 @@ func contextPackageJSONResult(report agentcontext.PackageReport) agentcontext.Pa
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1898,6 +1905,7 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1916,6 +1924,7 @@ func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -1929,7 +1938,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 	return explainJSONData{
 		Target:                  report.Target,
 		AnalysisMode:            analysisModeAST,
-		Confidence:              jsonConfidence(report.Warnings, analysisModeAST, report.CallAnalysisMode),
+		Confidence:              jsonConfidence(report.Warnings, analysisModeAST, report.CallAnalysisMode, report.InterfaceAnalysisMode),
 		Limitations:             explainLimitations(report.CallAnalysisMode),
 		Symbol:                  report.Symbol,
 		Purpose:                 report.Purpose,
@@ -1942,6 +1951,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		AffectedPackages:        report.AffectedPackages,
 		AffectedInterfaces:      report.AffectedInterfaces,
 		AffectedImplementations: report.AffectedImplementations,
+		InterfaceAnalysisMode:   report.InterfaceAnalysisMode,
 		RelatedTests:            report.RelatedTests,
 		TestCommands:            report.TestCommands,
 		TestPlan:                report.TestPlan,

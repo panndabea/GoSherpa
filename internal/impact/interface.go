@@ -27,6 +27,7 @@ const (
 type interfaceImpactSignals struct {
 	Interfaces      []string
 	Implementations []string
+	AnalysisMode    string
 	Warnings        []string
 }
 
@@ -180,6 +181,7 @@ func interfaceSignalsForPackages(root string, packages []string) (interfaceImpac
 	return interfaceImpactSignals{
 		Interfaces:      uniqueSortedStrings(interfaces),
 		Implementations: uniqueSortedStrings(implementations),
+		AnalysisMode:    graph.AnalysisMode,
 		Warnings:        graph.Warnings,
 	}, nil
 }
@@ -225,6 +227,7 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 		return interfaceImpactSignals{
 			Interfaces:      uniqueSortedStrings(interfaces),
 			Implementations: uniqueSortedStrings(implementations),
+			AnalysisMode:    graph.AnalysisMode,
 			Warnings:        graph.Warnings,
 		}, nil
 	}
@@ -249,6 +252,7 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 	return interfaceImpactSignals{
 		Interfaces:      uniqueSortedStrings(interfaces),
 		Implementations: uniqueSortedStrings(implementations),
+		AnalysisMode:    graph.AnalysisMode,
 		Warnings:        graph.Warnings,
 	}, nil
 }

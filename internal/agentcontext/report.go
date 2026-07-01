@@ -1,7 +1,10 @@
 package agentcontext
 
 import (
+	"strings"
+
 	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -34,6 +37,7 @@ type Report struct {
 	AffectedPackages        []string                       `json:"affectedPackages"`
 	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
 	AffectedImplementations []string                       `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                         `json:"interfaceAnalysisMode,omitempty"`
 	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
 	TestCommands            []string                       `json:"testCommands"`
 	TestPlan                sherpa.TestPlan                `json:"testPlan"`
@@ -89,6 +93,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		AffectedPackages:        explainReport.AffectedPackages,
 		AffectedInterfaces:      explainReport.AffectedInterfaces,
 		AffectedImplementations: explainReport.AffectedImplementations,
+		InterfaceAnalysisMode:   explainReport.InterfaceAnalysisMode,
 		RelatedTests:            explainReport.RelatedTests,
 		TestCommands:            explainReport.TestCommands,
 		TestPlan:                explainReport.TestPlan,
@@ -225,6 +230,9 @@ func confidence(report Report) string {
 	if len(report.Warnings) > 0 || len(report.SourceContext.Lines) == 0 {
 		return ConfidenceLow
 	}
+	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
+		return ConfidenceLow
+	}
 
 	return ConfidenceMedium
 }
@@ -236,6 +244,7 @@ func normalizeReport(report Report) Report {
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)

@@ -45,6 +45,10 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 	builder.WriteString("\n")
 	builder.WriteString("\n")
 
+	if writeReportAnalysis(&builder, report) {
+		builder.WriteString("\n")
+	}
+
 	if includeChangedFiles {
 		writeReportValues(&builder, "CHANGED FILES", report.ChangedFiles)
 		builder.WriteString("\n")
@@ -74,6 +78,18 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 	}
 
 	return builder.String()
+}
+
+func writeReportAnalysis(builder *strings.Builder, report ImpactReport) bool {
+	analysisMode := strings.TrimSpace(report.InterfaceAnalysisMode)
+	if analysisMode == "" {
+		return false
+	}
+
+	builder.WriteString("ANALYSIS\n")
+	fmt.Fprintf(builder, "  Interface analysis: %s\n", analysisMode)
+
+	return true
 }
 
 func writeReportValues(builder *strings.Builder, title string, values []string) {

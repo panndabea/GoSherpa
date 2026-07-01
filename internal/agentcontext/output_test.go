@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -54,9 +55,10 @@ func TestFormat(t *testing.T) {
 		RelatedTests: []sherpa.RelatedTest{
 			{Name: "TestTarget", Position: sherpa.Position{File: "service_test.go", Line: 5}, DirectReference: true},
 		},
-		TestCommands: []string{"go test ."},
-		AnalysisMode: AnalysisModeAST,
-		Confidence:   ConfidenceMedium,
+		TestCommands:          []string{"go test ."},
+		AnalysisMode:          AnalysisModeAST,
+		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
+		Confidence:            ConfidenceMedium,
 		Limitations: []string{
 			"Dynamic dispatch, reflection, and function values are not resolved.",
 		},
@@ -78,6 +80,7 @@ func TestFormat(t *testing.T) {
 		"Target handles the main service step.",
 		"ANALYSIS",
 		"Mode: ast",
+		"Interface analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",
 		"Architecture role: connector",
@@ -146,8 +149,9 @@ func TestFormatFile(t *testing.T) {
 				},
 			},
 		},
-		AnalysisMode: AnalysisModeAST,
-		Confidence:   ConfidenceMedium,
+		AnalysisMode:          AnalysisModeAST,
+		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
+		Confidence:            ConfidenceMedium,
 		Limitations: []string{
 			"File context uses package-level impact for affected packages and tests.",
 		},
@@ -164,6 +168,7 @@ func TestFormatFile(t *testing.T) {
 		"declares 1 supported symbol",
 		"ANALYSIS",
 		"Mode: ast",
+		"Interface analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",
 		"Impact reaches 2 packages.",
@@ -235,8 +240,9 @@ func TestFormatPackage(t *testing.T) {
 				},
 			},
 		},
-		AnalysisMode: AnalysisModeAST,
-		Confidence:   ConfidenceMedium,
+		AnalysisMode:          AnalysisModeAST,
+		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
+		Confidence:            ConfidenceMedium,
 		Limitations: []string{
 			"Package context uses package-level impact for affected packages and tests.",
 		},
@@ -252,6 +258,7 @@ func TestFormatPackage(t *testing.T) {
 		"contains 2 Go files",
 		"ANALYSIS",
 		"Mode: ast",
+		"Interface analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",
 		"Impact reaches 2 packages.",
@@ -307,8 +314,9 @@ func TestFormatDiff(t *testing.T) {
 				},
 			},
 		},
-		AnalysisMode: AnalysisModeDiff,
-		Confidence:   ConfidenceMedium,
+		AnalysisMode:          AnalysisModeDiff,
+		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
+		Confidence:            ConfidenceMedium,
 		Limitations: []string{
 			"Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
 		},
@@ -323,6 +331,7 @@ func TestFormatDiff(t *testing.T) {
 		"Diff changes 1 file",
 		"ANALYSIS",
 		"Mode: git-diff+ast",
+		"Interface analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",
 		"Impact reaches 2 packages.",

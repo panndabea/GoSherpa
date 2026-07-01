@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/supertabaluga/gosherpa/internal/agentcontext"
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -47,11 +48,48 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "explain",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode":     agentcontext.AnalysisModeAST,
-				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
-				"confidence":       agentcontext.ConfidenceMedium,
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
+		},
+		{
+			name:    "impact file",
+			args:    []string{"impact", "file", "service.go", "--json"},
+			command: "impact file",
+			target:  "service.go",
+			wantFields: map[string]string{
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"changedFiles", "changedPackages", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
+		},
+		{
+			name:    "impact package",
+			args:    []string{"impact", "package", ".", "--json"},
+			command: "impact package",
+			target:  ".",
+			wantFields: map[string]string{
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"changedPackages", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
+		},
+		{
+			name:    "impact symbol",
+			args:    []string{"impact", "symbol", "Target", "--json"},
+			command: "impact symbol",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"affectedSymbols", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
 		},
 		{
 			name:    "impact",
@@ -81,11 +119,36 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "context symbol",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode":     agentcontext.AnalysisModeAST,
-				"callAnalysisMode": sherpa.CallAnalysisModeTypechecked,
-				"confidence":       agentcontext.ConfidenceMedium,
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
+		},
+		{
+			name:    "context file",
+			args:    []string{"context", "file", "service.go", "--json"},
+			command: "context file",
+			target:  "service.go",
+			wantFields: map[string]string{
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"symbols", "sourceContexts", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
+		},
+		{
+			name:    "context package",
+			args:    []string{"context", "package", ".", "--json"},
+			command: "context package",
+			target:  ".",
+			wantFields: map[string]string{
+				"analysisMode":          agentcontext.AnalysisModeAST,
+				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"files", "symbols", "sourceContexts", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
 		},
 	}
 

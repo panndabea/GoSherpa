@@ -29,6 +29,9 @@ Every context result includes:
   and `fallback` items.
 - `readingOrder`: ordered source locations to inspect next.
 - `analysisMode`: deterministic analysis mode label.
+- `interfaceAnalysisMode`: optional trust label for affected interface and
+  implementation signals when interface subanalysis ran (`typechecked` or
+  `ast-fallback`).
 - `confidence`: deterministic confidence label.
 - `limitations`: known blind spots and conservative boundaries.
 
@@ -73,14 +76,16 @@ explains what was omitted from the bounded context bundle.
 
 `context symbol` adds symbol identity, definition, source context, references,
 callers, callees, `callAnalysisMode`, affected packages, interface signals,
-related tests, and test planning.
+`interfaceAnalysisMode`, related tests, and test planning.
 
 `context file` adds file identity, package identity, file symbols, source
-contexts, package-level impact, affected tests, and test planning.
+contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
+test planning.
 
 `context package` adds package identity, package files, package symbols, source
-contexts, package-level impact, affected tests, and test planning.
+contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
+test planning.
 
 `context diff` adds base ref, changed files, changed packages, affected
-symbols, affected packages, interface signals, affected tests, and test
-planning.
+symbols, affected packages, interface signals, `interfaceAnalysisMode`,
+affected tests, and test planning.

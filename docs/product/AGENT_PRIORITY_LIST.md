@@ -115,8 +115,9 @@ semantics using `go/packages` and the Go type checker.
 
 Current status: `gosherpa refs`, call graph commands, and standalone interface
 navigation have `go/packages`-backed typechecked paths with AST fallback.
-Context and impact compose some of those signals, but still need broader shared
-semantic loading across every analysis field.
+Context and report-based impact bundles now expose `interfaceAnalysisMode` for
+the interface subanalysis, but still need broader shared semantic loading across
+every analysis field.
 
 Focus areas:
 
@@ -175,6 +176,8 @@ Done when:
 - JSON output includes `confidence`, `analysisMode`, and `limitations` for
   context, impact, callers, callees, interfaces, and tests. Context has the
   first slice.
+- Bundles that include interface or implementation impact expose
+  `interfaceAnalysisMode` separately from the broader bundle `analysisMode`.
 - Human output shows warnings without becoming noisy.
 - Confidence is rule-based and deterministic.
 

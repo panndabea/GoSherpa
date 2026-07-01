@@ -26,6 +26,7 @@ type ImpactReport struct {
 	AffectedSymbols         []string      `json:"affectedSymbols"`
 	AffectedInterfaces      []string      `json:"affectedInterfaces"`
 	AffectedImplementations []string      `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string        `json:"interfaceAnalysisMode,omitempty"`
 	AffectedTests           []RelatedTest `json:"affectedTests"`
 	TestCommands            []string      `json:"testCommands"`
 	TestPlan                TestPlan      `json:"testPlan"`
@@ -78,6 +79,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
@@ -118,6 +120,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
@@ -140,6 +143,7 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
@@ -274,6 +278,7 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.AffectedSymbols = nonNilStrings(report.AffectedSymbols)
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilStrings(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.TestCommands = nonNilStrings(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Warnings = nonNilStrings(report.Warnings)

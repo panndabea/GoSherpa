@@ -8,6 +8,7 @@
   "data": {
     "analysisMode": "ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Impact analysis uses syntax plus local package dependency and interface signals.",
       "Symbol impact includes references and conservative caller-package propagation.",

@@ -139,6 +139,7 @@ Agent-facing analysis data objects include:
 ```json
 {
   "analysisMode": "ast",
+  "interfaceAnalysisMode": "typechecked",
   "confidence": "medium",
   "limitations": []
 }
@@ -146,6 +147,9 @@ Agent-facing analysis data objects include:
 
 - `analysisMode`: deterministic label describing how the command assembled its
   result.
+- `interfaceAnalysisMode`: optional label describing the interface-impact
+  subanalysis when a bundle includes affected interface or implementation
+  fields. It uses `typechecked` or `ast-fallback`.
 - `confidence`: deterministic trust label, currently `medium` or `low`.
 - `limitations`: known blind spots and conservative boundaries for the command.
 
@@ -163,9 +167,9 @@ Call analysis mode values:
 - `ast-fallback`: GoSherpa fell back to AST-only call analysis because
   typechecked loading was unavailable.
 
-Reference and standalone interface analysis use the same `typechecked` and
-`ast-fallback` labels. Broader context, impact, test, and path commands
-currently use:
+Reference, standalone interface analysis, and interface subanalysis in context
+or report-based impact bundles use the same `typechecked` and `ast-fallback`
+labels. Broader context, impact, test, and path commands currently use:
 
 - `ast`: syntax plus local type information and repository-local heuristics.
 - `git-diff+ast`: git diff discovery plus AST/local repository analysis.
@@ -289,6 +293,7 @@ Data:
   "affectedPackages": [],
   "affectedInterfaces": [],
   "affectedImplementations": [],
+  "interfaceAnalysisMode": "typechecked",
   "relatedTests": [],
   "testCommands": [],
   "testPlan": {
@@ -318,6 +323,8 @@ Data:
 - `affectedInterfaces`: interface contracts affected by changes to the symbol.
 - `affectedImplementations`: implementation symbols affected by changes to the
   symbol.
+- `interfaceAnalysisMode`: trust mode for `affectedInterfaces` and
+  `affectedImplementations`, either `typechecked` or `ast-fallback`.
 - `relatedTests`: tests related to the symbol.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan.
@@ -338,6 +345,12 @@ Data:
 Impact data keeps its existing arrays such as `references`, `callers`,
 `affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
 keeps `tests` or `affectedTests`, `commands`, and `testPlan`.
+
+Report-based impact data (`impact file`, `impact package`, `impact symbol`, and
+`impact diff`) also includes `affectedInterfaces`,
+`affectedImplementations`, and `interfaceAnalysisMode` when interface
+subanalysis ran. The older `impact <symbol-or-package>` data object does not
+include those report-specific fields yet.
 
 ## Interface And Path Data
 
@@ -362,11 +375,15 @@ Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
 - `limitations`: context, call, and test-planning blind spots.
 - `callAnalysisMode`: call graph trust mode, either `typechecked` or
   `ast-fallback`.
+- `interfaceAnalysisMode`: trust mode for interface and implementation impact
+  fields when present, either `typechecked` or `ast-fallback`.
 - `callers`: repository-local callers.
 - `callees`: repository-local callees.
 
 Agents should not treat `analysisMode` and `callAnalysisMode` as interchangeable.
 `analysisMode` describes how the context bundle was assembled; `callAnalysisMode`
 describes the trust level of the call graph fields.
+The same distinction applies to `interfaceAnalysisMode`: it describes only the
+interface and implementation impact fields inside a broader bundle.
 
 `data.warnings` is absent; use envelope `warnings`.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -41,6 +42,9 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	}
 	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
 		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
 	}
 	if report.Confidence != ConfidenceMedium {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
@@ -142,6 +146,9 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	if report.AnalysisMode != AnalysisModeAST {
 		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
 	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
 	if report.Confidence != ConfidenceMedium {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
 	}
@@ -233,6 +240,9 @@ func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	}
 	if report.AnalysisMode != AnalysisModeAST {
 		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
 	}
 	if report.Confidence != ConfidenceMedium {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)
@@ -349,6 +359,9 @@ func NewSession() Session {
 	}
 	if report.AnalysisMode != AnalysisModeDiff {
 		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeDiff)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
 	}
 	if report.Confidence != ConfidenceMedium {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceMedium)

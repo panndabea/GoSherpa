@@ -89,6 +89,7 @@
     ],
     "analysisMode": "git-diff+ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
       "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",

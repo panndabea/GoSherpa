@@ -211,6 +211,7 @@
     ],
     "analysisMode": "ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Call analysis used typechecked package loading where available.",
       "Dynamic dispatch, reflection, and function values are not resolved.",

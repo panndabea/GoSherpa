@@ -31,6 +31,7 @@ type PackageReport struct {
 	AffectedPackages        []string                    `json:"affectedPackages"`
 	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
 	AffectedImplementations []string                    `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                      `json:"interfaceAnalysisMode,omitempty"`
 	AffectedTests           []impactengine.RelatedTest  `json:"affectedTests"`
 	TestCommands            []string                    `json:"testCommands"`
 	TestPlan                sherpa.TestPlan             `json:"testPlan"`
@@ -85,6 +86,7 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 		AffectedPackages:        impactReport.AffectedPackages,
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
+		InterfaceAnalysisMode:   impactReport.InterfaceAnalysisMode,
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
@@ -348,6 +350,9 @@ func packageConfidence(report PackageReport) string {
 	if len(report.Warnings) > 0 || report.Package == "" {
 		return ConfidenceLow
 	}
+	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
+		return ConfidenceLow
+	}
 
 	return ConfidenceMedium
 }
@@ -362,6 +367,7 @@ func normalizePackageReport(report PackageReport) PackageReport {
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
+	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)

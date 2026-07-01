@@ -71,7 +71,8 @@ Implemented:
   tests, and JSON output.
 - Initial `gosherpa context symbol <target>` export with disambiguated symbol
   identity, source excerpt, references, callers, callees, impact signals,
-  related tests, suggested commands, confidence, limitations, and JSON output.
+  related tests, suggested commands, confidence, limitations, interface
+  subanalysis mode, and JSON output.
 - Initial `gosherpa context file <file>` export with file symbols, source
   excerpts, affected packages, affected tests, suggested commands, reading
   order, confidence, limitations, and JSON output.
@@ -111,6 +112,9 @@ Implemented:
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
   import-aware signature matching and embedded-interface expansion.
+- Report-based impact and context bundles expose `interfaceAnalysisMode` so
+  agents can distinguish bundle-level AST analysis from typechecked interface
+  subanalysis.
 - Standalone `implementers <interface>` and `interfaces <type>` navigation
   commands backed by the local interface graph.
 - Changed-symbol extraction from git diff hunks, including deleted symbols from
@@ -135,7 +139,8 @@ Current limitations:
   unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact uses typechecked method sets when package loading
   succeeds and falls back to local AST method-set matching when it cannot load
-  semantic package data.
+  semantic package data; report-based impact and context JSON expose which path
+  was used through `interfaceAnalysisMode`.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers, callees, and paths still do not resolve dynamic dispatch,

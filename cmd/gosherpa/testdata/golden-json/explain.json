@@ -9,6 +9,7 @@
     "target": "Target",
     "analysisMode": "ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
       "Purpose, risk, architecture role, and reading order are deterministic heuristics.",

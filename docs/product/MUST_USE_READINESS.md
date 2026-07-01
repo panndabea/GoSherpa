@@ -61,8 +61,9 @@ semantics using `go/packages` and the Go type checker.
 
 Current status: `gosherpa refs`, call graph commands, and standalone interface
 navigation have `go/packages`-backed typechecked paths with AST fallback.
-Context and impact compose some of those signals, but still need broader shared
-semantic loading across every analysis field.
+Context and report-based impact bundles expose `interfaceAnalysisMode` for the
+interface subanalysis, but still need broader shared semantic loading across
+every analysis field.
 
 Focus areas:
 

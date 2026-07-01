@@ -419,6 +419,7 @@
     ],
     "analysisMode": "ast",
     "confidence": "medium",
+    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "File context uses package-level impact for affected packages and tests.",
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",

@@ -1,10 +1,13 @@
 package impact
 
 import (
+	"errors"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 )
 
 func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
@@ -152,6 +155,9 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedInterfacePac
 
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
 }
 
 func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedImplementationPackage(t *testing.T) {
@@ -164,6 +170,9 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedImplementati
 
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
 }
 
 func TestAnalyzePackageRequiresMatchingInterfaceMethodSignatures(t *testing.T) {
@@ -232,6 +241,9 @@ func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
 }
 
 func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
@@ -245,6 +257,33 @@ func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
 	assertStrings(t, report.AffectedSymbols, []string{"./internal/jwt.JWTAuthenticator"})
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
+}
+
+func TestAnalyzeSymbolReportsFallbackInterfaceAnalysisMode(t *testing.T) {
+	oldLoader := loadSemanticInterfaceRepository
+	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		loadSemanticInterfaceRepository = oldLoader
+	}()
+
+	root := writeInterfaceImpactProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/jwt.JWTAuthenticator")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
+	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "typechecked interface analysis unavailable: loader failed") {
+		t.Fatalf("expected typechecked fallback warning, got %#v", report.Warnings)
+	}
 }
 
 func writeImpactAnalysisProject(t *testing.T) string {
