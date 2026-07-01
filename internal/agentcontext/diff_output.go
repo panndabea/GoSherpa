@@ -18,6 +18,7 @@ func FormatDiff(report DiffReport) string {
 	writePurpose(&builder, report.Purpose)
 	builder.WriteString("\n")
 	writeDiffAnalysis(&builder, report)
+	writeTruncation(&builder, report.Truncated)
 	builder.WriteString("\n")
 	writeValues(&builder, "CHANGED FILES", report.ChangedFiles)
 	builder.WriteString("\n")

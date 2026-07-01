@@ -21,6 +21,7 @@ func Format(report Report) string {
 	writePurpose(&builder, report.Purpose)
 	builder.WriteString("\n")
 	writeAnalysis(&builder, report)
+	writeTruncation(&builder, report.Truncated)
 	builder.WriteString("\n")
 	writeCallers(&builder, report.Callers)
 	builder.WriteString("\n")
@@ -54,6 +55,7 @@ func FormatFile(report FileReport) string {
 	writePurpose(&builder, report.Purpose)
 	builder.WriteString("\n")
 	writeFileAnalysis(&builder, report)
+	writeTruncation(&builder, report.Truncated)
 	builder.WriteString("\n")
 	writeFileSymbols(&builder, report.Symbols)
 	builder.WriteString("\n")
@@ -87,6 +89,7 @@ func FormatPackage(report PackageReport) string {
 	writePurpose(&builder, report.Purpose)
 	builder.WriteString("\n")
 	writePackageAnalysis(&builder, report)
+	writeTruncation(&builder, report.Truncated)
 	builder.WriteString("\n")
 	writeValues(&builder, "PACKAGE FILES", report.Files)
 	builder.WriteString("\n")
@@ -249,6 +252,19 @@ func writePackageAnalysis(builder *strings.Builder, report PackageReport) {
 	}
 	for _, reason := range report.Risk.Reasons {
 		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
+}
+
+func writeTruncation(builder *strings.Builder, truncation *Truncation) {
+	messages := truncationMessages(truncation)
+	if len(messages) == 0 {
+		return
+	}
+
+	builder.WriteString("\n")
+	builder.WriteString("TRUNCATED\n")
+	for _, message := range messages {
+		fmt.Fprintf(builder, "  %s\n", message)
 	}
 }
 

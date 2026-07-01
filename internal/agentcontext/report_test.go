@@ -70,6 +70,41 @@ func TestAnalyzeSymbolIncludesTestCallersWithOption(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSymbolAppliesLimits(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{
+		IncludeTests: true,
+		Limits: LimitOptions{
+			MaxReferences: 1,
+			MaxTests:      1,
+			SourceRadius:  NewSourceRadius(0),
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.Limits == nil || report.Limits.MaxReferences != 1 || report.Limits.MaxTests != 1 {
+		t.Fatalf("expected limits to be recorded, got %#v", report.Limits)
+	}
+	if report.Limits.SourceRadius == nil || *report.Limits.SourceRadius != 0 {
+		t.Fatalf("expected source radius 0 limit, got %#v", report.Limits)
+	}
+	if len(report.SourceContext.Lines) != 1 {
+		t.Fatalf("expected target-only source context, got %#v", report.SourceContext.Lines)
+	}
+	if len(report.References) != 1 {
+		t.Fatalf("expected one reference, got %#v", report.References)
+	}
+	if len(report.Callers) != 1 {
+		t.Fatalf("expected one caller, got %#v", report.Callers)
+	}
+	if report.Truncated == nil || report.Truncated.References == 0 || report.Truncated.Callers == 0 {
+		t.Fatalf("expected reference and caller truncation, got %#v", report.Truncated)
+	}
+}
+
 func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	root := writeAgentContextProject(t)
 
@@ -138,6 +173,30 @@ func TestAnalyzeFileNotesTestsOptionInLimitations(t *testing.T) {
 	}
 }
 
+func TestAnalyzeFileAppliesLimits(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxSymbols: 1,
+			MaxTests:   1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if len(report.Symbols) != 1 || report.Symbols[0].Name != "Entry" {
+		t.Fatalf("expected first symbol only, got %#v", report.Symbols)
+	}
+	if len(report.SourceContexts) != 1 {
+		t.Fatalf("expected one source context, got %#v", report.SourceContexts)
+	}
+	if report.Truncated == nil || report.Truncated.Symbols != 2 || report.Truncated.SourceContexts != 2 {
+		t.Fatalf("expected symbol/source truncation, got %#v", report.Truncated)
+	}
+}
+
 func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	root := writeAgentContextProject(t)
 
@@ -203,6 +262,31 @@ func TestAnalyzePackageNotesTestsOptionInLimitations(t *testing.T) {
 	}
 	if !strings.Contains(report.Limitations[5], "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzePackageAppliesLimits(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxFiles:   1,
+			MaxSymbols: 1,
+			MaxTests:   1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if len(report.Files) != 1 || report.Files[0] != "service.go" {
+		t.Fatalf("expected service.go only, got %#v", report.Files)
+	}
+	if len(report.Symbols) != 1 || report.Symbols[0].Name != "Entry" {
+		t.Fatalf("expected first symbol only, got %#v", report.Symbols)
+	}
+	if report.Truncated == nil || report.Truncated.Files != 1 || report.Truncated.Symbols != 3 {
+		t.Fatalf("expected file/symbol truncation, got %#v", report.Truncated)
 	}
 }
 
@@ -303,6 +387,38 @@ func TestAnalyzeDiffNotesTestsOptionInLimitations(t *testing.T) {
 	}
 	if !strings.Contains(report.Limitations[4], "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzeDiffAppliesLimits(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n")
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n\nfunc AddedFirst() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n\nfunc AddedSecond() {}\n")
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxFiles:   1,
+			MaxSymbols: 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if len(report.ChangedFiles) != 1 {
+		t.Fatalf("expected one changed file, got %#v", report.ChangedFiles)
+	}
+	if len(report.AffectedSymbols) != 1 {
+		t.Fatalf("expected one affected symbol, got %#v", report.AffectedSymbols)
+	}
+	if report.Truncated == nil || report.Truncated.ChangedFiles != 1 || report.Truncated.AffectedSymbols != 1 {
+		t.Fatalf("expected diff truncation, got %#v", report.Truncated)
 	}
 }
 

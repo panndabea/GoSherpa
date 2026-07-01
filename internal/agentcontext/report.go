@@ -14,8 +14,9 @@ const (
 )
 
 type AnalyzeOptions struct {
-	IncludeTests bool `json:"includeTests"`
-	SourceRadius int  `json:"sourceRadius"`
+	IncludeTests bool         `json:"includeTests"`
+	SourceRadius int          `json:"sourceRadius"`
+	Limits       LimitOptions `json:"limits"`
 }
 
 type Report struct {
@@ -38,6 +39,8 @@ type Report struct {
 	ReadingOrder            []explainengine.ReadingStep    `json:"readingOrder"`
 	AnalysisMode            string                         `json:"analysisMode"`
 	Confidence              string                         `json:"confidence"`
+	Limits                  *LimitOptions                  `json:"limits,omitempty"`
+	Truncated               *Truncation                    `json:"truncated,omitempty"`
 	Limitations             []string                       `json:"limitations"`
 	Warnings                []string                       `json:"-"`
 }
@@ -61,10 +64,8 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		return Report{}, err
 	}
 
-	radius := options.SourceRadius
-	if radius == 0 {
-		radius = sherpa.DefaultSourceContextRadius
-	}
+	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	warnings := append([]string{}, explainReport.Warnings...)
 	sourceContext, err := sherpa.ReadSourceContext(root, explainReport.Symbol.Position, radius)
@@ -91,12 +92,92 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		TestPlan:                explainReport.TestPlan,
 		ReadingOrder:            explainReport.ReadingOrder,
 		AnalysisMode:            AnalysisModeAST,
+		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
 	report.Limitations = limitations(options.IncludeTests)
 	report.Confidence = confidence(report)
+	report = applySymbolLimits(report, limits)
 
 	return normalizeReport(report), nil
+}
+
+func applySymbolLimits(report Report, limits LimitOptions) Report {
+	var truncation Truncation
+	originalReadingOrderCount := len(report.ReadingOrder)
+
+	report.References, truncation.References = limitSlice(report.References, limits.MaxReferences)
+	report.Callers, truncation.Callers = limitSlice(report.Callers, limits.MaxReferences)
+	report.Callees, truncation.Callees = limitSlice(report.Callees, limits.MaxReferences)
+	report.RelatedTests, truncation.RelatedTests = limitSlice(report.RelatedTests, limits.MaxTests)
+	report.ReadingOrder = symbolReadingOrder(report)
+	if originalReadingOrderCount > len(report.ReadingOrder) {
+		truncation.ReadingOrder = originalReadingOrderCount - len(report.ReadingOrder)
+	}
+
+	report.Truncated = reportTruncation(truncation)
+
+	return report
+}
+
+func symbolReadingOrder(report Report) []explainengine.ReadingStep {
+	steps := []explainengine.ReadingStep{
+		{
+			Title:    "Definition",
+			Reason:   "Start with the symbol declaration and nearby implementation.",
+			Position: report.Symbol.Position,
+		},
+	}
+
+	for _, callee := range firstCallees(report.Callees, 3) {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Callee: " + callee.Name,
+			Reason:   "Understand direct work delegated by this symbol.",
+			Position: callee.Position,
+		})
+	}
+
+	for _, caller := range firstCallers(report.Callers, 3) {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Caller: " + caller.Name,
+			Reason:   "See how callers depend on this symbol.",
+			Position: caller.Position,
+		})
+	}
+
+	for _, test := range firstRelatedTests(report.RelatedTests, 3) {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Test: " + test.Name,
+			Reason:   "Check expected behavior and regression coverage.",
+			Position: test.Position,
+		})
+	}
+
+	return steps
+}
+
+func firstCallees(values []sherpa.Callee, limit int) []sherpa.Callee {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
+}
+
+func firstCallers(values []sherpa.Caller, limit int) []sherpa.Caller {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
+}
+
+func firstRelatedTests(values []sherpa.RelatedTest, limit int) []sherpa.RelatedTest {
+	if len(values) <= limit {
+		return values
+	}
+
+	return values[:limit]
 }
 
 func identityFromSymbol(target string, symbol sherpa.Symbol) Identity {

@@ -16,8 +16,9 @@ import (
 )
 
 type FileAnalyzeOptions struct {
-	IncludeTests bool `json:"includeTests"`
-	SourceRadius int  `json:"sourceRadius"`
+	IncludeTests bool         `json:"includeTests"`
+	SourceRadius int          `json:"sourceRadius"`
+	Limits       LimitOptions `json:"limits"`
 }
 
 type FileReport struct {
@@ -38,6 +39,8 @@ type FileReport struct {
 	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
 	AnalysisMode            string                      `json:"analysisMode"`
 	Confidence              string                      `json:"confidence"`
+	Limits                  *LimitOptions               `json:"limits,omitempty"`
+	Truncated               *Truncation                 `json:"truncated,omitempty"`
 	Limitations             []string                    `json:"limitations"`
 	Warnings                []string                    `json:"-"`
 }
@@ -64,10 +67,8 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 	}
 	symbols := symbolsInFile(allSymbols, file)
 
-	radius := options.SourceRadius
-	if radius == 0 {
-		radius = sherpa.DefaultSourceContextRadius
-	}
+	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	warnings := append([]string{}, impactReport.Warnings...)
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
@@ -89,6 +90,7 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
 		AnalysisMode:            AnalysisModeAST,
+		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
 	report.Purpose = filePurpose(report)
@@ -96,8 +98,26 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 	report.ReadingOrder = fileReadingOrder(report)
 	report.Limitations = fileLimitations(options.IncludeTests)
 	report.Confidence = fileConfidence(report)
+	report = applyFileLimits(report, limits)
 
 	return normalizeFileReport(report), nil
+}
+
+func applyFileLimits(report FileReport, limits LimitOptions) FileReport {
+	var truncation Truncation
+	originalReadingOrderCount := len(report.ReadingOrder)
+
+	report.Symbols, truncation.Symbols = limitSlice(report.Symbols, limits.MaxSymbols)
+	report.SourceContexts, truncation.SourceContexts = limitSlice(report.SourceContexts, limits.MaxSymbols)
+	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)
+	report.ReadingOrder = fileReadingOrder(report)
+	if originalReadingOrderCount > len(report.ReadingOrder) {
+		truncation.ReadingOrder = originalReadingOrderCount - len(report.ReadingOrder)
+	}
+
+	report.Truncated = reportTruncation(truncation)
+
+	return report
 }
 
 func normalizeFileTarget(root string, target string) (string, error) {

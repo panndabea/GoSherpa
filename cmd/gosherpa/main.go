@@ -44,6 +44,9 @@ type cliInvocation struct {
 	HasKindOption     bool
 	SearchPackage     string
 	HasPackageOption  bool
+	ContextLimits     agentcontext.LimitOptions
+	HasContextLimit   bool
+	HasSourceRadius   bool
 }
 
 type jsonResponse[T any] struct {
@@ -292,6 +295,123 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			continue
 		}
 
+		if arg == "--max-files" {
+			value, err := parsePositiveFlagValue("--max-files", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxFiles = value
+			invocation.HasContextLimit = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-files=") {
+			value, err := parsePositiveInteger("--max-files", strings.TrimPrefix(arg, "--max-files="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxFiles = value
+			invocation.HasContextLimit = true
+			continue
+		}
+
+		if arg == "--max-references" {
+			value, err := parsePositiveFlagValue("--max-references", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxReferences = value
+			invocation.HasContextLimit = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-references=") {
+			value, err := parsePositiveInteger("--max-references", strings.TrimPrefix(arg, "--max-references="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxReferences = value
+			invocation.HasContextLimit = true
+			continue
+		}
+
+		if arg == "--max-symbols" {
+			value, err := parsePositiveFlagValue("--max-symbols", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxSymbols = value
+			invocation.HasContextLimit = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-symbols=") {
+			value, err := parsePositiveInteger("--max-symbols", strings.TrimPrefix(arg, "--max-symbols="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxSymbols = value
+			invocation.HasContextLimit = true
+			continue
+		}
+
+		if arg == "--max-tests" {
+			value, err := parsePositiveFlagValue("--max-tests", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxTests = value
+			invocation.HasContextLimit = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-tests=") {
+			value, err := parsePositiveInteger("--max-tests", strings.TrimPrefix(arg, "--max-tests="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxTests = value
+			invocation.HasContextLimit = true
+			continue
+		}
+
+		if arg == "--source-radius" {
+			value, err := parseNonNegativeFlagValue("--source-radius", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.SourceRadius = agentcontext.NewSourceRadius(value)
+			invocation.HasContextLimit = true
+			invocation.HasSourceRadius = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--source-radius=") {
+			value, err := parseNonNegativeInteger("--source-radius", strings.TrimPrefix(arg, "--source-radius="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.SourceRadius = agentcontext.NewSourceRadius(value)
+			invocation.HasContextLimit = true
+			invocation.HasSourceRadius = true
+			continue
+		}
+
 		if arg == "--limit" {
 			value, err := parsePositiveFlagValue("--limit", args, i)
 			if err != nil {
@@ -391,6 +511,14 @@ func parsePositiveFlagValue(flag string, args []string, index int) (int, error) 
 	return parsePositiveInteger(flag, args[index+1])
 }
 
+func parseNonNegativeFlagValue(flag string, args []string, index int) (int, error) {
+	if index+1 >= len(args) {
+		return 0, fmt.Errorf("missing value for %s", flag)
+	}
+
+	return parseNonNegativeInteger(flag, args[index+1])
+}
+
 func parsePositiveInteger(flag string, value string) (int, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -399,6 +527,20 @@ func parsePositiveInteger(flag string, value string) (int, error) {
 
 	parsed, err := strconv.Atoi(trimmed)
 	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid value for %s: %s", flag, trimmed)
+	}
+
+	return parsed, nil
+}
+
+func parseNonNegativeInteger(flag string, value string) (int, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, fmt.Errorf("missing value for %s", flag)
+	}
+
+	parsed, err := strconv.Atoi(trimmed)
+	if err != nil || parsed < 0 {
 		return 0, fmt.Errorf("invalid value for %s: %s", flag, trimmed)
 	}
 
@@ -491,6 +633,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasContextLimit && invocation.Command != "context" {
+		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, and --source-radius are only supported by context")
+		return exitUsage
+	}
+
+	if err := validateContextLimitOptions(invocation); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return exitUsage
+	}
+
 	if invocation.HasKindOption && invocation.Command != "search" && invocation.Command != "refs" {
 		fmt.Fprintln(stderr, "error: --kind is only supported by search and refs")
 		return exitUsage
@@ -543,6 +695,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzeSymbol(root, target, agentcontext.AnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "context symbol", target, stderr, err)
@@ -575,6 +728,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzeFile(root, target, agentcontext.FileAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "context file", target, stderr, err)
@@ -607,6 +761,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzePackage(root, target, agentcontext.PackageAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "context package", target, stderr, err)
@@ -638,6 +793,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			report, err := agentcontext.AnalyzeDiff(root, invocation.BaseRef, agentcontext.DiffAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "context diff", invocation.BaseRef, stderr, err)
@@ -1264,6 +1420,47 @@ func supportsContextOption(command string) bool {
 	}
 }
 
+func validateContextLimitOptions(invocation cliInvocation) error {
+	if !invocation.HasContextLimit || invocation.Command != "context" || len(invocation.CommandArgs) == 0 {
+		return nil
+	}
+
+	var unsupported []string
+	switch invocation.CommandArgs[0] {
+	case "symbol":
+		if invocation.ContextLimits.MaxFiles > 0 {
+			unsupported = append(unsupported, "--max-files")
+		}
+		if invocation.ContextLimits.MaxSymbols > 0 {
+			unsupported = append(unsupported, "--max-symbols")
+		}
+	case "file":
+		if invocation.ContextLimits.MaxFiles > 0 {
+			unsupported = append(unsupported, "--max-files")
+		}
+		if invocation.ContextLimits.MaxReferences > 0 {
+			unsupported = append(unsupported, "--max-references")
+		}
+	case "package":
+		if invocation.ContextLimits.MaxReferences > 0 {
+			unsupported = append(unsupported, "--max-references")
+		}
+	case "diff":
+		if invocation.ContextLimits.MaxReferences > 0 {
+			unsupported = append(unsupported, "--max-references")
+		}
+		if invocation.HasSourceRadius {
+			unsupported = append(unsupported, "--source-radius")
+		}
+	}
+
+	if len(unsupported) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("unsupported context option for context %s: %s", invocation.CommandArgs[0], strings.Join(unsupported, ", "))
+}
+
 func isImpactDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
 }
@@ -1725,10 +1922,10 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
-	fmt.Fprintln(writer, "  context symbol <target> [--tests]")
-	fmt.Fprintln(writer, "  context file <file> [--tests]")
-	fmt.Fprintln(writer, "  context package <package> [--tests]")
-	fmt.Fprintln(writer, "  context diff --base <ref> [--tests]")
+	fmt.Fprintln(writer, "  context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
@@ -1751,26 +1948,26 @@ func printUsage(writer io.Writer) {
 }
 
 func printContextUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context package <package> [--tests]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
 }
 
 func printContextSymbolUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
 }
 
 func printContextFileUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
 }
 
 func printContextPackageUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context package <package> [--tests]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
 }
 
 func printContextDiffUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
 }
 
 func printImpactUsage(writer io.Writer) {

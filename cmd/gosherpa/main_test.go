@@ -494,10 +494,10 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 	printUsage(&output)
 
 	for _, want := range []string{
-		"context symbol <target> [--tests]",
-		"context file <file> [--tests]",
-		"context package <package> [--tests]",
-		"context diff --base <ref> [--tests]",
+		"context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]",
+		"context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]",
+		"context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]",
+		"context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -1432,10 +1432,99 @@ func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
 }
 
+func TestMainRunsContextSymbolCommandWithLimits(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target", "--tests", "--max-references", "1"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"TRUNCATED", "references:", "callers:", "reading order:"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsContextSymbolCommandWithLimitsAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"context", "symbol", "Target",
+		"--tests",
+		"--max-references", "1",
+		"--max-tests", "1",
+		"--source-radius", "0",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+
+	limits, ok := data["limits"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected limits object, got %T", data["limits"])
+	}
+	if limits["maxReferences"] != float64(1) || limits["maxTests"] != float64(1) || limits["sourceRadius"] != float64(0) {
+		t.Fatalf("unexpected limits: %#v", limits)
+	}
+
+	truncated, ok := data["truncated"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected truncated object, got %T", data["truncated"])
+	}
+	if truncated["references"] == nil || truncated["callers"] == nil {
+		t.Fatalf("expected reference and caller truncation, got %#v", truncated)
+	}
+
+	sourceContext, ok := data["sourceContext"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sourceContext object, got %T", data["sourceContext"])
+	}
+	lines := assertMainTestJSONArrayHasLength(t, sourceContext, "lines", 1)
+	if lines[0].(map[string]any)["text"] != "func Target() {}" {
+		t.Fatalf("expected target source line only, got %#v", lines)
+	}
+	assertMainTestJSONArrayHasLength(t, data, "references", 1)
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+}
+
+func TestMainRejectsUnsupportedContextLimitOption(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--max-references", "1"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+	if !strings.Contains(result.Stderr, "unsupported context option for context diff: --max-references") {
+		t.Fatalf("expected unsupported context option error, got %q", result.Stderr)
+	}
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainPrintsContextFileUsageWhenTargetIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "context", "file"})
 
-	want := "usage: gosherpa [--root <path>] context file <file> [--tests]\n"
+	want := "usage: gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1553,7 +1642,7 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 func TestMainPrintsContextPackageUsageWhenTargetIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "context", "package"})
 
-	want := "usage: gosherpa [--root <path>] context package <package> [--tests]\n"
+	want := "usage: gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1672,7 +1761,7 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "context", "diff"})
 
-	want := "usage: gosherpa [--root <path>] context diff --base <ref> [--tests]\n"
+	want := "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}

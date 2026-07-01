@@ -9,7 +9,8 @@ import (
 )
 
 type DiffAnalyzeOptions struct {
-	IncludeTests bool `json:"includeTests"`
+	IncludeTests bool         `json:"includeTests"`
+	Limits       LimitOptions `json:"limits"`
 }
 
 type DiffReport struct {
@@ -29,6 +30,8 @@ type DiffReport struct {
 	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
 	AnalysisMode            string                      `json:"analysisMode"`
 	Confidence              string                      `json:"confidence"`
+	Limits                  *LimitOptions               `json:"limits,omitempty"`
+	Truncated               *Truncation                 `json:"truncated,omitempty"`
 	Limitations             []string                    `json:"limitations"`
 	Warnings                []string                    `json:"-"`
 }
@@ -52,6 +55,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
 		AnalysisMode:            AnalysisModeDiff,
+		Limits:                  reportLimits(options.Limits),
 		Warnings:                impactReport.Warnings,
 	}
 	report.Purpose = diffPurpose(report)
@@ -59,8 +63,26 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 	report.ReadingOrder = diffReadingOrder(report)
 	report.Limitations = diffLimitations(options.IncludeTests)
 	report.Confidence = diffConfidence(report)
+	report = applyDiffLimits(report, options.Limits)
 
 	return normalizeDiffReport(report), nil
+}
+
+func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
+	var truncation Truncation
+	originalReadingOrderCount := len(report.ReadingOrder)
+
+	report.ChangedFiles, truncation.ChangedFiles = limitSlice(report.ChangedFiles, limits.MaxFiles)
+	report.AffectedSymbols, truncation.AffectedSymbols = limitSlice(report.AffectedSymbols, limits.MaxSymbols)
+	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)
+	report.ReadingOrder = diffReadingOrder(report)
+	if originalReadingOrderCount > len(report.ReadingOrder) {
+		truncation.ReadingOrder = originalReadingOrderCount - len(report.ReadingOrder)
+	}
+
+	report.Truncated = reportTruncation(truncation)
+
+	return report
 }
 
 func diffPurpose(report DiffReport) string {

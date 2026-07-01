@@ -14,8 +14,9 @@ import (
 )
 
 type PackageAnalyzeOptions struct {
-	IncludeTests bool `json:"includeTests"`
-	SourceRadius int  `json:"sourceRadius"`
+	IncludeTests bool         `json:"includeTests"`
+	SourceRadius int          `json:"sourceRadius"`
+	Limits       LimitOptions `json:"limits"`
 }
 
 type PackageReport struct {
@@ -36,6 +37,8 @@ type PackageReport struct {
 	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
 	AnalysisMode            string                      `json:"analysisMode"`
 	Confidence              string                      `json:"confidence"`
+	Limits                  *LimitOptions               `json:"limits,omitempty"`
+	Truncated               *Truncation                 `json:"truncated,omitempty"`
 	Limitations             []string                    `json:"limitations"`
 	Warnings                []string                    `json:"-"`
 }
@@ -63,10 +66,8 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 	}
 	symbols := symbolsInPackage(allSymbols, packagePath)
 
-	radius := options.SourceRadius
-	if radius == 0 {
-		radius = sherpa.DefaultSourceContextRadius
-	}
+	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	warnings := append([]string{}, impactReport.Warnings...)
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
@@ -88,6 +89,7 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
 		AnalysisMode:            AnalysisModeAST,
+		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
 	report.Purpose = packagePurpose(report)
@@ -95,8 +97,27 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 	report.ReadingOrder = packageReadingOrder(report)
 	report.Limitations = packageLimitations(options.IncludeTests)
 	report.Confidence = packageConfidence(report)
+	report = applyPackageLimits(report, limits)
 
 	return normalizePackageReport(report), nil
+}
+
+func applyPackageLimits(report PackageReport, limits LimitOptions) PackageReport {
+	var truncation Truncation
+	originalReadingOrderCount := len(report.ReadingOrder)
+
+	report.Files, truncation.Files = limitSlice(report.Files, limits.MaxFiles)
+	report.Symbols, truncation.Symbols = limitSlice(report.Symbols, limits.MaxSymbols)
+	report.SourceContexts, truncation.SourceContexts = limitSlice(report.SourceContexts, limits.MaxSymbols)
+	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)
+	report.ReadingOrder = packageReadingOrder(report)
+	if originalReadingOrderCount > len(report.ReadingOrder) {
+		truncation.ReadingOrder = originalReadingOrderCount - len(report.ReadingOrder)
+	}
+
+	report.Truncated = reportTruncation(truncation)
+
+	return report
 }
 
 func packageFiles(root string, packagePath string) ([]string, error) {
