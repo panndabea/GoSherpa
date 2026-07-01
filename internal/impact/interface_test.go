@@ -1,10 +1,12 @@
 package impact
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -28,6 +30,9 @@ func TestFindImplementersReturnsImplementations(t *testing.T) {
 	if result.Implementers[0].Position.File != "internal/jwt/jwt.go" {
 		t.Fatalf("expected root-relative position, got %#v", result.Implementers[0].Position)
 	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
 }
 
 func TestFindInterfacesReturnsSatisfiedInterfaces(t *testing.T) {
@@ -49,6 +54,74 @@ func TestFindInterfacesReturnsSatisfiedInterfaces(t *testing.T) {
 	}
 	if result.Interfaces[0].Position.File != "internal/auth/auth.go" {
 		t.Fatalf("expected root-relative position, got %#v", result.Interfaces[0].Position)
+	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+}
+
+func TestFindImplementersUsesTypecheckedAliases(t *testing.T) {
+	root := writeInterfaceAliasProject(t)
+
+	result, err := FindImplementers(root, "./internal/auth.Authenticator")
+	if err != nil {
+		t.Fatalf("FindImplementers returned error: %v", err)
+	}
+
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+	if len(result.Implementers) != 1 {
+		t.Fatalf("expected 1 implementer, got %#v", result.Implementers)
+	}
+	if result.Implementers[0].Name != "./internal/jwt.JWTAuthenticator" {
+		t.Fatalf("expected JWTAuthenticator implementer, got %#v", result.Implementers[0])
+	}
+}
+
+func TestFindImplementersUsesGenericPointerReceiver(t *testing.T) {
+	root := writeGenericPointerReceiverProject(t)
+
+	result, err := FindImplementers(root, "./internal/cache.Flusher")
+	if err != nil {
+		t.Fatalf("FindImplementers returned error: %v", err)
+	}
+
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+	if len(result.Implementers) != 1 {
+		t.Fatalf("expected 1 implementer, got %#v", result.Implementers)
+	}
+	if result.Implementers[0].Name != "./internal/cache.Cache" {
+		t.Fatalf("expected Cache implementer, got %#v", result.Implementers[0])
+	}
+}
+
+func TestFindInterfacesFallsBackWhenTypecheckedLoadingFails(t *testing.T) {
+	oldLoader := loadSemanticInterfaceRepository
+	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		loadSemanticInterfaceRepository = oldLoader
+	}()
+
+	root := writeInterfaceImpactProject(t)
+
+	result, err := FindInterfaces(root, "./internal/jwt.JWTAuthenticator")
+	if err != nil {
+		t.Fatalf("FindInterfaces returned error: %v", err)
+	}
+
+	if result.AnalysisMode != InterfaceAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback analysis mode, got %q", result.AnalysisMode)
+	}
+	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "typechecked interface analysis unavailable: loader failed") {
+		t.Fatalf("expected typechecked fallback warning, got %#v", result.Warnings)
+	}
+	if len(result.Interfaces) != 1 || result.Interfaces[0].Name != "./internal/auth.Authenticator" {
+		t.Fatalf("expected fallback interface result, got %#v", result.Interfaces)
 	}
 }
 
@@ -128,6 +201,60 @@ func (FileStore) Save() error {
 type FileStore struct{}
 
 func (FileStore) Save() error {
+	return nil
+}
+`)
+
+	return root
+}
+
+func writeInterfaceAliasProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "model", "user.go"), `package model
+
+type UserID string
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/model"
+
+type UserID = model.UserID
+
+type Authenticator interface {
+	Authenticate(UserID) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt.go"), `package jwt
+
+import "example.com/app/internal/model"
+
+type JWTAuthenticator struct{}
+
+func (JWTAuthenticator) Authenticate(model.UserID) error {
+	return nil
+}
+`)
+
+	return root
+}
+
+func writeGenericPointerReceiverProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "cache", "cache.go"), `package cache
+
+type Flusher interface {
+	Flush() error
+}
+
+type Cache[T any] struct{}
+
+func (*Cache[T]) Flush() error {
 	return nil
 }
 `)

@@ -59,9 +59,10 @@ default tool.
 Move the highest-risk analysis paths from AST-first heuristics toward Go
 semantics using `go/packages` and the Go type checker.
 
-Current status: `gosherpa refs` has a `go/packages`-backed typechecked path
-with AST/per-package fallback. Call graph, interface, context, and impact
-analysis still need broader shared semantic loading.
+Current status: `gosherpa refs`, call graph commands, and standalone interface
+navigation have `go/packages`-backed typechecked paths with AST fallback.
+Context and impact compose some of those signals, but still need broader shared
+semantic loading across every analysis field.
 
 Focus areas:
 

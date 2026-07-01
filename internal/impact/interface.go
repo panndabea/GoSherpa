@@ -7,18 +7,27 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"go/types"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
+)
+
+const (
+	InterfaceAnalysisModeTypechecked = "typechecked"
+	InterfaceAnalysisModeASTFallback = "ast-fallback"
 )
 
 type interfaceImpactSignals struct {
 	Interfaces      []string
 	Implementations []string
+	Warnings        []string
 }
 
 type Implementer struct {
@@ -29,6 +38,8 @@ type Implementer struct {
 type ImplementersResult struct {
 	Target       string        `json:"target"`
 	Implementers []Implementer `json:"implementers"`
+	AnalysisMode string        `json:"-"`
+	Warnings     []string      `json:"-"`
 }
 
 type SatisfiedInterface struct {
@@ -37,8 +48,10 @@ type SatisfiedInterface struct {
 }
 
 type InterfacesResult struct {
-	Target     string               `json:"target"`
-	Interfaces []SatisfiedInterface `json:"interfaces"`
+	Target       string               `json:"target"`
+	Interfaces   []SatisfiedInterface `json:"interfaces"`
+	AnalysisMode string               `json:"-"`
+	Warnings     []string             `json:"-"`
 }
 
 type interfaceGraph struct {
@@ -47,6 +60,8 @@ type interfaceGraph struct {
 	ImplementationsByIface map[string][]string
 	InterfacesByType       map[string][]string
 	EmbeddingByIface       map[string][]string
+	AnalysisMode           string
+	Warnings               []string
 }
 
 type interfaceInfo struct {
@@ -56,6 +71,7 @@ type interfaceInfo struct {
 	Position  sherpa.Position
 	Methods   methodSet
 	Embedded  []interfaceRef
+	Type      *types.Interface
 }
 
 type typeInfo struct {
@@ -64,6 +80,7 @@ type typeInfo struct {
 	Qualified string
 	Position  sherpa.Position
 	Methods   methodSet
+	Type      types.Type
 }
 
 type methodSet map[string]string
@@ -79,6 +96,8 @@ type interfaceSymbolTarget struct {
 	Name     string
 }
 
+var loadSemanticInterfaceRepository = semantics.LoadRepository
+
 func FindImplementers(root string, target string) (ImplementersResult, error) {
 	graph, err := buildInterfaceGraph(root)
 	if err != nil {
@@ -93,6 +112,8 @@ func FindImplementers(root string, target string) (ImplementersResult, error) {
 	return ImplementersResult{
 		Target:       iface.Qualified,
 		Implementers: implementersForInterface(graph, iface.Qualified),
+		AnalysisMode: graph.AnalysisMode,
+		Warnings:     graph.Warnings,
 	}, nil
 }
 
@@ -108,8 +129,10 @@ func FindInterfaces(root string, target string) (InterfacesResult, error) {
 	}
 
 	return InterfacesResult{
-		Target:     typ.Qualified,
-		Interfaces: interfacesForType(graph, typ.Qualified),
+		Target:       typ.Qualified,
+		Interfaces:   interfacesForType(graph, typ.Qualified),
+		AnalysisMode: graph.AnalysisMode,
+		Warnings:     graph.Warnings,
 	}, nil
 }
 
@@ -157,6 +180,7 @@ func interfaceSignalsForPackages(root string, packages []string) (interfaceImpac
 	return interfaceImpactSignals{
 		Interfaces:      uniqueSortedStrings(interfaces),
 		Implementations: uniqueSortedStrings(implementations),
+		Warnings:        graph.Warnings,
 	}, nil
 }
 
@@ -201,6 +225,7 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 		return interfaceImpactSignals{
 			Interfaces:      uniqueSortedStrings(interfaces),
 			Implementations: uniqueSortedStrings(implementations),
+			Warnings:        graph.Warnings,
 		}, nil
 	}
 
@@ -224,10 +249,195 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 	return interfaceImpactSignals{
 		Interfaces:      uniqueSortedStrings(interfaces),
 		Implementations: uniqueSortedStrings(implementations),
+		Warnings:        graph.Warnings,
 	}, nil
 }
 
 func buildInterfaceGraph(root string) (interfaceGraph, error) {
+	graph, warnings, ok := buildTypecheckedInterfaceGraph(root)
+	if ok {
+		return graph, nil
+	}
+
+	graph, err := buildASTInterfaceGraph(root)
+	if err != nil {
+		return interfaceGraph{}, err
+	}
+
+	graph.AnalysisMode = InterfaceAnalysisModeASTFallback
+	graph.Warnings = nonNilStrings(warnings)
+
+	return graph, nil
+}
+
+func buildTypecheckedInterfaceGraph(root string) (interfaceGraph, []string, bool) {
+	if !interfaceShouldAttemptTypechecked(root) {
+		return interfaceGraph{}, nil, false
+	}
+
+	repo, err := loadSemanticInterfaceRepository(root, semantics.LoadOptions{})
+	if err != nil {
+		return interfaceGraph{}, []string{fmt.Sprintf("typechecked interface analysis unavailable: %v", err)}, false
+	}
+
+	graph := semanticInterfaceGraph(repo)
+	if graph.AnalysisMode == "" {
+		return interfaceGraph{}, append([]string{"typechecked interface analysis unavailable: no typechecked packages loaded"}, repo.Warnings...), false
+	}
+
+	return graph, nonNilStrings(repo.Warnings), true
+}
+
+func interfaceShouldAttemptTypechecked(root string) bool {
+	info, err := os.Stat(filepath.Join(root, "go.mod"))
+	return err == nil && !info.IsDir()
+}
+
+func semanticInterfaceGraph(repo semantics.Repository) interfaceGraph {
+	modulePath, _ := sherpa.ModulePath(repo.Root)
+
+	var interfaces []interfaceInfo
+	var typeInfos []typeInfo
+	usablePackages := 0
+
+	for _, pkg := range repo.Packages {
+		if !semanticInterfacePackageUsable(pkg) {
+			continue
+		}
+
+		usablePackages++
+		names := pkg.Types.Scope().Names()
+		for _, name := range names {
+			typeName, ok := pkg.Types.Scope().Lookup(name).(*types.TypeName)
+			if !ok {
+				continue
+			}
+
+			named, ok := typeName.Type().(*types.Named)
+			if !ok {
+				continue
+			}
+
+			iface, ok := named.Underlying().(*types.Interface)
+			if ok {
+				iface.Complete()
+				interfaces = append(interfaces, interfaceInfo{
+					Name:      typeName.Name(),
+					Package:   pkg.PackagePath,
+					Qualified: qualifiedSignalName(pkg.PackagePath, typeName.Name()),
+					Position:  interfacePosition(repo.Root, pkg.FileSet, typeName.Pos()),
+					Methods:   typecheckedInterfaceMethodSet(iface),
+					Embedded:  typecheckedEmbeddedInterfaces(modulePath, iface),
+					Type:      iface,
+				})
+				continue
+			}
+
+			typeInfos = append(typeInfos, typeInfo{
+				Name:      typeName.Name(),
+				Package:   pkg.PackagePath,
+				Qualified: qualifiedSignalName(pkg.PackagePath, typeName.Name()),
+				Position:  interfacePosition(repo.Root, pkg.FileSet, typeName.Pos()),
+				Methods:   typecheckedTypeMethodSet(named),
+				Type:      named,
+			})
+		}
+	}
+
+	if usablePackages == 0 {
+		return interfaceGraph{}
+	}
+
+	sortInterfaceInfos(interfaces)
+	sortTypeInfos(typeInfos)
+
+	graph := interfaceGraph{
+		Interfaces:   interfaces,
+		Types:        typeInfos,
+		AnalysisMode: InterfaceAnalysisModeTypechecked,
+		Warnings:     nonNilStrings(repo.Warnings),
+	}
+
+	return completeInterfaceGraph(graph)
+}
+
+func semanticInterfacePackageUsable(pkg semantics.Package) bool {
+	return pkg.FileSet != nil && pkg.Types != nil
+}
+
+func typecheckedInterfaceMethodSet(iface *types.Interface) methodSet {
+	methods := make(methodSet)
+	if iface == nil {
+		return methods
+	}
+
+	iface.Complete()
+	for i := 0; i < iface.NumMethods(); i++ {
+		method := iface.Method(i)
+		methods[method.Name()] = method.Type().String()
+	}
+
+	return methods
+}
+
+func typecheckedTypeMethodSet(typ types.Type) methodSet {
+	methods := methodSetFromSelectionSet(types.NewMethodSet(typ))
+	if named, ok := typ.(*types.Named); ok {
+		mergeMethodSets(methods, methodSetFromSelectionSet(types.NewMethodSet(types.NewPointer(named))))
+	}
+
+	return methods
+}
+
+func methodSetFromSelectionSet(methodSetValue *types.MethodSet) methodSet {
+	methods := make(methodSet)
+	if methodSetValue == nil {
+		return methods
+	}
+
+	for i := 0; i < methodSetValue.Len(); i++ {
+		selection := methodSetValue.At(i)
+		method := selection.Obj()
+		methods[method.Name()] = method.Type().String()
+	}
+
+	return methods
+}
+
+func typecheckedEmbeddedInterfaces(modulePath string, iface *types.Interface) []interfaceRef {
+	if iface == nil {
+		return nil
+	}
+
+	var embedded []interfaceRef
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		ref, ok := typecheckedInterfaceRef(modulePath, iface.EmbeddedType(i))
+		if ok {
+			embedded = append(embedded, ref)
+		}
+	}
+
+	return embedded
+}
+
+func typecheckedInterfaceRef(modulePath string, typ types.Type) (interfaceRef, bool) {
+	named, ok := typ.(*types.Named)
+	if !ok {
+		return interfaceRef{}, false
+	}
+	if named.Obj() == nil || named.Obj().Pkg() == nil {
+		return interfaceRef{}, false
+	}
+
+	packagePath, ok := localInterfaceImportPackage(named.Obj().Pkg().Path(), modulePath)
+	if !ok {
+		return interfaceRef{}, false
+	}
+
+	return interfaceRef{Package: packagePath, Name: named.Obj().Name()}, true
+}
+
+func buildASTInterfaceGraph(root string) (interfaceGraph, error) {
 	files, err := sherpa.FindGoFiles(root)
 	if err != nil {
 		return interfaceGraph{}, err
@@ -317,15 +527,22 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 	})
 
 	graph := interfaceGraph{
-		Interfaces:             interfaces,
-		Types:                  types,
-		ImplementationsByIface: make(map[string][]string),
-		InterfacesByType:       make(map[string][]string),
-		EmbeddingByIface:       interfaceEmbeddingMap(interfaces),
+		Interfaces:   interfaces,
+		Types:        types,
+		AnalysisMode: InterfaceAnalysisModeASTFallback,
 	}
 
-	for _, iface := range interfaces {
-		for _, typ := range types {
+	return completeInterfaceGraph(graph), nil
+}
+
+func completeInterfaceGraph(graph interfaceGraph) interfaceGraph {
+	graph.ImplementationsByIface = make(map[string][]string)
+	graph.InterfacesByType = make(map[string][]string)
+	graph.EmbeddingByIface = interfaceEmbeddingMap(graph.Interfaces)
+	graph.Warnings = nonNilStrings(graph.Warnings)
+
+	for _, iface := range graph.Interfaces {
+		for _, typ := range graph.Types {
 			if !typeImplementsInterface(typ, iface) {
 				continue
 			}
@@ -342,7 +559,7 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 		graph.InterfacesByType[typ] = uniqueSortedStrings(interfaces)
 	}
 
-	return graph, nil
+	return graph
 }
 
 func findInterfaceTarget(root string, graph interfaceGraph, target string) (interfaceInfo, error) {
@@ -510,6 +727,32 @@ func sortSatisfiedInterfaces(interfaces []SatisfiedInterface) {
 		}
 
 		return interfaces[i].Position.Line < interfaces[j].Position.Line
+	})
+}
+
+func sortInterfaceInfos(interfaces []interfaceInfo) {
+	sort.Slice(interfaces, func(i int, j int) bool {
+		if interfaces[i].Qualified != interfaces[j].Qualified {
+			return interfaces[i].Qualified < interfaces[j].Qualified
+		}
+		if interfaces[i].Position.File != interfaces[j].Position.File {
+			return interfaces[i].Position.File < interfaces[j].Position.File
+		}
+
+		return interfaces[i].Position.Line < interfaces[j].Position.Line
+	})
+}
+
+func sortTypeInfos(types []typeInfo) {
+	sort.Slice(types, func(i int, j int) bool {
+		if types[i].Qualified != types[j].Qualified {
+			return types[i].Qualified < types[j].Qualified
+		}
+		if types[i].Position.File != types[j].Position.File {
+			return types[i].Position.File < types[j].Position.File
+		}
+
+		return types[i].Position.Line < types[j].Position.Line
 	})
 }
 
@@ -893,6 +1136,10 @@ func interfaceReceiverName(funcDecl *ast.FuncDecl) string {
 }
 
 func typeImplementsInterface(typ typeInfo, iface interfaceInfo) bool {
+	if typ.Type != nil && iface.Type != nil {
+		return typecheckedTypeImplementsInterface(typ.Type, iface.Type)
+	}
+
 	for method, ifaceSignature := range iface.Methods {
 		typeSignature, ok := typ.Methods[method]
 		if !ok || typeSignature != ifaceSignature {
@@ -901,6 +1148,24 @@ func typeImplementsInterface(typ typeInfo, iface interfaceInfo) bool {
 	}
 
 	return true
+}
+
+func typecheckedTypeImplementsInterface(typ types.Type, iface *types.Interface) bool {
+	if typ == nil || iface == nil {
+		return false
+	}
+
+	iface.Complete()
+	if types.Implements(typ, iface) {
+		return true
+	}
+
+	named, ok := typ.(*types.Named)
+	if !ok {
+		return false
+	}
+
+	return types.Implements(types.NewPointer(named), iface)
 }
 
 func interfacePosition(root string, fileSet *token.FileSet, pos token.Pos) sherpa.Position {

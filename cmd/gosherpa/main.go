@@ -1242,7 +1242,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				root,
 				"implementers",
 				normalizedResult.Target,
-				nil,
+				normalizedResult.Warnings,
 				implementersJSONDataFromResult(normalizedResult),
 			))
 		}
@@ -1273,7 +1273,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				root,
 				"interfaces",
 				normalizedResult.Target,
-				nil,
+				normalizedResult.Warnings,
 				interfacesJSONDataFromResult(normalizedResult),
 			))
 		}
@@ -1740,30 +1740,38 @@ func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenc
 
 func implementersJSONResult(result impactengine.ImplementersResult) impactengine.ImplementersResult {
 	result.Implementers = nonNilSlice(result.Implementers)
+	result.Warnings = nonNilSlice(result.Warnings)
+	if strings.TrimSpace(result.AnalysisMode) == "" {
+		result.AnalysisMode = impactengine.InterfaceAnalysisModeASTFallback
+	}
 
 	return result
 }
 
 func implementersJSONDataFromResult(result impactengine.ImplementersResult) implementersJSONData {
 	return implementersJSONData{
-		AnalysisMode: analysisModeAST,
-		Confidence:   jsonConfidence(nil, analysisModeAST),
-		Limitations:  interfaceLimitations(),
+		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  interfaceLimitations(result.AnalysisMode),
 		Implementers: result.Implementers,
 	}
 }
 
 func interfacesJSONResult(result impactengine.InterfacesResult) impactengine.InterfacesResult {
 	result.Interfaces = nonNilSlice(result.Interfaces)
+	result.Warnings = nonNilSlice(result.Warnings)
+	if strings.TrimSpace(result.AnalysisMode) == "" {
+		result.AnalysisMode = impactengine.InterfaceAnalysisModeASTFallback
+	}
 
 	return result
 }
 
 func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfacesJSONData {
 	return interfacesJSONData{
-		AnalysisMode: analysisModeAST,
-		Confidence:   jsonConfidence(nil, analysisModeAST),
-		Limitations:  interfaceLimitations(),
+		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  interfaceLimitations(result.AnalysisMode),
 		Interfaces:   result.Interfaces,
 	}
 }
@@ -1947,7 +1955,9 @@ func jsonConfidence(warnings []string, analysisModes ...string) string {
 	}
 
 	for _, mode := range analysisModes {
-		if mode == sherpa.CallAnalysisModeASTFallback {
+		if mode == sherpa.CallAnalysisModeASTFallback ||
+			mode == sherpa.ReferenceAnalysisModeASTFallback ||
+			mode == impactengine.InterfaceAnalysisModeASTFallback {
 			return confidenceLow
 		}
 	}
@@ -2026,7 +2036,7 @@ func impactLimitations(analysisMode string) []string {
 	return []string{
 		"Impact analysis uses syntax plus local package dependency and interface signals.",
 		"Symbol impact includes references and conservative caller-package propagation.",
-		"Interface impact uses local method-set matching and may miss alias, build-tag, or generic edge cases.",
+		"Interface impact uses typechecked method sets when package loading succeeds and AST fallback otherwise.",
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 	}
 }
@@ -2047,11 +2057,25 @@ func testLimitations(analysisMode string) []string {
 	}
 }
 
-func interfaceLimitations() []string {
-	return []string{
-		"Interface analysis uses local method-set matching.",
-		"Embedded local interfaces are expanded, but full module typechecking is not used for every alias, build-tag, or generic edge case.",
-		"External implementations outside the repository are not reported.",
+func interfaceLimitations(analysisMode string) []string {
+	switch analysisMode {
+	case impactengine.InterfaceAnalysisModeTypechecked:
+		return []string{
+			"Interface analysis used typechecked method sets from repository-local packages.",
+			"External implementations outside the repository are not reported.",
+			"Build tags follow the default Go package loading environment.",
+		}
+	case impactengine.InterfaceAnalysisModeASTFallback:
+		return []string{
+			"Interface analysis used AST fallback because typechecked loading was unavailable.",
+			"Embedded local interfaces are expanded, but alias, build-tag, and generic edge cases may be incomplete.",
+			"External implementations outside the repository are not reported.",
+		}
+	default:
+		return []string{
+			"Interface analysis uses local method-set matching.",
+			"External implementations outside the repository are not reported.",
+		}
 	}
 }
 

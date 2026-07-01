@@ -11,7 +11,7 @@
     "limitations": [
       "Impact analysis uses syntax plus local package dependency and interface signals.",
       "Symbol impact includes references and conservative caller-package propagation.",
-      "Interface impact uses local method-set matching and may miss alias, build-tag, or generic edge cases.",
+      "Interface impact uses typechecked method sets when package loading succeeds and AST fallback otherwise.",
       "Dynamic dispatch, reflection, and function values are not resolved."
     ],
     "kind": "symbol",

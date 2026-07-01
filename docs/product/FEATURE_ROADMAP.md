@@ -133,10 +133,9 @@ Current limitations:
   consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests;
   unqualified symbol targets may require disambiguation across packages.
-- Interface implementer impact canonicalizes local/external import paths in
-  method signatures and resolves local embedded interfaces, but does not yet use
-  full module-level typechecked analysis for aliases, build tags, or generic
-  edge cases.
+- Interface implementer impact uses typechecked method sets when package loading
+  succeeds and falls back to local AST method-set matching when it cannot load
+  semantic package data.
 - Test discovery uses same-package tests and syntactic direct-reference
   matching; table-test names are not extracted yet.
 - Callers, callees, and paths still do not resolve dynamic dispatch,
@@ -894,10 +893,11 @@ implemented. `internal/impact.ChangedSymbols` extracts changed and deleted
 symbols from git diff hunks. `gosherpa impact diff --base <ref>` and `gosherpa
 tests affected --base <ref>` are implemented for human and JSON output.
 `gosherpa impact file|package|symbol` is implemented for human and JSON output.
-Interface and implementer impact signals are implemented as a conservative
-local method-set scan with import-aware signature matching and embedded-interface
-expansion. Package-qualified symbol impact disambiguates references and affected
-tests. Symbol impact includes transitive callers in affected packages.
+Interface and implementer impact signals use typechecked method sets when
+package loading succeeds and fall back to conservative local AST method-set
+matching when semantic data is unavailable. Package-qualified symbol impact
+disambiguates references and affected tests. Symbol impact includes transitive
+callers in affected packages.
 Affected-test planning includes package tests for affected caller packages.
 
 Human question:

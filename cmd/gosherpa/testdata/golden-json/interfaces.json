@@ -6,12 +6,12 @@
   "modulePath": "example.com/interfaces",
   "warnings": [],
   "data": {
-    "analysisMode": "ast",
+    "analysisMode": "typechecked",
     "confidence": "medium",
     "limitations": [
-      "Interface analysis uses local method-set matching.",
-      "Embedded local interfaces are expanded, but full module typechecking is not used for every alias, build-tag, or generic edge case.",
-      "External implementations outside the repository are not reported."
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "External implementations outside the repository are not reported.",
+      "Build tags follow the default Go package loading environment."
     ],
     "interfaces": [
       {

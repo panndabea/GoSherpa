@@ -163,8 +163,9 @@ Call analysis mode values:
 - `ast-fallback`: GoSherpa fell back to AST-only call analysis because
   typechecked loading was unavailable.
 
-Reference analysis uses the same `typechecked` and `ast-fallback` labels.
-Broader context, impact, test, interface, and path commands currently use:
+Reference and standalone interface analysis use the same `typechecked` and
+`ast-fallback` labels. Broader context, impact, test, and path commands
+currently use:
 
 - `ast`: syntax plus local type information and repository-local heuristics.
 - `git-diff+ast`: git diff discovery plus AST/local repository analysis.
@@ -343,7 +344,8 @@ keeps `tests` or `affectedTests`, `commands`, and `testPlan`.
 `implementers`, `interfaces`, `path`, and `paths` data objects include the
 common metadata fields:
 
-- `analysisMode`: currently `ast`.
+- `analysisMode`: `typechecked` or `ast-fallback` for `implementers` and
+  `interfaces`; currently `ast` for path commands.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific interface or path-analysis blind spots.
 

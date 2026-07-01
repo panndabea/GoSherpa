@@ -78,6 +78,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
 }
@@ -117,6 +118,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
 }
@@ -138,6 +140,7 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 	}
 	report.AffectedInterfaces = signals.Interfaces
 	report.AffectedImplementations = signals.Implementations
+	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 
 	return normalizeReport(report), nil
 }
