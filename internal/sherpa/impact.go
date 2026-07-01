@@ -27,7 +27,15 @@ type ImpactResult struct {
 	Warnings     []string            `json:"warnings"`
 }
 
+type ImpactOptions struct {
+	BuildTags []string
+}
+
 func FindImpact(root string, target string) (ImpactResult, error) {
+	return FindImpactWithOptions(root, target, ImpactOptions{})
+}
+
+func FindImpactWithOptions(root string, target string, options ImpactOptions) (ImpactResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return ImpactResult{}, err
@@ -37,7 +45,7 @@ func FindImpact(root string, target string) (ImpactResult, error) {
 		return findPackageImpact(rootPath, target)
 	}
 
-	return findSymbolImpact(rootPath, target)
+	return findSymbolImpact(rootPath, target, options)
 }
 
 func isImpactPackageTarget(target string) bool {
@@ -108,13 +116,15 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 	}, nil
 }
 
-func findSymbolImpact(root string, target string) (ImpactResult, error) {
+func findSymbolImpact(root string, target string, options ImpactOptions) (ImpactResult, error) {
 	normalizedTarget, err := normalizeReferenceTarget(root, target)
 	if err != nil {
 		return ImpactResult{}, err
 	}
 
-	referenceReport, err := FindReferenceReport(root, target)
+	referenceReport, err := FindReferenceReportWithOptions(root, target, ReferenceOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return ImpactResult{}, err
 	}
@@ -127,7 +137,8 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 	}
 
 	if normalizedTarget.Package == "" {
-		callers, err := impactSymbolCallers(root, target)
+		callers, warnings, err := impactSymbolCallers(root, target, options)
+		result.Warnings = append(result.Warnings, warnings...)
 		if err == nil {
 			result.Callers = callers
 		} else if !isImpactNonFunctionTargetError(err) {
@@ -154,18 +165,21 @@ func findSymbolImpact(root string, target string) (ImpactResult, error) {
 	return result, nil
 }
 
-func impactSymbolCallers(root string, target string) ([]Caller, error) {
+func impactSymbolCallers(root string, target string, options ImpactOptions) ([]Caller, []string, error) {
 	normalizedTarget, err := normalizeCallTarget(root, target)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	functions, err := collectFunctionInfos(root)
+	functions, _, warnings, err := collectCallFunctionInfos(root, CallOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
-		return nil, err
+		return nil, warnings, err
 	}
 
-	return collectTransitiveCallersFromFunctions(functions, normalizedTarget)
+	callers, err := collectTransitiveCallersFromFunctions(functions, normalizedTarget)
+	return callers, warnings, err
 }
 
 func impactSymbolTests(root string, target string, packages []string, targetPackages []string) (TestsResult, []string) {

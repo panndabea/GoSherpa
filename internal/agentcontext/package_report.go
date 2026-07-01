@@ -14,7 +14,8 @@ import (
 )
 
 type PackageAnalyzeOptions struct {
-	IncludeTests bool         `json:"includeTests"`
+	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 	SourceRadius int          `json:"sourceRadius"`
 	Limits       LimitOptions `json:"limits"`
 }
@@ -45,7 +46,9 @@ type PackageReport struct {
 }
 
 func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOptions) (PackageReport, error) {
-	impactReport, err := impactengine.AnalyzePackage(root, targetPackage)
+	impactReport, err := impactengine.AnalyzePackageWithOptions(root, targetPackage, impactengine.AnalyzerOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return PackageReport{}, err
 	}

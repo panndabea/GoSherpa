@@ -280,6 +280,43 @@ func Run() {
 	}
 }
 
+func TestFindReferenceReportWithOptionsHonorsBuildTags(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "enterprise.go"), `//go:build enterprise
+
+package service
+
+func Run() {
+	Target()
+}
+`)
+
+	withoutTags, err := FindReferenceReportWithOptions(tmp, "Target", ReferenceOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withoutTags.References) != 1 {
+		t.Fatalf("expected only definition without tag, got %#v", withoutTags.References)
+	}
+
+	withTags, err := FindReferenceReportWithOptions(tmp, "Target", ReferenceOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withTags.AnalysisMode != ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %s", withTags.AnalysisMode)
+	}
+	assertReferenceAt(t, withTags.References, "enterprise.go", 6, ReferenceKindCall)
+}
+
 func TestFindReferencesHonorsPackageQualifiedTargets(t *testing.T) {
 	tmp := t.TempDir()
 

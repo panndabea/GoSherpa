@@ -68,6 +68,46 @@ func Broken() {
 	}
 }
 
+func TestLoadRepositoryHonorsBuildTags(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Always() {}
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "enterprise.go"), `//go:build enterprise
+
+package service
+
+func Enterprise() {}
+`)
+
+	withoutTags, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if semanticTestCompiledFileExists(withoutTags, "enterprise.go") {
+		t.Fatalf("expected enterprise.go to be excluded without tag, got %#v", withoutTags.Packages)
+	}
+
+	withTags, err := LoadRepository(tmp, LoadOptions{BuildTags: []string{"enterprise"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !semanticTestCompiledFileExists(withTags, "enterprise.go") {
+		t.Fatalf("expected enterprise.go to be included with tag, got %#v", withTags.Packages)
+	}
+}
+
+func TestNormalizeBuildTagsSplitsDeduplicatesAndSorts(t *testing.T) {
+	got := NormalizeBuildTags([]string{"integration, enterprise", "enterprise", "debug"})
+	want := []string{"debug", "enterprise", "integration"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("NormalizeBuildTags() = %#v, want %#v", got, want)
+	}
+}
+
 func TestPackageWarningsIgnoresTransientGoBuildCacheMissWithUsableData(t *testing.T) {
 	pkg := &packages.Package{
 		PkgPath:   "example.com/app",
@@ -125,6 +165,18 @@ func assertSemanticTestContains(t *testing.T, values []string, want string) {
 	}
 
 	t.Fatalf("expected %q in %v", want, values)
+}
+
+func semanticTestCompiledFileExists(repo Repository, name string) bool {
+	for _, pkg := range repo.Packages {
+		for _, file := range pkg.CompiledGoFiles {
+			if filepath.Base(file) == name {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func writeSemanticTestFile(t *testing.T, path string, contents string) {

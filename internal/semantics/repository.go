@@ -14,6 +14,7 @@ import (
 
 type LoadOptions struct {
 	IncludeTests bool
+	BuildTags    []string
 	BuildFlags   []string
 	Patterns     []string
 }
@@ -60,7 +61,7 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 			packages.NeedTypesSizes,
 		Dir:        rootPath,
 		Tests:      options.IncludeTests,
-		BuildFlags: append([]string{}, options.BuildFlags...),
+		BuildFlags: packageLoadBuildFlags(options),
 	}
 
 	loaded, err := packages.Load(cfg, patterns...)
@@ -98,6 +99,48 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	repo.Warnings = uniqueSorted(repo.Warnings)
 
 	return repo, nil
+}
+
+func packageLoadBuildFlags(options LoadOptions) []string {
+	flags := append([]string{}, options.BuildFlags...)
+	tags := NormalizeBuildTags(options.BuildTags)
+	if len(tags) > 0 {
+		flags = append(flags, "-tags="+strings.Join(tags, ","))
+	}
+
+	return flags
+}
+
+func NormalizeBuildTags(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	for _, value := range values {
+		fields := strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == '\r'
+		})
+		for _, field := range fields {
+			tag := strings.TrimSpace(field)
+			if tag == "" {
+				continue
+			}
+
+			seen[tag] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+
+	tags := make([]string, 0, len(seen))
+	for tag := range seen {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+
+	return tags
 }
 
 func packageFromLoaded(root string, pkg *packages.Package) (Package, bool, error) {

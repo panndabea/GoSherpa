@@ -13,7 +13,12 @@ import (
 )
 
 type Analyzer struct {
-	Root string
+	Root      string
+	BuildTags []string
+}
+
+type AnalyzerOptions struct {
+	BuildTags []string
 }
 
 type RelatedTest = sherpa.RelatedTest
@@ -37,20 +42,43 @@ func NewAnalyzer(root string) Analyzer {
 	return Analyzer{Root: root}
 }
 
+func NewAnalyzerWithOptions(root string, options AnalyzerOptions) Analyzer {
+	return Analyzer{
+		Root:      root,
+		BuildTags: append([]string{}, options.BuildTags...),
+	}
+}
+
 func AnalyzeDiff(root string, base string, head string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzeDiff(base, head)
+}
+
+func AnalyzeDiffWithOptions(root string, base string, head string, options AnalyzerOptions) (ImpactReport, error) {
+	return NewAnalyzerWithOptions(root, options).AnalyzeDiff(base, head)
 }
 
 func AnalyzeFile(root string, file string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzeFile(file)
 }
 
+func AnalyzeFileWithOptions(root string, file string, options AnalyzerOptions) (ImpactReport, error) {
+	return NewAnalyzerWithOptions(root, options).AnalyzeFile(file)
+}
+
 func AnalyzePackage(root string, targetPackage string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzePackage(targetPackage)
 }
 
+func AnalyzePackageWithOptions(root string, targetPackage string, options AnalyzerOptions) (ImpactReport, error) {
+	return NewAnalyzerWithOptions(root, options).AnalyzePackage(targetPackage)
+}
+
 func AnalyzeSymbol(root string, target string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzeSymbol(target)
+}
+
+func AnalyzeSymbolWithOptions(root string, target string, options AnalyzerOptions) (ImpactReport, error) {
+	return NewAnalyzerWithOptions(root, options).AnalyzeSymbol(target)
 }
 
 func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
@@ -73,7 +101,9 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	}
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
-	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
+	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
+		BuildTags: a.BuildTags,
+	})
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -103,7 +133,9 @@ func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
-	result, err := sherpa.FindImpact(a.Root, targetPackage)
+	result, err := sherpa.FindImpactWithOptions(a.Root, targetPackage, sherpa.ImpactOptions{
+		BuildTags: a.BuildTags,
+	})
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -114,7 +146,9 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
-	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages)
+	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
+		BuildTags: a.BuildTags,
+	})
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -127,7 +161,9 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
-	result, err := sherpa.FindImpact(a.Root, target)
+	result, err := sherpa.FindImpactWithOptions(a.Root, target, sherpa.ImpactOptions{
+		BuildTags: a.BuildTags,
+	})
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -137,7 +173,9 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.AffectedSymbols = []string{result.Target}
-	signals, err := interfaceSignalsForSymbol(a.Root, target)
+	signals, err := interfaceSignalsForSymbol(a.Root, target, InterfaceOptions{
+		BuildTags: a.BuildTags,
+	})
 	if err != nil {
 		return ImpactReport{}, err
 	}

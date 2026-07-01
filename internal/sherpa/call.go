@@ -47,6 +47,7 @@ type CallersResult struct {
 
 type CallOptions struct {
 	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 }
 
 type CallPathOptions struct {
@@ -123,6 +124,10 @@ type callPathSearchState struct {
 var loadSemanticCallRepository = semantics.LoadRepository
 
 func FindCallees(root string, target string) (CalleesResult, error) {
+	return FindCalleesWithOptions(root, target, CallOptions{})
+}
+
+func FindCalleesWithOptions(root string, target string, options CallOptions) (CalleesResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return CalleesResult{}, err
@@ -133,7 +138,7 @@ func FindCallees(root string, target string) (CalleesResult, error) {
 		return CalleesResult{}, err
 	}
 
-	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath)
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath, options)
 	if err != nil {
 		return CalleesResult{
 			Target:       normalizedTarget.String(),
@@ -180,7 +185,7 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 		return CallersResult{}, err
 	}
 
-	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath)
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath, options)
 	if err != nil {
 		return CallersResult{
 			Target:       normalizedTarget.String(),
@@ -482,8 +487,8 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 	return functions, nil
 }
 
-func collectCallFunctionInfos(root string) ([]functionInfo, string, []string, error) {
-	functions, warnings, ok := collectTypecheckedCallFunctionInfos(root)
+func collectCallFunctionInfos(root string, options CallOptions) ([]functionInfo, string, []string, error) {
+	functions, warnings, ok := collectTypecheckedCallFunctionInfos(root, options)
 	if ok {
 		return functions, CallAnalysisModeTypechecked, warnings, nil
 	}
@@ -496,12 +501,14 @@ func collectCallFunctionInfos(root string) ([]functionInfo, string, []string, er
 	return functions, CallAnalysisModeASTFallback, warnings, nil
 }
 
-func collectTypecheckedCallFunctionInfos(root string) ([]functionInfo, []string, bool) {
+func collectTypecheckedCallFunctionInfos(root string, options CallOptions) ([]functionInfo, []string, bool) {
 	if !referenceShouldAttemptTypechecked(root) {
 		return nil, nil, false
 	}
 
-	repo, err := loadSemanticCallRepository(root, semantics.LoadOptions{})
+	repo, err := loadSemanticCallRepository(root, semantics.LoadOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return nil, []string{fmt.Sprintf("typechecked call analysis unavailable: %v", err)}, false
 	}

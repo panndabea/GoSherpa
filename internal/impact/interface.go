@@ -97,10 +97,18 @@ type interfaceSymbolTarget struct {
 	Name     string
 }
 
+type InterfaceOptions struct {
+	BuildTags []string
+}
+
 var loadSemanticInterfaceRepository = semantics.LoadRepository
 
 func FindImplementers(root string, target string) (ImplementersResult, error) {
-	graph, err := buildInterfaceGraph(root)
+	return FindImplementersWithOptions(root, target, InterfaceOptions{})
+}
+
+func FindImplementersWithOptions(root string, target string, options InterfaceOptions) (ImplementersResult, error) {
+	graph, err := buildInterfaceGraph(root, options)
 	if err != nil {
 		return ImplementersResult{}, err
 	}
@@ -119,7 +127,11 @@ func FindImplementers(root string, target string) (ImplementersResult, error) {
 }
 
 func FindInterfaces(root string, target string) (InterfacesResult, error) {
-	graph, err := buildInterfaceGraph(root)
+	return FindInterfacesWithOptions(root, target, InterfaceOptions{})
+}
+
+func FindInterfacesWithOptions(root string, target string, options InterfaceOptions) (InterfacesResult, error) {
+	graph, err := buildInterfaceGraph(root, options)
 	if err != nil {
 		return InterfacesResult{}, err
 	}
@@ -137,13 +149,13 @@ func FindInterfaces(root string, target string) (InterfacesResult, error) {
 	}, nil
 }
 
-func interfaceSignalsForPackages(root string, packages []string) (interfaceImpactSignals, error) {
+func interfaceSignalsForPackages(root string, packages []string, options InterfaceOptions) (interfaceImpactSignals, error) {
 	packages = uniqueSortedStrings(packages)
 	if len(packages) == 0 {
 		return interfaceImpactSignals{}, nil
 	}
 
-	graph, err := buildInterfaceGraph(root)
+	graph, err := buildInterfaceGraph(root, options)
 	if err != nil {
 		return interfaceImpactSignals{}, err
 	}
@@ -186,13 +198,13 @@ func interfaceSignalsForPackages(root string, packages []string) (interfaceImpac
 	}, nil
 }
 
-func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSignals, error) {
+func interfaceSignalsForSymbol(root string, target string, options InterfaceOptions) (interfaceImpactSignals, error) {
 	targetParts := parseInterfaceSymbolTarget(root, target)
 	if targetParts.Name == "" {
 		return interfaceImpactSignals{}, nil
 	}
 
-	graph, err := buildInterfaceGraph(root)
+	graph, err := buildInterfaceGraph(root, options)
 	if err != nil {
 		return interfaceImpactSignals{}, err
 	}
@@ -257,8 +269,8 @@ func interfaceSignalsForSymbol(root string, target string) (interfaceImpactSigna
 	}, nil
 }
 
-func buildInterfaceGraph(root string) (interfaceGraph, error) {
-	graph, warnings, ok := buildTypecheckedInterfaceGraph(root)
+func buildInterfaceGraph(root string, options InterfaceOptions) (interfaceGraph, error) {
+	graph, warnings, ok := buildTypecheckedInterfaceGraph(root, options)
 	if ok {
 		return graph, nil
 	}
@@ -274,12 +286,14 @@ func buildInterfaceGraph(root string) (interfaceGraph, error) {
 	return graph, nil
 }
 
-func buildTypecheckedInterfaceGraph(root string) (interfaceGraph, []string, bool) {
+func buildTypecheckedInterfaceGraph(root string, options InterfaceOptions) (interfaceGraph, []string, bool) {
 	if !interfaceShouldAttemptTypechecked(root) {
 		return interfaceGraph{}, nil, false
 	}
 
-	repo, err := loadSemanticInterfaceRepository(root, semantics.LoadOptions{})
+	repo, err := loadSemanticInterfaceRepository(root, semantics.LoadOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return interfaceGraph{}, []string{fmt.Sprintf("typechecked interface analysis unavailable: %v", err)}, false
 	}

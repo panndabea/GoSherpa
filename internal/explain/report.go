@@ -37,6 +37,7 @@ type Report struct {
 
 type AnalyzeOptions struct {
 	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 }
 
 type RiskSummary struct {
@@ -66,7 +67,9 @@ func Analyze(root string, target string) (Report, error) {
 }
 
 func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Report, error) {
-	impactResult, err := sherpa.FindImpact(root, target)
+	impactResult, err := sherpa.FindImpactWithOptions(root, target, sherpa.ImpactOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return Report{}, err
 	}
@@ -102,7 +105,9 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		report.Purpose = purpose
 	}
 
-	impactReport, err := impactengine.AnalyzeSymbol(root, target)
+	impactReport, err := impactengine.AnalyzeSymbolWithOptions(root, target, impactengine.AnalyzerOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		report.Warnings = append(report.Warnings, err.Error())
 	} else {

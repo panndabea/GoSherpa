@@ -125,6 +125,39 @@ func TestParseCLIArgsRejectsUnknownFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsBuildTags(t *testing.T) {
+	got, err := parseCLIArgs([]string{"--tags", "enterprise,integration", "refs", "Target"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !got.HasTagsOption {
+		t.Fatal("expected tags option")
+	}
+	assertMainTestStrings(t, got.BuildTags, []string{"enterprise", "integration"})
+}
+
+func TestParseCLIArgsRejectsMissingBuildTagsValue(t *testing.T) {
+	tests := [][]string{
+		{"--tags"},
+		{"--tags="},
+		{"--tags", "   "},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(test)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+
+			if !strings.Contains(err.Error(), "missing value for --tags") {
+				t.Fatalf("expected missing tags value error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	tests := [][]string{
 		{"--json", "refs", "ParseFile"},
@@ -1284,7 +1317,7 @@ func TestMainRunsExplainCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 	assertMainTestJSONArrayHasLength(t, data, "callees", 0)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
 
 	if data["purpose"] != "" {
@@ -1404,7 +1437,7 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "references", 2)
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "testCommands", 1)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
 
 	if _, ok := data["warnings"]; ok {
@@ -3365,6 +3398,56 @@ func Run() {
 
 	if strings.Contains(result.Stdout, "REFERENCES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsRefsCommandWithBuildTags(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "enterprise.go"), `//go:build enterprise
+
+package service
+
+func Run() {
+	Target()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "--tags", "enterprise", "refs", "Target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "refs", "Target", "example.com/app")
+
+	references := assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	foundTaggedReference := false
+	for _, reference := range references {
+		item, ok := reference.(map[string]any)
+		if !ok {
+			t.Fatalf("expected reference object, got %#v", reference)
+		}
+		position, ok := item["position"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected reference position object, got %#v", item["position"])
+		}
+		if position["file"] == "enterprise.go" {
+			foundTaggedReference = true
+		}
+	}
+	if !foundTaggedReference {
+		t.Fatalf("expected tagged reference in enterprise.go, got %#v", references)
 	}
 }
 

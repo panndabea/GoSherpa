@@ -98,6 +98,49 @@ func TestFindImplementersUsesGenericPointerReceiver(t *testing.T) {
 	}
 }
 
+func TestFindImplementersWithOptionsHonorsBuildTags(t *testing.T) {
+	root := t.TempDir()
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n")
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package service
+
+type Runner interface {
+	Run() error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "enterprise.go"), `//go:build enterprise
+
+package service
+
+type EnterpriseRunner struct{}
+
+func (EnterpriseRunner) Run() error {
+	return nil
+}
+`)
+
+	withoutTags, err := FindImplementersWithOptions(root, "Runner", InterfaceOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withoutTags.Implementers) != 0 {
+		t.Fatalf("expected no tagged implementers without tag, got %#v", withoutTags.Implementers)
+	}
+
+	withTags, err := FindImplementersWithOptions(root, "Runner", InterfaceOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withTags.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", withTags.AnalysisMode)
+	}
+	if len(withTags.Implementers) != 1 || withTags.Implementers[0].Name != "EnterpriseRunner" {
+		t.Fatalf("expected tagged implementer, got %#v", withTags.Implementers)
+	}
+}
+
 func TestFindInterfacesFallsBackWhenTypecheckedLoadingFails(t *testing.T) {
 	oldLoader := loadSemanticInterfaceRepository
 	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {

@@ -610,6 +610,46 @@ func Target() {}
 	}
 }
 
+func TestFindCallersWithOptionsHonorsBuildTags(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "enterprise.go"), `//go:build enterprise
+
+package service
+
+func Run() {
+	Target()
+}
+`)
+
+	withoutTags, err := FindCallersWithOptions(tmp, "Target", CallOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withoutTags.Callers) != 0 {
+		t.Fatalf("expected no callers without tag, got %#v", withoutTags.Callers)
+	}
+
+	withTags, err := FindCallersWithOptions(tmp, "Target", CallOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withTags.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %s", withTags.AnalysisMode)
+	}
+	names := callTestCallerNames(withTags.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected tagged caller, got %#v", withTags.Callers)
+	}
+}
+
 func TestFindCalleesIgnoresTestFiles(t *testing.T) {
 	tmp := t.TempDir()
 

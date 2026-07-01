@@ -10,7 +10,8 @@ import (
 )
 
 type DiffAnalyzeOptions struct {
-	IncludeTests bool         `json:"includeTests"`
+	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 	Limits       LimitOptions `json:"limits"`
 }
 
@@ -39,7 +40,9 @@ type DiffReport struct {
 }
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
-	impactReport, err := impactengine.AnalyzeDiff(root, base, "")
+	impactReport, err := impactengine.AnalyzeDiffWithOptions(root, base, "", impactengine.AnalyzerOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return DiffReport{}, err
 	}

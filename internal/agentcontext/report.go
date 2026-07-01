@@ -17,7 +17,8 @@ const (
 )
 
 type AnalyzeOptions struct {
-	IncludeTests bool         `json:"includeTests"`
+	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 	SourceRadius int          `json:"sourceRadius"`
 	Limits       LimitOptions `json:"limits"`
 }
@@ -64,6 +65,7 @@ type Identity struct {
 func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, error) {
 	explainReport, err := explainengine.AnalyzeWithOptions(root, target, explainengine.AnalyzeOptions{
 		IncludeTests: options.IncludeTests,
+		BuildTags:    options.BuildTags,
 	})
 	if err != nil {
 		return Report{}, err

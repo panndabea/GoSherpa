@@ -16,7 +16,8 @@ import (
 )
 
 type FileAnalyzeOptions struct {
-	IncludeTests bool         `json:"includeTests"`
+	IncludeTests bool `json:"includeTests"`
+	BuildTags    []string
 	SourceRadius int          `json:"sourceRadius"`
 	Limits       LimitOptions `json:"limits"`
 }
@@ -52,7 +53,9 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		return FileReport{}, err
 	}
 
-	impactReport, err := impactengine.AnalyzeFile(root, file)
+	impactReport, err := impactengine.AnalyzeFileWithOptions(root, file, impactengine.AnalyzerOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return FileReport{}, err
 	}

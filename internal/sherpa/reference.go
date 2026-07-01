@@ -46,7 +46,8 @@ const (
 )
 
 type ReferenceOptions struct {
-	Kind ReferenceKind
+	Kind      ReferenceKind
+	BuildTags []string
 }
 
 var loadSemanticReferenceRepository = semantics.LoadRepository
@@ -271,7 +272,9 @@ func parseReferencePackages(root string, files []string) ([]referencePackage, er
 }
 
 func findTypecheckedReferenceReport(root string, target referenceTarget, options ReferenceOptions) (ReferenceReport, bool) {
-	repo, err := loadSemanticReferenceRepository(root, semantics.LoadOptions{})
+	repo, err := loadSemanticReferenceRepository(root, semantics.LoadOptions{
+		BuildTags: options.BuildTags,
+	})
 	if err != nil {
 		return ReferenceReport{
 			Target:       target.String(),

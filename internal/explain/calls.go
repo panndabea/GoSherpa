@@ -49,8 +49,11 @@ func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, opti
 	targetName := callTarget.Display()
 	callers, callersErr := sherpa.FindCallersWithOptions(root, targetName, sherpa.CallOptions{
 		IncludeTests: options.IncludeTests,
+		BuildTags:    options.BuildTags,
 	})
-	callees, calleesErr := sherpa.FindCallees(root, targetName)
+	callees, calleesErr := sherpa.FindCalleesWithOptions(root, targetName, sherpa.CallOptions{
+		BuildTags: options.BuildTags,
+	})
 
 	result := callSignalsResult{
 		AnalysisMode: mergeCallAnalysisModes(callers.AnalysisMode, callees.AnalysisMode),

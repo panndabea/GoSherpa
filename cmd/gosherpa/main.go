@@ -12,6 +12,7 @@ import (
 	agentcontext "github.com/supertabaluga/gosherpa/internal/agentcontext"
 	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
 	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -43,6 +44,8 @@ type cliInvocation struct {
 	HasTestsOption    bool
 	ShowContext       bool
 	HasContextOption  bool
+	BuildTags         []string
+	HasTagsOption     bool
 	KindFilter        string
 	SearchKind        sherpa.SymbolKind
 	ReferenceKind     sherpa.ReferenceKind
@@ -238,6 +241,34 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 		if arg == "--context" {
 			invocation.ShowContext = true
 			invocation.HasContextOption = true
+			continue
+		}
+
+		if arg == "--tags" {
+			value, err := parseStringFlagValue("--tags", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			tags, err := parseBuildTagsFlag("--tags", value)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.BuildTags = tags
+			invocation.HasTagsOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--tags=") {
+			tags, err := parseBuildTagsFlag("--tags", strings.TrimPrefix(arg, "--tags="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.BuildTags = tags
+			invocation.HasTagsOption = true
 			continue
 		}
 
@@ -543,6 +574,15 @@ func parseStringFlag(flag string, value string) (string, error) {
 	return trimmed, nil
 }
 
+func parseBuildTagsFlag(flag string, value string) ([]string, error) {
+	tags := semantics.NormalizeBuildTags([]string{value})
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("missing value for %s", flag)
+	}
+
+	return tags, nil
+}
+
 func parsePositiveFlagValue(flag string, args []string, index int) (int, error) {
 	if index+1 >= len(args) {
 		return 0, fmt.Errorf("missing value for %s", flag)
@@ -708,6 +748,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
+		fmt.Fprintln(stderr, "error: --tags is only supported by refs, callers, callees, explain, context, impact, tests affected, implementers, and interfaces")
+		return exitUsage
+	}
+
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --json is only supported by known commands")
 		return exitUsage
@@ -735,6 +780,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzeSymbol(root, target, agentcontext.AnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				BuildTags:    invocation.BuildTags,
 				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
@@ -768,6 +814,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzeFile(root, target, agentcontext.FileAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				BuildTags:    invocation.BuildTags,
 				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
@@ -801,6 +848,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			target := invocation.CommandArgs[1]
 			report, err := agentcontext.AnalyzePackage(root, target, agentcontext.PackageAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				BuildTags:    invocation.BuildTags,
 				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
@@ -833,6 +881,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			report, err := agentcontext.AnalyzeDiff(root, invocation.BaseRef, agentcontext.DiffAnalyzeOptions{
 				IncludeTests: invocation.IncludeTests,
+				BuildTags:    invocation.BuildTags,
 				Limits:       invocation.ContextLimits,
 			})
 			if err != nil {
@@ -872,6 +921,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		report, err := explainengine.AnalyzeWithOptions(root, target, explainengine.AnalyzeOptions{
 			IncludeTests: invocation.IncludeTests,
+			BuildTags:    invocation.BuildTags,
 		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "explain", target, stderr, err)
@@ -1002,7 +1052,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		name := invocation.CommandArgs[0]
 
 		report, err := sherpa.FindReferenceReportWithOptions(root, name, sherpa.ReferenceOptions{
-			Kind: invocation.ReferenceKind,
+			Kind:      invocation.ReferenceKind,
+			BuildTags: invocation.BuildTags,
 		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "refs", name, stderr, err)
@@ -1047,7 +1098,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				return exitFailure
 			}
 
-			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
+			report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
+				BuildTags: invocation.BuildTags,
+			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
 			}
@@ -1080,7 +1133,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 			kind := invocation.CommandArgs[0]
 			target := invocation.CommandArgs[1]
-			report, err := analyzeImpactSubcommand(root, kind, target)
+			report, err := analyzeImpactSubcommand(root, kind, target, invocation.BuildTags)
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "impact "+kind, target, stderr, err)
 			}
@@ -1107,7 +1160,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := sherpa.FindImpact(root, target)
+		result, err := sherpa.FindImpactWithOptions(root, target, sherpa.ImpactOptions{
+			BuildTags: invocation.BuildTags,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "impact", target, stderr, err)
 		}
@@ -1143,7 +1198,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				return exitFailure
 			}
 
-			report, err := impactengine.AnalyzeDiff(root, invocation.BaseRef, "")
+			report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
+				BuildTags: invocation.BuildTags,
+			})
 			if err != nil {
 				return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
 			}
@@ -1233,7 +1290,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := impactengine.FindImplementers(root, target)
+		result, err := impactengine.FindImplementersWithOptions(root, target, impactengine.InterfaceOptions{
+			BuildTags: invocation.BuildTags,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
 		}
@@ -1264,7 +1323,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := impactengine.FindInterfaces(root, target)
+		result, err := impactengine.FindInterfacesWithOptions(root, target, impactengine.InterfaceOptions{
+			BuildTags: invocation.BuildTags,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
 		}
@@ -1338,6 +1399,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		result, err := sherpa.FindCallersWithOptions(root, target, sherpa.CallOptions{
 			IncludeTests: invocation.IncludeTests,
+			BuildTags:    invocation.BuildTags,
 		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "callers", target, stderr, err)
@@ -1379,7 +1441,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := sherpa.FindCallees(root, target)
+		result, err := sherpa.FindCalleesWithOptions(root, target, sherpa.CallOptions{
+			BuildTags: invocation.BuildTags,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "callees", target, stderr, err)
 		}
@@ -1462,6 +1526,17 @@ func supportsContextOption(command string) bool {
 	}
 }
 
+func supportsTagsOption(invocation cliInvocation) bool {
+	switch invocation.Command {
+	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces":
+		return true
+	case "tests":
+		return isTestsAffectedInvocation(invocation)
+	default:
+		return false
+	}
+}
+
 func validateContextLimitOptions(invocation cliInvocation) error {
 	if !invocation.HasContextLimit || invocation.Command != "context" || len(invocation.CommandArgs) == 0 {
 		return nil
@@ -1524,14 +1599,15 @@ func isImpactReportSubcommand(command string) bool {
 	}
 }
 
-func analyzeImpactSubcommand(root string, kind string, target string) (impactengine.ImpactReport, error) {
+func analyzeImpactSubcommand(root string, kind string, target string, buildTags []string) (impactengine.ImpactReport, error) {
+	options := impactengine.AnalyzerOptions{BuildTags: buildTags}
 	switch kind {
 	case "file":
-		return impactengine.AnalyzeFile(root, target)
+		return impactengine.AnalyzeFileWithOptions(root, target, options)
 	case "package":
-		return impactengine.AnalyzePackage(root, target)
+		return impactengine.AnalyzePackageWithOptions(root, target, options)
 	case "symbol":
-		return impactengine.AnalyzeSymbol(root, target)
+		return impactengine.AnalyzeSymbolWithOptions(root, target, options)
 	default:
 		return impactengine.ImpactReport{}, fmt.Errorf("unknown impact subcommand: %s", kind)
 	}
@@ -2139,6 +2215,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "global options:")
 	fmt.Fprintln(writer, "  --root <path>    repository root, defaults to .")
+	fmt.Fprintln(writer, "  --tags <list>    build tags for semantic package loading")
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
