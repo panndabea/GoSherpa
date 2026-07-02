@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	agentcontext "github.com/supertabaluga/gosherpa/internal/agentcontext"
 	"github.com/supertabaluga/gosherpa/internal/sherpa"
 )
 
@@ -1594,7 +1595,7 @@ func TestMainRunsContextFileCommand(t *testing.T) {
 		"PURPOSE",
 		"declares 2 supported symbols",
 		"ANALYSIS",
-		"Mode: ast",
+		"Mode: typechecked+ast",
 		"Confidence: medium",
 		"Risk: medium",
 		"FILE SYMBOLS",
@@ -1649,8 +1650,8 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 	if data["packageName"] != "service" {
 		t.Fatalf("expected package name service, got %v", data["packageName"])
 	}
-	if data["analysisMode"] != "ast" {
-		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
 	}
 	if data["confidence"] != "medium" {
 		t.Fatalf("expected medium confidence, got %v", data["confidence"])
@@ -1711,7 +1712,7 @@ func TestMainRunsContextPackageCommand(t *testing.T) {
 		"PURPOSE",
 		"declaring 3 supported symbols",
 		"ANALYSIS",
-		"Mode: ast",
+		"Mode: typechecked+ast",
 		"Confidence: medium",
 		"Risk: medium",
 		"PACKAGE FILES",
@@ -1767,8 +1768,8 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 	if data["packageName"] != "service" {
 		t.Fatalf("expected package name service, got %v", data["packageName"])
 	}
-	if data["analysisMode"] != "ast" {
-		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
 	}
 	if data["confidence"] != "medium" {
 		t.Fatalf("expected medium confidence, got %v", data["confidence"])

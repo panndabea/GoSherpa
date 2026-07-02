@@ -132,7 +132,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "context file",
 			target:  "service.go",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
@@ -144,7 +144,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "context package",
 			target:  ".",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},

@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	AnalysisModeAST  = "ast"
-	AnalysisModeDiff = "git-diff+ast"
+	AnalysisModeAST            = "ast"
+	AnalysisModeTypecheckedAST = "typechecked+ast"
+	AnalysisModeDiff           = "git-diff+ast"
 
 	ConfidenceMedium = "medium"
 	ConfidenceLow    = "low"

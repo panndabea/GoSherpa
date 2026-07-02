@@ -172,6 +172,8 @@ or report-based impact bundles use the same `typechecked` and `ast-fallback`
 labels. Broader context, impact, test, and path commands currently use:
 
 - `ast`: syntax plus local type information and repository-local heuristics.
+- `typechecked+ast`: typechecked package loading for selected context fields,
+  combined with syntax/local impact and test signals.
 - `git-diff+ast`: git diff discovery plus AST/local repository analysis.
 
 `callers.data.analysisMode` and `callees.data.analysisMode` use these values.
@@ -179,8 +181,10 @@ labels. Broader context, impact, test, and path commands currently use:
 the same values.
 
 `context symbol.data.analysisMode` is different: it describes the broader
-context bundle mode, currently `ast`. `context diff.data.analysisMode` is
-currently `git-diff+ast`.
+context bundle mode, currently `ast`. `context file.data.analysisMode` and
+`context package.data.analysisMode` can be `typechecked+ast` when package files
+and symbols come from typechecked package loading. `context diff.data.analysisMode`
+is currently `git-diff+ast`.
 
 ## `callers` Data
 
@@ -365,12 +369,14 @@ common metadata fields:
 Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
 `to`, and `paths`.
 
-## `context symbol` Call Metadata
+## `context` Call Metadata
 
-`context symbol` data is the symbol context bundle documented in
-`docs/product/CONTEXT_SCHEMA_V1.md`, plus explicit call analysis trust metadata:
+`context` data is documented in `docs/product/CONTEXT_SCHEMA_V1.md`.
+`context symbol` additionally includes explicit call analysis trust metadata:
 
-- `analysisMode`: broader context analysis mode, currently `ast`.
+- `analysisMode`: broader context analysis mode, currently `ast` for symbol
+  context and `typechecked+ast` for file/package context when typechecked
+  package loading succeeds.
 - `confidence`: deterministic trust label.
 - `limitations`: context, call, and test-planning blind spots.
 - `callAnalysisMode`: call graph trust mode, either `typechecked` or

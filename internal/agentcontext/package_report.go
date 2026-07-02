@@ -54,9 +54,26 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 	}
 
 	packagePath := firstString(impactReport.ChangedPackages)
-	files, err := packageFiles(root, packagePath)
-	if err != nil {
-		return PackageReport{}, err
+	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
+	warnings := append([]string{}, impactReport.Warnings...)
+	warnings = append(warnings, semanticSnapshot.warnings...)
+
+	analysisMode := AnalysisModeAST
+	var files []string
+	if semanticOK && semanticSnapshot.hasPackage(packagePath) {
+		analysisMode = AnalysisModeTypecheckedAST
+		var fileWarnings []string
+		files, fileWarnings = semanticSnapshot.packageFiles(root, packagePath)
+		warnings = append(warnings, fileWarnings...)
+	} else {
+		if semanticOK {
+			warnings = append(warnings, fmt.Sprintf("typechecked context package not loaded: %s", packagePath))
+		}
+		var err error
+		files, err = packageFiles(root, packagePath)
+		if err != nil {
+			return PackageReport{}, err
+		}
 	}
 
 	packageName, err := packageNameForFiles(root, files)
@@ -64,16 +81,22 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 		return PackageReport{}, err
 	}
 
-	allSymbols, err := sherpa.ParseRepository(root)
-	if err != nil {
-		return PackageReport{}, err
+	var symbols []sherpa.Symbol
+	if analysisMode == AnalysisModeTypecheckedAST {
+		var symbolWarnings []string
+		symbols, symbolWarnings = semanticSnapshot.symbolsInPackage(root, packagePath)
+		warnings = append(warnings, symbolWarnings...)
+	} else {
+		allSymbols, err := sherpa.ParseRepository(root)
+		if err != nil {
+			return PackageReport{}, err
+		}
+		symbols = symbolsInPackage(allSymbols, packagePath)
 	}
-	symbols := symbolsInPackage(allSymbols, packagePath)
 
 	limits := normalizeLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
-	warnings := append([]string{}, impactReport.Warnings...)
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
 	if err != nil {
 		warnings = append(warnings, err.Error())
@@ -93,14 +116,14 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
-		AnalysisMode:            AnalysisModeAST,
+		AnalysisMode:            analysisMode,
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
 	report.Purpose = packagePurpose(report)
 	report.Risk = packageRiskSummary(report)
 	report.ReadingOrder = packageReadingOrder(report)
-	report.Limitations = packageLimitations(options.IncludeTests)
+	report.Limitations = packageLimitations(options.IncludeTests, report.AnalysisMode)
 	report.Confidence = packageConfidence(report)
 	report = applyPackageLimits(report, limits)
 
@@ -333,11 +356,11 @@ func packageReadingOrder(report PackageReport) []explainengine.ReadingStep {
 	return steps
 }
 
-func packageLimitations(includeTests bool) []string {
+func packageLimitations(includeTests bool, analysisMode string) []string {
 	values := []string{
 		"Package context uses package-level impact for affected packages and tests.",
 		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
-		"Analysis uses syntax plus local type information, not full module loading.",
+		packageContextAnalysisLimitation(analysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses same-package tests and syntactic direct-reference matching.",
 	}
@@ -347,6 +370,15 @@ func packageLimitations(includeTests bool) []string {
 	}
 
 	return values
+}
+
+func packageContextAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case AnalysisModeTypecheckedAST:
+		return "Package context used typechecked package loading for package files and symbols, with syntax/local impact signals."
+	default:
+		return "Package context used AST fallback for package files and symbols because typechecked loading was unavailable."
+	}
 }
 
 func packageConfidence(report PackageReport) string {

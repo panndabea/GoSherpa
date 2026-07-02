@@ -65,16 +65,31 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		return FileReport{}, err
 	}
 
-	allSymbols, err := sherpa.ParseRepository(root)
-	if err != nil {
-		return FileReport{}, err
+	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
+	warnings := append([]string{}, impactReport.Warnings...)
+	warnings = append(warnings, semanticSnapshot.warnings...)
+
+	analysisMode := AnalysisModeAST
+	var symbols []sherpa.Symbol
+	if semanticOK && semanticSnapshot.hasPackage(firstString(impactReport.ChangedPackages)) {
+		analysisMode = AnalysisModeTypecheckedAST
+		var symbolWarnings []string
+		symbols, symbolWarnings = semanticSnapshot.symbolsInFile(root, file, firstString(impactReport.ChangedPackages))
+		warnings = append(warnings, symbolWarnings...)
+	} else {
+		if semanticOK {
+			warnings = append(warnings, fmt.Sprintf("typechecked context package not loaded: %s", firstString(impactReport.ChangedPackages)))
+		}
+		allSymbols, err := sherpa.ParseRepository(root)
+		if err != nil {
+			return FileReport{}, err
+		}
+		symbols = symbolsInFile(allSymbols, file)
 	}
-	symbols := symbolsInFile(allSymbols, file)
 
 	limits := normalizeLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
-	warnings := append([]string{}, impactReport.Warnings...)
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
 	if err != nil {
 		warnings = append(warnings, err.Error())
@@ -94,14 +109,14 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
-		AnalysisMode:            AnalysisModeAST,
+		AnalysisMode:            analysisMode,
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
 	report.Purpose = filePurpose(report)
 	report.Risk = fileRiskSummary(report)
 	report.ReadingOrder = fileReadingOrder(report)
-	report.Limitations = fileLimitations(options.IncludeTests)
+	report.Limitations = fileLimitations(options.IncludeTests, report.AnalysisMode)
 	report.Confidence = fileConfidence(report)
 	report = applyFileLimits(report, limits)
 
@@ -317,11 +332,11 @@ func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
 	return steps
 }
 
-func fileLimitations(includeTests bool) []string {
+func fileLimitations(includeTests bool, analysisMode string) []string {
 	values := []string{
 		"File context uses package-level impact for affected packages and tests.",
 		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
-		"Analysis uses syntax plus local type information, not full module loading.",
+		fileContextAnalysisLimitation(analysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses same-package tests and syntactic direct-reference matching.",
 	}
@@ -331,6 +346,15 @@ func fileLimitations(includeTests bool) []string {
 	}
 
 	return values
+}
+
+func fileContextAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case AnalysisModeTypecheckedAST:
+		return "File context used typechecked package loading for package files and symbols, with syntax/local impact signals."
+	default:
+		return "File context used AST fallback for package files and symbols because typechecked loading was unavailable."
+	}
 }
 
 func fileConfidence(report FileReport) string {

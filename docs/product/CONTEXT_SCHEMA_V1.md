@@ -35,6 +35,11 @@ Every context result includes:
 - `confidence`: deterministic confidence label.
 - `limitations`: known blind spots and conservative boundaries.
 
+Current context analysis modes include `ast`, `typechecked+ast`, and
+`git-diff+ast`. File and package context use `typechecked+ast` when package
+files and symbols come from typechecked package loading while impact and test
+signals still use syntax/local repository analysis.
+
 When size controls are used, context results may also include:
 
 - `limits`: active user-provided limits.

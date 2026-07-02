@@ -143,8 +143,8 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	if len(report.SourceContexts) != 3 {
 		t.Fatalf("expected 3 source contexts, got %#v", report.SourceContexts)
 	}
-	if report.AnalysisMode != AnalysisModeAST {
-		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeTypecheckedAST)
 	}
 	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
 		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
@@ -238,8 +238,8 @@ func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	if len(report.SourceContexts) != 4 {
 		t.Fatalf("expected 4 source contexts, got %#v", report.SourceContexts)
 	}
-	if report.AnalysisMode != AnalysisModeAST {
-		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeTypecheckedAST)
 	}
 	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
 		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
@@ -280,6 +280,40 @@ func TestAnalyzePackageNotesTestsOptionInLimitations(t *testing.T) {
 	}
 	if !strings.Contains(report.Limitations[5], "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzePackageUsesBuildTagsForContextSymbols(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Always() {}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "enterprise.go"), `//go:build enterprise
+
+package app
+
+func Enterprise() {}
+`)
+
+	withoutTags, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzePackage without tags returned error: %v", err)
+	}
+	if withoutTags.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s", withoutTags.AnalysisMode, AnalysisModeTypecheckedAST)
+	}
+	if agentContextReportHasSymbol(withoutTags.Symbols, "Enterprise") {
+		t.Fatalf("did not expect Enterprise without build tag, got %#v", withoutTags.Symbols)
+	}
+
+	withTags, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{BuildTags: []string{"enterprise"}})
+	if err != nil {
+		t.Fatalf("AnalyzePackage with tags returned error: %v", err)
+	}
+	if !agentContextReportHasSymbol(withTags.Symbols, "Enterprise") {
+		t.Fatalf("expected Enterprise with build tag, got %#v", withTags.Symbols)
 	}
 }
 
@@ -471,6 +505,16 @@ func TestTarget(t *testing.T) {
 `)
 
 	return root
+}
+
+func agentContextReportHasSymbol(symbols []sherpa.Symbol, name string) bool {
+	for _, symbol := range symbols {
+		if symbol.Name == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func writeAgentContextTestFile(t *testing.T, path string, contents string) {
