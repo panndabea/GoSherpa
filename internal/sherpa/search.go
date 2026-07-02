@@ -20,6 +20,12 @@ type SymbolSearchOptions struct {
 	Limit     int
 }
 
+type SymbolFilterOptions struct {
+	Kind      SymbolKind
+	Package   string
+	TestsOnly bool
+}
+
 func FindSymbol(symbols []Symbol, name string) *Symbol {
 	for i := range symbols {
 		if symbols[i].Name == name {
@@ -41,11 +47,11 @@ func SearchSymbolsWithOptions(symbols []Symbol, terms []string, options SymbolSe
 	}
 
 	var results []SymbolSearchResult
-	for _, symbol := range symbols {
-		if !symbolMatchesSearchOptions(symbol, options) {
-			continue
-		}
-
+	for _, symbol := range FilterSymbols(symbols, SymbolFilterOptions{
+		Kind:      options.Kind,
+		Package:   options.Package,
+		TestsOnly: options.TestsOnly,
+	}) {
 		score, matchedTerms := scoreSymbolSearchResult(symbol, queryTerms)
 		if len(matchedTerms) != len(queryTerms) {
 			continue
@@ -71,6 +77,19 @@ func SearchSymbolsWithOptions(symbols []Symbol, terms []string, options SymbolSe
 	}
 
 	return results
+}
+
+func FilterSymbols(symbols []Symbol, options SymbolFilterOptions) []Symbol {
+	var filtered []Symbol
+	for _, symbol := range symbols {
+		if !symbolMatchesFilterOptions(symbol, options) {
+			continue
+		}
+
+		filtered = append(filtered, symbol)
+	}
+
+	return filtered
 }
 
 func FindSymbolTarget(root string, symbols []Symbol, target string) (Symbol, error) {
@@ -141,7 +160,7 @@ func scoreSymbolSearchResult(symbol Symbol, terms []string) (int, []string) {
 	return score, matchedTerms
 }
 
-func symbolMatchesSearchOptions(symbol Symbol, options SymbolSearchOptions) bool {
+func symbolMatchesFilterOptions(symbol Symbol, options SymbolFilterOptions) bool {
 	if options.Kind != "" && symbol.Kind != options.Kind {
 		return false
 	}

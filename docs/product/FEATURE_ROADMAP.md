@@ -396,6 +396,9 @@ Done when:
 
 ### 1.3 Symbol Filters
 
+Status: implemented with `--kind`, `--package`, and `--tests` filters for
+`gosherpa symbols` in human and JSON output.
+
 Human question:
 
 ```text
@@ -412,10 +415,11 @@ gosherpa symbols --tests
 
 Requirements:
 
-- Filter by kind.
-- Filter by package.
-- Include or exclude tests explicitly.
-- Support stable sorting by package, kind, name, and file.
+- Filter by kind. Implemented.
+- Filter by package. Implemented.
+- Filter to test symbols explicitly with `--tests`. Implemented.
+- Support stable sorting by package, kind, name, and file. Implemented by the
+  existing repository parse order and formatter grouping.
 
 Done when:
 

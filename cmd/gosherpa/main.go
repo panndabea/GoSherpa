@@ -688,7 +688,7 @@ func parseNonNegativeInteger(flag string, value string) (int, error) {
 
 func parseKindFilter(invocation *cliInvocation) error {
 	switch invocation.Command {
-	case "search":
+	case "search", "symbols":
 		kind, err := parseSymbolKindFlag("--kind", invocation.KindFilter)
 		if err != nil {
 			return err
@@ -780,8 +780,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasPackageOption && invocation.Command != "search" {
-		fmt.Fprintln(stderr, "error: --package is only supported by search")
+	if invocation.HasPackageOption && !supportsPackageOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --package is only supported by search and symbols")
 		return exitUsage
 	}
 
@@ -795,8 +795,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasKindOption && invocation.Command != "search" && invocation.Command != "refs" {
-		fmt.Fprintln(stderr, "error: --kind is only supported by search and refs")
+	if invocation.HasKindOption && !supportsKindOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --kind is only supported by search, symbols, and refs")
 		return exitUsage
 	}
 
@@ -811,7 +811,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --tests is only supported by search, callers, explain, and context")
+		fmt.Fprintln(stderr, "error: --tests is only supported by symbols, search, callers, explain, and context")
 		return exitUsage
 	}
 
@@ -1161,6 +1161,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "symbols", "", stderr, err)
 		}
+		symbols = sherpa.FilterSymbols(symbols, sherpa.SymbolFilterOptions{
+			Kind:      invocation.SearchKind,
+			Package:   invocation.SearchPackage,
+			TestsOnly: invocation.IncludeTests,
+		})
 
 		if invocation.JSON {
 			return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", nil, symbolsJSONData{
@@ -1639,13 +1644,21 @@ func supportsLimitOption(command string) bool {
 	return command == "search" || isPathCommand(command)
 }
 
+func supportsPackageOption(command string) bool {
+	return command == "search" || command == "symbols"
+}
+
+func supportsKindOption(command string) bool {
+	return command == "search" || command == "symbols" || command == "refs"
+}
+
 func isPathCommand(command string) bool {
 	return command == "path" || command == "paths"
 }
 
 func supportsTestsOption(command string) bool {
 	switch command {
-	case "search", "callers", "explain", "context":
+	case "symbols", "search", "callers", "explain", "context":
 		return true
 	default:
 		return false
@@ -2429,7 +2442,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
 	fmt.Fprintln(writer, "  doctor")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
-	fmt.Fprintln(writer, "  symbols")
+	fmt.Fprintln(writer, "  symbols [--kind <kind>] [--package <package>] [--tests]")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
 	fmt.Fprintln(writer, "  search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
 	fmt.Fprintln(writer, "  refs <name> [--kind <kind>] [--context]")

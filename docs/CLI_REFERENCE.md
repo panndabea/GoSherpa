@@ -14,7 +14,7 @@ go build -o gosherpa ./cmd/gosherpa
 Prefer not to build a binary yet?
 
 ```bash
-go run ./cmd/gosherpa symbols
+go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa doctor
@@ -40,7 +40,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 
 | Capability | Command | Result |
 | --- | --- | --- |
-| Symbol atlas | `gosherpa symbols` | Lists discovered structs, interfaces, functions, and methods |
+| Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, functions, and methods with optional kind, package, and test filters |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
@@ -84,6 +84,9 @@ Found 4 references
 
 ```bash
 ./gosherpa symbols
+./gosherpa symbols --kind struct
+./gosherpa symbols --kind method --package ./internal/sherpa
+./gosherpa symbols --tests
 ./gosherpa symbols --json
 ./gosherpa symbol ParseFile
 ./gosherpa symbol ParseFile --json

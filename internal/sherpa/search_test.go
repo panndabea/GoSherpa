@@ -225,6 +225,44 @@ func TestSearchSymbolsFiltersToTests(t *testing.T) {
 	assertSearchTestResultNames(t, results, []string{"TestCreateUser"})
 }
 
+func TestFilterSymbolsUsesKindPackageAndTestOptions(t *testing.T) {
+	symbols := []Symbol{
+		{
+			Name:    "CreateUser",
+			Kind:    SymbolKindFunction,
+			Package: "./internal/service",
+		},
+		{
+			Name:    "TestCreateUser",
+			Kind:    SymbolKindFunction,
+			Package: "./internal/service",
+		},
+		{
+			Name:    "TestCreateUserHandler",
+			Kind:    SymbolKindFunction,
+			Package: "./internal/http",
+		},
+		{
+			Name:    "UserRepository",
+			Kind:    SymbolKindInterface,
+			Package: "./internal/service",
+		},
+	}
+
+	filtered := FilterSymbols(symbols, SymbolFilterOptions{
+		Kind:      SymbolKindFunction,
+		Package:   "./internal/service",
+		TestsOnly: true,
+	})
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 symbol, got %d: %#v", len(filtered), filtered)
+	}
+	if filtered[0].Name != "TestCreateUser" {
+		t.Fatalf("expected TestCreateUser, got %s", filtered[0].Name)
+	}
+}
+
 func TestSearchSymbolsFiltersToTestFiles(t *testing.T) {
 	symbols := []Symbol{
 		{

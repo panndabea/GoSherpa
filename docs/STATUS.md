@@ -14,6 +14,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 
 - Repository scanning and Go file discovery
 - Struct, interface, function, and method discovery
+- Symbol listing filters by kind, package, and test symbols
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
 - Typechecked reference analysis via `go/packages`, with an AST/per-package fallback when semantic loading is unavailable
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters

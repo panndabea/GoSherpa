@@ -453,6 +453,37 @@ func TestParseCLIArgsAcceptsSearchFilters(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsSymbolsFilters(t *testing.T) {
+	got, err := parseCLIArgs([]string{"symbols", "--kind", "Function", "--package=./internal/service", "--tests"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Command != "symbols" {
+		t.Fatalf("expected command symbols, got %s", got.Command)
+	}
+
+	if got.SearchKind != sherpa.SymbolKindFunction {
+		t.Fatalf("expected function kind, got %s", got.SearchKind)
+	}
+
+	if !got.HasKindOption {
+		t.Fatal("expected kind option marker")
+	}
+
+	if got.SearchPackage != "./internal/service" {
+		t.Fatalf("expected package ./internal/service, got %s", got.SearchPackage)
+	}
+
+	if !got.HasPackageOption {
+		t.Fatal("expected package option marker")
+	}
+
+	if !got.IncludeTests || !got.HasTestsOption {
+		t.Fatal("expected tests option")
+	}
+}
+
 func TestParseCLIArgsAcceptsRefsKindFilter(t *testing.T) {
 	got, err := parseCLIArgs([]string{"refs", "ParseFile", "--kind", "call"})
 	if err != nil {
@@ -479,6 +510,7 @@ func TestParseCLIArgsRejectsInvalidSearchFilters(t *testing.T) {
 		{"search", "user", "--kind"},
 		{"search", "user", "--kind="},
 		{"search", "user", "--kind", "package"},
+		{"symbols", "--kind", "package"},
 		{"search", "user", "--package"},
 		{"search", "user", "--package="},
 	}
@@ -1214,13 +1246,13 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 }
 
 func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
-	result := runMainTest(t, []string{"gosherpa", "symbols", "--tests"})
+	result := runMainTest(t, []string{"gosherpa", "deps", ".", "--tests"})
 
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by search, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 
@@ -1263,8 +1295,8 @@ func TestMainRejectsContextWithJSON(t *testing.T) {
 
 func TestMainRejectsSearchFilterFlagsForOtherCommands(t *testing.T) {
 	tests := [][]string{
-		{"gosherpa", "symbols", "--kind", "function"},
-		{"gosherpa", "symbols", "--package", "."},
+		{"gosherpa", "deps", ".", "--kind", "function"},
+		{"gosherpa", "deps", ".", "--package", "."},
 	}
 
 	for _, test := range tests {
@@ -3403,6 +3435,113 @@ func Run() {}
 
 	if strings.Contains(result.Stdout, "FUNCTIONS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsSymbolsWithFilters(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Worker struct{}
+
+func Run() {}
+
+func (Worker) Work() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service
+
+import "testing"
+
+func TestRun(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "other", "other.go"), `package other
+
+func TestableHelper() {}
+`)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root",
+		tmp,
+		"symbols",
+		"--kind",
+		"function",
+		"--package",
+		"./internal/service",
+		"--tests",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"TESTS", "TestRun", "internal/service/service_test.go"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	for _, unwanted := range []string{"\n  Run ", "\n  Worker", "TestableHelper", "internal/other"} {
+		if strings.Contains(result.Stdout, unwanted) {
+			t.Fatalf("expected output not to contain %s, got:\n%s", unwanted, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsSymbolsFiltersAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Worker struct{}
+
+func Run() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "other", "other.go"), `package other
+
+type Other struct{}
+`)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root",
+		tmp,
+		"symbols",
+		"--kind",
+		"struct",
+		"--package",
+		"./internal/service",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "symbols", "", "example.com/app")
+	symbols := assertMainTestJSONArrayHasLength(t, data, "symbols", 1)
+
+	symbol, ok := symbols[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected symbol object, got %T", symbols[0])
+	}
+	if symbol["name"] != "Worker" {
+		t.Fatalf("expected Worker symbol, got %v", symbol["name"])
+	}
+	if symbol["package"] != "./internal/service" {
+		t.Fatalf("expected ./internal/service package, got %v", symbol["package"])
 	}
 }
 

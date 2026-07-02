@@ -42,7 +42,7 @@ git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go test ./...
 go run ./cmd/gosherpa doctor
-go run ./cmd/gosherpa symbols
+go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa explain ParseFile
 ```
 
@@ -66,7 +66,7 @@ Use `--root` to run GoSherpa from another working directory:
 | Command | What it shows |
 | --- | --- |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
-| `gosherpa symbols` | Structs, interfaces, functions, and methods |
+| `gosherpa symbols --kind function --package ./internal/sherpa` | Structs, interfaces, functions, and methods with optional kind, package, and test filters |
 | `gosherpa symbol ParseFile` | One symbol's package, signature, docs, and source location |
 | `gosherpa search parse file` | Ranked partial symbol matches |
 | `gosherpa explain ParseFile` | Purpose, risk, relationships, reading order, and test signals |
