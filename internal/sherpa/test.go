@@ -19,12 +19,13 @@ const (
 )
 
 type RelatedTest struct {
-	Name            string   `json:"name"`
-	Package         string   `json:"package"`
-	PackageName     string   `json:"packageName"`
-	Position        Position `json:"position"`
-	DirectReference bool     `json:"directReference"`
-	ExternalPackage bool     `json:"externalPackage"`
+	Name            string       `json:"name"`
+	Package         string       `json:"package"`
+	PackageName     string       `json:"packageName"`
+	Position        Position     `json:"position"`
+	Range           *SourceRange `json:"range,omitempty"`
+	DirectReference bool         `json:"directReference"`
+	ExternalPackage bool         `json:"externalPackage"`
 }
 
 type TestsResult struct {
@@ -45,6 +46,7 @@ type testFileInfo struct {
 type literalSubtest struct {
 	Name string
 	Pos  token.Pos
+	End  token.Pos
 	Func *ast.FuncLit
 }
 
@@ -252,7 +254,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				Name:            funcDecl.Name.Name,
 				Package:         testFile.Package,
 				PackageName:     testFile.PackageName,
-				Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line}),
+				Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
+				Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, funcDecl.Pos(), funcDecl.End()),
 				DirectReference: directReference,
 				ExternalPackage: isExternalTestPackage(testFile.PackageName),
 			})
@@ -272,7 +275,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 					Name:            funcDecl.Name.Name + "/" + subtest.Name,
 					Package:         testFile.Package,
 					PackageName:     testFile.PackageName,
-					Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line}),
+					Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
+					Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, subtest.Pos, subtest.End),
 					DirectReference: subtestDirectReference,
 					ExternalPackage: isExternalTestPackage(testFile.PackageName),
 				})
@@ -388,6 +392,7 @@ func collectLiteralSubtests(body *ast.BlockStmt, testParamNames map[string]struc
 			subtests = append(subtests, literalSubtest{
 				Name: name,
 				Pos:  node.Pos(),
+				End:  node.End(),
 				Func: funcLit,
 			})
 

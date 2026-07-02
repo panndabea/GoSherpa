@@ -281,6 +281,10 @@ Done for the first slice:
 
 ### 7. Source Snippet Ranges
 
+Status: implemented for symbols, references, callers, callees, call path steps,
+and related tests in JSON output. Reading-order entries still use compact
+positions.
+
 Expose file, line, column, and optional range information.
 
 Why this helps:
@@ -288,7 +292,7 @@ Why this helps:
 Agents can open exactly the right code instead of reading whole files. This also
 improves editor, MCP, and future IDE integrations.
 
-Done when:
+Done for the first slice:
 
 - Symbol definitions include start and end positions.
 - References include enough position data to locate the exact occurrence.

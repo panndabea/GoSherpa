@@ -21,6 +21,7 @@ type Reference struct {
 	Name     string        `json:"name"`
 	Kind     ReferenceKind `json:"kind,omitempty"`
 	Position Position      `json:"position"`
+	Range    *SourceRange  `json:"range,omitempty"`
 }
 
 const (
@@ -350,7 +351,8 @@ func findTypecheckedReferencesInPackage(root string, pkg referencePackage, targe
 	seen := make(map[token.Pos]struct{})
 
 	var refs []Reference
-	addReference := func(pos token.Pos, kind ReferenceKind) {
+	addReference := func(start token.Pos, end token.Pos, kind ReferenceKind) {
+		pos := start
 		if !pos.IsValid() {
 			return
 		}
@@ -365,9 +367,11 @@ func findTypecheckedReferencesInPackage(root string, pkg referencePackage, targe
 			Name: target.String(),
 			Kind: kind,
 			Position: positionRelativeToRoot(root, Position{
-				File: position.Filename,
-				Line: position.Line,
+				File:   position.Filename,
+				Line:   position.Line,
+				Column: position.Column,
 			}),
+			Range: sourceRangeRelativeToRoot(root, pkg.FileSet, start, end),
 		})
 	}
 
@@ -390,13 +394,13 @@ func findTypecheckedReferencesInPackage(root string, pkg referencePackage, targe
 			case *ast.Ident:
 				object, definition := referenceIdentObject(pkg.Info, node)
 				if referenceObjectMatchesTarget(object, targetObjects) {
-					addReference(node.Pos(), referenceKindForIdent(object, definition, parent, node))
+					addReference(node.Pos(), node.End(), referenceKindForIdent(object, definition, parent, node))
 				}
 			case *ast.SelectorExpr:
 				object := pkg.Info.Uses[node.Sel]
 				selection := pkg.Info.Selections[node]
 				if referenceObjectMatchesTarget(object, targetObjects) || referenceSelectionMatchesTarget(selection, targetObjects) {
-					addReference(node.Sel.Pos(), referenceKindForTypecheckedSelector(object, selection, parent, node))
+					addReference(node.Sel.Pos(), node.Sel.End(), referenceKindForTypecheckedSelector(object, selection, parent, node))
 				}
 			}
 
@@ -612,7 +616,8 @@ func findReferencesInPackage(
 	seen := make(map[token.Pos]struct{})
 
 	var refs []Reference
-	addReference := func(pos token.Pos, kind ReferenceKind) {
+	addReference := func(start token.Pos, end token.Pos, kind ReferenceKind) {
+		pos := start
 		if !pos.IsValid() {
 			return
 		}
@@ -627,9 +632,11 @@ func findReferencesInPackage(
 			Name: target.String(),
 			Kind: kind,
 			Position: positionRelativeToRoot(root, Position{
-				File: position.Filename,
-				Line: position.Line,
+				File:   position.Filename,
+				Line:   position.Line,
+				Column: position.Column,
 			}),
+			Range: sourceRangeRelativeToRoot(root, pkg.FileSet, start, end),
 		})
 	}
 
@@ -653,16 +660,16 @@ func findReferencesInPackage(
 			case *ast.Ident:
 				object, definition := referenceIdentObject(pkg.Info, node)
 				if referenceObjectMatchesTarget(object, targetObjects) {
-					addReference(node.Pos(), referenceKindForIdent(object, definition, parent, node))
+					addReference(node.Pos(), node.End(), referenceKindForIdent(object, definition, parent, node))
 				}
 			case *ast.SelectorExpr:
 				selection := pkg.Info.Selections[node]
 				if referenceSelectionMatchesTarget(selection, targetObjects) {
-					addReference(node.Sel.Pos(), referenceKindForSelector(selection, parent, node))
+					addReference(node.Sel.Pos(), node.Sel.End(), referenceKindForSelector(selection, parent, node))
 				}
 
 				if referenceSelectorMatchesImportedTarget(pkg.Info, node, target, targetPackages, imports) {
-					addReference(node.Sel.Pos(), referenceKindForImportedSelector(parent, node))
+					addReference(node.Sel.Pos(), node.Sel.End(), referenceKindForImportedSelector(parent, node))
 				}
 			}
 

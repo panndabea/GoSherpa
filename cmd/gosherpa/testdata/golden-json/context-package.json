@@ -382,6 +382,7 @@
     ],
     "affectedInterfaces": [],
     "affectedImplementations": [],
+    "interfaceAnalysisMode": "typechecked",
     "affectedTests": [
       {
         "name": "TestTarget",
@@ -389,7 +390,20 @@
         "packageName": "golden",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         },
         "directReference": false,
         "externalPackage": false
@@ -494,13 +508,13 @@
         "reason": "Check expected behavior and regression coverage.",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
         }
       }
     ],
     "analysisMode": "typechecked+ast",
     "confidence": "medium",
-    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Package context uses package-level impact for affected packages and tests.",
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",

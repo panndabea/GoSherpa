@@ -297,10 +297,30 @@ func symbolPosition(fileSet *token.FileSet, pos token.Pos) Position {
 }
 
 func symbolRange(fileSet *token.FileSet, start token.Pos, end token.Pos) *SourceRange {
+	return sourceRange(fileSet, start, end)
+}
+
+func sourceRange(fileSet *token.FileSet, start token.Pos, end token.Pos) *SourceRange {
+	if fileSet == nil || !start.IsValid() || !end.IsValid() {
+		return nil
+	}
+
 	return &SourceRange{
 		Start: symbolPosition(fileSet, start),
 		End:   symbolPosition(fileSet, end),
 	}
+}
+
+func sourceRangeRelativeToRoot(root string, fileSet *token.FileSet, start token.Pos, end token.Pos) *SourceRange {
+	rng := sourceRange(fileSet, start, end)
+	if rng == nil {
+		return nil
+	}
+
+	rng.Start = positionRelativeToRoot(root, rng.Start)
+	rng.End = positionRelativeToRoot(root, rng.End)
+
+	return rng
 }
 
 func nodeString(node any) string {

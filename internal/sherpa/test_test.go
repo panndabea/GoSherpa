@@ -290,6 +290,44 @@ func TestTargetCases(t *testing.T) {
 	assertContainsString(t, names, "TestTargetCases/group/leaf")
 }
 
+func TestFindTestsReturnsSourceRanges(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+
+func TestSubtests(t *testing.T) {
+	t.Run("case", func(t *testing.T) { Target() })
+}
+`)
+
+	result, err := FindTests(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topLevel := findRelatedTest(result.Tests, "TestTarget")
+	if topLevel == nil {
+		t.Fatalf("expected TestTarget, got %v", result.Tests)
+	}
+	assertSourceRange(t, topLevel.Range, "service_test.go", 5, 1, 7, 2)
+
+	subtest := findRelatedTest(result.Tests, "TestSubtests/case")
+	if subtest == nil {
+		t.Fatalf("expected TestSubtests/case, got %v", result.Tests)
+	}
+	assertSourceRange(t, subtest.Range, "service_test.go", 10, 2, 10, 48)
+}
+
 func TestFindTestsAddsFallbackForSymbolPackageWithoutTests(t *testing.T) {
 	tmp := t.TempDir()
 

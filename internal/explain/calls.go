@@ -304,6 +304,7 @@ func collectExplainCallers(functions []explainFunctionInfo, target callSignalTar
 			callers = append(callers, sherpa.Caller{
 				Name:     function.Target,
 				Position: explainPosition(function.Root, function.FileSet, call.Fun.Pos()),
+				Range:    explainSourceRange(function.Root, function.FileSet, call.Fun.Pos(), call.Fun.End()),
 			})
 
 			return true
@@ -342,6 +343,7 @@ func collectExplainCallees(function explainFunctionInfo) []sherpa.Callee {
 		callees = append(callees, sherpa.Callee{
 			Name:     name,
 			Position: explainPosition(function.Root, function.FileSet, call.Fun.Pos()),
+			Range:    explainSourceRange(function.Root, function.FileSet, call.Fun.Pos(), call.Fun.End()),
 		})
 
 		return true
@@ -523,9 +525,21 @@ func explainAbsoluteRootPath(root string) (string, error) {
 func explainPosition(root string, fileSet *token.FileSet, pos token.Pos) sherpa.Position {
 	position := fileSet.Position(pos)
 	return explainPositionRelativeToRoot(root, sherpa.Position{
-		File: position.Filename,
-		Line: position.Line,
+		File:   position.Filename,
+		Line:   position.Line,
+		Column: position.Column,
 	})
+}
+
+func explainSourceRange(root string, fileSet *token.FileSet, start token.Pos, end token.Pos) *sherpa.SourceRange {
+	if fileSet == nil || !start.IsValid() || !end.IsValid() {
+		return nil
+	}
+
+	return &sherpa.SourceRange{
+		Start: explainPosition(root, fileSet, start),
+		End:   explainPosition(root, fileSet, end),
+	}
 }
 
 func explainPositionRelativeToRoot(root string, position sherpa.Position) sherpa.Position {

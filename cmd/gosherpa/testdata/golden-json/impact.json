@@ -23,7 +23,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 11,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 11,
+            "column": 8
+          }
         }
       },
       {
@@ -31,7 +44,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 15,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 15,
+            "column": 8
+          }
         }
       },
       {
@@ -39,7 +65,20 @@
         "kind": "definition",
         "position": {
           "file": "service.go",
-          "line": 18
+          "line": 18,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 12
+          }
         }
       }
     ],
@@ -49,28 +88,80 @@
         "name": "Run",
         "position": {
           "file": "cmd/app/main.go",
-          "line": 6
+          "line": 6,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "cmd/app/main.go",
+            "line": 6,
+            "column": 2
+          },
+          "end": {
+            "file": "cmd/app/main.go",
+            "line": 6,
+            "column": 14
+          }
         }
       },
       {
         "name": "Entry",
         "position": {
           "file": "service.go",
-          "line": 6
+          "line": 6,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 6,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 6,
+            "column": 7
+          }
         }
       },
       {
         "name": "First",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 11,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 11,
+            "column": 8
+          }
         }
       },
       {
         "name": "Second",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 15,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 15,
+            "column": 8
+          }
         }
       }
     ],
@@ -91,7 +182,20 @@
         "packageName": "golden",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         },
         "directReference": true,
         "externalPackage": false

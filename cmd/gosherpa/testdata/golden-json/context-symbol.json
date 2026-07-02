@@ -94,7 +94,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 11,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 11,
+            "column": 8
+          }
         }
       },
       {
@@ -102,7 +115,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 15,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 15,
+            "column": 8
+          }
         }
       },
       {
@@ -110,7 +136,20 @@
         "kind": "definition",
         "position": {
           "file": "service.go",
-          "line": 18
+          "line": 18,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 12
+          }
         }
       }
     ],
@@ -119,14 +158,40 @@
         "name": "First",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 11,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 11,
+            "column": 8
+          }
         }
       },
       {
         "name": "Second",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 15,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 15,
+            "column": 8
+          }
         }
       }
     ],
@@ -138,6 +203,7 @@
     ],
     "affectedInterfaces": [],
     "affectedImplementations": [],
+    "interfaceAnalysisMode": "typechecked",
     "relatedTests": [
       {
         "name": "TestTarget",
@@ -145,7 +211,20 @@
         "packageName": "golden",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         },
         "directReference": true,
         "externalPackage": false
@@ -189,7 +268,8 @@
         "reason": "See how callers depend on this symbol.",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
         }
       },
       {
@@ -197,7 +277,8 @@
         "reason": "See how callers depend on this symbol.",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
         }
       },
       {
@@ -205,13 +286,13 @@
         "reason": "Check expected behavior and regression coverage.",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
         }
       }
     ],
     "analysisMode": "typechecked+ast",
     "confidence": "medium",
-    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Symbol context used typechecked package loading for symbol identity, with syntax/local impact and test signals.",
       "Call analysis used typechecked package loading where available.",

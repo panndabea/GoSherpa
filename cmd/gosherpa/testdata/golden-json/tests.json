@@ -21,7 +21,20 @@
         "packageName": "golden",
         "position": {
           "file": "service_test.go",
-          "line": 5
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         },
         "directReference": true,
         "externalPackage": false

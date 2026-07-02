@@ -54,6 +54,27 @@ Positions are root-relative and 1-based:
 
 `column` may be omitted when it is not known.
 
+Source ranges are root-relative and use the same position shape:
+
+```json
+{
+  "start": {
+    "file": "service.go",
+    "line": 12,
+    "column": 3
+  },
+  "end": {
+    "file": "service.go",
+    "line": 12,
+    "column": 9
+  }
+}
+```
+
+`range` is optional. It is emitted for symbols, references, callers, callees,
+call path steps, and related tests when Go parser positions identify the exact
+source span. `position` remains the primary compact location field.
+
 Symbols use this profile shape. Some fields are omitted when empty:
 
 - `name`
@@ -78,7 +99,20 @@ References:
   "kind": "call",
   "position": {
     "file": "service.go",
-    "line": 8
+    "line": 8,
+    "column": 2
+  },
+  "range": {
+    "start": {
+      "file": "service.go",
+      "line": 8,
+      "column": 2
+    },
+    "end": {
+      "file": "service.go",
+      "line": 8,
+      "column": 8
+    }
   }
 }
 ```
@@ -93,7 +127,8 @@ Callers and callees share the same entry shape:
   "name": "Run",
   "position": {
     "file": "service.go",
-    "line": 4
+    "line": 4,
+    "column": 2
   }
 }
 ```
@@ -107,7 +142,8 @@ Related tests:
   "packageName": "service",
   "position": {
     "file": "service_test.go",
-    "line": 5
+    "line": 5,
+    "column": 1
   },
   "directReference": true,
   "externalPackage": false

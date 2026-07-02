@@ -52,6 +52,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering
+- Source ranges with columns for symbols, references, callers, callees, call paths, and related tests in JSON output
 
 ## Known MVP Limitations
 

@@ -85,6 +85,36 @@ func Run() {
 	}
 }
 
+func TestFindReferencesReturnsSourceRanges(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+
+func Run() {
+	Target()
+}
+`)
+
+	refs, err := FindReferences(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+
+	assertReferenceAt(t, refs, "service.go", 3, ReferenceKindDefinition)
+	assertReferenceAt(t, refs, "service.go", 6, ReferenceKindCall)
+
+	definition := findReferenceAt(refs, "service.go", 3, ReferenceKindDefinition)
+	call := findReferenceAt(refs, "service.go", 6, ReferenceKindCall)
+	assertSourceRange(t, definition.Range, "service.go", 3, 6, 3, 12)
+	assertSourceRange(t, call.Range, "service.go", 6, 2, 6, 8)
+}
+
 func TestFindReferencesIgnoresShadowedIdentifiers(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -592,4 +622,39 @@ func assertReferenceAt(t *testing.T, refs []Reference, file string, line int, ki
 	}
 
 	t.Fatalf("expected %s reference at %s:%d, got %v", kind, file, line, refs)
+}
+
+func findReferenceAt(refs []Reference, file string, line int, kind ReferenceKind) Reference {
+	for _, ref := range refs {
+		if ref.Position.File == file && ref.Position.Line == line && ref.Kind == kind {
+			return ref
+		}
+	}
+
+	return Reference{}
+}
+
+func assertSourceRange(t *testing.T, got *SourceRange, file string, startLine int, startColumn int, endLine int, endColumn int) {
+	t.Helper()
+
+	if got == nil {
+		t.Fatalf("expected source range for %s:%d:%d-%d:%d", file, startLine, startColumn, endLine, endColumn)
+	}
+
+	if got.Start.File != file ||
+		got.Start.Line != startLine ||
+		got.Start.Column != startColumn ||
+		got.End.File != file ||
+		got.End.Line != endLine ||
+		got.End.Column != endColumn {
+		t.Fatalf(
+			"expected range %s:%d:%d-%d:%d, got %#v",
+			file,
+			startLine,
+			startColumn,
+			endLine,
+			endColumn,
+			got,
+		)
+	}
 }

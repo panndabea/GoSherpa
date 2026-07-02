@@ -17,8 +17,9 @@ import (
 )
 
 type Callee struct {
-	Name     string   `json:"name"`
-	Position Position `json:"position"`
+	Name     string       `json:"name"`
+	Position Position     `json:"position"`
+	Range    *SourceRange `json:"range,omitempty"`
 }
 
 const (
@@ -34,8 +35,9 @@ type CalleesResult struct {
 }
 
 type Caller struct {
-	Name     string   `json:"name"`
-	Position Position `json:"position"`
+	Name     string       `json:"name"`
+	Position Position     `json:"position"`
+	Range    *SourceRange `json:"range,omitempty"`
 }
 
 type CallersResult struct {
@@ -56,9 +58,10 @@ type CallPathOptions struct {
 }
 
 type CallPathStep struct {
-	Caller   string   `json:"caller"`
-	Callee   string   `json:"callee"`
-	Position Position `json:"position"`
+	Caller   string       `json:"caller"`
+	Callee   string       `json:"callee"`
+	Position Position     `json:"position"`
+	Range    *SourceRange `json:"range,omitempty"`
 }
 
 type CallPath struct {
@@ -96,6 +99,7 @@ type callReference struct {
 	Name     string
 	Expr     ast.Expr
 	Position Position
+	Range    *SourceRange
 }
 
 type callGraphNode struct {
@@ -108,6 +112,7 @@ type callGraphEdge struct {
 	Caller   callGraphNode
 	Callee   callGraphNode
 	Position Position
+	Range    *SourceRange
 }
 
 type testFunctionGroupKey struct {
@@ -462,8 +467,9 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 				name := funcDecl.Name.Name
 				pos := fileSet.Position(funcDecl.Pos())
 				position := positionRelativeToRoot(rootPath, Position{
-					File: pos.Filename,
-					Line: pos.Line,
+					File:   pos.Filename,
+					Line:   pos.Line,
+					Column: pos.Column,
 				})
 
 				functions = append(functions, functionInfo{
@@ -542,8 +548,9 @@ func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {
 				name := funcDecl.Name.Name
 				pos := pkg.FileSet.Position(funcDecl.Pos())
 				position := positionRelativeToRoot(repo.Root, Position{
-					File: pos.Filename,
-					Line: pos.Line,
+					File:   pos.Filename,
+					Line:   pos.Line,
+					Column: pos.Column,
 				})
 
 				functions = append(functions, functionInfo{
@@ -685,8 +692,9 @@ func collectTestCallerFunctionInfos(root string) ([]functionInfo, error) {
 				name := funcDecl.Name.Name
 				pos := fileSet.Position(funcDecl.Pos())
 				position := positionRelativeToRoot(rootPath, Position{
-					File: pos.Filename,
-					Line: pos.Line,
+					File:   pos.Filename,
+					Line:   pos.Line,
+					Column: pos.Column,
 				})
 
 				functions = append(functions, functionInfo{
@@ -808,6 +816,7 @@ func buildCallGraph(functions []functionInfo) map[string][]callGraphEdge {
 					Caller:   caller,
 					Callee:   functionNode(match),
 					Position: reference.Position,
+					Range:    reference.Range,
 				})
 			}
 		}
@@ -899,6 +908,7 @@ func findCallPathsInGraph(graph map[string][]callGraphEdge, from callGraphNode, 
 				Caller:   edge.Caller.Target,
 				Callee:   edge.Callee.Target,
 				Position: edge.Position,
+				Range:    edge.Range,
 			})
 
 			if edge.Callee.Key == to.Key {
@@ -1251,6 +1261,7 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 		callees = append(callees, Callee{
 			Name:     reference.Name,
 			Position: reference.Position,
+			Range:    reference.Range,
 		})
 	}
 
@@ -1286,14 +1297,16 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 
 		pos := function.FileSet.Position(call.Fun.Pos())
 		position := positionRelativeToRoot(function.Root, Position{
-			File: pos.Filename,
-			Line: pos.Line,
+			File:   pos.Filename,
+			Line:   pos.Line,
+			Column: pos.Column,
 		})
 
 		references = append(references, callReference{
 			Name:     name,
 			Expr:     call.Fun,
 			Position: position,
+			Range:    sourceRangeRelativeToRoot(function.Root, function.FileSet, call.Fun.Pos(), call.Fun.End()),
 		})
 
 		return true
@@ -1385,6 +1398,7 @@ func collectCallersFromFunctions(functions []functionInfo, target callTarget) []
 			callers = append(callers, Caller{
 				Name:     function.Target,
 				Position: reference.Position,
+				Range:    reference.Range,
 			})
 		}
 	}
@@ -1420,6 +1434,7 @@ func collectTransitiveCallersFromFunctions(functions []functionInfo, target call
 				callers = append(callers, Caller{
 					Name:     edge.Caller.Target,
 					Position: edge.Position,
+					Range:    edge.Range,
 				})
 			}
 

@@ -19,7 +19,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 11
+          "line": 11,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 11,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 11,
+            "column": 8
+          }
         }
       },
       {
@@ -27,7 +40,20 @@
         "kind": "call",
         "position": {
           "file": "service.go",
-          "line": 15
+          "line": 15,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 15,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 15,
+            "column": 8
+          }
         }
       },
       {
@@ -35,7 +61,20 @@
         "kind": "definition",
         "position": {
           "file": "service.go",
-          "line": 18
+          "line": 18,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 12
+          }
         }
       }
     ]

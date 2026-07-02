@@ -41,6 +41,11 @@ from typechecked package loading. File and package context use `typechecked+ast`
 when package files and symbols come from typechecked package loading while
 impact and test signals still use syntax/local repository analysis.
 
+Location-bearing context entries reuse the shared position and range shapes from
+`JSON_SCHEMA_V1.md`. References, callers, callees, affected tests, and related
+tests keep `position` and may include `range` when Go parser positions identify
+the exact source span.
+
 When size controls are used, context results may also include:
 
 - `limits`: active user-provided limits.

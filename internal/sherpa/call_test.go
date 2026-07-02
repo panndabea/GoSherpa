@@ -417,6 +417,8 @@ func Step() {}
 		t.Fatalf("expected internal/service/service.go, got %s", got)
 	}
 
+	assertSourceRange(t, result.Callees[0].Range, "internal/service/service.go", 4, 2, 4, 6)
+
 	if strings.Contains(got, tmp) {
 		t.Fatalf("expected root-relative path, got %s", got)
 	}
@@ -742,6 +744,8 @@ func Step() {}
 	if got != "internal/service/service.go" {
 		t.Fatalf("expected internal/service/service.go, got %s", got)
 	}
+
+	assertSourceRange(t, result.Callers[0].Range, "internal/service/service.go", 4, 2, 4, 6)
 
 	if strings.Contains(got, tmp) {
 		t.Fatalf("expected root-relative path, got %s", got)
@@ -1317,6 +1321,8 @@ func Target() {}
 	if got != "internal/service/service.go" {
 		t.Fatalf("expected internal/service/service.go, got %s", got)
 	}
+
+	assertSourceRange(t, result.Paths[0].Steps[0].Range, "internal/service/service.go", 4, 2, 4, 8)
 
 	if strings.Contains(got, tmp) {
 		t.Fatalf("expected root-relative path, got %s", got)

@@ -127,6 +127,8 @@ Implemented:
 - Affected-test planning for transitive caller packages.
 - Reference kind classification for definitions, calls, type usages, field
   accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
+- Source ranges with columns for symbols, references, callers, callees, call
+  paths, and related tests in JSON output.
 
 Current limitations:
 
@@ -151,8 +153,8 @@ Current limitations:
 - Unqualified standalone call graph targets can be ambiguous across packages;
   GoSherpa reports candidates and package-qualified examples for
   disambiguation.
-- Symbol definitions include file, line, column, and source ranges; references,
-  calls, and tests still mostly expose file and line only.
+- Reading-order entries still expose compact positions rather than full source
+  ranges.
 - Test callers are available with `callers --tests` and `explain --tests`;
   tests are still skipped by some other analysis paths and are not yet
   first-class.
