@@ -141,6 +141,7 @@ func applySymbolLimits(report Report, limits LimitOptions) Report {
 	}
 
 	report.Truncated = reportTruncation(truncation)
+	report = applySymbolByteLimit(report, limits.MaxBytes)
 
 	return report
 }

@@ -463,6 +463,29 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 			continue
 		}
 
+		if arg == "--max-bytes" {
+			value, err := parsePositiveFlagValue("--max-bytes", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxBytes = value
+			invocation.HasContextLimit = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--max-bytes=") {
+			value, err := parsePositiveInteger("--max-bytes", strings.TrimPrefix(arg, "--max-bytes="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.ContextLimits.MaxBytes = value
+			invocation.HasContextLimit = true
+			continue
+		}
+
 		if arg == "--source-radius" {
 			value, err := parseNonNegativeFlagValue("--source-radius", args, i)
 			if err != nil {
@@ -719,7 +742,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasContextLimit && invocation.Command != "context" {
-		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, and --source-radius are only supported by context")
+		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context")
 		return exitUsage
 	}
 
@@ -2344,10 +2367,10 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
-	fmt.Fprintln(writer, "  context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
+	fmt.Fprintln(writer, "  context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
 	fmt.Fprintln(writer, "  doctor")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
@@ -2372,26 +2395,26 @@ func printUsage(writer io.Writer) {
 }
 
 func printContextUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
 }
 
 func printContextSymbolUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
 }
 
 func printContextFileUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
 }
 
 func printContextPackageUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
 }
 
 func printContextDiffUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
 }
 
 func printImpactUsage(writer io.Writer) {

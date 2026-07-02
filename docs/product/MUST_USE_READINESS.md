@@ -105,9 +105,9 @@ before editing.
 Needed next:
 
 - keep documented JSON schemas aligned with golden fixtures and command output
-- add byte-budget controls such as `--max-bytes`; entry-count controls already
-  exist for `--max-files`, `--max-references`, `--max-symbols`, `--max-tests`,
-  and `--source-radius`
+- keep byte-budget and entry-count controls reliable across context outputs:
+  `--max-bytes`, `--max-files`, `--max-references`, `--max-symbols`,
+  `--max-tests`, and `--source-radius`
 - broaden and document `confidence`, `analysisMode`, and `limitations`
   behavior consistently beyond the existing context reports
 - concise human warnings without noisy terminal output

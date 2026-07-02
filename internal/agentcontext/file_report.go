@@ -136,6 +136,7 @@ func applyFileLimits(report FileReport, limits LimitOptions) FileReport {
 	}
 
 	report.Truncated = reportTruncation(truncation)
+	report = applyFileByteLimit(report, limits.MaxBytes)
 
 	return report
 }

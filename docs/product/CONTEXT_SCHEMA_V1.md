@@ -53,10 +53,12 @@ Example:
   "limits": {
     "maxReferences": 20,
     "maxTests": 10,
+    "maxBytes": 12000,
     "sourceRadius": 1
   },
   "truncated": {
     "references": 7,
+    "sourceLines": 4,
     "readingOrder": 2
   }
 }
@@ -70,13 +72,19 @@ Supported context flags:
 - `--max-references <n>` limits symbol references, callers, and callees.
 - `--max-symbols <n>` limits symbol lists and matching source excerpts.
 - `--max-tests <n>` limits related or affected test lists.
+- `--max-bytes <n>` applies a best-effort byte budget to the context data
+  payload by omitting large fields in a deterministic order while keeping JSON
+  valid.
 - `--source-radius <n>` limits source excerpt radius for symbol, file, and
   package context. `0` means target line only.
 
-`context diff` supports `--max-files`, `--max-symbols`, and `--max-tests`.
+`context diff` supports `--max-files`, `--max-symbols`, `--max-tests`, and
+`--max-bytes`.
 
 Purpose and risk are computed before output truncation. The `truncated` object
 explains what was omitted from the bounded context bundle.
+If the requested byte budget is smaller than the minimum report shell, the
+`truncated.byteBudgetOverage` field reports the remaining byte overage.
 
 ## Context Kinds
 

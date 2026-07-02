@@ -144,6 +144,7 @@ func applyPackageLimits(report PackageReport, limits LimitOptions) PackageReport
 	}
 
 	report.Truncated = reportTruncation(truncation)
+	report = applyPackageByteLimit(report, limits.MaxBytes)
 
 	return report
 }

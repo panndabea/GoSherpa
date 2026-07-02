@@ -185,6 +185,34 @@ func TestAnalyzeSymbolAppliesLimits(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSymbolAppliesByteLimit(t *testing.T) {
+	root := writeAgentContextProject(t)
+	maxBytes := 2400
+
+	report, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{
+		IncludeTests: true,
+		Limits: LimitOptions{
+			MaxBytes: maxBytes,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.Limits == nil || report.Limits.MaxBytes != maxBytes {
+		t.Fatalf("expected max bytes limit to be recorded, got %#v", report.Limits)
+	}
+	if report.Truncated == nil {
+		t.Fatal("expected byte budget truncation")
+	}
+	if report.Truncated.SourceLines == 0 && report.Truncated.References == 0 && report.Truncated.Callers == 0 && report.Truncated.Callees == 0 {
+		t.Fatalf("expected context details to be truncated, got %#v", report.Truncated)
+	}
+	if size := encodedJSONLen(normalizeReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
+		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
+	}
+}
+
 func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	root := writeAgentContextProject(t)
 
@@ -277,6 +305,30 @@ func TestAnalyzeFileAppliesLimits(t *testing.T) {
 	}
 	if report.Truncated == nil || report.Truncated.Symbols != 2 || report.Truncated.SourceContexts != 2 {
 		t.Fatalf("expected symbol/source truncation, got %#v", report.Truncated)
+	}
+}
+
+func TestAnalyzeFileAppliesByteLimit(t *testing.T) {
+	root := writeAgentContextProject(t)
+	maxBytes := 2600
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: maxBytes,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if report.Limits == nil || report.Limits.MaxBytes != maxBytes {
+		t.Fatalf("expected max bytes limit to be recorded, got %#v", report.Limits)
+	}
+	if report.Truncated == nil || report.Truncated.SourceContexts == 0 {
+		t.Fatalf("expected source context byte truncation, got %#v", report.Truncated)
+	}
+	if size := encodedJSONLen(normalizeFileReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
+		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
 	}
 }
 
@@ -407,6 +459,30 @@ func TestAnalyzePackageAppliesLimits(t *testing.T) {
 	}
 	if report.Truncated == nil || report.Truncated.Files != 1 || report.Truncated.Symbols != 3 {
 		t.Fatalf("expected file/symbol truncation, got %#v", report.Truncated)
+	}
+}
+
+func TestAnalyzePackageAppliesByteLimit(t *testing.T) {
+	root := writeAgentContextProject(t)
+	maxBytes := 2800
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: maxBytes,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if report.Limits == nil || report.Limits.MaxBytes != maxBytes {
+		t.Fatalf("expected max bytes limit to be recorded, got %#v", report.Limits)
+	}
+	if report.Truncated == nil || report.Truncated.SourceContexts == 0 {
+		t.Fatalf("expected source context byte truncation, got %#v", report.Truncated)
+	}
+	if size := encodedJSONLen(normalizePackageReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
+		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
 	}
 }
 
@@ -542,6 +618,38 @@ func TestAnalyzeDiffAppliesLimits(t *testing.T) {
 	}
 	if report.Truncated == nil || report.Truncated.ChangedFiles != 1 || report.Truncated.AffectedSymbols != 1 {
 		t.Fatalf("expected diff truncation, got %#v", report.Truncated)
+	}
+}
+
+func TestAnalyzeDiffAppliesByteLimit(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n")
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n\nfunc AddedFirst() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n\nfunc AddedSecond() {}\n")
+
+	maxBytes := 1200
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: maxBytes,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.Limits == nil || report.Limits.MaxBytes != maxBytes {
+		t.Fatalf("expected max bytes limit to be recorded, got %#v", report.Limits)
+	}
+	if report.Truncated == nil || report.Truncated.AffectedSymbols == 0 && report.Truncated.ChangedFiles == 0 {
+		t.Fatalf("expected diff byte truncation, got %#v", report.Truncated)
+	}
+	if size := encodedJSONLen(normalizeDiffReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
+		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
 	}
 }
 

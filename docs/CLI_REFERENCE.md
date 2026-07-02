@@ -95,6 +95,7 @@ Found 4 references
 ./gosherpa context symbol ParseFile
 ./gosherpa context symbol ParseFile --tests
 ./gosherpa context symbol ParseFile --json
+./gosherpa context symbol ParseFile --max-bytes 12000 --json
 ./gosherpa context file internal/sherpa/impact.go
 ./gosherpa context file internal/sherpa/impact.go --json
 ./gosherpa context package ./internal/sherpa
@@ -162,5 +163,10 @@ JSON output for all commands uses a stable envelope:
 ```
 
 When `--json` is used with an ambiguous target, GoSherpa keeps stdout empty and emits a structured diagnostic to stderr with `error.code: "ambiguous_target"` and candidate package/file/line details.
+
+Context commands support size controls for agent workflows: `--max-files`,
+`--max-references`, `--max-symbols`, `--max-tests`, `--source-radius`, and
+`--max-bytes`. The byte budget omits large context fields deterministically and
+keeps JSON valid; any omissions are reported in `data.truncated`.
 
 See the [Agent JSON Schema](product/JSON_SCHEMA_V1.md) and [Context JSON Schema](product/CONTEXT_SCHEMA_V1.md) for the full machine-readable contracts.

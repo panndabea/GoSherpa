@@ -87,6 +87,7 @@ func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
 	}
 
 	report.Truncated = reportTruncation(truncation)
+	report = applyDiffByteLimit(report, limits.MaxBytes)
 
 	return report
 }

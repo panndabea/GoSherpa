@@ -7,6 +7,7 @@ type LimitOptions struct {
 	MaxReferences int  `json:"maxReferences,omitempty"`
 	MaxSymbols    int  `json:"maxSymbols,omitempty"`
 	MaxTests      int  `json:"maxTests,omitempty"`
+	MaxBytes      int  `json:"maxBytes,omitempty"`
 	SourceRadius  *int `json:"sourceRadius,omitempty"`
 }
 
@@ -14,11 +15,14 @@ type Truncation struct {
 	Files                   int `json:"files,omitempty"`
 	Symbols                 int `json:"symbols,omitempty"`
 	SourceContexts          int `json:"sourceContexts,omitempty"`
+	SourceLines             int `json:"sourceLines,omitempty"`
 	References              int `json:"references,omitempty"`
 	Callers                 int `json:"callers,omitempty"`
 	Callees                 int `json:"callees,omitempty"`
 	RelatedTests            int `json:"relatedTests,omitempty"`
 	AffectedTests           int `json:"affectedTests,omitempty"`
+	TestCommands            int `json:"testCommands,omitempty"`
+	TestPlanItems           int `json:"testPlanItems,omitempty"`
 	ChangedFiles            int `json:"changedFiles,omitempty"`
 	ChangedPackages         int `json:"changedPackages,omitempty"`
 	AffectedPackages        int `json:"affectedPackages,omitempty"`
@@ -26,6 +30,7 @@ type Truncation struct {
 	AffectedInterfaces      int `json:"affectedInterfaces,omitempty"`
 	AffectedImplementations int `json:"affectedImplementations,omitempty"`
 	ReadingOrder            int `json:"readingOrder,omitempty"`
+	ByteBudgetOverage       int `json:"byteBudgetOverage,omitempty"`
 }
 
 func NewSourceRadius(value int) *int {
@@ -53,6 +58,7 @@ func limitOptionsActive(limits LimitOptions) bool {
 		limits.MaxReferences > 0 ||
 		limits.MaxSymbols > 0 ||
 		limits.MaxTests > 0 ||
+		limits.MaxBytes > 0 ||
 		limits.SourceRadius != nil
 }
 
@@ -60,18 +66,22 @@ func truncationActive(truncation Truncation) bool {
 	return truncation.Files > 0 ||
 		truncation.Symbols > 0 ||
 		truncation.SourceContexts > 0 ||
+		truncation.SourceLines > 0 ||
 		truncation.References > 0 ||
 		truncation.Callers > 0 ||
 		truncation.Callees > 0 ||
 		truncation.RelatedTests > 0 ||
 		truncation.AffectedTests > 0 ||
+		truncation.TestCommands > 0 ||
+		truncation.TestPlanItems > 0 ||
 		truncation.ChangedFiles > 0 ||
 		truncation.ChangedPackages > 0 ||
 		truncation.AffectedPackages > 0 ||
 		truncation.AffectedSymbols > 0 ||
 		truncation.AffectedInterfaces > 0 ||
 		truncation.AffectedImplementations > 0 ||
-		truncation.ReadingOrder > 0
+		truncation.ReadingOrder > 0 ||
+		truncation.ByteBudgetOverage > 0
 }
 
 func limitSlice[T any](values []T, max int) ([]T, int) {
@@ -115,11 +125,14 @@ func truncationMessages(truncation *Truncation) []string {
 	appendMessage("files", truncation.Files)
 	appendMessage("symbols", truncation.Symbols)
 	appendMessage("source contexts", truncation.SourceContexts)
+	appendMessage("source lines", truncation.SourceLines)
 	appendMessage("references", truncation.References)
 	appendMessage("callers", truncation.Callers)
 	appendMessage("callees", truncation.Callees)
 	appendMessage("related tests", truncation.RelatedTests)
 	appendMessage("affected tests", truncation.AffectedTests)
+	appendMessage("test commands", truncation.TestCommands)
+	appendMessage("test plan items", truncation.TestPlanItems)
 	appendMessage("changed files", truncation.ChangedFiles)
 	appendMessage("changed packages", truncation.ChangedPackages)
 	appendMessage("affected packages", truncation.AffectedPackages)
@@ -127,6 +140,9 @@ func truncationMessages(truncation *Truncation) []string {
 	appendMessage("affected interfaces", truncation.AffectedInterfaces)
 	appendMessage("affected implementations", truncation.AffectedImplementations)
 	appendMessage("reading order", truncation.ReadingOrder)
+	if truncation.ByteBudgetOverage > 0 {
+		messages = append(messages, fmt.Sprintf("byte budget overage: %d bytes", truncation.ByteBudgetOverage))
+	}
 
 	return messages
 }
