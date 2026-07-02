@@ -106,17 +106,19 @@ type searchJSONData struct {
 }
 
 type impactJSONData struct {
-	AnalysisMode string                     `json:"analysisMode"`
-	Confidence   string                     `json:"confidence"`
-	Limitations  []string                   `json:"limitations"`
-	Kind         sherpa.ImpactKind          `json:"kind"`
-	References   []sherpa.Reference         `json:"references"`
-	Callers      []sherpa.Caller            `json:"callers"`
-	Dependencies sherpa.PackageDependencies `json:"dependencies"`
-	Packages     []string                   `json:"packages"`
-	RelatedTests []sherpa.RelatedTest       `json:"relatedTests"`
-	TestCommands []string                   `json:"testCommands"`
-	TestPlan     sherpa.TestPlan            `json:"testPlan"`
+	AnalysisMode          string                     `json:"analysisMode"`
+	Confidence            string                     `json:"confidence"`
+	Limitations           []string                   `json:"limitations"`
+	Kind                  sherpa.ImpactKind          `json:"kind"`
+	References            []sherpa.Reference         `json:"references"`
+	ReferenceAnalysisMode string                     `json:"referenceAnalysisMode,omitempty"`
+	Callers               []sherpa.Caller            `json:"callers"`
+	CallAnalysisMode      string                     `json:"callAnalysisMode,omitempty"`
+	Dependencies          sherpa.PackageDependencies `json:"dependencies"`
+	Packages              []string                   `json:"packages"`
+	RelatedTests          []sherpa.RelatedTest       `json:"relatedTests"`
+	TestCommands          []string                   `json:"testCommands"`
+	TestPlan              sherpa.TestPlan            `json:"testPlan"`
 }
 
 type impactDiffJSONData struct {
@@ -127,6 +129,8 @@ type impactDiffJSONData struct {
 	ChangedPackages         []string                   `json:"changedPackages"`
 	AffectedPackages        []string                   `json:"affectedPackages"`
 	AffectedSymbols         []string                   `json:"affectedSymbols"`
+	ReferenceAnalysisMode   string                     `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                     `json:"callAnalysisMode,omitempty"`
 	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
 	AffectedImplementations []string                   `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
@@ -207,6 +211,7 @@ type explainJSONData struct {
 	Risk                    explainengine.RiskSummary      `json:"risk"`
 	ArchitectureRole        explainengine.ArchitectureRole `json:"architectureRole"`
 	References              []sherpa.Reference             `json:"references"`
+	ReferenceAnalysisMode   string                         `json:"referenceAnalysisMode,omitempty"`
 	Callers                 []sherpa.Caller                `json:"callers"`
 	Callees                 []sherpa.Callee                `json:"callees"`
 	CallAnalysisMode        string                         `json:"callAnalysisMode"`
@@ -1744,7 +1749,9 @@ func newJSONErrorResponse(root string, command string, target string, errorData 
 
 func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	result.References = nonNilSlice(result.References)
+	result.ReferenceAnalysisMode = strings.TrimSpace(result.ReferenceAnalysisMode)
 	result.Callers = nonNilSlice(result.Callers)
+	result.CallAnalysisMode = strings.TrimSpace(result.CallAnalysisMode)
 	result.Dependencies.Imports = nonNilSlice(result.Dependencies.Imports)
 	result.Dependencies.UsedBy = nonNilSlice(result.Dependencies.UsedBy)
 	result.Packages = nonNilSlice(result.Packages)
@@ -1757,19 +1764,27 @@ func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 }
 
 func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
+	analysisMode := impactResultAnalysisMode(result)
+
 	return impactJSONData{
-		AnalysisMode: analysisModeAST,
-		Confidence:   jsonConfidence(result.Warnings, analysisModeAST),
-		Limitations:  impactLimitations(analysisModeAST),
-		Kind:         result.Kind,
-		References:   result.References,
-		Callers:      result.Callers,
-		Dependencies: result.Dependencies,
-		Packages:     result.Packages,
-		RelatedTests: result.RelatedTests,
-		TestCommands: result.TestCommands,
-		TestPlan:     result.TestPlan,
+		AnalysisMode:          analysisMode,
+		Confidence:            jsonConfidence(result.Warnings, analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode),
+		Limitations:           impactBundleLimitations(analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode),
+		Kind:                  result.Kind,
+		References:            result.References,
+		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
+		Callers:               result.Callers,
+		CallAnalysisMode:      result.CallAnalysisMode,
+		Dependencies:          result.Dependencies,
+		Packages:              result.Packages,
+		RelatedTests:          result.RelatedTests,
+		TestCommands:          result.TestCommands,
+		TestPlan:              result.TestPlan,
 	}
+}
+
+func impactResultAnalysisMode(result sherpa.ImpactResult) string {
+	return bundleAnalysisMode(result.ReferenceAnalysisMode, result.CallAnalysisMode)
 }
 
 func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactReport {
@@ -1777,6 +1792,8 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
+	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
@@ -1789,14 +1806,18 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 }
 
 func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode string) impactDiffJSONData {
+	analysisMode = impactReportAnalysisMode(report, analysisMode)
+
 	return impactDiffJSONData{
 		AnalysisMode:            analysisMode,
-		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.InterfaceAnalysisMode),
-		Limitations:             impactLimitations(analysisMode),
+		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
+		Limitations:             impactBundleLimitations(analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode),
 		ChangedFiles:            report.ChangedFiles,
 		ChangedPackages:         report.ChangedPackages,
 		AffectedPackages:        report.AffectedPackages,
 		AffectedSymbols:         report.AffectedSymbols,
+		ReferenceAnalysisMode:   report.ReferenceAnalysisMode,
+		CallAnalysisMode:        report.CallAnalysisMode,
 		AffectedInterfaces:      report.AffectedInterfaces,
 		AffectedImplementations: report.AffectedImplementations,
 		InterfaceAnalysisMode:   report.InterfaceAnalysisMode,
@@ -1804,6 +1825,14 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 		TestCommands:            report.TestCommands,
 		TestPlan:                report.TestPlan,
 	}
+}
+
+func impactReportAnalysisMode(report impactengine.ImpactReport, fallback string) string {
+	if fallback == analysisModeDiff {
+		return fallback
+	}
+
+	return bundleAnalysisMode(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
 }
 
 func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
@@ -2029,6 +2058,7 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 
 func explainJSONResult(report explainengine.Report) explainengine.Report {
 	report.References = nonNilSlice(report.References)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.Callers = nonNilSlice(report.Callers)
 	report.Callees = nonNilSlice(report.Callees)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
@@ -2045,16 +2075,19 @@ func explainJSONResult(report explainengine.Report) explainengine.Report {
 }
 
 func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
+	analysisMode := explainAnalysisMode(report)
+
 	return explainJSONData{
 		Target:                  report.Target,
-		AnalysisMode:            analysisModeAST,
-		Confidence:              jsonConfidence(report.Warnings, analysisModeAST, report.CallAnalysisMode, report.InterfaceAnalysisMode),
-		Limitations:             explainLimitations(report.CallAnalysisMode),
+		AnalysisMode:            analysisMode,
+		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
+		Limitations:             explainLimitations(report.ReferenceAnalysisMode, report.CallAnalysisMode),
 		Symbol:                  report.Symbol,
 		Purpose:                 report.Purpose,
 		Risk:                    report.Risk,
 		ArchitectureRole:        report.ArchitectureRole,
 		References:              report.References,
+		ReferenceAnalysisMode:   report.ReferenceAnalysisMode,
 		Callers:                 report.Callers,
 		Callees:                 report.Callees,
 		CallAnalysisMode:        report.CallAnalysisMode,
@@ -2067,6 +2100,22 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		TestPlan:                report.TestPlan,
 		ReadingOrder:            report.ReadingOrder,
 	}
+}
+
+func explainAnalysisMode(report explainengine.Report) string {
+	return bundleAnalysisMode(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
+}
+
+func bundleAnalysisMode(analysisModes ...string) string {
+	for _, mode := range analysisModes {
+		if mode == sherpa.ReferenceAnalysisModeTypechecked ||
+			mode == sherpa.CallAnalysisModeTypechecked ||
+			mode == impactengine.InterfaceAnalysisModeTypechecked {
+			return agentcontext.AnalysisModeTypecheckedAST
+		}
+	}
+
+	return analysisModeAST
 }
 
 func jsonConfidence(warnings []string, analysisModes ...string) string {
@@ -2132,13 +2181,28 @@ func callPathLimitations() []string {
 	}
 }
 
-func explainLimitations(callAnalysisMode string) []string {
+func explainLimitations(referenceAnalysisMode string, callAnalysisMode string) []string {
 	limitations := []string{
 		"Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
 		"Purpose, risk, architecture role, and reading order are deterministic heuristics.",
 	}
+	if strings.TrimSpace(referenceAnalysisMode) != "" {
+		limitations = append(limitations, referenceAnalysisLimitation(referenceAnalysisMode))
+	}
 	limitations = append(limitations, callLimitations(callAnalysisMode)...)
 	limitations = append(limitations, testLimitations(analysisModeAST)...)
+
+	return limitations
+}
+
+func impactBundleLimitations(analysisMode string, referenceAnalysisMode string, callAnalysisMode string) []string {
+	limitations := impactLimitations(analysisMode)
+	if strings.TrimSpace(referenceAnalysisMode) != "" {
+		limitations = append(limitations, referenceAnalysisLimitation(referenceAnalysisMode))
+	}
+	if strings.TrimSpace(callAnalysisMode) != "" {
+		limitations = append(limitations, callAnalysisLimitation(callAnalysisMode))
+	}
 
 	return limitations
 }

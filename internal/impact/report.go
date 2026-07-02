@@ -29,6 +29,8 @@ type ImpactReport struct {
 	ChangedPackages         []string      `json:"changedPackages"`
 	AffectedPackages        []string      `json:"affectedPackages"`
 	AffectedSymbols         []string      `json:"affectedSymbols"`
+	ReferenceAnalysisMode   string        `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string        `json:"callAnalysisMode,omitempty"`
 	AffectedInterfaces      []string      `json:"affectedInterfaces"`
 	AffectedImplementations []string      `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string        `json:"interfaceAnalysisMode,omitempty"`
@@ -189,11 +191,13 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 
 func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 	return ImpactReport{
-		AffectedPackages: result.Packages,
-		AffectedTests:    result.RelatedTests,
-		TestCommands:     result.TestCommands,
-		TestPlan:         result.TestPlan,
-		Warnings:         result.Warnings,
+		AffectedPackages:      result.Packages,
+		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
+		CallAnalysisMode:      result.CallAnalysisMode,
+		AffectedTests:         result.RelatedTests,
+		TestCommands:          result.TestCommands,
+		TestPlan:              result.TestPlan,
+		Warnings:              result.Warnings,
 	}
 }
 
@@ -314,6 +318,8 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.ChangedPackages = nonNilStrings(report.ChangedPackages)
 	report.AffectedPackages = nonNilStrings(report.AffectedPackages)
 	report.AffectedSymbols = nonNilStrings(report.AffectedSymbols)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
+	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilStrings(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)

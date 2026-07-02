@@ -343,8 +343,9 @@ Data:
 `impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`,
 `tests`, and `tests affected` data objects include the common metadata fields:
 
-- `analysisMode`: `ast` for direct impact/test queries, `git-diff+ast` for
-  diff-based queries.
+- `analysisMode`: `ast`, `typechecked+ast`, or `git-diff+ast`. Direct impact
+  queries use `typechecked+ast` when one or more composed subanalyses used
+  typechecked package loading; diff-based queries use `git-diff+ast`.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific impact or test-planning blind spots.
 
@@ -352,11 +353,11 @@ Impact data keeps its existing arrays such as `references`, `callers`,
 `affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
 keeps `tests` or `affectedTests`, `commands`, and `testPlan`.
 
-Report-based impact data (`impact file`, `impact package`, `impact symbol`, and
-`impact diff`) also includes `affectedInterfaces`,
-`affectedImplementations`, and `interfaceAnalysisMode` when interface
-subanalysis ran. The older `impact <symbol-or-package>` data object does not
-include those report-specific fields yet.
+Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
+when those subanalyses ran. Report-based impact data (`impact file`,
+`impact package`, `impact symbol`, and `impact diff`) also includes
+`affectedInterfaces`, `affectedImplementations`, and `interfaceAnalysisMode`
+when interface subanalysis ran.
 
 ## Interface And Path Data
 
@@ -390,7 +391,8 @@ Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
 Agents should not treat `analysisMode` and `callAnalysisMode` as interchangeable.
 `analysisMode` describes how the context bundle was assembled; `callAnalysisMode`
 describes the trust level of the call graph fields.
-The same distinction applies to `interfaceAnalysisMode`: it describes only the
-interface and implementation impact fields inside a broader bundle.
+The same distinction applies to `referenceAnalysisMode` and
+`interfaceAnalysisMode`: each describes only its corresponding subanalysis
+inside a broader bundle.
 
 `data.warnings` is absent; use envelope `warnings`.

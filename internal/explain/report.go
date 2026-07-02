@@ -21,6 +21,7 @@ type Report struct {
 	Risk                    RiskSummary          `json:"risk"`
 	ArchitectureRole        ArchitectureRole     `json:"architectureRole"`
 	References              []sherpa.Reference   `json:"references"`
+	ReferenceAnalysisMode   string               `json:"referenceAnalysisMode,omitempty"`
 	Callers                 []sherpa.Caller      `json:"callers"`
 	Callees                 []sherpa.Callee      `json:"callees"`
 	CallAnalysisMode        string               `json:"callAnalysisMode"`
@@ -88,14 +89,15 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 	}
 
 	report := Report{
-		Target:           impactResult.Target,
-		Symbol:           symbol,
-		References:       impactResult.References,
-		AffectedPackages: impactResult.Packages,
-		RelatedTests:     impactResult.RelatedTests,
-		TestCommands:     impactResult.TestCommands,
-		TestPlan:         impactResult.TestPlan,
-		Warnings:         impactResult.Warnings,
+		Target:                impactResult.Target,
+		Symbol:                symbol,
+		References:            impactResult.References,
+		ReferenceAnalysisMode: impactResult.ReferenceAnalysisMode,
+		AffectedPackages:      impactResult.Packages,
+		RelatedTests:          impactResult.RelatedTests,
+		TestCommands:          impactResult.TestCommands,
+		TestPlan:              impactResult.TestPlan,
+		Warnings:              impactResult.Warnings,
 	}
 
 	purpose, err := symbolPurpose(root, symbol)
@@ -548,6 +550,7 @@ func normalizeReport(report Report) Report {
 	report.Risk.Reasons = nonNil(uniqueStrings(report.Risk.Reasons))
 	report.ArchitectureRole.Reasons = nonNil(uniqueStrings(report.ArchitectureRole.Reasons))
 	report.References = nonNil(report.References)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.Callers = nonNil(report.Callers)
 	report.Callees = nonNil(report.Callees)
 	report.AffectedPackages = nonNil(report.AffectedPackages)

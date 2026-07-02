@@ -48,7 +48,8 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "explain",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
+				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
@@ -61,7 +62,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "impact file",
 			target:  "service.go",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
@@ -73,7 +74,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "impact package",
 			target:  ".",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
@@ -85,7 +86,9 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "impact symbol",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
+				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
+				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
@@ -97,8 +100,10 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "impact",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode": agentcontext.AnalysisModeAST,
-				"confidence":   agentcontext.ConfidenceMedium,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
+				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
+				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "limitations", "relatedTests"},
 		},

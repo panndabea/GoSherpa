@@ -6,9 +6,8 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
-    "analysisMode": "ast",
+    "analysisMode": "typechecked+ast",
     "confidence": "medium",
-    "interfaceAnalysisMode": "typechecked",
     "limitations": [
       "Impact analysis uses syntax plus local package dependency and interface signals.",
       "Symbol impact includes references and conservative caller-package propagation.",
@@ -28,6 +27,7 @@
     "affectedSymbols": [],
     "affectedInterfaces": [],
     "affectedImplementations": [],
+    "interfaceAnalysisMode": "typechecked",
     "affectedTests": [
       {
         "name": "TestTarget",

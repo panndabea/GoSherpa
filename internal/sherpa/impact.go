@@ -15,16 +15,18 @@ const (
 )
 
 type ImpactResult struct {
-	Target       string              `json:"target"`
-	Kind         ImpactKind          `json:"kind"`
-	References   []Reference         `json:"references"`
-	Callers      []Caller            `json:"callers"`
-	Dependencies PackageDependencies `json:"dependencies"`
-	Packages     []string            `json:"packages"`
-	RelatedTests []RelatedTest       `json:"relatedTests"`
-	TestCommands []string            `json:"testCommands"`
-	TestPlan     TestPlan            `json:"testPlan"`
-	Warnings     []string            `json:"warnings"`
+	Target                string              `json:"target"`
+	Kind                  ImpactKind          `json:"kind"`
+	References            []Reference         `json:"references"`
+	ReferenceAnalysisMode string              `json:"referenceAnalysisMode,omitempty"`
+	Callers               []Caller            `json:"callers"`
+	CallAnalysisMode      string              `json:"callAnalysisMode,omitempty"`
+	Dependencies          PackageDependencies `json:"dependencies"`
+	Packages              []string            `json:"packages"`
+	RelatedTests          []RelatedTest       `json:"relatedTests"`
+	TestCommands          []string            `json:"testCommands"`
+	TestPlan              TestPlan            `json:"testPlan"`
+	Warnings              []string            `json:"warnings"`
 }
 
 type ImpactOptions struct {
@@ -130,18 +132,21 @@ func findSymbolImpact(root string, target string, options ImpactOptions) (Impact
 	}
 
 	result := ImpactResult{
-		Target:     normalizedTarget.String(),
-		Kind:       ImpactKindSymbol,
-		References: referenceReport.References,
-		Warnings:   referenceReport.Warnings,
+		Target:                normalizedTarget.String(),
+		Kind:                  ImpactKindSymbol,
+		References:            referenceReport.References,
+		ReferenceAnalysisMode: referenceReport.AnalysisMode,
+		Warnings:              referenceReport.Warnings,
 	}
 
 	if normalizedTarget.Package == "" {
-		callers, warnings, err := impactSymbolCallers(root, target, options)
+		callers, analysisMode, warnings, err := impactSymbolCallers(root, target, options)
 		result.Warnings = append(result.Warnings, warnings...)
 		if err == nil {
+			result.CallAnalysisMode = analysisMode
 			result.Callers = callers
 		} else if !isImpactNonFunctionTargetError(err) {
+			result.CallAnalysisMode = analysisMode
 			result.Warnings = append(result.Warnings, err.Error())
 		}
 	}
@@ -165,21 +170,21 @@ func findSymbolImpact(root string, target string, options ImpactOptions) (Impact
 	return result, nil
 }
 
-func impactSymbolCallers(root string, target string, options ImpactOptions) ([]Caller, []string, error) {
+func impactSymbolCallers(root string, target string, options ImpactOptions) ([]Caller, string, []string, error) {
 	normalizedTarget, err := normalizeCallTarget(root, target)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 
-	functions, _, warnings, err := collectCallFunctionInfos(root, CallOptions{
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(root, CallOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
-		return nil, warnings, err
+		return nil, analysisMode, warnings, err
 	}
 
 	callers, err := collectTransitiveCallersFromFunctions(functions, normalizedTarget)
-	return callers, warnings, err
+	return callers, analysisMode, warnings, err
 }
 
 func impactSymbolTests(root string, target string, packages []string, targetPackages []string) (TestsResult, []string) {
