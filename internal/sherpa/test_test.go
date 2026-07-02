@@ -211,6 +211,47 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestFindTestsUsesTypeInfoForExternalTestReceiverMethodReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (client *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service_test
+
+import (
+	"testing"
+
+	"example.com/app/internal/service"
+)
+
+func TestStart(t *testing.T) {
+	client := &service.Client{}
+	client.Start()
+}
+`)
+
+	result, err := FindTests(tmp, "./internal/service.Client.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test := findRelatedTest(result.Tests, "TestStart")
+	if test == nil {
+		t.Fatalf("expected TestStart, got %v", result.Tests)
+	}
+	if !test.DirectReference {
+		t.Fatalf("expected direct reference marker, got %v", test)
+	}
+	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./internal/service" {
+		t.Fatalf("expected direct test plan item for ./internal/service, got %#v", result.TestPlan)
+	}
+}
+
 func TestFindTestsIncludesLiteralSubtestsForDirectReferences(t *testing.T) {
 	tmp := t.TempDir()
 

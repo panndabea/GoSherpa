@@ -5,10 +5,13 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/supertabaluga/gosherpa/internal/semantics"
 )
 
 type TestTargetKind string
@@ -49,6 +52,8 @@ type literalSubtest struct {
 	End  token.Pos
 	Func *ast.FuncLit
 }
+
+type testReferenceKeys map[string]struct{}
 
 func FindTests(root string, target string) (TestsResult, error) {
 	rootPath, err := absoluteRootPath(root)
@@ -229,6 +234,7 @@ func fileDefinesReferenceTarget(file *ast.File, target referenceTarget) bool {
 func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget) []RelatedTest {
 	var tests []RelatedTest
 	modulePath := readModulePath(root)
+	typecheckedDirectReferences := typecheckedDirectTestReferenceKeys(root, target)
 
 	for _, testFile := range testFiles {
 		_, packageMatches := packages[testFile.Package]
@@ -242,7 +248,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 
 			directReference := false
 			if target.Name != "" {
-				directReference = functionReferencesTarget(funcDecl, target, packageMatches, imports)
+				directReference = typecheckedDirectReferences.Contains(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name) ||
+					functionReferencesTarget(funcDecl, target, packageMatches, imports)
 			}
 
 			if !packageMatches && !directReference {
@@ -263,7 +270,9 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 			for _, subtest := range literalSubtests(funcDecl) {
 				subtestDirectReference := false
 				if target.Name != "" {
-					subtestDirectReference = nodeReferencesTarget(subtest.Func.Body, target, packageMatches, imports)
+					subtestName := funcDecl.Name.Name + "/" + subtest.Name
+					subtestDirectReference = typecheckedDirectReferences.Contains(root, testFile.FileSet, subtest.Pos, subtestName) ||
+						nodeReferencesTarget(subtest.Func.Body, target, packageMatches, imports)
 				}
 
 				if !packageMatches && !subtestDirectReference {
@@ -287,6 +296,123 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 	sortRelatedTests(tests)
 
 	return tests
+}
+
+func typecheckedDirectTestReferenceKeys(root string, target referenceTarget) testReferenceKeys {
+	if target.Name == "" || !referenceShouldAttemptTypechecked(root) {
+		return nil
+	}
+
+	repo, err := semantics.LoadRepository(root, semantics.LoadOptions{IncludeTests: true})
+	if err != nil {
+		return nil
+	}
+
+	packages := semanticReferencePackages(repo)
+	if len(packages) == 0 {
+		return nil
+	}
+
+	targetObjects := semanticReferenceTargetObjects(packages, target)
+	if len(targetObjects) == 0 {
+		return nil
+	}
+
+	keys := make(testReferenceKeys)
+	for _, pkg := range packages {
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				funcDecl, ok := decl.(*ast.FuncDecl)
+				if !ok || !isGoTestFunction(funcDecl) {
+					continue
+				}
+
+				if typecheckedNodeReferencesTarget(pkg.Info, funcDecl.Body, targetObjects) {
+					keys.Add(root, pkg.FileSet, funcDecl.Pos(), funcDecl.Name.Name)
+				}
+
+				for _, subtest := range literalSubtests(funcDecl) {
+					if !typecheckedNodeReferencesTarget(pkg.Info, subtest.Func.Body, targetObjects) {
+						continue
+					}
+
+					keys.Add(root, pkg.FileSet, subtest.Pos, funcDecl.Name.Name+"/"+subtest.Name)
+				}
+			}
+		}
+	}
+
+	return keys
+}
+
+func typecheckedNodeReferencesTarget(info types.Info, node ast.Node, targetObjects map[types.Object]struct{}) bool {
+	if node == nil {
+		return false
+	}
+
+	found := false
+	ast.Inspect(node, func(node ast.Node) bool {
+		if found {
+			return false
+		}
+
+		switch node := node.(type) {
+		case *ast.Ident:
+			object, _ := referenceIdentObject(info, node)
+			if referenceObjectMatchesTarget(object, targetObjects) {
+				found = true
+				return false
+			}
+		case *ast.SelectorExpr:
+			object := info.Uses[node.Sel]
+			selection := info.Selections[node]
+			if referenceObjectMatchesTarget(object, targetObjects) || referenceSelectionMatchesTarget(selection, targetObjects) {
+				found = true
+				return false
+			}
+		}
+
+		return true
+	})
+
+	return found
+}
+
+func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token.Pos, name string) {
+	if keys == nil {
+		return
+	}
+
+	key := testReferenceKey(root, fileSet, pos, name)
+	if key == "" {
+		return
+	}
+
+	keys[key] = struct{}{}
+}
+
+func (keys testReferenceKeys) Contains(root string, fileSet *token.FileSet, pos token.Pos, name string) bool {
+	if keys == nil {
+		return false
+	}
+
+	_, ok := keys[testReferenceKey(root, fileSet, pos, name)]
+	return ok
+}
+
+func testReferenceKey(root string, fileSet *token.FileSet, pos token.Pos, name string) string {
+	if fileSet == nil || !pos.IsValid() || name == "" {
+		return ""
+	}
+
+	position := fileSet.Position(pos)
+	relative := positionRelativeToRoot(root, Position{
+		File:   position.Filename,
+		Line:   position.Line,
+		Column: position.Column,
+	})
+
+	return relative.File + ":" + strconv.Itoa(relative.Line) + ":" + strconv.Itoa(relative.Column) + ":" + name
 }
 
 func testFileLocalImports(file *ast.File, modulePath string) map[string]string {

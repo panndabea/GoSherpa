@@ -761,7 +761,7 @@ func addReferenceTargetObject(objects map[types.Object]struct{}, object types.Ob
 func declDefinesReferenceTarget(decl ast.Decl, target referenceTarget) bool {
 	funcDecl, ok := decl.(*ast.FuncDecl)
 	if ok {
-		if funcDecl.Recv != nil {
+		if funcDecl.Recv != nil && target.Receiver == "" {
 			return false
 		}
 
