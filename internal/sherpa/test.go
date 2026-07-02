@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/supertabaluga/gosherpa/internal/semantics"
+	"github.com/panndabea/GoSherpa/internal/semantics"
 )
 
 type TestTargetKind string

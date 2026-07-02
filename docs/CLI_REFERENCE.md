@@ -166,7 +166,7 @@ JSON output for all commands uses a stable envelope:
   "command": "impact",
   "target": "ParseFile",
   "root": "/path/to/GoSherpa",
-  "modulePath": "github.com/supertabaluga/gosherpa",
+  "modulePath": "github.com/panndabea/GoSherpa",
   "warnings": [],
   "data": {}
 }

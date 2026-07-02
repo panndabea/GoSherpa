@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supertabaluga/gosherpa/internal/agentcontext"
-	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/agentcontext"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestMainAgentJSONSchemaContracts(t *testing.T) {

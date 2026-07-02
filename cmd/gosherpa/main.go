@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	agentcontext "github.com/supertabaluga/gosherpa/internal/agentcontext"
-	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
-	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
-	"github.com/supertabaluga/gosherpa/internal/semantics"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/semantics"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 const (

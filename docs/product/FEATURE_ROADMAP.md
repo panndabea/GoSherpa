@@ -1374,7 +1374,7 @@ Support levels:
 3. Fully stable internal IDs:
 
    ```text
-   github.com/supertabaluga/gosherpa/internal/sherpa.ParseFile
+   github.com/panndabea/GoSherpa/internal/sherpa.ParseFile
    ```
 
 Recommendation:

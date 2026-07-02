@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	gitdiff "github.com/supertabaluga/gosherpa/internal/git"
+	gitdiff "github.com/panndabea/GoSherpa/internal/git"
 )
 
 func ChangedPackages(root string, base string, head string) ([]string, error) {

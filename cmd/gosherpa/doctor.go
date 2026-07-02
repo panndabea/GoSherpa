@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/supertabaluga/gosherpa/internal/semantics"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/semantics"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 const (

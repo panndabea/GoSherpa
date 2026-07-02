@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supertabaluga/gosherpa/internal/semantics"
+	"github.com/panndabea/GoSherpa/internal/semantics"
 )
 
 func TestNormalizeCallTarget(t *testing.T) {

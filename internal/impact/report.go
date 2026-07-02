@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	gitdiff "github.com/supertabaluga/gosherpa/internal/git"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	gitdiff "github.com/panndabea/GoSherpa/internal/git"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type Analyzer struct {

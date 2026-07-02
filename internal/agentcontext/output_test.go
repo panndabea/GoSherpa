@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
-	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestFormat(t *testing.T) {

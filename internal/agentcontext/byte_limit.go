@@ -3,7 +3,7 @@ package agentcontext
 import (
 	"encoding/json"
 
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func applySymbolByteLimit(report Report, maxBytes int) Report {

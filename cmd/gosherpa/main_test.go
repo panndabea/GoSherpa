@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	agentcontext "github.com/supertabaluga/gosherpa/internal/agentcontext"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestParseCLIArgsDefaultsRootToCurrentDirectory(t *testing.T) {

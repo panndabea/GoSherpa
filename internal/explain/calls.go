@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type callSignalTarget struct {

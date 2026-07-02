@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitdiff "github.com/supertabaluga/gosherpa/internal/git"
+	gitdiff "github.com/panndabea/GoSherpa/internal/git"
 )
 
 type changedSymbolRange struct {

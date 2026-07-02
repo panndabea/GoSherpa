@@ -1,4 +1,4 @@
-module github.com/supertabaluga/gosherpa
+module github.com/panndabea/GoSherpa
 
 go 1.24.4
 

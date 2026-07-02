@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
-	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type FileAnalyzeOptions struct {

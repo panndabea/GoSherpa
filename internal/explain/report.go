@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	impactengine "github.com/supertabaluga/gosherpa/internal/impact"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type Report struct {

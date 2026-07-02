@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func Format(report Report) string {

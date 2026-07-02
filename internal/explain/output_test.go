@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestFormat(t *testing.T) {

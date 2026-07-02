@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestFormatImplementers(t *testing.T) {

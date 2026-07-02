@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	explainengine "github.com/supertabaluga/gosherpa/internal/explain"
-	"github.com/supertabaluga/gosherpa/internal/sherpa"
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func FormatDiff(report DiffReport) string {
