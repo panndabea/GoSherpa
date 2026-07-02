@@ -225,7 +225,7 @@ func limitations(includeTestCallers bool, analysisMode string, callAnalysisMode 
 		callAnalysisLimitation(callAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
-		"Test discovery uses same-package tests and syntactic direct-reference matching.",
+		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 	}
 
 	if !includeTestCallers {

@@ -183,7 +183,7 @@ func callerPackageTestPlanReason(pkg string, names []string) string {
 }
 
 func fallbackTestPlanReason(pkg string) string {
-	return "No matching test functions were found in " + pkg + "; run package tests to compile impacted code."
+	return "Run package tests for " + pkg + " to compile impacted code and cover tests not matched directly."
 }
 
 func testPlanNamesSuffix(names []string) string {

@@ -427,7 +427,7 @@
       "fallback": [
         {
           "command": "go test ./cmd/app",
-          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
           "package": "./cmd/app"
         }
       ]
@@ -520,7 +520,7 @@
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
       "Package context used typechecked package loading for package files and symbols, with syntax/local impact signals.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
-      "Test discovery uses same-package tests and syntactic direct-reference matching."
+      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names."
     ]
   }
 }

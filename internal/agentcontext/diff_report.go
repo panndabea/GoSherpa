@@ -190,7 +190,7 @@ func diffLimitations(includeTests bool) []string {
 		"Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
 		"Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
 		"Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
-		"Test discovery uses same-package tests and syntactic direct-reference matching.",
+		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 	}
 
 	if includeTests {

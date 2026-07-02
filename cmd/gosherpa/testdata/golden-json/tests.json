@@ -9,11 +9,12 @@
     "analysisMode": "ast",
     "confidence": "medium",
     "limitations": [
-      "Test discovery uses same-package tests and syntactic direct-reference matching.",
-      "Table-test and subtest names are not extracted.",
+      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+      "Dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],
     "kind": "symbol",
+    "scope": "related",
     "tests": [
       {
         "name": "TestTarget",

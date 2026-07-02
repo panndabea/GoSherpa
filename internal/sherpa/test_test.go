@@ -113,6 +113,99 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestFindTestsWithRelatedScopeFocusesDirectReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+func TestParserOther(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result, err := FindTestsWithOptions(tmp, "ParseFile", TestOptions{Scope: TestScopeRelated})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestUsesParser")
+	if containsString(names, "TestParserPackage") || containsString(names, "TestParserOther") {
+		t.Fatalf("expected focused direct tests, got %v", names)
+	}
+
+	if result.Scope != TestScopeRelated {
+		t.Fatalf("expected related scope, got %s", result.Scope)
+	}
+	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./cmd/app" {
+		t.Fatalf("expected direct plan item for ./cmd/app, got %#v", result.TestPlan)
+	}
+	if len(result.TestPlan.Related) != 0 {
+		t.Fatalf("expected no related plan items, got %#v", result.TestPlan)
+	}
+	if len(result.TestPlan.Fallback) != 1 || result.TestPlan.Fallback[0].Package != "./internal/parser" {
+		t.Fatalf("expected fallback package test for ./internal/parser, got %#v", result.TestPlan)
+	}
+}
+
+func TestFindTestsWithAllScopePreservesSamePackageRelatedTests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result, err := FindTestsWithOptions(tmp, "ParseFile", TestOptions{Scope: TestScopeAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestParserPackage")
+	assertContainsString(t, names, "TestUsesParser")
+	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/parser" {
+		t.Fatalf("expected related plan item for ./internal/parser, got %#v", result.TestPlan)
+	}
+}
+
 func TestFindTestsHonorsPackageQualifiedSymbolTargets(t *testing.T) {
 	tmp := t.TempDir()
 

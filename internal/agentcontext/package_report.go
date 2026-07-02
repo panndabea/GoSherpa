@@ -363,7 +363,7 @@ func packageLimitations(includeTests bool, analysisMode string) []string {
 		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
 		packageContextAnalysisLimitation(analysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
-		"Test discovery uses same-package tests and syntactic direct-reference matching.",
+		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 	}
 
 	if includeTests {

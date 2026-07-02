@@ -239,6 +239,39 @@ func TestParseCLIArgsAcceptsTestsFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsTestScope(t *testing.T) {
+	tests := [][]string{
+		{"tests", "Target", "--scope", "direct"},
+		{"tests", "Target", "--scope=all"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.HasTestScopeOption {
+				t.Fatal("expected scope option marker")
+			}
+			if got.TestScope == "" {
+				t.Fatal("expected test scope")
+			}
+		})
+	}
+}
+
+func TestParseCLIArgsRejectsInvalidTestScope(t *testing.T) {
+	_, err := parseCLIArgs([]string{"tests", "Target", "--scope", "wide"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "invalid value for --scope") {
+		t.Fatalf("expected invalid scope error, got %v", err)
+	}
+}
+
 func TestParseCLIArgsAcceptsBaseFlagForDiffCommands(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -554,7 +587,7 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 	printUsage(&output)
 
 	for _, want := range []string{
-		"tests <symbol-or-package>",
+		"tests <symbol-or-package> [--scope direct|related|all]",
 		"tests affected --base <ref>",
 	} {
 		if !strings.Contains(output.String(), want) {
@@ -612,7 +645,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"usage: gosherpa [--root <path>] tests <symbol-or-package>",
+		"usage: gosherpa [--root <path>] tests <symbol-or-package> [--scope direct|related|all]",
 		"gosherpa [--root <path>] tests affected --base <ref>",
 	} {
 		if !strings.Contains(result.Stderr, want) {
@@ -832,14 +865,58 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"TESTS", "ParseFile (symbol)", "RELATED TESTS", "TestParserPackage", "TestUsesParser", "TEST PLAN", "DIRECT", "RELATED", "go test ./cmd/app", "go test ./internal/parser"} {
+	for _, want := range []string{"TESTS", "ParseFile (symbol)", "RELATED TESTS", "TestUsesParser", "TEST PLAN", "DIRECT", "FALLBACK", "go test ./cmd/app", "go test ./internal/parser"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
 	}
 
+	if strings.Contains(result.Stdout, "TestParserPackage") {
+		t.Fatalf("expected focused default output to omit same-package tests when direct tests exist, got:\n%s", result.Stdout)
+	}
+
 	if strings.Contains(result.Stdout, tmp) {
 		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsTestsCommandWithAllScope(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParser(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "ParseFile", "--scope", "all"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	for _, want := range []string{"TestParserPackage", "TestUsesParser", "RELATED", "go test ./internal/parser"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
 	}
 }
 
@@ -887,11 +964,16 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected kind symbol, got %v", data["kind"])
 	}
 
-	assertMainTestJSONArrayHasLength(t, data, "tests", 2)
+	if data["scope"] != "related" {
+		t.Fatalf("expected related scope, got %v", data["scope"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "tests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "commands", 2)
 	testPlan := assertMainTestJSONObject(t, data, "testPlan")
 	assertMainTestJSONArrayHasLength(t, testPlan, "direct", 1)
-	assertMainTestJSONArrayHasLength(t, testPlan, "related", 1)
+	assertMainTestJSONArrayHasLength(t, testPlan, "related", 0)
+	assertMainTestJSONArrayHasLength(t, testPlan, "fallback", 1)
 
 	if strings.Contains(result.Stdout, "TESTS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
@@ -1140,6 +1222,22 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 
 	if !strings.Contains(result.Stderr, "error: --tests is only supported by search, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsScopeFlagForOtherCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "symbols", "--scope", "direct"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --scope is only supported by tests <symbol-or-package>") {
+		t.Fatalf("expected scope flag error, got:\n%s", result.Stderr)
 	}
 
 	if result.Stdout != "" {

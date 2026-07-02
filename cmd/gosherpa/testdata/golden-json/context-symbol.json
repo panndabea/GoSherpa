@@ -248,7 +248,7 @@
       "fallback": [
         {
           "command": "go test ./cmd/app",
-          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
           "package": "./cmd/app"
         }
       ]
@@ -298,7 +298,7 @@
       "Call analysis used typechecked package loading where available.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Call graph results are repository-local and may miss some imported-package receiver calls.",
-      "Test discovery uses same-package tests and syntactic direct-reference matching.",
+      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
       "Test callers are included only when --tests is used."
     ]
   }

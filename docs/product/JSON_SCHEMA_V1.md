@@ -456,7 +456,9 @@ use envelope `warnings`.
 
 Impact data keeps its existing arrays such as `references`, `callers`,
 `affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
-keeps `tests` or `affectedTests`, `commands`, and `testPlan`.
+keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
+includes `scope` with one of `direct`, `related`, or `all`; the default
+`related` scope focuses direct references when they exist.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Report-based impact data (`impact file`,

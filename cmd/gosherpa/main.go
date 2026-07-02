@@ -29,32 +29,34 @@ const (
 )
 
 type cliInvocation struct {
-	Root              string
-	Command           string
-	CommandArgs       []string
-	JSON              bool
-	CallPathLimit     int
-	CallPathMaxDepth  int
-	HasCallPathOption bool
-	HasLimitOption    bool
-	HasMaxDepthOption bool
-	BaseRef           string
-	HasBaseOption     bool
-	IncludeTests      bool
-	HasTestsOption    bool
-	ShowContext       bool
-	HasContextOption  bool
-	BuildTags         []string
-	HasTagsOption     bool
-	KindFilter        string
-	SearchKind        sherpa.SymbolKind
-	ReferenceKind     sherpa.ReferenceKind
-	HasKindOption     bool
-	SearchPackage     string
-	HasPackageOption  bool
-	ContextLimits     agentcontext.LimitOptions
-	HasContextLimit   bool
-	HasSourceRadius   bool
+	Root               string
+	Command            string
+	CommandArgs        []string
+	JSON               bool
+	CallPathLimit      int
+	CallPathMaxDepth   int
+	HasCallPathOption  bool
+	HasLimitOption     bool
+	HasMaxDepthOption  bool
+	BaseRef            string
+	HasBaseOption      bool
+	IncludeTests       bool
+	HasTestsOption     bool
+	ShowContext        bool
+	HasContextOption   bool
+	BuildTags          []string
+	HasTagsOption      bool
+	KindFilter         string
+	SearchKind         sherpa.SymbolKind
+	ReferenceKind      sherpa.ReferenceKind
+	HasKindOption      bool
+	TestScope          sherpa.TestScope
+	HasTestScopeOption bool
+	SearchPackage      string
+	HasPackageOption   bool
+	ContextLimits      agentcontext.LimitOptions
+	HasContextLimit    bool
+	HasSourceRadius    bool
 }
 
 type jsonResponse[T any] struct {
@@ -144,6 +146,7 @@ type testsJSONData struct {
 	Confidence   string                `json:"confidence"`
 	Limitations  []string              `json:"limitations"`
 	Kind         sherpa.TestTargetKind `json:"kind"`
+	Scope        sherpa.TestScope      `json:"scope"`
 	Tests        []sherpa.RelatedTest  `json:"tests"`
 	Commands     []string              `json:"commands"`
 	TestPlan     sherpa.TestPlan       `json:"testPlan"`
@@ -345,6 +348,34 @@ func parseCLIArgs(args []string) (cliInvocation, error) {
 
 			invocation.KindFilter = value
 			invocation.HasKindOption = true
+			continue
+		}
+
+		if arg == "--scope" {
+			value, err := parseStringFlagValue("--scope", args, i)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			scope, err := parseTestScopeFlag("--scope", value)
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.TestScope = scope
+			invocation.HasTestScopeOption = true
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "--scope=") {
+			scope, err := parseTestScopeFlag("--scope", strings.TrimPrefix(arg, "--scope="))
+			if err != nil {
+				return cliInvocation{}, err
+			}
+
+			invocation.TestScope = scope
+			invocation.HasTestScopeOption = true
 			continue
 		}
 
@@ -710,6 +741,19 @@ func parseReferenceKindFlag(flag string, value string) (sherpa.ReferenceKind, er
 	return "", fmt.Errorf("invalid value for %s: %s", flag, trimmed)
 }
 
+func parseTestScopeFlag(flag string, value string) (sherpa.TestScope, error) {
+	trimmed, err := parseStringFlag(flag, value)
+	if err != nil {
+		return "", err
+	}
+
+	if scope, ok := sherpa.ParseTestScope(trimmed); ok {
+		return scope, nil
+	}
+
+	return "", fmt.Errorf("invalid value for %s: %s", flag, trimmed)
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -753,6 +797,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if invocation.HasKindOption && invocation.Command != "search" && invocation.Command != "refs" {
 		fmt.Fprintln(stderr, "error: --kind is only supported by search and refs")
+		return exitUsage
+	}
+
+	if invocation.HasTestScopeOption && !isScopedTestsInvocation(invocation) {
+		fmt.Fprintln(stderr, "error: --scope is only supported by tests <symbol-or-package>")
 		return exitUsage
 	}
 
@@ -1311,7 +1360,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		target := invocation.CommandArgs[0]
 
-		result, err := sherpa.FindTests(root, target)
+		result, err := sherpa.FindTestsWithOptions(root, target, sherpa.TestOptions{
+			Scope: invocation.TestScope,
+		})
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "tests", target, stderr, err)
 		}
@@ -1674,6 +1725,10 @@ func isTestsAffectedInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "tests" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "affected"
 }
 
+func isScopedTestsInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "tests" && !isTestsAffectedInvocation(invocation)
+}
+
 func isPRInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "pr"
 }
@@ -1898,6 +1953,7 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 		Confidence:   jsonConfidence(nil, analysisModeAST),
 		Limitations:  testLimitations(analysisModeAST),
 		Kind:         result.Kind,
+		Scope:        result.Scope,
 		Tests:        result.Tests,
 		Commands:     result.Commands,
 		TestPlan:     result.TestPlan,
@@ -2278,14 +2334,14 @@ func testLimitations(analysisMode string) []string {
 	if analysisMode == analysisModeDiff {
 		return []string{
 			"Affected test planning is based on changed packages, affected packages, and syntactic test references.",
-			"Table-test and subtest names are not extracted.",
+			"Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
 			"Fallback commands are package-level when direct test functions are not known.",
 		}
 	}
 
 	return []string{
-		"Test discovery uses same-package tests and syntactic direct-reference matching.",
-		"Table-test and subtest names are not extracted.",
+		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+		"Dynamic table-test names may be incomplete.",
 		"Fallback commands are package-level when direct test functions are not known.",
 	}
 }
@@ -2383,7 +2439,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  impact symbol <symbol>")
 	fmt.Fprintln(writer, "  impact diff --base <ref>")
 	fmt.Fprintln(writer, "  pr --base <ref>")
-	fmt.Fprintln(writer, "  tests <symbol-or-package>")
+	fmt.Fprintln(writer, "  tests <symbol-or-package> [--scope direct|related|all]")
 	fmt.Fprintln(writer, "  tests affected --base <ref>")
 	fmt.Fprintln(writer, "  deps <package>")
 	fmt.Fprintln(writer, "  implementers <interface>")
@@ -2451,7 +2507,7 @@ func printImpactSubcommandUsage(writer io.Writer, kind string) {
 }
 
 func printTestsUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests <symbol-or-package>")
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests <symbol-or-package> [--scope direct|related|all]")
 	fmt.Fprintln(writer, "       gosherpa [--root <path>] tests affected --base <ref>")
 }
 

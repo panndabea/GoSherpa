@@ -146,8 +146,8 @@ Current limitations:
   succeeds and falls back to local AST method-set matching when it cannot load
   semantic package data; report-based impact and context JSON expose which path
   was used through `interfaceAnalysisMode`.
-- Test discovery uses same-package tests and syntactic direct-reference
-  matching; table-test names are not extracted yet.
+- Test discovery uses direct references, same-package tests, and literal
+  `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Callers, callees, and paths still do not resolve dynamic dispatch,
   reflection, function values, or every imported-package receiver call.
 - Unqualified standalone call graph targets can be ambiguous across packages;
@@ -803,7 +803,8 @@ Goal: help developers make changes with confidence.
 ### 5.1 Test Discovery
 
 Status: MVP implemented with same-package tests, external `_test` packages,
-direct symbol references, and suggested `go test` commands.
+direct symbol references, literal `t.Run` subtest names, scoped output, and
+suggested `go test` commands.
 
 Human question:
 
@@ -815,6 +816,8 @@ Command sketch:
 
 ```bash
 gosherpa tests UserService.Create
+gosherpa tests UserService.Create --scope direct
+gosherpa tests UserService.Create --scope all
 gosherpa tests ./internal/user
 gosherpa tests internal/user/service.go
 ```
@@ -824,12 +827,16 @@ MVP behavior:
 - Find tests in the same package.
 - Find tests in external `_test` packages.
 - Find tests that reference the target symbol.
+- Extract literal `t.Run` subtest names.
+- Scope symbol test output with `--scope direct|related|all`; the default
+  `related` scope focuses direct references when they exist and keeps package
+  test commands as fallback.
 - Suggest exact `go test` commands.
 
 Later behavior:
 
 - Accept file targets.
-- Find table-test names when possible.
+- Infer dynamic table-driven names when possible.
 - Use type-aware reference matching inside test files.
 
 Example:

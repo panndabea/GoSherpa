@@ -21,6 +21,18 @@ const (
 	TestTargetKindPackage TestTargetKind = "package"
 )
 
+type TestScope string
+
+const (
+	TestScopeRelated TestScope = "related"
+	TestScopeDirect  TestScope = "direct"
+	TestScopeAll     TestScope = "all"
+)
+
+type TestOptions struct {
+	Scope TestScope
+}
+
 type RelatedTest struct {
 	Name            string       `json:"name"`
 	Package         string       `json:"package"`
@@ -34,6 +46,7 @@ type RelatedTest struct {
 type TestsResult struct {
 	Target   string         `json:"target"`
 	Kind     TestTargetKind `json:"kind"`
+	Scope    TestScope      `json:"scope,omitempty"`
 	Tests    []RelatedTest  `json:"tests"`
 	Commands []string       `json:"commands"`
 	TestPlan TestPlan       `json:"testPlan"`
@@ -56,19 +69,54 @@ type literalSubtest struct {
 type testReferenceKeys map[string]struct{}
 
 func FindTests(root string, target string) (TestsResult, error) {
+	return FindTestsWithOptions(root, target, TestOptions{Scope: TestScopeAll})
+}
+
+func FindTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return TestsResult{}, err
 	}
 
+	options = normalizeTestOptions(options)
 	if isImpactPackageTarget(target) {
-		return findPackageTests(rootPath, target)
+		return findPackageTestsWithOptions(rootPath, target, options)
 	}
 
-	return findSymbolTests(rootPath, target)
+	return findSymbolTestsWithOptions(rootPath, target, options)
+}
+
+func ParseTestScope(value string) (TestScope, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case string(TestScopeRelated):
+		return TestScopeRelated, true
+	case string(TestScopeDirect):
+		return TestScopeDirect, true
+	case string(TestScopeAll):
+		return TestScopeAll, true
+	default:
+		return "", false
+	}
+}
+
+func normalizeTestOptions(options TestOptions) TestOptions {
+	if options.Scope == "" {
+		options.Scope = TestScopeRelated
+		return options
+	}
+
+	if _, ok := ParseTestScope(string(options.Scope)); !ok {
+		options.Scope = TestScopeRelated
+	}
+
+	return options
 }
 
 func findPackageTests(root string, target string) (TestsResult, error) {
+	return findPackageTestsWithOptions(root, target, TestOptions{Scope: TestScopeAll})
+}
+
+func findPackageTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
 	modPath, err := modulePath(root)
 	if err != nil {
 		return TestsResult{}, err
@@ -96,7 +144,7 @@ func findPackageTests(root string, target string) (TestsResult, error) {
 	packages := map[string]struct{}{
 		normalizedTarget: {},
 	}
-	tests := collectRelatedTests(root, testFiles, packages, referenceTarget{})
+	tests := filterTestsForScope(collectRelatedTests(root, testFiles, packages, referenceTarget{}), TestTargetKindPackage, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget,
 		Kind:             TestTargetKindPackage,
@@ -107,6 +155,7 @@ func findPackageTests(root string, target string) (TestsResult, error) {
 	return TestsResult{
 		Target:   normalizedTarget,
 		Kind:     TestTargetKindPackage,
+		Scope:    options.Scope,
 		Tests:    tests,
 		Commands: TestPlanCommands(plan),
 		TestPlan: plan,
@@ -114,6 +163,10 @@ func findPackageTests(root string, target string) (TestsResult, error) {
 }
 
 func findSymbolTests(root string, target string) (TestsResult, error) {
+	return findSymbolTestsWithOptions(root, target, TestOptions{Scope: TestScopeAll})
+}
+
+func findSymbolTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
 	normalizedTarget, err := normalizeReferenceTarget(root, target)
 	if err != nil {
 		return TestsResult{}, err
@@ -129,7 +182,7 @@ func findSymbolTests(root string, target string) (TestsResult, error) {
 		return TestsResult{}, err
 	}
 
-	tests := collectRelatedTests(root, testFiles, packages, normalizedTarget)
+	tests := filterTestsForScope(collectRelatedTests(root, testFiles, packages, normalizedTarget), TestTargetKindSymbol, options.Scope)
 	targetPackages := sortedMapKeys(packages)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget.String(),
@@ -141,6 +194,7 @@ func findSymbolTests(root string, target string) (TestsResult, error) {
 	return TestsResult{
 		Target:   normalizedTarget.String(),
 		Kind:     TestTargetKindSymbol,
+		Scope:    options.Scope,
 		Tests:    tests,
 		Commands: TestPlanCommands(plan),
 		TestPlan: plan,
@@ -296,6 +350,40 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 	sortRelatedTests(tests)
 
 	return tests
+}
+
+func filterTestsForScope(tests []RelatedTest, kind TestTargetKind, scope TestScope) []RelatedTest {
+	switch scope {
+	case TestScopeAll:
+		return tests
+	case TestScopeDirect:
+		if kind == TestTargetKindPackage {
+			return tests
+		}
+		return directRelatedTests(tests)
+	case TestScopeRelated:
+		if kind == TestTargetKindPackage {
+			return tests
+		}
+		direct := directRelatedTests(tests)
+		if len(direct) > 0 {
+			return direct
+		}
+		return tests
+	default:
+		return tests
+	}
+}
+
+func directRelatedTests(tests []RelatedTest) []RelatedTest {
+	var direct []RelatedTest
+	for _, test := range tests {
+		if test.DirectReference {
+			direct = append(direct, test)
+		}
+	}
+
+	return direct
 }
 
 func typecheckedDirectTestReferenceKeys(root string, target referenceTarget) testReferenceKeys {

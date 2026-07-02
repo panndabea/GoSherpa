@@ -55,7 +55,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
 | PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, risk, affected tests, and verification commands |
-| Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
+| Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
@@ -121,6 +121,8 @@ Found 4 references
 ./gosherpa pr --base HEAD
 ./gosherpa pr --base HEAD --json
 ./gosherpa tests ParseFile
+./gosherpa tests ParseFile --scope direct
+./gosherpa tests ParseFile --scope all
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
 ./gosherpa tests affected --base HEAD

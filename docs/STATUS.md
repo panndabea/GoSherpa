@@ -62,7 +62,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
-- Test discovery uses same-package tests and syntactic direct-reference matching; table-test names are not extracted yet.
+- Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Caller, callee, and path analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
 - Context export currently supports symbol, file, package, and diff targets.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.

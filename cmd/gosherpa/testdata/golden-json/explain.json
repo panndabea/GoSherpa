@@ -17,8 +17,8 @@
       "Call graph results are repository-local.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Imported-package receiver calls may be incomplete.",
-      "Test discovery uses same-package tests and syntactic direct-reference matching.",
-      "Table-test and subtest names are not extracted.",
+      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+      "Dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],
     "symbol": {
@@ -225,7 +225,7 @@
       "fallback": [
         {
           "command": "go test ./cmd/app",
-          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
           "package": "./cmd/app"
         }
       ]
