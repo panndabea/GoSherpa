@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoSherpa - Code-Struktur verstehen, ohne dich zu verlaufen</title>
+  <meta name="description" content="GoSherpa ist eine ruhige, deterministische CLI fuer Go-Projekte: Symbole finden, Referenzen verstehen, Impact abschaetzen und Agent-Kontext exportieren.">
+  <meta property="og:title" content="GoSherpa">
+  <meta property="og:description" content="Structural code intelligence for Go projects - erklaert als freundlicher Comic-Guide.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://panndabea.github.io/GoSherpa/">
+  <meta property="og:image" content="https://panndabea.github.io/GoSherpa/pictures/gosherpa-comic-overview.webp">
+  <meta name="theme-color" content="#0f6f7d">
+  <link rel="canonical" href="https://panndabea.github.io/GoSherpa/">
+  <style>
+    :root {
+      --ink: #10242c;
+      --muted: #4e6670;
+      --sky: #e8f8fb;
+      --go: #00add8;
+      --sea: #0f6f7d;
+      --pine: #2f6b52;
+      --sun: #f3b64b;
+      --coral: #d86445;
+      --paper: #fffdf7;
+      --snow: #f6fbfa;
+      --line: #cfe0de;
+      --shadow: 0 18px 45px rgba(16, 36, 44, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--snow);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .site-header {
+      position: absolute;
+      inset: 0 0 auto;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1rem 0;
+      color: #ffffff;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
+
+    .brand img {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      object-position: 12% 50%;
+      border: 2px solid rgba(255, 255, 255, 0.78);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .nav-links a {
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      text-shadow: 0 1px 16px rgba(0, 0, 0, 0.46);
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
+      background: rgba(255, 255, 255, 0.18);
+      outline: none;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 82svh;
+      overflow: hidden;
+      color: #ffffff;
+      background:
+        linear-gradient(90deg, rgba(8, 26, 34, 0.86), rgba(8, 26, 34, 0.58) 38%, rgba(8, 26, 34, 0.2) 72%),
+        linear-gradient(0deg, rgba(8, 26, 34, 0.82), rgba(8, 26, 34, 0.04) 42%),
+        url("pictures/gosherpa-comic-overview.webp") center / cover no-repeat;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 7rem;
+      background: linear-gradient(0deg, var(--snow), rgba(246, 251, 250, 0));
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 11rem 0 6rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 1rem;
+      color: #c5f4ff;
+      font-size: 0.9rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin-bottom: 1rem;
+      font-size: 5.4rem;
+      line-height: 0.95;
+      letter-spacing: 0;
+      text-shadow: 0 10px 35px rgba(0, 0, 0, 0.38);
+    }
+
+    .hero-copy {
+      max-width: 680px;
+      margin-bottom: 1.6rem;
+      font-size: 1.3rem;
+      color: rgba(255, 255, 255, 0.92);
+      text-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+    }
+
+    .hero-actions,
+    .mini-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0.75rem 1rem;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-weight: 800;
+      line-height: 1.2;
+      transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .button.primary {
+      color: #0a2630;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    .button.secondary {
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.48);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      max-width: 760px;
+      margin-top: 1.4rem;
+      padding: 0;
+      list-style: none;
+    }
+
+    .hero-points li {
+      padding: 0.42rem 0.6rem;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.94);
+    }
+
+    main {
+      overflow: hidden;
+    }
+
+    section {
+      padding: 5.5rem 0;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .section-kicker {
+      margin-bottom: 0.7rem;
+      color: var(--sea);
+      font-size: 0.82rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .section-title {
+      max-width: 780px;
+      margin-bottom: 1rem;
+      font-size: 2.7rem;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .section-lead {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 1.1rem;
+    }
+
+    .ask-list {
+      display: grid;
+      gap: 0.75rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .ask-list li {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 0.8rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ask-list strong {
+      color: var(--ink);
+    }
+
+    .ask-list span {
+      color: var(--muted);
+    }
+
+    .band {
+      background: #ffffff;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .section-head .section-title {
+      margin-bottom: 0;
+    }
+
+    .comic-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .comic-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      box-shadow: 0 10px 25px rgba(16, 36, 44, 0.07);
+    }
+
+    .comic-card img {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      background: #ffffff;
+    }
+
+    .comic-body {
+      padding: 1.1rem;
+    }
+
+    .comic-body h3 {
+      margin-bottom: 0.35rem;
+      font-size: 1.2rem;
+      line-height: 1.2;
+    }
+
+    .comic-body p {
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .command-pill {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      padding: 0.65rem 0.7rem;
+      border: 1px solid #d7e8e4;
+      border-radius: 8px;
+      background: #f5fbfa;
+      color: #18404a;
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    .capability-table {
+      border-top: 1px solid var(--line);
+    }
+
+    .capability-row {
+      display: grid;
+      grid-template-columns: 0.85fr 1.6fr 1.1fr;
+      gap: 1rem;
+      align-items: center;
+      padding: 1.05rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .capability-row strong {
+      font-size: 1.03rem;
+    }
+
+    .capability-row span {
+      color: var(--muted);
+    }
+
+    .capability-row code {
+      justify-self: end;
+      max-width: 100%;
+      overflow-x: auto;
+      padding: 0.44rem 0.55rem;
+      border-radius: 8px;
+      background: #edf8f6;
+      color: #16414a;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    .terminal {
+      overflow: hidden;
+      border: 1px solid #24434b;
+      border-radius: 8px;
+      background: #10242c;
+      color: #eafffb;
+      box-shadow: var(--shadow);
+    }
+
+    .terminal-bar {
+      display: flex;
+      gap: 0.45rem;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      background: #17333d;
+    }
+
+    .terminal-dot {
+      width: 0.72rem;
+      height: 0.72rem;
+      border-radius: 50%;
+      background: var(--coral);
+    }
+
+    .terminal-dot:nth-child(2) {
+      background: var(--sun);
+    }
+
+    .terminal-dot:nth-child(3) {
+      background: var(--go);
+    }
+
+    .terminal pre {
+      margin: 0;
+      overflow-x: auto;
+      padding: 1.2rem;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .terminal .comment {
+      color: #89b8b4;
+    }
+
+    .terminal .accent {
+      color: #8ee7ff;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .audience {
+      min-height: 100%;
+      padding: 1.2rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .audience h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1.12rem;
+    }
+
+    .audience p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .cta {
+      position: relative;
+      color: #ffffff;
+      background:
+        linear-gradient(90deg, rgba(8, 29, 35, 0.88), rgba(17, 94, 93, 0.82)),
+        url("pictures/gosherpa-comic-agents.webp") center / cover no-repeat;
+    }
+
+    .cta .wrap {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .cta h2 {
+      margin-bottom: 0.85rem;
+      font-size: 2.6rem;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .cta p {
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 1.08rem;
+    }
+
+    .install-box {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 8px;
+      background: rgba(8, 26, 34, 0.62);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .install-box pre {
+      margin: 0;
+      overflow-x: auto;
+      padding: 1.2rem;
+      color: #eafffb;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      white-space: pre;
+    }
+
+    footer {
+      padding: 2rem 0;
+      color: #47606b;
+      background: #ffffff;
+      border-top: 1px solid var(--line);
+      font-size: 0.95rem;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      font-weight: 800;
+      color: var(--sea);
+    }
+
+    @media (max-width: 920px) {
+      .site-header {
+        align-items: flex-start;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      h1 {
+        font-size: 4rem;
+      }
+
+      .hero-copy {
+        font-size: 1.14rem;
+      }
+
+      .intro-grid,
+      .split,
+      .cta .wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .comic-grid,
+      .audience-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .capability-row {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+      }
+
+      .capability-row code {
+        justify-self: start;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .hero {
+        min-height: 86svh;
+        background-position: 42% 50%;
+      }
+
+      .hero-content {
+        padding: 8.5rem 0 5rem;
+      }
+
+      h1 {
+        font-size: 3.2rem;
+      }
+
+      .section-title,
+      .cta h2 {
+        font-size: 2.05rem;
+      }
+
+      section {
+        padding: 4rem 0;
+      }
+
+      .ask-list li {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .footer-inner {
+        display: grid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" aria-label="Hauptnavigation">
+    <a class="brand" href="#top" aria-label="GoSherpa Start">
+      <img src="pictures/gosherpa-readme-hero.png" alt="" width="52" height="52">
+      <span>GoSherpa</span>
+    </a>
+    <nav class="nav-links" aria-label="Seitenbereiche">
+      <a href="#comics">Comics</a>
+      <a href="#features">Funktionen</a>
+      <a href="#agents">Agents</a>
+      <a href="#try">Ausprobieren</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-label="GoSherpa Comic Hero">
+      <div class="hero-content">
+        <p class="eyebrow">Structural code intelligence for Go projects</p>
+        <h1>GoSherpa</h1>
+        <p class="hero-copy">Frag eine Code-Struktur-Frage. Bekomme eine kleine, verlässliche Antwort: Symbole, Referenzen, Call-Pfade, Impact, Tests und Agent-Kontext direkt aus deinem Go-Repository.</p>
+        <div class="hero-actions" aria-label="Primaere Aktionen">
+          <a class="button primary" href="https://github.com/panndabea/GoSherpa">Auf GitHub ansehen</a>
+          <a class="button secondary" href="docs/CLI_REFERENCE.md">CLI-Referenz lesen</a>
+        </div>
+        <ul class="hero-points" aria-label="Kurzueberblick">
+          <li>Symbol-Lookup</li>
+          <li>Referenzen</li>
+          <li>Caller &amp; Callees</li>
+          <li>Impact</li>
+          <li>PR-Kontext</li>
+          <li>JSON fuer Agents</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap intro-grid">
+        <div>
+          <p class="section-kicker">Warum GoSherpa</p>
+          <h2 class="section-title">Wenn der Code zum Gebirge wird, zeigt GoSherpa die Route.</h2>
+          <p class="section-lead">GoSherpa liest dein Go-Projekt strukturell statt magisch. Die CLI gibt dir ruhige, wiederholbare Antworten, die du im Terminal scannen, in Reviews verwenden oder als kompakten Kontext an Coding Agents weitergeben kannst.</p>
+        </div>
+        <ul class="ask-list" aria-label="Typische Fragen und Antworten">
+          <li>
+            <strong>Wo ist das definiert?</strong>
+            <span>Symbol, Datei, Signatur und Zeilennummer.</span>
+          </li>
+          <li>
+            <strong>Wer benutzt das?</strong>
+            <span>Referenzen, direkte Caller und relevante Tests.</span>
+          </li>
+          <li>
+            <strong>Was ruft diese Funktion auf?</strong>
+            <span>Callees und lokale Call-Pfade durch dein Repository.</span>
+          </li>
+          <li>
+            <strong>Was betrifft mein Diff?</strong>
+            <span>Betroffene Packages, Risiko und sinnvolle Testbefehle.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="band" id="comics">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Comic-Guides</p>
+            <h2 class="section-title">Drei Situationen, in denen GoSherpa sofort hilft.</h2>
+          </div>
+          <p class="section-lead">Die Bilder erzählen die Geschichte, die CLI liefert die Details.</p>
+        </div>
+
+        <div class="comic-grid">
+          <article class="comic-card">
+            <img src="pictures/gosherpa-comic-symbols.webp" alt="GoSherpa zeigt einem Entwickler den richtigen Symbol-Marker und seine Referenzpfade." width="1774" height="887" loading="eager" decoding="async">
+            <div class="comic-body">
+              <h3>Symbole finden</h3>
+              <p>Vom Namen zur Definition: GoSherpa zeigt dir Signatur, Package, Datei, Dokumentation und passende Treffer, ohne dass du das Projekt durchklicken musst.</p>
+              <code class="command-pill">gosherpa symbol ParseFile</code>
+            </div>
+          </article>
+
+          <article class="comic-card">
+            <img src="pictures/gosherpa-comic-impact.webp" alt="GoSherpa markiert die Auswirkungen einer Code-Aenderung und weist auf Testpfade hin." width="1774" height="887" loading="eager" decoding="async">
+            <div class="comic-body">
+              <h3>Impact einschätzen</h3>
+              <p>Ein kleiner Change kann mehrere Routen berühren. GoSherpa zeigt betroffene Packages, geänderte Symbole, Risiko und die Tests, die jetzt wirklich zählen.</p>
+              <code class="command-pill">gosherpa impact diff --base HEAD</code>
+            </div>
+          </article>
+
+          <article class="comic-card">
+            <img src="pictures/gosherpa-comic-agents.webp" alt="GoSherpa verdichtet verstreute Codekarten zu einer klaren Route fuer Entwickler und Coding Agents." width="1824" height="862" loading="eager" decoding="async">
+            <div class="comic-body">
+              <h3>Kontext weitergeben</h3>
+              <p>Für Menschen lesbar, für Tools stabil: Kontextbefehle exportieren Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.</p>
+              <code class="command-pill">gosherpa context symbol ParseFile --json</code>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <p class="section-kicker">Was die Software kann</p>
+        <h2 class="section-title">Konkrete Antworten statt Code-Nebel.</h2>
+        <p class="section-lead">GoSherpa ist bewusst als CLI gebaut: kleine Befehle, stabile Ausgaben, menschenlesbar zuerst und mit JSON, wenn Automatisierung gebraucht wird.</p>
+
+        <div class="capability-table" role="table" aria-label="GoSherpa Funktionen">
+          <div class="capability-row" role="row">
+            <strong role="cell">Symbolatlas</strong>
+            <span role="cell">Listet Structs, Interfaces, Funktionen und Methoden im Projekt.</span>
+            <code role="cell">gosherpa symbols</code>
+          </div>
+          <div class="capability-row" role="row">
+            <strong role="cell">Suche &amp; Referenzen</strong>
+            <span role="cell">Findet partial Matches und Go-bewusste Referenzen, optional nach Art gefiltert.</span>
+            <code role="cell">gosherpa refs ParseFile --kind call</code>
+          </div>
+          <div class="capability-row" role="row">
+            <strong role="cell">Call-Beziehungen</strong>
+            <span role="cell">Zeigt direkte Caller, Callees und kurze lokale Pfade zwischen Funktionen.</span>
+            <code role="cell">gosherpa path Run ParseFile</code>
+          </div>
+          <div class="capability-row" role="row">
+            <strong role="cell">Abhängigkeiten</strong>
+            <span role="cell">Macht Package-Imports, lokale Dependents und Interface-Implementierungen sichtbar.</span>
+            <code role="cell">gosherpa deps ./internal/sherpa</code>
+          </div>
+          <div class="capability-row" role="row">
+            <strong role="cell">PR-Intelligenz</strong>
+            <span role="cell">Fasst Diffs zusammen und nennt Risiko, betroffene Bereiche und Verifikation.</span>
+            <code role="cell">gosherpa pr --base HEAD</code>
+          </div>
+          <div class="capability-row" role="row">
+            <strong role="cell">Agent-Kontext</strong>
+            <span role="cell">Exportiert begrenzte, deterministische Kontextpakete für Codex, Claude Code, Cursor und CI.</span>
+            <code role="cell">gosherpa context diff --json</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="agents">
+      <div class="wrap split">
+        <div>
+          <p class="section-kicker">Für Menschen und Agents</p>
+          <h2 class="section-title">Ein gemeinsamer Blick auf dieselbe Repository-Intelligenz.</h2>
+          <p class="section-lead">GoSherpa versucht nicht, dein IDE zu ersetzen. Es macht die Struktur deiner Codebasis sichtbar, damit du beim Lesen, Ändern und Reviewen weniger raten musst.</p>
+          <div class="audience-grid">
+            <article class="audience">
+              <h3>Entwickler</h3>
+              <p>Schneller verstehen, wo etwas lebt, wer es benutzt und wie groß der nächste Schritt wirklich ist.</p>
+            </article>
+            <article class="audience">
+              <h3>Review</h3>
+              <p>PR-Zusammenfassungen, betroffene Tests und Risiko-Hinweise direkt aus dem Diff.</p>
+            </article>
+            <article class="audience">
+              <h3>Automation</h3>
+              <p>Stabile JSON-Umschläge für Scripts, CI und Coding Agents, die keinen Projektroman brauchen.</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Beispielausgaben">
+          <div class="terminal-bar" aria-hidden="true">
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+          </div>
+          <pre><span class="comment"># Ein Symbol verstehen</span>
+<span class="accent">gosherpa explain ParseFile</span>
+
+<span class="comment"># Betroffene Tests fuer ein Diff</span>
+<span class="accent">gosherpa tests affected --base HEAD</span>
+
+<span class="comment"># Kompakter Agent-Kontext</span>
+<span class="accent">gosherpa context package ./internal/sherpa --json</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" id="try">
+      <div class="wrap">
+        <div>
+          <p class="section-kicker">Ausprobieren</p>
+          <h2>Starte lokal in wenigen Befehlen.</h2>
+          <p>GoSherpa ist ein frühes MVP, aber die Grundroute steht: bauen, testen, fragen, verstehen. Für GitHub Pages ist diese Seite als statische Root-Page vorbereitet.</p>
+          <div class="mini-actions">
+            <a class="button primary" href="https://github.com/panndabea/GoSherpa">Repository öffnen</a>
+            <a class="button secondary" href="README.md">README ansehen</a>
+          </div>
+        </div>
+        <div class="install-box" aria-label="Installationsbefehle">
+          <pre>git clone https://github.com/panndabea/GoSherpa.git
+cd GoSherpa
+go test ./...
+go build -o gosherpa ./cmd/gosherpa
+
+./gosherpa doctor
+./gosherpa symbols
+./gosherpa impact diff --base HEAD</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>GoSherpa - MIT License - Early MVP</span>
+      <div class="footer-links">
+        <a href="docs/CLI_REFERENCE.md">CLI Reference</a>
+        <a href="docs/STATUS.md">Status</a>
+        <a href="https://github.com/panndabea/GoSherpa">GitHub</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
