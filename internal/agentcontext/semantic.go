@@ -2,7 +2,9 @@ package agentcontext
 
 import (
 	"fmt"
+	"go/token"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,6 +18,12 @@ type contextSemanticSnapshot struct {
 	symbols        []sherpa.Symbol
 	filesByPackage map[string][]string
 	warnings       []string
+}
+
+type contextSymbolTarget struct {
+	Package  string
+	Receiver string
+	Name     string
 }
 
 func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemanticSnapshot, bool) {
@@ -95,6 +103,159 @@ func (snapshot contextSemanticSnapshot) symbolsInPackage(root string, packagePat
 	sortSymbols(symbols)
 
 	return symbols, uniqueStrings(warnings)
+}
+
+func (snapshot contextSemanticSnapshot) symbol(root string, target string) (sherpa.Symbol, bool, error) {
+	parsed, err := parseContextSymbolTarget(root, target, snapshot.modulePath)
+	if err != nil {
+		return sherpa.Symbol{}, false, err
+	}
+	if parsed.Name == "" {
+		return sherpa.Symbol{}, false, nil
+	}
+
+	var matches []sherpa.Symbol
+	for _, symbol := range snapshot.symbols {
+		if contextSymbolMatchesTarget(symbol, parsed) {
+			matches = append(matches, symbol)
+		}
+	}
+
+	if len(matches) == 0 {
+		return sherpa.Symbol{}, false, nil
+	}
+	if len(matches) > 1 {
+		return sherpa.Symbol{}, false, sherpa.NewAmbiguousTargetError("symbol", target, contextSymbolTargetCandidates(matches, snapshot.modulePath))
+	}
+
+	return matches[0], true, nil
+}
+
+func parseContextSymbolTarget(root string, target string, modulePath string) (contextSymbolTarget, error) {
+	value := strings.TrimSpace(filepath.ToSlash(target))
+	if value == "" {
+		return contextSymbolTarget{}, fmt.Errorf("symbol target is empty")
+	}
+
+	packagePath, symbol, err := splitContextPackageQualifiedTarget(root, value, modulePath)
+	if err != nil {
+		return contextSymbolTarget{}, err
+	}
+
+	segments := strings.Split(symbol, ".")
+	if len(segments) == 0 {
+		return contextSymbolTarget{}, nil
+	}
+
+	for _, segment := range segments {
+		if segment == "" || !token.IsIdentifier(segment) {
+			return contextSymbolTarget{}, fmt.Errorf("invalid symbol target: %s", target)
+		}
+	}
+
+	parsed := contextSymbolTarget{
+		Package: packagePath,
+		Name:    segments[len(segments)-1],
+	}
+	if len(segments) >= 2 {
+		parsed.Receiver = segments[len(segments)-2]
+	}
+
+	return parsed, nil
+}
+
+func splitContextPackageQualifiedTarget(root string, target string, modulePath string) (string, string, error) {
+	lastSlash := strings.LastIndex(target, "/")
+	if lastSlash < 0 {
+		return "", target, nil
+	}
+
+	firstDotAfterSlash := strings.Index(target[lastSlash+1:], ".")
+	if firstDotAfterSlash < 0 {
+		return "", target, nil
+	}
+
+	separator := lastSlash + 1 + firstDotAfterSlash
+	packagePath, err := normalizeContextPackagePath(root, target[:separator], modulePath)
+	if err != nil {
+		return "", "", err
+	}
+
+	return packagePath, target[separator+1:], nil
+}
+
+func normalizeContextPackagePath(root string, packagePath string, modulePath string) (string, error) {
+	value := strings.TrimSpace(filepath.ToSlash(packagePath))
+	if value == "" {
+		return "", fmt.Errorf("package path is empty")
+	}
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("absolute package paths are not supported: %s", packagePath)
+	}
+
+	modulePath = strings.TrimSpace(modulePath)
+	if modulePath == "" {
+		modulePath = contextModulePath(root)
+	}
+	if modulePath != "" {
+		if value == modulePath {
+			return ".", nil
+		}
+		if strings.HasPrefix(value, modulePath+"/") {
+			value = strings.TrimPrefix(value, modulePath+"/")
+		} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
+			return "", fmt.Errorf("non-local package-qualified symbol targets are not supported: %s", packagePath)
+		}
+	} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
+		return "", fmt.Errorf("module path is required for package-qualified symbol target: %s", packagePath)
+	}
+
+	value = strings.TrimPrefix(value, "./")
+	for _, segment := range strings.Split(value, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("package path must not contain '..': %s", packagePath)
+		}
+	}
+
+	cleaned := path.Clean(value)
+	if cleaned == "." {
+		return ".", nil
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("package path escapes repository: %s", packagePath)
+	}
+
+	return "./" + cleaned, nil
+}
+
+func contextSymbolMatchesTarget(symbol sherpa.Symbol, target contextSymbolTarget) bool {
+	if target.Package != "" && symbol.Package != target.Package {
+		return false
+	}
+
+	if target.Receiver != "" {
+		return symbol.Receiver == target.Receiver && symbol.Name == target.Name
+	}
+	if target.Package != "" {
+		return symbol.Receiver == "" && symbol.Name == target.Name
+	}
+
+	return symbol.Name == target.Name
+}
+
+func contextSymbolTargetCandidates(symbols []sherpa.Symbol, modulePath string) []sherpa.TargetCandidate {
+	candidates := make([]sherpa.TargetCandidate, 0, len(symbols))
+	for _, symbol := range symbols {
+		target := symbol.DisplayName()
+		candidates = append(candidates, sherpa.TargetCandidate{
+			Package:  symbol.Package,
+			Symbol:   target,
+			Position: symbol.Position,
+			Example:  sherpa.FormatPackageQualifiedTarget(symbol.Package, target, modulePath),
+		})
+	}
+
+	return candidates
 }
 
 func contextSemanticPackageFiles(root string, pkg semantics.Package) []string {

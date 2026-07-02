@@ -1382,7 +1382,7 @@ func TestMainRunsContextSymbolCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"CONTEXT", "TARGET", "Target (function)", "DEFINITION", "service.go", "SOURCE", "func Target() {}", "ANALYSIS", "Mode: ast", "Confidence: medium", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "TEST PLAN", "go test .", "LIMITATIONS"} {
+	for _, want := range []string{"CONTEXT", "TARGET", "Target (function)", "DEFINITION", "service.go", "SOURCE", "func Target() {}", "ANALYSIS", "Mode: typechecked+ast", "Confidence: medium", "CALLED BY", "Entry", "REFERENCES", "AFFECTED PACKAGES", ".", "SUGGESTED TESTS", "TestTarget", "TEST PLAN", "go test .", "LIMITATIONS"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1409,8 +1409,8 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
 
-	if data["analysisMode"] != "ast" {
-		t.Fatalf("expected ast analysis mode, got %v", data["analysisMode"])
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
 	}
 	if data["confidence"] != "medium" {
 		t.Fatalf("expected medium confidence, got %v", data["confidence"])
@@ -1440,7 +1440,7 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -1464,7 +1464,7 @@ func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
 
 	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
 }
 
 func TestMainRunsContextSymbolCommandWithLimits(t *testing.T) {

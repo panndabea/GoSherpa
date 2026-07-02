@@ -119,7 +119,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "context symbol",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode":          agentcontext.AnalysisModeAST,
+				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"confidence":            agentcontext.ConfidenceMedium,

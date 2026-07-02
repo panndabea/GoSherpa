@@ -181,7 +181,9 @@ labels. Broader context, impact, test, and path commands currently use:
 the same values.
 
 `context symbol.data.analysisMode` is different: it describes the broader
-context bundle mode, currently `ast`. `context file.data.analysisMode` and
+context bundle mode. It can be `typechecked+ast` when symbol identity comes from
+typechecked package loading, or `ast` when that semantic path is unavailable or
+does not include the target symbol. `context file.data.analysisMode` and
 `context package.data.analysisMode` can be `typechecked+ast` when package files
 and symbols come from typechecked package loading. `context diff.data.analysisMode`
 is currently `git-diff+ast`.
@@ -374,9 +376,8 @@ Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
 `context` data is documented in `docs/product/CONTEXT_SCHEMA_V1.md`.
 `context symbol` additionally includes explicit call analysis trust metadata:
 
-- `analysisMode`: broader context analysis mode, currently `ast` for symbol
-  context and `typechecked+ast` for file/package context when typechecked
-  package loading succeeds.
+- `analysisMode`: broader context analysis mode, `typechecked+ast` when symbol
+  identity comes from typechecked package loading and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: context, call, and test-planning blind spots.
 - `callAnalysisMode`: call graph trust mode, either `typechecked` or

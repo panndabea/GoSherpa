@@ -36,9 +36,10 @@ Every context result includes:
 - `limitations`: known blind spots and conservative boundaries.
 
 Current context analysis modes include `ast`, `typechecked+ast`, and
-`git-diff+ast`. File and package context use `typechecked+ast` when package
-files and symbols come from typechecked package loading while impact and test
-signals still use syntax/local repository analysis.
+`git-diff+ast`. Symbol context uses `typechecked+ast` when symbol identity comes
+from typechecked package loading. File and package context use `typechecked+ast`
+when package files and symbols come from typechecked package loading while
+impact and test signals still use syntax/local repository analysis.
 
 When size controls are used, context results may also include:
 

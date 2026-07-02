@@ -37,8 +37,8 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	if len(report.SourceContext.Lines) == 0 {
 		t.Fatal("expected source context lines")
 	}
-	if report.AnalysisMode != AnalysisModeAST {
-		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeAST)
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeTypecheckedAST)
 	}
 	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
 		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
@@ -53,6 +53,9 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 		t.Fatal("expected limitations")
 	}
 	if !strings.Contains(report.Limitations[0], "typechecked") {
+		t.Fatalf("expected typechecked symbol limitation, got %#v", report.Limitations)
+	}
+	if !strings.Contains(report.Limitations[1], "typechecked") {
 		t.Fatalf("expected typechecked call limitation, got %#v", report.Limitations)
 	}
 	if len(report.Callers) != 1 || report.Callers[0].Name != "Entry" {
@@ -63,6 +66,71 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	}
 	if len(report.RelatedTests) != 1 || report.RelatedTests[0].Name != "TestTarget" {
 		t.Fatalf("expected TestTarget related test, got %#v", report.RelatedTests)
+	}
+}
+
+func TestAnalyzeSymbolUsesPackageQualifiedSemanticIdentity(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+func Target() {}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "billing", "billing.go"), `package billing
+
+func Target() {}
+`)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.Target", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeTypecheckedAST)
+	}
+	if report.Identity.Package != "./internal/auth" {
+		t.Fatalf("identity package = %q, want ./internal/auth", report.Identity.Package)
+	}
+	if report.Identity.QualifiedName != "./internal/auth.Target" {
+		t.Fatalf("identity qualified name = %q, want ./internal/auth.Target", report.Identity.QualifiedName)
+	}
+	if report.SourceContext.Position.File != "internal/auth/auth.go" {
+		t.Fatalf("source context file = %q, want internal/auth/auth.go", report.SourceContext.Position.File)
+	}
+}
+
+func TestAnalyzeSymbolUsesBuildTagsForSemanticIdentity(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Always() {}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "enterprise.go"), `//go:build enterprise
+
+package app
+
+func Target() {}
+`)
+
+	withoutTags, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol without tags returned error: %v", err)
+	}
+	if withoutTags.AnalysisMode != AnalysisModeAST {
+		t.Fatalf("analysis mode without tags = %q, want %s", withoutTags.AnalysisMode, AnalysisModeAST)
+	}
+
+	withTags, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{BuildTags: []string{"enterprise"}})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol with tags returned error: %v", err)
+	}
+	if withTags.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode with tags = %q, want %s", withTags.AnalysisMode, AnalysisModeTypecheckedAST)
+	}
+	if withTags.SourceContext.Position.File != "enterprise.go" {
+		t.Fatalf("source context file with tags = %q, want enterprise.go", withTags.SourceContext.Position.File)
 	}
 }
 

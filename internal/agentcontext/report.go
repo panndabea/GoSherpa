@@ -76,15 +76,30 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	warnings := append([]string{}, explainReport.Warnings...)
-	sourceContext, err := sherpa.ReadSourceContext(root, explainReport.Symbol.Position, radius)
+	analysisMode := AnalysisModeAST
+	symbol := explainReport.Symbol
+	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
+	warnings = append(warnings, semanticSnapshot.warnings...)
+	if semanticOK {
+		semanticSymbol, found, err := semanticSnapshot.symbol(root, target)
+		if err != nil {
+			return Report{}, err
+		}
+		if found {
+			symbol = semanticSymbol
+			analysisMode = AnalysisModeTypecheckedAST
+		}
+	}
+
+	sourceContext, err := sherpa.ReadSourceContext(root, symbol.Position, radius)
 	if err != nil {
 		warnings = append(warnings, err.Error())
 	}
 
 	report := Report{
 		Target:                  explainReport.Target,
-		Identity:                identityFromSymbol(explainReport.Target, explainReport.Symbol),
-		Symbol:                  explainReport.Symbol,
+		Identity:                identityFromSymbol(explainReport.Target, symbol),
+		Symbol:                  symbol,
 		SourceContext:           sourceContext,
 		Purpose:                 explainReport.Purpose,
 		Risk:                    explainReport.Risk,
@@ -101,11 +116,11 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		TestCommands:            explainReport.TestCommands,
 		TestPlan:                explainReport.TestPlan,
 		ReadingOrder:            explainReport.ReadingOrder,
-		AnalysisMode:            AnalysisModeAST,
+		AnalysisMode:            analysisMode,
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
-	report.Limitations = limitations(options.IncludeTests, report.CallAnalysisMode)
+	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.CallAnalysisMode)
 	report.Confidence = confidence(report)
 	report = applySymbolLimits(report, limits)
 
@@ -203,8 +218,9 @@ func identityFromSymbol(target string, symbol sherpa.Symbol) Identity {
 	}
 }
 
-func limitations(includeTestCallers bool, callAnalysisMode string) []string {
+func limitations(includeTestCallers bool, analysisMode string, callAnalysisMode string) []string {
 	values := []string{
+		symbolContextAnalysisLimitation(analysisMode),
 		callAnalysisLimitation(callAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
@@ -216,6 +232,15 @@ func limitations(includeTestCallers bool, callAnalysisMode string) []string {
 	}
 
 	return values
+}
+
+func symbolContextAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case AnalysisModeTypecheckedAST:
+		return "Symbol context used typechecked package loading for symbol identity, with syntax/local impact and test signals."
+	default:
+		return "Symbol context used AST fallback for symbol identity because typechecked loading was unavailable or did not include the target symbol."
+	}
 }
 
 func callAnalysisLimitation(callAnalysisMode string) string {
@@ -254,7 +279,7 @@ func normalizeReport(report Report) Report {
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)
 	report.Limitations = nonNilSlice(report.Limitations)
-	report.Warnings = nonNilSlice(report.Warnings)
+	report.Warnings = uniqueStrings(report.Warnings)
 
 	return report
 }

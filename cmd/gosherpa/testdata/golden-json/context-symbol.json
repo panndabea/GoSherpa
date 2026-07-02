@@ -209,10 +209,11 @@
         }
       }
     ],
-    "analysisMode": "ast",
+    "analysisMode": "typechecked+ast",
     "confidence": "medium",
     "interfaceAnalysisMode": "typechecked",
     "limitations": [
+      "Symbol context used typechecked package loading for symbol identity, with syntax/local impact and test signals.",
       "Call analysis used typechecked package loading where available.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Call graph results are repository-local and may miss some imported-package receiver calls.",
