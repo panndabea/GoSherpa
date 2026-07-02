@@ -782,7 +782,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasMaxDepthOption && !isPathCommand(invocation.Command) {
+	if invocation.HasMaxDepthOption && !supportsMaxDepthOption(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --max-depth is only supported by path commands")
 		return exitUsage
 	}
@@ -792,7 +792,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasContextLimit && invocation.Command != "context" {
+	if invocation.HasContextLimit && !supportsContextLimitOption(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context")
 		return exitUsage
 	}
@@ -842,888 +842,83 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	switch invocation.Command {
-	case "doctor":
-		if len(invocation.CommandArgs) != 0 {
-			printDoctorUsage(stderr)
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		report := analyzeDoctor(root, invocation.BuildTags)
-		if invocation.JSON {
-			normalizedReport := normalizeDoctorReport(report)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"doctor",
-				normalizedReport.Target,
-				normalizedReport.Warnings,
-				normalizedReport,
-			))
-		}
-
-		fmt.Fprint(stdout, formatDoctorReport(report))
-		return exitSuccess
-
-	case "context":
-		if len(invocation.CommandArgs) < 1 {
-			printContextUsage(stderr)
-			return exitUsage
-		}
-
-		switch invocation.CommandArgs[0] {
-		case "symbol":
-			if len(invocation.CommandArgs) != 2 {
-				printContextSymbolUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			target := invocation.CommandArgs[1]
-			report, err := agentcontext.AnalyzeSymbol(root, target, agentcontext.AnalyzeOptions{
-				IncludeTests: invocation.IncludeTests,
-				BuildTags:    invocation.BuildTags,
-				Limits:       invocation.ContextLimits,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "context symbol", target, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := contextSymbolJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"context symbol",
-					normalizedReport.Target,
-					normalizedReport.Warnings,
-					normalizedReport,
-				))
-			}
-
-			fmt.Fprint(stdout, agentcontext.Format(report))
-			return exitSuccess
-		case "file":
-			if len(invocation.CommandArgs) != 2 {
-				printContextFileUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			target := invocation.CommandArgs[1]
-			report, err := agentcontext.AnalyzeFile(root, target, agentcontext.FileAnalyzeOptions{
-				IncludeTests: invocation.IncludeTests,
-				BuildTags:    invocation.BuildTags,
-				Limits:       invocation.ContextLimits,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "context file", target, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := contextFileJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"context file",
-					normalizedReport.Target,
-					normalizedReport.Warnings,
-					normalizedReport,
-				))
-			}
-
-			fmt.Fprint(stdout, agentcontext.FormatFile(report))
-			return exitSuccess
-		case "package":
-			if len(invocation.CommandArgs) != 2 {
-				printContextPackageUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			target := invocation.CommandArgs[1]
-			report, err := agentcontext.AnalyzePackage(root, target, agentcontext.PackageAnalyzeOptions{
-				IncludeTests: invocation.IncludeTests,
-				BuildTags:    invocation.BuildTags,
-				Limits:       invocation.ContextLimits,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "context package", target, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := contextPackageJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"context package",
-					normalizedReport.Target,
-					normalizedReport.Warnings,
-					normalizedReport,
-				))
-			}
-
-			fmt.Fprint(stdout, agentcontext.FormatPackage(report))
-			return exitSuccess
-		case "diff":
-			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
-				printContextDiffUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			report, err := agentcontext.AnalyzeDiff(root, invocation.BaseRef, agentcontext.DiffAnalyzeOptions{
-				IncludeTests: invocation.IncludeTests,
-				BuildTags:    invocation.BuildTags,
-				Limits:       invocation.ContextLimits,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "context diff", invocation.BaseRef, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := contextDiffJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"context diff",
-					normalizedReport.Target,
-					normalizedReport.Warnings,
-					normalizedReport,
-				))
-			}
-
-			fmt.Fprint(stdout, agentcontext.FormatDiff(report))
-			return exitSuccess
-		default:
-			printContextUsage(stderr)
-			return exitUsage
-		}
-
-	case "pr":
-		if len(invocation.CommandArgs) != 0 || !invocation.HasBaseOption {
-			printPRUsage(stderr)
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		report, err := analyzePR(root, invocation.BaseRef, invocation.BuildTags)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "pr", invocation.BaseRef, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedReport := normalizePRReport(report)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"pr",
-				normalizedReport.Base,
-				normalizedReport.Warnings,
-				normalizedReport,
-			))
-		}
-
-		fmt.Fprint(stdout, formatPRReport(report))
-		return exitSuccess
-
-	case "explain":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol> [--tests]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		report, err := explainengine.AnalyzeWithOptions(root, target, explainengine.AnalyzeOptions{
-			IncludeTests: invocation.IncludeTests,
-			BuildTags:    invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "explain", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedReport := explainJSONResult(report)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"explain",
-				normalizedReport.Target,
-				normalizedReport.Warnings,
-				explainJSONDataFromReport(normalizedReport),
-			))
-		}
-
-		fmt.Fprint(stdout, explainengine.Format(report))
-		return exitSuccess
-
-	case "symbol":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] symbol <target> [--context]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		symbols, err := sherpa.ParseRepository(root)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "symbol", target, stderr, err)
-		}
-
-		symbol, err := sherpa.FindSymbolTarget(root, symbols, target)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "symbol", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, nil, symbolJSONData{
-				Symbol: symbol,
-			}))
-		}
-
-		if invocation.ShowContext {
-			context, err := sherpa.ReadSourceContext(root, symbol.Position, sherpa.DefaultSourceContextRadius)
-			if err != nil {
-				return writeCommandError(false, root, "symbol", target, stderr, err)
-			}
-
-			fmt.Fprint(stdout, sherpa.FormatSymbolWithContext(symbol, context))
-			return exitSuccess
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatSymbol(symbol))
-		return exitSuccess
-
-	case "search":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		terms := invocation.CommandArgs
-		target := strings.Join(terms, " ")
-
-		symbols, err := sherpa.ParseRepository(root)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "search", target, stderr, err)
-		}
-
-		results := sherpa.SearchSymbolsWithOptions(symbols, terms, sherpa.SymbolSearchOptions{
-			Kind:      invocation.SearchKind,
-			Package:   invocation.SearchPackage,
-			TestsOnly: invocation.IncludeTests,
-			Limit:     invocation.CallPathLimit,
-		})
-		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, nil, searchJSONData{
-				Terms:   nonNilSlice(terms),
-				Results: nonNilSlice(results),
-			}))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatSymbolSearch(terms, results))
-		return exitSuccess
-
-	case "symbols":
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		symbols, err := sherpa.ParseRepository(root)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "symbols", "", stderr, err)
-		}
-		symbols = sherpa.FilterSymbols(symbols, sherpa.SymbolFilterOptions{
-			Kind:      invocation.SearchKind,
-			Package:   invocation.SearchPackage,
-			TestsOnly: invocation.IncludeTests,
-		})
-
-		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", nil, symbolsJSONData{
-				Symbols: nonNilSlice(symbols),
-			}))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatSymbols(symbols))
-		return exitSuccess
-
-	case "refs":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] refs <name> [--kind <kind>] [--context]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		name := invocation.CommandArgs[0]
-
-		report, err := sherpa.FindReferenceReportWithOptions(root, name, sherpa.ReferenceOptions{
-			Kind:      invocation.ReferenceKind,
-			BuildTags: invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "refs", name, stderr, err)
-		}
-
-		if invocation.JSON {
-			return writeJSON(stdout, stderr, newJSONResponse(root, "refs", name, report.Warnings, referencesJSONData{
-				AnalysisMode: report.AnalysisMode,
-				Confidence:   jsonConfidence(report.Warnings, report.AnalysisMode),
-				Limitations:  referenceLimitations(report.AnalysisMode),
-				References:   nonNilSlice(report.References),
-			}))
-		}
-
-		if invocation.ShowContext {
-			contexts, err := sherpa.ReadSourceContexts(root, referencePositions(report.References), sherpa.DefaultSourceContextRadius)
-			if err != nil {
-				return writeCommandError(false, root, "refs", name, stderr, err)
-			}
-
-			fmt.Fprint(stdout, sherpa.FormatReferenceReportWithContext(report, contexts))
-			return exitSuccess
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatReferenceReport(report))
-		return exitSuccess
-
-	case "impact":
-		if len(invocation.CommandArgs) < 1 {
-			printImpactUsage(stderr)
-			return exitUsage
-		}
-
-		if invocation.CommandArgs[0] == "diff" {
-			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
-				printImpactDiffUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
-				BuildTags: invocation.BuildTags,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := impactDiffJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"impact diff",
-					invocation.BaseRef,
-					normalizedReport.Warnings,
-					impactDiffJSONDataFromReport(normalizedReport, analysisModeDiff),
-				))
-			}
-
-			fmt.Fprint(stdout, impactengine.FormatDiffReport(report))
-			return exitSuccess
-		}
-
-		if isImpactReportSubcommand(invocation.CommandArgs[0]) {
-			if len(invocation.CommandArgs) != 2 {
-				printImpactSubcommandUsage(stderr, invocation.CommandArgs[0])
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			kind := invocation.CommandArgs[0]
-			target := invocation.CommandArgs[1]
-			report, err := analyzeImpactSubcommand(root, kind, target, invocation.BuildTags)
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "impact "+kind, target, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := impactDiffJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"impact "+kind,
-					target,
-					normalizedReport.Warnings,
-					impactDiffJSONDataFromReport(normalizedReport, analysisModeAST),
-				))
-			}
-
-			fmt.Fprint(stdout, formatImpactSubcommandReport(kind, report))
-			return exitSuccess
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := sherpa.FindImpactWithOptions(root, target, sherpa.ImpactOptions{
-			BuildTags: invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "impact", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := impactJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"impact",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				impactJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatImpact(result))
-		return exitSuccess
-
-	case "tests":
-		if len(invocation.CommandArgs) < 1 {
-			printTestsUsage(stderr)
-			return exitUsage
-		}
-
-		if invocation.CommandArgs[0] == "affected" {
-			if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
-				printTestsAffectedUsage(stderr)
-				return exitUsage
-			}
-
-			root, ok := resolveRootPath(invocation.Root, stderr)
-			if !ok {
-				return exitFailure
-			}
-
-			report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
-				BuildTags: invocation.BuildTags,
-			})
-			if err != nil {
-				return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
-			}
-
-			if invocation.JSON {
-				normalizedReport := impactDiffJSONResult(report)
-				return writeJSON(stdout, stderr, newJSONResponse(
-					root,
-					"tests affected",
-					invocation.BaseRef,
-					normalizedReport.Warnings,
-					testsAffectedJSONDataFromReport(normalizedReport),
-				))
-			}
-
-			fmt.Fprint(stdout, impactengine.FormatAffectedTestsReport(report))
-			return exitSuccess
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := sherpa.FindTestsWithOptions(root, target, sherpa.TestOptions{
-			Scope: invocation.TestScope,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "tests", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := testsJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"tests",
-				normalizedResult.Target,
-				nil,
-				testsJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatTests(result))
-		return exitSuccess
-
-	case "deps":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] deps <package>")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		targetPackage := invocation.CommandArgs[0]
-
-		deps, err := sherpa.FindPackageDependencies(root, targetPackage)
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "deps", targetPackage, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedDeps := dependenciesJSONResult(deps)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"deps",
-				normalizedDeps.Package,
-				nil,
-				dependenciesJSONDataFromResult(normalizedDeps),
-			))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatPackageDependencies(deps))
-		return exitSuccess
-	case "implementers":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] implementers <interface>")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := impactengine.FindImplementersWithOptions(root, target, impactengine.InterfaceOptions{
-			BuildTags: invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := implementersJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"implementers",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				implementersJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, impactengine.FormatImplementers(result))
-		return exitSuccess
-	case "interfaces":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] interfaces <type>")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := impactengine.FindInterfacesWithOptions(root, target, impactengine.InterfaceOptions{
-			BuildTags: invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := interfacesJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"interfaces",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				interfacesJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, impactengine.FormatInterfaces(result))
-		return exitSuccess
-	case "path", "paths":
-		if len(invocation.CommandArgs) < 2 {
-			fmt.Fprintf(stderr, "usage: gosherpa [--root <path>] %s <from> <to> [--limit <n>] [--max-depth <n>]\n", invocation.Command)
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		options := sherpa.CallPathOptions{
-			Limit:    invocation.CallPathLimit,
-			MaxDepth: invocation.CallPathMaxDepth,
-		}
-
-		result, err := sherpa.FindCallPaths(root, invocation.CommandArgs[0], invocation.CommandArgs[1], options)
-		if err != nil {
-			return writeCommandError(
-				invocation.JSON,
-				root,
-				invocation.Command,
-				invocation.CommandArgs[0]+" -> "+invocation.CommandArgs[1],
-				stderr,
-				err,
-			)
-		}
-
-		if invocation.JSON {
-			normalizedResult := callPathsJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				invocation.Command,
-				callPathJSONTarget(normalizedResult),
-				nil,
-				callPathsJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatCallPaths(result))
-		return exitSuccess
-	case "entrypoints":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] entrypoints <function-or-method> [--tests]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := sherpa.FindEntryPointsWithOptions(root, target, sherpa.CallOptions{
-			IncludeTests: invocation.IncludeTests,
-			BuildTags:    invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "entrypoints", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := entrypointsJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"entrypoints",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				entrypointsJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatEntryPoints(result))
-		return exitSuccess
-	case "callers":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := sherpa.FindCallersWithOptions(root, target, sherpa.CallOptions{
-			IncludeTests: invocation.IncludeTests,
-			BuildTags:    invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "callers", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := callersJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"callers",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				callersJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		if invocation.ShowContext {
-			contexts, err := sherpa.ReadSourceContexts(root, callerPositions(result.Callers), sherpa.DefaultSourceContextRadius)
-			if err != nil {
-				return writeCommandError(false, root, "callers", target, stderr, err)
-			}
-
-			fmt.Fprint(stdout, sherpa.FormatCallersWithContext(result, contexts))
-			return exitSuccess
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatCallers(result))
-		return exitSuccess
-	case "callees":
-		if len(invocation.CommandArgs) < 1 {
-			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callees <function-or-method> [--context]")
-			return exitUsage
-		}
-
-		root, ok := resolveRootPath(invocation.Root, stderr)
-		if !ok {
-			return exitFailure
-		}
-
-		target := invocation.CommandArgs[0]
-
-		result, err := sherpa.FindCalleesWithOptions(root, target, sherpa.CallOptions{
-			BuildTags: invocation.BuildTags,
-		})
-		if err != nil {
-			return writeCommandError(invocation.JSON, root, "callees", target, stderr, err)
-		}
-
-		if invocation.JSON {
-			normalizedResult := calleesJSONResult(result)
-			return writeJSON(stdout, stderr, newJSONResponse(
-				root,
-				"callees",
-				normalizedResult.Target,
-				normalizedResult.Warnings,
-				calleesJSONDataFromResult(normalizedResult),
-			))
-		}
-
-		if invocation.ShowContext {
-			contexts, err := sherpa.ReadSourceContexts(root, calleePositions(result.Callees), sherpa.DefaultSourceContextRadius)
-			if err != nil {
-				return writeCommandError(false, root, "callees", target, stderr, err)
-			}
-
-			fmt.Fprint(stdout, sherpa.FormatCalleesWithContext(result, contexts))
-			return exitSuccess
-		}
-
-		fmt.Fprint(stdout, sherpa.FormatCallees(result))
-		return exitSuccess
-	default:
+	spec, ok := commandSpecFor(invocation.Command)
+	if !ok {
 		fmt.Fprintln(stderr, "unknown command:", invocation.Command)
 		printUsage(stderr)
 		return exitUsage
 	}
+
+	return spec.Handler(invocation, stdout, stderr)
 }
 
 func knownCommand(command string) bool {
-	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "entrypoints", "callers", "callees", "explain", "context", "pr", "doctor":
-		return true
-	default:
-		return false
-	}
+	_, ok := commandSpecFor(command)
+	return ok
 }
 
 func supportsJSON(command string) bool {
-	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "entrypoints", "callers", "callees", "explain", "context", "pr", "doctor":
-		return true
-	default:
-		return false
-	}
+	spec, ok := commandSpecFor(command)
+	return ok && spec.JSON
 }
 
 func isBaseAwareInvocation(invocation cliInvocation) bool {
-	return isContextDiffInvocation(invocation) || isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation) || isPRInvocation(invocation)
+	spec, ok := commandSpecFor(invocation.Command)
+	if !ok || spec.BaseWhen == nil {
+		return false
+	}
+
+	return spec.BaseWhen(invocation)
 }
 
 func supportsLimitOption(command string) bool {
-	return command == "search" || isPathCommand(command)
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Limit
+}
+
+func supportsMaxDepthOption(command string) bool {
+	spec, ok := commandSpecFor(command)
+	return ok && spec.MaxDepth
 }
 
 func supportsPackageOption(command string) bool {
-	return command == "search" || command == "symbols"
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Package
 }
 
 func supportsKindOption(command string) bool {
-	return command == "search" || command == "symbols" || command == "refs"
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Kind
 }
 
-func isPathCommand(command string) bool {
-	return command == "path" || command == "paths"
+func supportsContextLimitOption(command string) bool {
+	spec, ok := commandSpecFor(command)
+	return ok && spec.ContextLimits
 }
 
 func supportsTestsOption(command string) bool {
-	switch command {
-	case "symbols", "search", "entrypoints", "callers", "explain", "context":
-		return true
-	default:
-		return false
-	}
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Tests
 }
 
 func supportsContextOption(command string) bool {
-	switch command {
-	case "symbol", "refs", "callers", "callees":
-		return true
-	default:
-		return false
-	}
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Context
 }
 
 func supportsTagsOption(invocation cliInvocation) bool {
-	switch invocation.Command {
-	case "refs", "entrypoints", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr", "doctor":
-		return true
-	case "tests":
-		return isTestsAffectedInvocation(invocation)
-	default:
+	spec, ok := commandSpecFor(invocation.Command)
+	if !ok {
 		return false
 	}
+	if spec.Tags {
+		return true
+	}
+	if spec.TagsWhen != nil {
+		return spec.TagsWhen(invocation)
+	}
+
+	return false
 }
 
 func validateContextLimitOptions(invocation cliInvocation) error {
@@ -2503,95 +1698,81 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
-	fmt.Fprintln(writer, "  context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
-	fmt.Fprintln(writer, "  doctor")
-	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
-	fmt.Fprintln(writer, "  symbols [--kind <kind>] [--package <package>] [--tests]")
-	fmt.Fprintln(writer, "  symbol <target> [--context]")
-	fmt.Fprintln(writer, "  search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]")
-	fmt.Fprintln(writer, "  refs <name> [--kind <kind>] [--context]")
-	fmt.Fprintln(writer, "  impact <symbol-or-package>")
-	fmt.Fprintln(writer, "  impact file <file>")
-	fmt.Fprintln(writer, "  impact package <package>")
-	fmt.Fprintln(writer, "  impact symbol <symbol>")
-	fmt.Fprintln(writer, "  impact diff --base <ref>")
-	fmt.Fprintln(writer, "  pr --base <ref>")
-	fmt.Fprintln(writer, "  tests <symbol-or-package> [--scope direct|related|all]")
-	fmt.Fprintln(writer, "  tests affected --base <ref>")
-	fmt.Fprintln(writer, "  deps <package>")
-	fmt.Fprintln(writer, "  implementers <interface>")
-	fmt.Fprintln(writer, "  interfaces <type>")
-	fmt.Fprintln(writer, "  path <from> <to>")
-	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
-	fmt.Fprintln(writer, "  entrypoints <function-or-method> [--tests]")
-	fmt.Fprintln(writer, "  callers <function-or-method> [--tests] [--context]")
-	fmt.Fprintln(writer, "  callees <function-or-method> [--context]")
+	for _, spec := range commandSpecs {
+		for _, usage := range spec.Usage {
+			fmt.Fprintln(writer, "  "+usage)
+		}
+	}
+}
+
+func printUsageLines(writer io.Writer, usageLines []string) {
+	for i, usage := range usageLines {
+		prefix := "usage: "
+		if i > 0 {
+			prefix = "       "
+		}
+
+		fmt.Fprintln(writer, prefix+"gosherpa [--root <path>] "+usage)
+	}
+}
+
+func printCommandUsage(writer io.Writer, usage string) {
+	printUsageLines(writer, []string{usage})
 }
 
 func printContextUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
+	printUsageLines(writer, contextUsageLines)
 }
 
 func printContextSymbolUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	printCommandUsage(writer, contextSymbolUsageLine)
 }
 
 func printContextFileUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	printCommandUsage(writer, contextFileUsageLine)
 }
 
 func printContextPackageUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]")
+	printCommandUsage(writer, contextPackageUsageLine)
 }
 
 func printContextDiffUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]")
+	printCommandUsage(writer, contextDiffUsageLine)
 }
 
 func printImpactUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact <symbol-or-package>")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact file <file>")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact package <package>")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact symbol <symbol>")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] impact diff --base <ref>")
+	printUsageLines(writer, impactUsageLines)
 }
 
 func printImpactDiffUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact diff --base <ref>")
+	printCommandUsage(writer, impactDiffUsageLine)
 }
 
 func printPRUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] pr --base <ref>")
+	printCommandUsage(writer, prUsageLine)
 }
 
 func printDoctorUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] doctor")
+	printCommandUsage(writer, doctorUsageLine)
 }
 
 func printImpactSubcommandUsage(writer io.Writer, kind string) {
 	switch kind {
 	case "file":
-		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact file <file>")
+		printCommandUsage(writer, impactFileUsageLine)
 	case "package":
-		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact package <package>")
+		printCommandUsage(writer, impactPackageUsageLine)
 	case "symbol":
-		fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact symbol <symbol>")
+		printCommandUsage(writer, impactSymbolUsageLine)
 	default:
 		printImpactUsage(writer)
 	}
 }
 
 func printTestsUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests <symbol-or-package> [--scope direct|related|all]")
-	fmt.Fprintln(writer, "       gosherpa [--root <path>] tests affected --base <ref>")
+	printUsageLines(writer, testsUsageLines)
 }
 
 func printTestsAffectedUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] tests affected --base <ref>")
+	printCommandUsage(writer, testsAffectedUsageLine)
 }
