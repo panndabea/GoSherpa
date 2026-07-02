@@ -43,6 +43,17 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantArrays: []string{"callees", "limitations"},
 		},
 		{
+			name:    "entrypoints",
+			args:    []string{"entrypoints", "Target", "--json"},
+			command: "entrypoints",
+			target:  "Target",
+			wantFields: map[string]string{
+				"analysisMode": sherpa.CallAnalysisModeTypechecked,
+				"confidence":   agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"entrypoints", "limitations"},
+		},
+		{
 			name:    "explain",
 			args:    []string{"explain", "Target", "--json"},
 			command: "explain",

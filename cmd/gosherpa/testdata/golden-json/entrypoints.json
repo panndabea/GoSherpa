@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "command": "entrypoints",
+  "target": "Target",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "analysisMode": "typechecked",
+    "confidence": "medium",
+    "limitations": [
+      "Call analysis used typechecked package loading where available.",
+      "Call graph results are repository-local.",
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Imported-package receiver calls may be incomplete.",
+      "Entry point classification is heuristic: main functions, test functions, exported functions, and functions with no local callers.",
+      "Framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet."
+    ],
+    "entrypoints": [
+      {
+        "name": "Entry",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 5,
+            "column": 11
+          }
+        }
+      },
+      {
+        "name": "First",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 10,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 10,
+            "column": 11
+          }
+        }
+      },
+      {
+        "name": "Second",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 14,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 14,
+            "column": 12
+          }
+        }
+      },
+      {
+        "name": "Target",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 12
+          }
+        }
+      },
+      {
+        "name": "Run",
+        "package": "./cmd/app",
+        "kind": "exported",
+        "position": {
+          "file": "cmd/app/main.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "cmd/app/main.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "cmd/app/main.go",
+            "line": 5,
+            "column": 9
+          }
+        }
+      }
+    ]
+  }
+}

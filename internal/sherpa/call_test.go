@@ -310,6 +310,115 @@ func Step() {}
 	}
 }
 
+func TestFindEntryPointsFindsMainExportedAndTargetEntrypoints(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func main() {
+	service.Entry()
+}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Entry() {
+	step()
+}
+
+func step() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindEntryPoints(tmp, "./internal/service.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestEntryPointLabels(result.EntryPoints)
+	want := []string{
+		"main:./cmd/app:main",
+		"exported:./internal/service:Entry",
+		"exported:./internal/service:Target",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	if result.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %s", result.AnalysisMode)
+	}
+	if result.EntryPoints[0].Position.File != "cmd/app/main.go" {
+		t.Fatalf("expected root-relative main position, got %s", result.EntryPoints[0].Position.File)
+	}
+	assertSourceRange(t, result.EntryPoints[0].Range, "cmd/app/main.go", 5, 1, 5, 10)
+}
+
+func TestFindEntryPointsFindsNoLocalCaller(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func run() {
+	target()
+}
+
+func target() {}
+`)
+
+	result, err := FindEntryPoints(tmp, "target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestEntryPointLabels(result.EntryPoints)
+	want := []string{"no-local-callers:.:run"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindEntryPointsWithOptionsIncludesTestEntryPoints(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestTarget() {
+	target()
+}
+`)
+
+	withoutTests, err := FindEntryPoints(tmp, "target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(callTestEntryPointLabels(withoutTests.EntryPoints), []string{"no-local-callers:.:target"}) {
+		t.Fatalf("expected target fallback without tests, got %#v", withoutTests.EntryPoints)
+	}
+
+	withTests, err := FindEntryPointsWithOptions(tmp, "target", CallOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestEntryPointLabels(withTests.EntryPoints)
+	want := []string{"test:.:TestTarget"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
 func TestCollectCalleesFromFunctionReturnsEmptyForNilBody(t *testing.T) {
 	got := collectCalleesFromFunction(functionInfo{
 		Decl: &ast.FuncDecl{},
@@ -1756,6 +1865,15 @@ func callTestCallerFiles(callers []Caller) []string {
 	}
 
 	return files
+}
+
+func callTestEntryPointLabels(entryPoints []EntryPoint) []string {
+	var labels []string
+	for _, entryPoint := range entryPoints {
+		labels = append(labels, string(entryPoint.Kind)+":"+entryPoint.Package+":"+entryPoint.Name)
+	}
+
+	return labels
 }
 
 func callTestPathCallees(path CallPath) []string {

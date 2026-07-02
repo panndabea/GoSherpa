@@ -345,3 +345,57 @@ Found 2 paths
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
 	}
 }
+
+func TestFormatEntryPoints(t *testing.T) {
+	result := EntryPointsResult{
+		Target:       "Target",
+		AnalysisMode: CallAnalysisModeTypechecked,
+		EntryPoints: []EntryPoint{
+			{
+				Name:    "main",
+				Package: "./cmd/app",
+				Kind:    EntryPointKindMain,
+				Position: Position{
+					File: "cmd/app/main.go",
+					Line: 5,
+				},
+			},
+			{
+				Name:    "Entry",
+				Package: "./internal/service",
+				Kind:    EntryPointKindExported,
+				Position: Position{
+					File: "internal/service/service.go",
+					Line: 3,
+				},
+			},
+		},
+	}
+
+	got := FormatEntryPoints(result)
+	want := fmt.Sprintf(`ENTRYPOINTS
+
+Target: Target
+Analysis: typechecked
+
+  %-17s %-36s %-20s cmd/app/main.go:5
+  %-17s %-36s %-20s internal/service/service.go:3
+
+Found 2 entrypoints
+`, EntryPointKindMain, "main", "./cmd/app", EntryPointKindExported, "Entry", "./internal/service")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatEntryPointsWithEmptyList(t *testing.T) {
+	result := EntryPointsResult{Target: "Target"}
+
+	got := FormatEntryPoints(result)
+	want := "no entrypoints found: Target\n"
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}

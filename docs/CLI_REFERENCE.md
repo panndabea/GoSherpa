@@ -26,6 +26,7 @@ go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa pr --base HEAD
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa tests affected --base HEAD
+go run ./cmd/gosherpa entrypoints ParseFile
 go run ./cmd/gosherpa path main FindCallers
 ```
 
@@ -64,6 +65,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct callers of a function or method |
 | Test callers | `gosherpa callers ./internal/sherpa.ParseFile --tests` | Includes direct callers from `_test.go` files on demand |
+| Entrypoints | `gosherpa entrypoints ./internal/sherpa.ParseFile` | Lists public, runtime, test, and no-local-caller functions that can reach a target |
 | Call path | `gosherpa path Run ./internal/sherpa.ParseFile` | Shows the shortest repository-local call path between functions or methods |
 | Call paths | `gosherpa paths Run ./internal/sherpa.ParseFile --limit 3` | Shows multiple repository-local call paths with optional limit and max depth |
 
@@ -143,6 +145,9 @@ Found 4 references
 ./gosherpa callers ParseFile --tests
 ./gosherpa callers ./internal/sherpa.ParseFile
 ./gosherpa callers ParseFile --json
+./gosherpa entrypoints ParseFile
+./gosherpa entrypoints ParseFile --tests
+./gosherpa entrypoints ./internal/sherpa.ParseFile --json
 ./gosherpa path main FindCallers
 ./gosherpa path main ./internal/sherpa.FindCallers
 ./gosherpa path main FindCallers --json

@@ -217,6 +217,7 @@ func TestParseCLIArgsAcceptsContextFlag(t *testing.T) {
 
 func TestParseCLIArgsAcceptsTestsFlag(t *testing.T) {
 	tests := [][]string{
+		{"entrypoints", "Target", "--tests"},
 		{"--tests", "callers", "Target"},
 		{"explain", "Target", "--tests"},
 	}
@@ -564,6 +565,7 @@ func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	for _, want := range []string{
 		"path <from> <to>",
 		"paths <from> <to> [--limit <n>] [--max-depth <n>]",
+		"entrypoints <function-or-method> [--tests]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -1252,7 +1254,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2932,6 +2934,155 @@ func TestMainRunsInterfacesCommandAsJSON(t *testing.T) {
 	}
 
 	if strings.Contains(result.Stdout, "INTERFACES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainPrintsEntryPointsUsageWhenArgumentIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "entrypoints"})
+
+	want := "usage: gosherpa [--root <path>] entrypoints <function-or-method> [--tests]\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsEntryPointsCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func main() {
+	service.Entry()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Entry() {
+	step()
+}
+
+func step() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "entrypoints", "./internal/service.Target"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"ENTRYPOINTS",
+		"Target: ./internal/service.Target",
+		"Analysis: typechecked",
+		"main",
+		"exported",
+		"Entry",
+		"Target",
+		"cmd/app/main.go",
+		"internal/service/service.go",
+		"Found 3 entrypoints",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsEntryPointsCommandWithTests(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+func TestTarget() {
+	Target()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "entrypoints", "Target", "--tests"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"ENTRYPOINTS", "TestTarget", "test", "Target", "exported", "Found 2 entrypoints"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsEntryPointsCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	target()
+}
+
+func target() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "entrypoints", "target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "entrypoints", "target", "example.com/app")
+
+	entryPoints := assertMainTestJSONArrayHasLength(t, data, "entrypoints", 1)
+	entryPoint, ok := entryPoints[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected entrypoint object, got %T", entryPoints[0])
+	}
+	if entryPoint["name"] != "Run" {
+		t.Fatalf("expected Run entrypoint, got %v", entryPoint["name"])
+	}
+	if entryPoint["kind"] != string(sherpa.EntryPointKindExported) {
+		t.Fatalf("expected exported entrypoint, got %v", entryPoint["kind"])
+	}
+
+	if strings.Contains(result.Stdout, "ENTRYPOINTS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }

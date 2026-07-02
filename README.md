@@ -32,6 +32,7 @@ It is built for developers and coding agents who want focused, repeatable answer
 | "Where is this thing defined?" | Symbols, files, signatures, and line numbers |
 | "Who uses this function?" | References and direct callers |
 | "What does this function touch?" | Direct callees and local call paths |
+| "What can reach this internal code?" | Runtime, test, exported, and no-local-caller entrypoints |
 | "What depends on this package?" | Local package imports and dependents |
 | "What might this change affect?" | Changed symbols, affected packages, and suggested tests |
 
@@ -52,6 +53,7 @@ Build a local binary when you are ready:
 go build -o gosherpa ./cmd/gosherpa
 ./gosherpa search parse file
 ./gosherpa refs ParseFile --kind call
+./gosherpa entrypoints ParseFile
 ./gosherpa impact diff --base HEAD
 ```
 
@@ -72,6 +74,7 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa explain ParseFile` | Purpose, risk, relationships, reading order, and test signals |
 | `gosherpa refs ParseFile --kind call` | Go-aware references filtered by kind |
 | `gosherpa callers ParseFile` | Direct callers of a function or method |
+| `gosherpa entrypoints ParseFile` | Public, runtime, test, and no-local-caller functions that can reach a target |
 | `gosherpa impact diff --base HEAD` | Changed files, affected packages, and suggested tests |
 | `gosherpa pr --base HEAD` | PR-style change summary with risk and verification commands |
 

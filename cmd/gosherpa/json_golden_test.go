@@ -90,6 +90,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			name: "paths",
 			args: []string{"paths", "Entry", "Target", "--limit", "2", "--json"},
 		},
+		{
+			name: "entrypoints",
+			args: []string{"entrypoints", "Target", "--json"},
+		},
 	}
 
 	for _, test := range tests {

@@ -92,6 +92,9 @@ Implemented:
 - Direct caller analysis with package-aware targets and receiver-variable method
   calls.
 - Shortest and limited repository-local call path analysis.
+- Initial `gosherpa entrypoints <target>` analysis for `main.main`, test
+  functions with `--tests`, exported functions, and functions with no local
+  callers.
 - Package-aware standalone call graph commands for package-qualified targets.
 - Receiver-variable method calls in standalone call graph commands, resolved
   with package-level type information.
@@ -148,16 +151,19 @@ Current limitations:
   was used through `interfaceAnalysisMode`.
 - Test discovery uses direct references, same-package tests, and literal
   `t.Run` subtest names; dynamic table-driven names may be incomplete.
-- Callers, callees, and paths still do not resolve dynamic dispatch,
-  reflection, function values, or every imported-package receiver call.
+- Callers, callees, paths, and entrypoints still do not resolve dynamic
+  dispatch, reflection, function values, or every imported-package receiver
+  call.
+- Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP
+  routers and CLI command handlers are not inferred yet.
 - Unqualified standalone call graph targets can be ambiguous across packages;
   GoSherpa reports candidates and package-qualified examples for
   disambiguation.
 - Reading-order entries still expose compact positions rather than full source
   ranges.
-- Test callers are available with `callers --tests` and `explain --tests`;
-  tests are still skipped by some other analysis paths and are not yet
-  first-class.
+- Test callers are available with `callers --tests`, `entrypoints --tests`,
+  and `explain --tests`; tests are still skipped by some other analysis paths
+  and are not yet first-class.
 - Context export currently supports symbol, file, package, and diff targets.
 
 ## Roadmap Overview
@@ -742,6 +748,9 @@ Done when:
 
 ### 4.3 Entrypoints
 
+Status: first slice implemented as `gosherpa entrypoints <target>` with human
+and JSON output.
+
 Human question:
 
 ```text
@@ -752,6 +761,8 @@ Command sketch:
 
 ```bash
 gosherpa entrypoints UserService.Create
+gosherpa entrypoints UserService.Create --tests
+gosherpa entrypoints ./internal/user.UserService.Create --json
 ```
 
 Potential entrypoint kinds:
@@ -766,7 +777,7 @@ Potential entrypoint kinds:
 MVP:
 
 - Start with `main.main`, tests, exported functions, and functions with no local
-  callers.
+  callers. Implemented.
 - Avoid framework-specific inference until there is a clear need.
 
 Done when:
@@ -1382,7 +1393,8 @@ Current status:
 - `--tags` is implemented for semantic/loading-aware commands: `refs`,
   `callers`, `callees`, `explain`, `context`, `impact`, `implementers`,
   `interfaces`, `pr`, `doctor`, and `tests affected`.
-- `--tests` is implemented for `search`, `callers`, `explain`, and `context`.
+- `--tests` is implemented for `search`, `entrypoints`, `callers`, `explain`,
+  and `context`.
 
 Requirements:
 

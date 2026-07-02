@@ -150,6 +150,36 @@ Related tests:
 }
 ```
 
+Entrypoints:
+
+```json
+{
+  "name": "Entry",
+  "package": "./internal/service",
+  "kind": "exported",
+  "position": {
+    "file": "internal/service/service.go",
+    "line": 12,
+    "column": 1
+  },
+  "range": {
+    "start": {
+      "file": "internal/service/service.go",
+      "line": 12,
+      "column": 1
+    },
+    "end": {
+      "file": "internal/service/service.go",
+      "line": 12,
+      "column": 11
+    }
+  }
+}
+```
+
+Entrypoint `kind` is one of `main`, `test`, `exported`, or
+`no-local-callers`.
+
 Test plans:
 
 ```json
@@ -277,6 +307,33 @@ Data:
 - `confidence`: deterministic trust label.
 - `limitations`: call-graph blind spots and scope boundaries.
 - `callees`: array of callee entries. The array is present even when empty.
+
+`data.warnings` is absent; use envelope `warnings`.
+
+## `entrypoints` Data
+
+Envelope:
+
+- `command`: `entrypoints`
+- `target`: resolved call target
+
+Data:
+
+```json
+{
+  "analysisMode": "typechecked",
+  "confidence": "medium",
+  "limitations": [],
+  "entrypoints": []
+}
+```
+
+- `analysisMode`: call analysis trust mode, either `typechecked` or
+  `ast-fallback`.
+- `confidence`: deterministic trust label.
+- `limitations`: call-graph and entrypoint-classification blind spots.
+- `entrypoints`: array of entrypoint entries. The array is present even when
+  empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 

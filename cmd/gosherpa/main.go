@@ -204,6 +204,13 @@ type callPathsJSONData struct {
 	Paths        []sherpa.CallPath `json:"paths"`
 }
 
+type entrypointsJSONData struct {
+	AnalysisMode string              `json:"analysisMode"`
+	Confidence   string              `json:"confidence"`
+	Limitations  []string            `json:"limitations"`
+	EntryPoints  []sherpa.EntryPoint `json:"entrypoints"`
+}
+
 type explainJSONData struct {
 	Target                  string                         `json:"target"`
 	AnalysisMode            string                         `json:"analysisMode"`
@@ -811,7 +818,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --tests is only supported by symbols, search, callers, explain, and context")
+		fmt.Fprintln(stderr, "error: --tests is only supported by symbols, search, entrypoints, callers, explain, and context")
 		return exitUsage
 	}
 
@@ -826,7 +833,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
-		fmt.Fprintln(stderr, "error: --tags is only supported by refs, callers, callees, explain, context, impact, tests affected, implementers, interfaces, pr, and doctor")
+		fmt.Fprintln(stderr, "error: --tags is only supported by refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interfaces, pr, and doctor")
 		return exitUsage
 	}
 
@@ -1524,6 +1531,40 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 		fmt.Fprint(stdout, sherpa.FormatCallPaths(result))
 		return exitSuccess
+	case "entrypoints":
+		if len(invocation.CommandArgs) < 1 {
+			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] entrypoints <function-or-method> [--tests]")
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		target := invocation.CommandArgs[0]
+
+		result, err := sherpa.FindEntryPointsWithOptions(root, target, sherpa.CallOptions{
+			IncludeTests: invocation.IncludeTests,
+			BuildTags:    invocation.BuildTags,
+		})
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "entrypoints", target, stderr, err)
+		}
+
+		if invocation.JSON {
+			normalizedResult := entrypointsJSONResult(result)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"entrypoints",
+				normalizedResult.Target,
+				normalizedResult.Warnings,
+				entrypointsJSONDataFromResult(normalizedResult),
+			))
+		}
+
+		fmt.Fprint(stdout, sherpa.FormatEntryPoints(result))
+		return exitSuccess
 	case "callers":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]")
@@ -1620,7 +1661,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr", "doctor":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "entrypoints", "callers", "callees", "explain", "context", "pr", "doctor":
 		return true
 	default:
 		return false
@@ -1629,7 +1670,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr", "doctor":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "entrypoints", "callers", "callees", "explain", "context", "pr", "doctor":
 		return true
 	default:
 		return false
@@ -1658,7 +1699,7 @@ func isPathCommand(command string) bool {
 
 func supportsTestsOption(command string) bool {
 	switch command {
-	case "symbols", "search", "callers", "explain", "context":
+	case "symbols", "search", "entrypoints", "callers", "explain", "context":
 		return true
 	default:
 		return false
@@ -1676,7 +1717,7 @@ func supportsContextOption(command string) bool {
 
 func supportsTagsOption(invocation cliInvocation) bool {
 	switch invocation.Command {
-	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr", "doctor":
+	case "refs", "entrypoints", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr", "doctor":
 		return true
 	case "tests":
 		return isTestsAffectedInvocation(invocation)
@@ -2093,6 +2134,22 @@ func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONDat
 	}
 }
 
+func entrypointsJSONResult(result sherpa.EntryPointsResult) sherpa.EntryPointsResult {
+	result.EntryPoints = nonNilSlice(result.EntryPoints)
+	result.Warnings = nonNilSlice(result.Warnings)
+
+	return result
+}
+
+func entrypointsJSONDataFromResult(result sherpa.EntryPointsResult) entrypointsJSONData {
+	return entrypointsJSONData{
+		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  entrypointLimitations(result.AnalysisMode),
+		EntryPoints:  result.EntryPoints,
+	}
+}
+
 func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.References = nonNilSlice(report.References)
 	report.Callers = nonNilSlice(report.Callers)
@@ -2299,6 +2356,16 @@ func callPathLimitations() []string {
 	}
 }
 
+func entrypointLimitations(analysisMode string) []string {
+	limitations := callLimitations(analysisMode)
+	limitations = append(limitations,
+		"Entry point classification is heuristic: main functions, test functions, exported functions, and functions with no local callers.",
+		"Framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.",
+	)
+
+	return limitations
+}
+
 func explainLimitations(referenceAnalysisMode string, callAnalysisMode string) []string {
 	limitations := []string{
 		"Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
@@ -2459,6 +2526,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  interfaces <type>")
 	fmt.Fprintln(writer, "  path <from> <to>")
 	fmt.Fprintln(writer, "  paths <from> <to> [--limit <n>] [--max-depth <n>]")
+	fmt.Fprintln(writer, "  entrypoints <function-or-method> [--tests]")
 	fmt.Fprintln(writer, "  callers <function-or-method> [--tests] [--context]")
 	fmt.Fprintln(writer, "  callees <function-or-method> [--context]")
 }

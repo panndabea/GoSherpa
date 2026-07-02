@@ -81,18 +81,19 @@ type callTarget struct {
 }
 
 type functionInfo struct {
-	Package    string
-	ImportPath string
-	ModulePath string
-	Receiver   string
-	Name       string
-	Target     string
-	Decl       *ast.FuncDecl
-	FileSet    *token.FileSet
-	TypeInfo   *types.Info
-	Position   Position
-	Root       string
-	Imports    map[string]string
+	Package     string
+	PackageName string
+	ImportPath  string
+	ModulePath  string
+	Receiver    string
+	Name        string
+	Target      string
+	Decl        *ast.FuncDecl
+	FileSet     *token.FileSet
+	TypeInfo    *types.Info
+	Position    Position
+	Root        string
+	Imports     map[string]string
 }
 
 type callReference struct {
@@ -474,18 +475,19 @@ func collectFunctionInfos(root string) ([]functionInfo, error) {
 				})
 
 				functions = append(functions, functionInfo{
-					Package:    packagePath,
-					ImportPath: importPath,
-					ModulePath: modulePath,
-					Receiver:   receiver,
-					Name:       name,
-					Target:     functionTargetName(funcDecl),
-					Decl:       funcDecl,
-					FileSet:    fileSet,
-					TypeInfo:   info,
-					Position:   position,
-					Root:       rootPath,
-					Imports:    imports,
+					Package:     packagePath,
+					PackageName: parsedFile.Name.Name,
+					ImportPath:  importPath,
+					ModulePath:  modulePath,
+					Receiver:    receiver,
+					Name:        name,
+					Target:      functionTargetName(funcDecl),
+					Decl:        funcDecl,
+					FileSet:     fileSet,
+					TypeInfo:    info,
+					Position:    position,
+					Root:        rootPath,
+					Imports:     imports,
 				})
 			}
 		}
@@ -555,18 +557,19 @@ func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {
 				})
 
 				functions = append(functions, functionInfo{
-					Package:    pkg.PackagePath,
-					ImportPath: pkg.ImportPath,
-					ModulePath: modulePath,
-					Receiver:   receiver,
-					Name:       name,
-					Target:     functionTargetName(funcDecl),
-					Decl:       funcDecl,
-					FileSet:    pkg.FileSet,
-					TypeInfo:   pkg.TypesInfo,
-					Position:   position,
-					Root:       repo.Root,
-					Imports:    imports,
+					Package:     pkg.PackagePath,
+					PackageName: pkg.Name,
+					ImportPath:  pkg.ImportPath,
+					ModulePath:  modulePath,
+					Receiver:    receiver,
+					Name:        name,
+					Target:      functionTargetName(funcDecl),
+					Decl:        funcDecl,
+					FileSet:     pkg.FileSet,
+					TypeInfo:    pkg.TypesInfo,
+					Position:    position,
+					Root:        repo.Root,
+					Imports:     imports,
 				})
 			}
 		}
@@ -645,18 +648,19 @@ func semanticTestCallFunctionInfos(repo semantics.Repository) []functionInfo {
 				seen[key] = struct{}{}
 
 				functions = append(functions, functionInfo{
-					Package:    functionPackage,
-					ImportPath: pkg.ImportPath,
-					ModulePath: modulePath,
-					Receiver:   receiver,
-					Name:       name,
-					Target:     functionTargetName(funcDecl),
-					Decl:       funcDecl,
-					FileSet:    pkg.FileSet,
-					TypeInfo:   pkg.TypesInfo,
-					Position:   position,
-					Root:       repo.Root,
-					Imports:    imports,
+					Package:     functionPackage,
+					PackageName: pkg.Name,
+					ImportPath:  pkg.ImportPath,
+					ModulePath:  modulePath,
+					Receiver:    receiver,
+					Name:        name,
+					Target:      functionTargetName(funcDecl),
+					Decl:        funcDecl,
+					FileSet:     pkg.FileSet,
+					TypeInfo:    pkg.TypesInfo,
+					Position:    position,
+					Root:        repo.Root,
+					Imports:     imports,
 				})
 			}
 		}
@@ -797,18 +801,19 @@ func collectASTTestCallerFunctionInfos(root string) ([]functionInfo, error) {
 				})
 
 				functions = append(functions, functionInfo{
-					Package:    functionPackage,
-					ImportPath: importPath,
-					ModulePath: modulePath,
-					Receiver:   receiver,
-					Name:       name,
-					Target:     functionTargetName(funcDecl),
-					Decl:       funcDecl,
-					FileSet:    fileSet,
-					TypeInfo:   info,
-					Position:   position,
-					Root:       rootPath,
-					Imports:    imports,
+					Package:     functionPackage,
+					PackageName: key.Package,
+					ImportPath:  importPath,
+					ModulePath:  modulePath,
+					Receiver:    receiver,
+					Name:        name,
+					Target:      functionTargetName(funcDecl),
+					Decl:        funcDecl,
+					FileSet:     fileSet,
+					TypeInfo:    info,
+					Position:    position,
+					Root:        rootPath,
+					Imports:     imports,
 				})
 			}
 		}
