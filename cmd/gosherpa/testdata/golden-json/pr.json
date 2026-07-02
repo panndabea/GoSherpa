@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "command": "pr",
+  "target": "HEAD",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "base": "HEAD",
+    "analysisMode": "git-diff+ast",
+    "confidence": "medium",
+    "limitations": [
+      "Diff impact is based on git changed files and hunk-level changed symbol extraction.",
+      "Impact analysis uses syntax plus local package dependency and interface signals.",
+      "Statement-level semantic consequences are not fully inferred.",
+      "Dynamic dispatch, reflection, and function values are not resolved."
+    ],
+    "changedFiles": [
+      "service.go"
+    ],
+    "changedPackages": [
+      "."
+    ],
+    "changedSymbols": [
+      "Added"
+    ],
+    "affectedPackages": [
+      ".",
+      "./cmd/app"
+    ],
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "interfaceAnalysisMode": "typechecked",
+    "risk": {
+      "level": "medium",
+      "reasons": [
+        "Changes reach dependent packages outside the directly changed package set."
+      ]
+    },
+    "affectedTests": [
+      {
+        "name": "TestTarget",
+        "package": ".",
+        "packageName": "golden",
+        "position": {
+          "file": "service_test.go",
+          "line": 5
+        },
+        "directReference": false,
+        "externalPackage": false
+      }
+    ],
+    "testCommands": [
+      "go test .",
+      "go test ./cmd/app"
+    ],
+    "testPlan": {
+      "direct": [],
+      "related": [
+        {
+          "command": "go test .",
+          "reason": "Tests in target package .: TestTarget.",
+          "package": ".",
+          "test": "TestTarget"
+        }
+      ],
+      "callerPackages": [],
+      "fallback": [
+        {
+          "command": "go test ./cmd/app",
+          "reason": "No matching test functions were found in ./cmd/app; run package tests to compile impacted code.",
+          "package": "./cmd/app"
+        }
+      ]
+    },
+    "verificationCommands": [
+      "go test .",
+      "go test ./cmd/app",
+      "go test ./..."
+    ]
+  }
+}

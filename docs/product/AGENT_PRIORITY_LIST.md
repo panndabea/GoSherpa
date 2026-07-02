@@ -246,15 +246,16 @@ Done when:
 
 ### 6. One Pull-Request Intelligence Command
 
-Add one high-level command for change review.
+Status: first slice implemented as one high-level command for change review.
 
 Command sketch:
 
 ```bash
+gosherpa pr --base main
 gosherpa pr --base main --json
 ```
 
-The command should summarize:
+The first slice summarizes:
 
 - changed files
 - changed packages
@@ -270,7 +271,7 @@ Why this helps:
 For review and repair tasks, the agent's first question is usually "what did
 this change touch and what should I run?" One command should answer that.
 
-Done when:
+Done for the first slice:
 
 - The command is a thin composition over existing impact, symbol, interface, and
   test engines.
@@ -385,7 +386,7 @@ Done when:
 3. Typechecked loading for the most important relationships.
 4. Structured test planning with reasons.
 5. Incremental snapshot.
-6. PR intelligence command.
+6. Harden the PR intelligence command.
 7. Position ranges.
 8. MCP or server mode.
 9. Schema documentation.

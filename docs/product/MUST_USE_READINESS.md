@@ -19,6 +19,9 @@ GoSherpa already has real MVP substance:
 - affected test suggestions
 - context export for symbols, files, packages, and diffs, including confidence,
   analysis mode, and limitations fields
+- PR review summaries through `gosherpa pr --base <ref>`, including changed
+  files, packages, symbols, risk notes, affected tests, and verification
+  commands
 - stable JSON output for commands
 - ambiguity diagnostics and package-qualified target support
 
@@ -148,8 +151,11 @@ the whole suite by default.
 
 ### 4. One Pull-Request Intelligence Command
 
-Add a high-level review command that composes existing impact, symbol,
-interface, and test engines.
+Status: first slice implemented as `gosherpa pr --base <ref>` with human and
+JSON output.
+
+Keep improving the high-level review command that composes existing impact,
+symbol, interface, and test engines.
 
 Command sketch:
 
@@ -158,7 +164,7 @@ gosherpa pr --base main
 gosherpa pr --base main --json
 ```
 
-It should summarize:
+The first slice summarizes:
 
 - changed files
 - changed packages
@@ -169,7 +175,7 @@ It should summarize:
 - recommended tests
 - verification commands
 
-Done when:
+Done for the first slice:
 
 - human output is short enough for a PR comment
 - JSON output is stable enough for CI and agents

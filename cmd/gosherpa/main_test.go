@@ -515,6 +515,7 @@ func TestPrintUsageIncludesImpact(t *testing.T) {
 		"impact package <package>",
 		"impact symbol <symbol>",
 		"impact diff --base <ref>",
+		"pr --base <ref>",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -1805,6 +1806,119 @@ func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {
 
 	if result.Stdout != "" {
 		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainPrintsPRUsageWhenBaseIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "pr"})
+
+	want := "usage: gosherpa [--root <path>] pr --base <ref>\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsPRCommand(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"PR REVIEW",
+		"Base: HEAD",
+		"Analysis: git-diff+ast",
+		"Confidence: medium",
+		"RISK",
+		"Level: medium",
+		"dependent packages",
+		"CHANGED FILES",
+		"internal/auth/session.go",
+		"CHANGED PACKAGES",
+		"./internal/auth",
+		"CHANGED SYMBOLS",
+		"NewSession",
+		"AFFECTED PACKAGES",
+		"./internal/api",
+		"AFFECTED TESTS",
+		"TestSession",
+		"TestHandler",
+		"TEST PLAN",
+		"go test ./internal/api",
+		"go test ./internal/auth",
+		"VERIFY",
+		"go test ./...",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsPRCommandAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "pr", "HEAD", "example.com/app")
+
+	if data["analysisMode"] != "git-diff+ast" {
+		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != "medium" {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+	risk, ok := data["risk"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected risk object, got %T", data["risk"])
+	}
+	if risk["level"] != "medium" {
+		t.Fatalf("expected medium risk, got %v", risk["level"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
+	assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
+	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
+	assertMainTestJSONArrayHasLength(t, data, "verificationCommands", 3)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "PR REVIEW") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -3631,6 +3745,50 @@ import "example.com/app"
 
 func Run() {
 	service.Entry()
+}
+`)
+
+	return tmp
+}
+
+func writeMainPRDiffProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestSession(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler.go"), `package api
+
+import "example.com/app/internal/auth"
+
+var _ = auth.Session{}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "api", "handler_test.go"), `package api
+
+import "testing"
+
+func TestHandler(t *testing.T) {}
+`)
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
 }
 `)
 

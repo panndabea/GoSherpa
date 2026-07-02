@@ -906,6 +906,36 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			return exitUsage
 		}
 
+	case "pr":
+		if len(invocation.CommandArgs) != 0 || !invocation.HasBaseOption {
+			printPRUsage(stderr)
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		report, err := analyzePR(root, invocation.BaseRef, invocation.BuildTags)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "pr", invocation.BaseRef, stderr, err)
+		}
+
+		if invocation.JSON {
+			normalizedReport := normalizePRReport(report)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"pr",
+				normalizedReport.Base,
+				normalizedReport.Warnings,
+				normalizedReport,
+			))
+		}
+
+		fmt.Fprint(stdout, formatPRReport(report))
+		return exitSuccess
+
 	case "explain":
 		if len(invocation.CommandArgs) < 1 {
 			fmt.Fprintln(stderr, "usage: gosherpa [--root <path>] explain <symbol> [--tests]")
@@ -1480,7 +1510,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr":
 		return true
 	default:
 		return false
@@ -1489,7 +1519,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr":
 		return true
 	default:
 		return false
@@ -1497,7 +1527,7 @@ func supportsJSON(command string) bool {
 }
 
 func isBaseAwareInvocation(invocation cliInvocation) bool {
-	return isContextDiffInvocation(invocation) || isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation)
+	return isContextDiffInvocation(invocation) || isImpactDiffInvocation(invocation) || isTestsAffectedInvocation(invocation) || isPRInvocation(invocation)
 }
 
 func supportsLimitOption(command string) bool {
@@ -1528,7 +1558,7 @@ func supportsContextOption(command string) bool {
 
 func supportsTagsOption(invocation cliInvocation) bool {
 	switch invocation.Command {
-	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces":
+	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr":
 		return true
 	case "tests":
 		return isTestsAffectedInvocation(invocation)
@@ -1588,6 +1618,10 @@ func isContextDiffInvocation(invocation cliInvocation) bool {
 
 func isTestsAffectedInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "tests" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "affected"
+}
+
+func isPRInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "pr"
 }
 
 func isImpactReportSubcommand(command string) bool {
@@ -2234,6 +2268,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  impact package <package>")
 	fmt.Fprintln(writer, "  impact symbol <symbol>")
 	fmt.Fprintln(writer, "  impact diff --base <ref>")
+	fmt.Fprintln(writer, "  pr --base <ref>")
 	fmt.Fprintln(writer, "  tests <symbol-or-package>")
 	fmt.Fprintln(writer, "  tests affected --base <ref>")
 	fmt.Fprintln(writer, "  deps <package>")
@@ -2278,6 +2313,10 @@ func printImpactUsage(writer io.Writer) {
 
 func printImpactDiffUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] impact diff --base <ref>")
+}
+
+func printPRUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] pr --base <ref>")
 }
 
 func printImpactSubcommandUsage(writer io.Writer, kind string) {

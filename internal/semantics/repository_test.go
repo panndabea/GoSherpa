@@ -146,6 +146,35 @@ func TestPackageWarningsKeepsCacheMissWithoutUsableData(t *testing.T) {
 	}
 }
 
+func TestPackageLoadHasCacheAccessErrorRecognizesSandboxPermissionErrors(t *testing.T) {
+	pkgs := []*packages.Package{
+		{
+			PkgPath: "example.com/app",
+			Errors: []packages.Error{
+				{
+					Msg: "-: open /Users/example/Library/Caches/go-build/cf/cache-d: operation not permitted",
+				},
+			},
+		},
+	}
+
+	if !packageLoadHasCacheAccessError(pkgs) {
+		t.Fatal("expected go-build cache permission error to be recognized")
+	}
+
+	ordinaryTypeError := []*packages.Package{
+		{
+			PkgPath: "example.com/app",
+			Errors: []packages.Error{
+				{Msg: "service.go:4:2: undefined: Missing"},
+			},
+		},
+	}
+	if packageLoadHasCacheAccessError(ordinaryTypeError) {
+		t.Fatal("expected ordinary type error not to be treated as cache access")
+	}
+}
+
 func semanticTestPackagePaths(repo Repository) []string {
 	var paths []string
 	for _, pkg := range repo.Packages {

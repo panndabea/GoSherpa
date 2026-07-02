@@ -54,6 +54,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
+| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, risk, affected tests, and verification commands |
 | Test discovery | `gosherpa tests ParseFile` | Lists related tests and suggested `go test` commands |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
@@ -121,6 +122,8 @@ Then explore the repository:
 ./gosherpa impact symbol ParseFile
 ./gosherpa impact diff --base HEAD
 ./gosherpa impact diff --base HEAD --json
+./gosherpa pr --base HEAD
+./gosherpa pr --base HEAD --json
 ./gosherpa tests ParseFile
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
@@ -183,6 +186,7 @@ go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
 go run ./cmd/gosherpa impact file internal/sherpa/impact.go
 go run ./cmd/gosherpa impact diff --base HEAD
+go run ./cmd/gosherpa pr --base HEAD
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa tests affected --base HEAD
 go run ./cmd/gosherpa path main FindCallers
@@ -242,6 +246,9 @@ Implemented:
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
+- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed
+  files, packages, symbols, risk notes, affected tests, and verification
+  commands
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
 - Changed-symbol extraction from git diff hunks, including deleted symbols from base files

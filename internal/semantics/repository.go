@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -45,11 +46,38 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 		return Repository{}, err
 	}
 
+	patterns := packageLoadPatterns(options)
+	loaded, err := loadPackages(rootPath, options, "")
+	if err != nil {
+		if packageLoadErrorIsCacheAccess(err.Error()) {
+			if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options); ok {
+				return retried, retryErr
+			}
+		}
+
+		return Repository{}, fmt.Errorf("load packages: %w", err)
+	}
+
+	repo, err := repositoryFromLoaded(rootPath, patterns, loaded)
+	if err != nil && packageLoadHasCacheAccessError(loaded) {
+		if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options); ok {
+			return retried, retryErr
+		}
+	}
+
+	return repo, err
+}
+
+func packageLoadPatterns(options LoadOptions) []string {
 	patterns := options.Patterns
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
 	}
 
+	return patterns
+}
+
+func loadPackages(root string, options LoadOptions, goCache string) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName |
 			packages.NeedFiles |
@@ -59,22 +87,62 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 			packages.NeedSyntax |
 			packages.NeedTypesInfo |
 			packages.NeedTypesSizes,
-		Dir:        rootPath,
+		Dir:        root,
 		Tests:      options.IncludeTests,
 		BuildFlags: packageLoadBuildFlags(options),
 	}
-
-	loaded, err := packages.Load(cfg, patterns...)
-	if err != nil {
-		return Repository{}, fmt.Errorf("load packages: %w", err)
+	if strings.TrimSpace(goCache) != "" {
+		cfg.Env = envWith("GOCACHE", goCache)
 	}
+
+	return packages.Load(cfg, packageLoadPatterns(options)...)
+}
+
+func retryLoadRepositoryWithWritableCache(root string, options LoadOptions) (Repository, error, bool) {
+	cache, err := writableGoBuildCache()
+	if err != nil {
+		return Repository{}, nil, false
+	}
+
+	loaded, err := loadPackages(root, options, cache)
+	if err != nil {
+		return Repository{}, fmt.Errorf("load packages: %w", err), true
+	}
+
+	repo, err := repositoryFromLoaded(root, packageLoadPatterns(options), loaded)
+	return repo, err, true
+}
+
+func writableGoBuildCache() (string, error) {
+	path := filepath.Join(os.TempDir(), "gosherpa-go-build-cache")
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func envWith(key string, value string) []string {
+	prefix := key + "="
+	env := os.Environ()
+	for i, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			env[i] = prefix + value
+			return env
+		}
+	}
+
+	return append(env, prefix+value)
+}
+
+func repositoryFromLoaded(root string, patterns []string, loaded []*packages.Package) (Repository, error) {
 	if len(loaded) == 0 {
 		return Repository{}, fmt.Errorf("load packages: no packages matched %s", strings.Join(patterns, ", "))
 	}
 
-	repo := Repository{Root: rootPath}
+	repo := Repository{Root: root}
 	for _, pkg := range loaded {
-		semanticPackage, ok, err := packageFromLoaded(rootPath, pkg)
+		semanticPackage, ok, err := packageFromLoaded(root, pkg)
 		if err != nil {
 			return Repository{}, err
 		}
@@ -83,7 +151,7 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 		}
 
 		repo.Packages = append(repo.Packages, semanticPackage)
-		repo.Warnings = append(repo.Warnings, packageWarnings(rootPath, pkg)...)
+		repo.Warnings = append(repo.Warnings, packageWarnings(root, pkg)...)
 	}
 
 	if len(repo.Packages) == 0 {
@@ -224,6 +292,37 @@ func packageLoadWarningIsActionable(pkg *packages.Package, message string) bool 
 	}
 
 	return true
+}
+
+func packageLoadHasCacheAccessError(packages []*packages.Package) bool {
+	for _, pkg := range packages {
+		if pkg == nil {
+			continue
+		}
+		for _, packageErr := range pkg.Errors {
+			if packageLoadErrorIsCacheAccess(packageErr.Error()) {
+				return true
+			}
+		}
+		for _, typeErr := range pkg.TypeErrors {
+			if packageLoadErrorIsCacheAccess(typeErr.Error()) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func packageLoadErrorIsCacheAccess(message string) bool {
+	value := strings.ToLower(filepath.ToSlash(message))
+	if !strings.Contains(value, "go-build") && !strings.Contains(value, "loading compiled go files from cache") {
+		return false
+	}
+
+	return strings.Contains(value, "operation not permitted") ||
+		strings.Contains(value, "permission denied") ||
+		strings.Contains(value, "cache entry not found")
 }
 
 func packageLoadWarningIsTransientCacheMiss(message string) bool {
