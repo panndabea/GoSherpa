@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GoSherpa - Code-Struktur verstehen, ohne dich zu verlaufen</title>
-  <meta name="description" content="GoSherpa ist eine ruhige, deterministische CLI fuer Go-Projekte: Symbole finden, Referenzen verstehen, Impact abschaetzen und Agent-Kontext exportieren.">
+  <meta name="description" content="GoSherpa ist eine ruhige, deterministische CLI für Go-Projekte: Symbole finden, Referenzen verstehen, Impact abschätzen und Agent-Kontext exportieren.">
   <meta property="og:title" content="GoSherpa">
-  <meta property="og:description" content="Structural code intelligence for Go projects - erklaert als freundlicher Comic-Guide.">
+  <meta property="og:description" content="Strukturelle Code-Intelligenz für Go-Projekte, erklärt als freundlicher Comic-Guide.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://panndabea.github.io/GoSherpa/">
   <meta property="og:image" content="https://panndabea.github.io/GoSherpa/pictures/gosherpa-hero-bg-v2.png">
+  <meta property="og:locale" content="de_DE">
   <meta name="theme-color" content="#0f6f7d">
   <link rel="canonical" href="https://panndabea.github.io/GoSherpa/">
   <link rel="preload" as="image" href="pictures/gosherpa-hero-bg-v2.png">
@@ -100,6 +101,12 @@
       font-weight: 700;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
     .nav-links a {
       padding: 0.55rem 0.75rem;
       border-radius: 8px;
@@ -110,6 +117,42 @@
     .nav-links a:focus-visible {
       background: rgba(255, 255, 255, 0.18);
       outline: none;
+    }
+
+    .lang-switcher {
+      display: inline-flex;
+      gap: 0.18rem;
+      padding: 0.24rem;
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      border-radius: 8px;
+      background: rgba(3, 31, 40, 0.22);
+      backdrop-filter: blur(8px);
+    }
+
+    .lang-button {
+      width: 2.35rem;
+      min-height: 2.15rem;
+      border: 0;
+      border-radius: 6px;
+      color: #ffffff;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .lang-button:hover,
+    .lang-button:focus-visible {
+      background: rgba(255, 255, 255, 0.18);
+      outline: none;
+    }
+
+    .lang-button.is-active {
+      color: #0a2630;
+      background: #ffffff;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
     }
 
     .hero {
@@ -559,6 +602,10 @@
         align-items: flex-start;
       }
 
+      .header-actions {
+        align-items: flex-end;
+      }
+
       .nav-links {
         display: none;
       }
@@ -639,36 +686,43 @@
   </style>
 </head>
 <body>
-  <header class="site-header" aria-label="Hauptnavigation">
-    <a class="brand" href="#top" aria-label="GoSherpa Start">
+  <header class="site-header" aria-label="Hauptnavigation" data-i18n-label="header.aria">
+    <a class="brand" href="#top" aria-label="GoSherpa Start" data-i18n-label="brand.aria">
       <img src="pictures/gosherpa-readme-hero.png" alt="" width="52" height="52">
       <span>GoSherpa</span>
     </a>
-    <nav class="nav-links" aria-label="Seitenbereiche">
-      <a href="#comics">Comics</a>
-      <a href="#features">Funktionen</a>
-      <a href="#agents">Agents</a>
-      <a href="#try">Ausprobieren</a>
-    </nav>
+    <div class="header-actions">
+      <nav class="nav-links" aria-label="Seitenbereiche" data-i18n-label="nav.aria">
+        <a href="#comics" data-i18n="nav.comics">Comics</a>
+        <a href="#features" data-i18n="nav.features">Funktionen</a>
+        <a href="#agents" data-i18n="nav.agents">Agents</a>
+        <a href="#try" data-i18n="nav.try">Ausprobieren</a>
+      </nav>
+      <div class="lang-switcher" role="group" aria-label="Sprache auswählen" data-i18n-label="language.aria">
+        <button class="lang-button is-active" type="button" data-lang-option="de" aria-label="Deutsch" aria-pressed="true">DE</button>
+        <button class="lang-button" type="button" data-lang-option="en" aria-label="English" aria-pressed="false">EN</button>
+        <button class="lang-button" type="button" data-lang-option="fr" aria-label="Français" aria-pressed="false">FR</button>
+      </div>
+    </div>
   </header>
 
   <main id="top">
-    <section class="hero" aria-label="GoSherpa Comic Hero">
+    <section class="hero" aria-label="GoSherpa Comic Hero" data-i18n-label="hero.aria">
       <div class="hero-content">
-        <p class="eyebrow">Structural code intelligence for Go projects</p>
+        <p class="eyebrow" data-i18n="hero.eyebrow">Strukturelle Code-Intelligenz für Go-Projekte</p>
         <h1>GoSherpa</h1>
-        <p class="hero-copy">Frag eine Code-Struktur-Frage. Bekomme eine kleine, verlässliche Antwort: Symbole, Referenzen, Call-Pfade, Impact, Tests und Agent-Kontext direkt aus deinem Go-Repository.</p>
-        <div class="hero-actions" aria-label="Primaere Aktionen">
-          <a class="button primary" href="https://github.com/panndabea/GoSherpa">Auf GitHub ansehen</a>
-          <a class="button secondary" href="docs/CLI_REFERENCE.md">CLI-Referenz lesen</a>
+        <p class="hero-copy" data-i18n="hero.copy">Frag eine Code-Struktur-Frage. Bekomme eine kleine, verlässliche Antwort: Symbole, Referenzen, Call-Pfade, Impact, Tests und Agent-Kontext direkt aus deinem Go-Repository.</p>
+        <div class="hero-actions" aria-label="Primäre Aktionen" data-i18n-label="hero.actions.aria">
+          <a class="button primary" href="https://github.com/panndabea/GoSherpa" data-i18n="hero.github">Auf GitHub ansehen</a>
+          <a class="button secondary" href="docs/CLI_REFERENCE.md" data-i18n="hero.cli">CLI-Referenz lesen</a>
         </div>
-        <ul class="hero-points" aria-label="Kurzueberblick">
-          <li>Symbol-Lookup</li>
-          <li>Referenzen</li>
-          <li>Caller &amp; Callees</li>
-          <li>Impact</li>
-          <li>PR-Kontext</li>
-          <li>JSON fuer Agents</li>
+        <ul class="hero-points" aria-label="Kurzüberblick" data-i18n-label="hero.points.aria">
+          <li data-i18n="hero.point.symbol">Symbol-Lookup</li>
+          <li data-i18n="hero.point.refs">Referenzen</li>
+          <li data-i18n="hero.point.calls">Caller &amp; Callees</li>
+          <li data-i18n="hero.point.impact">Impact</li>
+          <li data-i18n="hero.point.pr">PR-Kontext</li>
+          <li data-i18n="hero.point.json">JSON für Agents</li>
         </ul>
       </div>
     </section>
@@ -676,26 +730,26 @@
     <section>
       <div class="wrap intro-grid">
         <div>
-          <p class="section-kicker">Warum GoSherpa</p>
-          <h2 class="section-title">Wenn der Code zum Gebirge wird, zeigt GoSherpa die Route.</h2>
-          <p class="section-lead">GoSherpa liest dein Go-Projekt strukturell statt magisch. Die CLI gibt dir ruhige, wiederholbare Antworten, die du im Terminal scannen, in Reviews verwenden oder als kompakten Kontext an Coding Agents weitergeben kannst.</p>
+          <p class="section-kicker" data-i18n="why.kicker">Warum GoSherpa</p>
+          <h2 class="section-title" data-i18n="why.title">Wenn der Code zum Gebirge wird, zeigt GoSherpa die Route.</h2>
+          <p class="section-lead" data-i18n="why.lead">GoSherpa liest dein Go-Projekt strukturell statt magisch. Die CLI gibt dir ruhige, wiederholbare Antworten, die du im Terminal scannen, in Reviews verwenden oder als kompakten Kontext an Coding Agents weitergeben kannst.</p>
         </div>
-        <ul class="ask-list" aria-label="Typische Fragen und Antworten">
+        <ul class="ask-list" aria-label="Typische Fragen und Antworten" data-i18n-label="ask.aria">
           <li>
-            <strong>Wo ist das definiert?</strong>
-            <span>Symbol, Datei, Signatur und Zeilennummer.</span>
+            <strong data-i18n="ask.defined.q">Wo ist das definiert?</strong>
+            <span data-i18n="ask.defined.a">Symbol, Datei, Signatur und Zeilennummer.</span>
           </li>
           <li>
-            <strong>Wer benutzt das?</strong>
-            <span>Referenzen, direkte Caller und relevante Tests.</span>
+            <strong data-i18n="ask.uses.q">Wer benutzt das?</strong>
+            <span data-i18n="ask.uses.a">Referenzen, direkte Caller und relevante Tests.</span>
           </li>
           <li>
-            <strong>Was ruft diese Funktion auf?</strong>
-            <span>Callees und lokale Call-Pfade durch dein Repository.</span>
+            <strong data-i18n="ask.calls.q">Was ruft diese Funktion auf?</strong>
+            <span data-i18n="ask.calls.a">Callees und lokale Call-Pfade durch dein Repository.</span>
           </li>
           <li>
-            <strong>Was betrifft mein Diff?</strong>
-            <span>Betroffene Packages, Risiko und sinnvolle Testbefehle.</span>
+            <strong data-i18n="ask.diff.q">Was betrifft mein Diff?</strong>
+            <span data-i18n="ask.diff.a">Betroffene Packages, Risiko und sinnvolle Testbefehle.</span>
           </li>
         </ul>
       </div>
@@ -705,36 +759,36 @@
       <div class="wrap">
         <div class="section-head">
           <div>
-            <p class="section-kicker">Comic-Guides</p>
-            <h2 class="section-title">Drei Situationen, in denen GoSherpa sofort hilft.</h2>
+            <p class="section-kicker" data-i18n="comics.kicker">Comic-Guides</p>
+            <h2 class="section-title" data-i18n="comics.title">Drei Situationen, in denen GoSherpa sofort hilft.</h2>
           </div>
-          <p class="section-lead">Die Bilder erzählen die Geschichte, die CLI liefert die Details.</p>
+          <p class="section-lead" data-i18n="comics.lead">Die Bilder erzählen die Geschichte, die CLI liefert die Details.</p>
         </div>
 
         <div class="comic-grid">
           <article class="comic-card">
-            <img src="pictures/gosherpa-comic-symbols.webp" alt="GoSherpa zeigt einem Entwickler den richtigen Symbol-Marker und seine Referenzpfade." width="1774" height="887" loading="eager" decoding="async">
+            <img src="pictures/gosherpa-comic-symbols.webp" alt="GoSherpa zeigt einem Entwickler den richtigen Symbol-Marker und seine Referenzpfade." data-i18n-alt="comics.symbols.alt" width="1774" height="887" loading="eager" decoding="async">
             <div class="comic-body">
-              <h3>Symbole finden</h3>
-              <p>Vom Namen zur Definition: GoSherpa zeigt dir Signatur, Package, Datei, Dokumentation und passende Treffer, ohne dass du das Projekt durchklicken musst.</p>
+              <h3 data-i18n="comics.symbols.title">Symbole finden</h3>
+              <p data-i18n="comics.symbols.copy">Vom Namen zur Definition: GoSherpa zeigt dir Signatur, Package, Datei, Dokumentation und passende Treffer, ohne dass du das Projekt durchklicken musst.</p>
               <code class="command-pill">gosherpa symbol ParseFile</code>
             </div>
           </article>
 
           <article class="comic-card">
-            <img src="pictures/gosherpa-comic-impact.webp" alt="GoSherpa markiert die Auswirkungen einer Code-Aenderung und weist auf Testpfade hin." width="1774" height="887" loading="eager" decoding="async">
+            <img src="pictures/gosherpa-comic-impact.webp" alt="GoSherpa markiert die Auswirkungen einer Code-Änderung und weist auf Testpfade hin." data-i18n-alt="comics.impact.alt" width="1774" height="887" loading="eager" decoding="async">
             <div class="comic-body">
-              <h3>Impact einschätzen</h3>
-              <p>Ein kleiner Change kann mehrere Routen berühren. GoSherpa zeigt betroffene Packages, geänderte Symbole, Risiko und die Tests, die jetzt wirklich zählen.</p>
+              <h3 data-i18n="comics.impact.title">Impact einschätzen</h3>
+              <p data-i18n="comics.impact.copy">Ein kleiner Change kann mehrere Routen berühren. GoSherpa zeigt betroffene Packages, geänderte Symbole, Risiko und die Tests, die jetzt wirklich zählen.</p>
               <code class="command-pill">gosherpa impact diff --base HEAD</code>
             </div>
           </article>
 
           <article class="comic-card">
-            <img src="pictures/gosherpa-comic-agents.webp" alt="GoSherpa verdichtet verstreute Codekarten zu einer klaren Route fuer Entwickler und Coding Agents." width="1824" height="862" loading="eager" decoding="async">
+            <img src="pictures/gosherpa-comic-agents.webp" alt="GoSherpa verdichtet verstreute Codekarten zu einer klaren Route für Entwickler und Coding Agents." data-i18n-alt="comics.agents.alt" width="1824" height="862" loading="eager" decoding="async">
             <div class="comic-body">
-              <h3>Kontext weitergeben</h3>
-              <p>Für Menschen lesbar, für Tools stabil: Kontextbefehle exportieren Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.</p>
+              <h3 data-i18n="comics.agents.title">Kontext weitergeben</h3>
+              <p data-i18n="comics.agents.copy">Für Menschen lesbar, für Tools stabil: Kontextbefehle exportieren Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.</p>
               <code class="command-pill">gosherpa context symbol ParseFile --json</code>
             </div>
           </article>
@@ -744,39 +798,39 @@
 
     <section id="features">
       <div class="wrap">
-        <p class="section-kicker">Was die Software kann</p>
-        <h2 class="section-title">Konkrete Antworten statt Code-Nebel.</h2>
-        <p class="section-lead">GoSherpa ist bewusst als CLI gebaut: kleine Befehle, stabile Ausgaben, menschenlesbar zuerst und mit JSON, wenn Automatisierung gebraucht wird.</p>
+        <p class="section-kicker" data-i18n="features.kicker">Was die Software kann</p>
+        <h2 class="section-title" data-i18n="features.title">Konkrete Antworten statt Code-Nebel.</h2>
+        <p class="section-lead" data-i18n="features.lead">GoSherpa ist bewusst als CLI gebaut: kleine Befehle, stabile Ausgaben, menschenlesbar zuerst und mit JSON, wenn Automatisierung gebraucht wird.</p>
 
-        <div class="capability-table" role="table" aria-label="GoSherpa Funktionen">
+        <div class="capability-table" role="table" aria-label="GoSherpa Funktionen" data-i18n-label="features.table.aria">
           <div class="capability-row" role="row">
-            <strong role="cell">Symbolatlas</strong>
-            <span role="cell">Listet Structs, Interfaces, Funktionen und Methoden im Projekt.</span>
+            <strong role="cell" data-i18n="features.symbols.title">Symbolatlas</strong>
+            <span role="cell" data-i18n="features.symbols.copy">Listet Structs, Interfaces, Funktionen und Methoden im Projekt.</span>
             <code role="cell">gosherpa symbols</code>
           </div>
           <div class="capability-row" role="row">
-            <strong role="cell">Suche &amp; Referenzen</strong>
-            <span role="cell">Findet partial Matches und Go-bewusste Referenzen, optional nach Art gefiltert.</span>
+            <strong role="cell" data-i18n="features.refs.title">Suche &amp; Referenzen</strong>
+            <span role="cell" data-i18n="features.refs.copy">Findet partial Matches und Go-bewusste Referenzen, optional nach Art gefiltert.</span>
             <code role="cell">gosherpa refs ParseFile --kind call</code>
           </div>
           <div class="capability-row" role="row">
-            <strong role="cell">Call-Beziehungen</strong>
-            <span role="cell">Zeigt direkte Caller, Callees und kurze lokale Pfade zwischen Funktionen.</span>
+            <strong role="cell" data-i18n="features.calls.title">Call-Beziehungen</strong>
+            <span role="cell" data-i18n="features.calls.copy">Zeigt direkte Caller, Callees und kurze lokale Pfade zwischen Funktionen.</span>
             <code role="cell">gosherpa path Run ParseFile</code>
           </div>
           <div class="capability-row" role="row">
-            <strong role="cell">Abhängigkeiten</strong>
-            <span role="cell">Macht Package-Imports, lokale Dependents und Interface-Implementierungen sichtbar.</span>
+            <strong role="cell" data-i18n="features.deps.title">Abhängigkeiten</strong>
+            <span role="cell" data-i18n="features.deps.copy">Macht Package-Imports, lokale Dependents und Interface-Implementierungen sichtbar.</span>
             <code role="cell">gosherpa deps ./internal/sherpa</code>
           </div>
           <div class="capability-row" role="row">
-            <strong role="cell">PR-Intelligenz</strong>
-            <span role="cell">Fasst Diffs zusammen und nennt Risiko, betroffene Bereiche und Verifikation.</span>
+            <strong role="cell" data-i18n="features.pr.title">PR-Intelligenz</strong>
+            <span role="cell" data-i18n="features.pr.copy">Fasst Diffs zusammen und nennt Risiko, betroffene Bereiche und Verifikation.</span>
             <code role="cell">gosherpa pr --base HEAD</code>
           </div>
           <div class="capability-row" role="row">
-            <strong role="cell">Agent-Kontext</strong>
-            <span role="cell">Exportiert begrenzte, deterministische Kontextpakete für Codex, Claude Code, Cursor und CI.</span>
+            <strong role="cell" data-i18n="features.context.title">Agent-Kontext</strong>
+            <span role="cell" data-i18n="features.context.copy">Exportiert begrenzte, deterministische Kontextpakete für Codex, Claude Code, Cursor und CI.</span>
             <code role="cell">gosherpa context diff --json</code>
           </div>
         </div>
@@ -786,38 +840,38 @@
     <section class="band" id="agents">
       <div class="wrap split">
         <div>
-          <p class="section-kicker">Für Menschen und Agents</p>
-          <h2 class="section-title">Ein gemeinsamer Blick auf dieselbe Repository-Intelligenz.</h2>
-          <p class="section-lead">GoSherpa versucht nicht, dein IDE zu ersetzen. Es macht die Struktur deiner Codebasis sichtbar, damit du beim Lesen, Ändern und Reviewen weniger raten musst.</p>
+          <p class="section-kicker" data-i18n="agents.kicker">Für Menschen und Agents</p>
+          <h2 class="section-title" data-i18n="agents.title">Ein gemeinsamer Blick auf dieselbe Repository-Intelligenz.</h2>
+          <p class="section-lead" data-i18n="agents.lead">GoSherpa versucht nicht, deine IDE zu ersetzen. Es macht die Struktur deiner Codebasis sichtbar, damit du beim Lesen, Ändern und Reviewen weniger raten musst.</p>
           <div class="audience-grid">
             <article class="audience">
-              <h3>Entwickler</h3>
-              <p>Schneller verstehen, wo etwas lebt, wer es benutzt und wie groß der nächste Schritt wirklich ist.</p>
+              <h3 data-i18n="agents.developers.title">Entwickler</h3>
+              <p data-i18n="agents.developers.copy">Schneller verstehen, wo etwas lebt, wer es benutzt und wie groß der nächste Schritt wirklich ist.</p>
             </article>
             <article class="audience">
-              <h3>Review</h3>
-              <p>PR-Zusammenfassungen, betroffene Tests und Risiko-Hinweise direkt aus dem Diff.</p>
+              <h3 data-i18n="agents.review.title">Review</h3>
+              <p data-i18n="agents.review.copy">PR-Zusammenfassungen, betroffene Tests und Risiko-Hinweise direkt aus dem Diff.</p>
             </article>
             <article class="audience">
-              <h3>Automation</h3>
-              <p>Stabile JSON-Umschläge für Scripts, CI und Coding Agents, die keinen Projektroman brauchen.</p>
+              <h3 data-i18n="agents.automation.title">Automation</h3>
+              <p data-i18n="agents.automation.copy">Stabile JSON-Umschläge für Scripts, CI und Coding Agents, die keinen Projektroman brauchen.</p>
             </article>
           </div>
         </div>
 
-        <div class="terminal" aria-label="Beispielausgaben">
+        <div class="terminal" aria-label="Beispielausgaben" data-i18n-label="terminal.aria">
           <div class="terminal-bar" aria-hidden="true">
             <span class="terminal-dot"></span>
             <span class="terminal-dot"></span>
             <span class="terminal-dot"></span>
           </div>
-          <pre><span class="comment"># Ein Symbol verstehen</span>
+          <pre><span class="comment" data-i18n="terminal.symbol"># Ein Symbol verstehen</span>
 <span class="accent">gosherpa explain ParseFile</span>
 
-<span class="comment"># Betroffene Tests fuer ein Diff</span>
+<span class="comment" data-i18n="terminal.tests"># Betroffene Tests für ein Diff</span>
 <span class="accent">gosherpa tests affected --base HEAD</span>
 
-<span class="comment"># Kompakter Agent-Kontext</span>
+<span class="comment" data-i18n="terminal.context"># Kompakter Agent-Kontext</span>
 <span class="accent">gosherpa context package ./internal/sherpa --json</span></pre>
         </div>
       </div>
@@ -826,15 +880,15 @@
     <section class="cta" id="try">
       <div class="wrap">
         <div>
-          <p class="section-kicker">Ausprobieren</p>
-          <h2>Starte lokal in wenigen Befehlen.</h2>
-          <p>GoSherpa ist ein frühes MVP, aber die Grundroute steht: bauen, testen, fragen, verstehen. Für GitHub Pages ist diese Seite als statische Root-Page vorbereitet.</p>
+          <p class="section-kicker" data-i18n="cta.kicker">Ausprobieren</p>
+          <h2 data-i18n="cta.title">Starte lokal in wenigen Befehlen.</h2>
+          <p data-i18n="cta.copy">GoSherpa ist ein frühes MVP, aber die Grundroute steht: bauen, testen, fragen, verstehen. Für GitHub Pages ist diese Seite als statische Root-Page vorbereitet.</p>
           <div class="mini-actions">
-            <a class="button primary" href="https://github.com/panndabea/GoSherpa">Repository öffnen</a>
-            <a class="button secondary" href="README.md">README ansehen</a>
+            <a class="button primary" href="https://github.com/panndabea/GoSherpa" data-i18n="cta.repo">Repository öffnen</a>
+            <a class="button secondary" href="README.md" data-i18n="cta.readme">README ansehen</a>
           </div>
         </div>
-        <div class="install-box" aria-label="Installationsbefehle">
+        <div class="install-box" aria-label="Installationsbefehle" data-i18n-label="cta.install.aria">
           <pre>git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go test ./...
@@ -850,13 +904,374 @@ go build -o gosherpa ./cmd/gosherpa
 
   <footer>
     <div class="footer-inner">
-      <span>GoSherpa - MIT License - Early MVP</span>
+      <span data-i18n="footer.note">GoSherpa - MIT-Lizenz - Frühes MVP</span>
       <div class="footer-links">
-        <a href="docs/CLI_REFERENCE.md">CLI Reference</a>
-        <a href="docs/STATUS.md">Status</a>
+        <a href="docs/CLI_REFERENCE.md" data-i18n="footer.cli">CLI-Referenz</a>
+        <a href="docs/STATUS.md" data-i18n="footer.status">Status</a>
         <a href="https://github.com/panndabea/GoSherpa">GitHub</a>
       </div>
     </div>
   </footer>
+  <script>
+    (() => {
+      const translations = {
+        de: {
+          "meta.title": "GoSherpa - Code-Struktur verstehen, ohne dich zu verlaufen",
+          "meta.description": "GoSherpa ist eine ruhige, deterministische CLI für Go-Projekte: Symbole finden, Referenzen verstehen, Impact abschätzen und Agent-Kontext exportieren.",
+          "meta.ogDescription": "Strukturelle Code-Intelligenz für Go-Projekte, erklärt als freundlicher Comic-Guide.",
+          "meta.locale": "de_DE",
+          "header.aria": "Hauptnavigation",
+          "brand.aria": "GoSherpa Start",
+          "nav.aria": "Seitenbereiche",
+          "nav.comics": "Comics",
+          "nav.features": "Funktionen",
+          "nav.agents": "Agents",
+          "nav.try": "Ausprobieren",
+          "language.aria": "Sprache auswählen",
+          "hero.aria": "GoSherpa Comic-Hero",
+          "hero.eyebrow": "Strukturelle Code-Intelligenz für Go-Projekte",
+          "hero.copy": "Frag eine Code-Struktur-Frage. Bekomme eine kleine, verlässliche Antwort: Symbole, Referenzen, Call-Pfade, Impact, Tests und Agent-Kontext direkt aus deinem Go-Repository.",
+          "hero.actions.aria": "Primäre Aktionen",
+          "hero.github": "Auf GitHub ansehen",
+          "hero.cli": "CLI-Referenz lesen",
+          "hero.points.aria": "Kurzüberblick",
+          "hero.point.symbol": "Symbol-Lookup",
+          "hero.point.refs": "Referenzen",
+          "hero.point.calls": "Caller & Callees",
+          "hero.point.impact": "Impact",
+          "hero.point.pr": "PR-Kontext",
+          "hero.point.json": "JSON für Agents",
+          "why.kicker": "Warum GoSherpa",
+          "why.title": "Wenn der Code zum Gebirge wird, zeigt GoSherpa die Route.",
+          "why.lead": "GoSherpa liest dein Go-Projekt strukturell statt magisch. Die CLI gibt dir ruhige, wiederholbare Antworten, die du im Terminal scannen, in Reviews verwenden oder als kompakten Kontext an Coding Agents weitergeben kannst.",
+          "ask.aria": "Typische Fragen und Antworten",
+          "ask.defined.q": "Wo ist das definiert?",
+          "ask.defined.a": "Symbol, Datei, Signatur und Zeilennummer.",
+          "ask.uses.q": "Wer benutzt das?",
+          "ask.uses.a": "Referenzen, direkte Caller und relevante Tests.",
+          "ask.calls.q": "Was ruft diese Funktion auf?",
+          "ask.calls.a": "Callees und lokale Call-Pfade durch dein Repository.",
+          "ask.diff.q": "Was betrifft mein Diff?",
+          "ask.diff.a": "Betroffene Packages, Risiko und sinnvolle Testbefehle.",
+          "comics.kicker": "Comic-Guides",
+          "comics.title": "Drei Situationen, in denen GoSherpa sofort hilft.",
+          "comics.lead": "Die Bilder erzählen die Geschichte, die CLI liefert die Details.",
+          "comics.symbols.alt": "GoSherpa zeigt einem Entwickler den richtigen Symbol-Marker und seine Referenzpfade.",
+          "comics.symbols.title": "Symbole finden",
+          "comics.symbols.copy": "Vom Namen zur Definition: GoSherpa zeigt dir Signatur, Package, Datei, Dokumentation und passende Treffer, ohne dass du das Projekt durchklicken musst.",
+          "comics.impact.alt": "GoSherpa markiert die Auswirkungen einer Code-Änderung und weist auf Testpfade hin.",
+          "comics.impact.title": "Impact einschätzen",
+          "comics.impact.copy": "Ein kleiner Change kann mehrere Routen berühren. GoSherpa zeigt betroffene Packages, geänderte Symbole, Risiko und die Tests, die jetzt wirklich zählen.",
+          "comics.agents.alt": "GoSherpa verdichtet verstreute Codekarten zu einer klaren Route für Entwickler und Coding Agents.",
+          "comics.agents.title": "Kontext weitergeben",
+          "comics.agents.copy": "Für Menschen lesbar, für Tools stabil: Kontextbefehle exportieren Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.",
+          "features.kicker": "Was die Software kann",
+          "features.title": "Konkrete Antworten statt Code-Nebel.",
+          "features.lead": "GoSherpa ist bewusst als CLI gebaut: kleine Befehle, stabile Ausgaben, menschenlesbar zuerst und mit JSON, wenn Automatisierung gebraucht wird.",
+          "features.table.aria": "GoSherpa Funktionen",
+          "features.symbols.title": "Symbolatlas",
+          "features.symbols.copy": "Listet Structs, Interfaces, Funktionen und Methoden im Projekt.",
+          "features.refs.title": "Suche & Referenzen",
+          "features.refs.copy": "Findet partial Matches und Go-bewusste Referenzen, optional nach Art gefiltert.",
+          "features.calls.title": "Call-Beziehungen",
+          "features.calls.copy": "Zeigt direkte Caller, Callees und kurze lokale Pfade zwischen Funktionen.",
+          "features.deps.title": "Abhängigkeiten",
+          "features.deps.copy": "Macht Package-Imports, lokale Dependents und Interface-Implementierungen sichtbar.",
+          "features.pr.title": "PR-Intelligenz",
+          "features.pr.copy": "Fasst Diffs zusammen und nennt Risiko, betroffene Bereiche und Verifikation.",
+          "features.context.title": "Agent-Kontext",
+          "features.context.copy": "Exportiert begrenzte, deterministische Kontextpakete für Codex, Claude Code, Cursor und CI.",
+          "agents.kicker": "Für Menschen und Agents",
+          "agents.title": "Ein gemeinsamer Blick auf dieselbe Repository-Intelligenz.",
+          "agents.lead": "GoSherpa versucht nicht, deine IDE zu ersetzen. Es macht die Struktur deiner Codebasis sichtbar, damit du beim Lesen, Ändern und Reviewen weniger raten musst.",
+          "agents.developers.title": "Entwickler",
+          "agents.developers.copy": "Schneller verstehen, wo etwas lebt, wer es benutzt und wie groß der nächste Schritt wirklich ist.",
+          "agents.review.title": "Review",
+          "agents.review.copy": "PR-Zusammenfassungen, betroffene Tests und Risiko-Hinweise direkt aus dem Diff.",
+          "agents.automation.title": "Automation",
+          "agents.automation.copy": "Stabile JSON-Umschläge für Scripts, CI und Coding Agents, die keinen Projektroman brauchen.",
+          "terminal.aria": "Beispielausgaben",
+          "terminal.symbol": "# Ein Symbol verstehen",
+          "terminal.tests": "# Betroffene Tests für ein Diff",
+          "terminal.context": "# Kompakter Agent-Kontext",
+          "cta.kicker": "Ausprobieren",
+          "cta.title": "Starte lokal in wenigen Befehlen.",
+          "cta.copy": "GoSherpa ist ein frühes MVP, aber die Grundroute steht: bauen, testen, fragen, verstehen. Für GitHub Pages ist diese Seite als statische Root-Page vorbereitet.",
+          "cta.repo": "Repository öffnen",
+          "cta.readme": "README ansehen",
+          "cta.install.aria": "Installationsbefehle",
+          "footer.note": "GoSherpa - MIT-Lizenz - Frühes MVP",
+          "footer.cli": "CLI-Referenz",
+          "footer.status": "Status"
+        },
+        en: {
+          "meta.title": "GoSherpa - Understand code structure without getting lost",
+          "meta.description": "GoSherpa is a calm, deterministic CLI for Go projects: find symbols, understand references, estimate impact, and export agent context.",
+          "meta.ogDescription": "Structural code intelligence for Go projects, explained as a friendly comic guide.",
+          "meta.locale": "en_US",
+          "header.aria": "Main navigation",
+          "brand.aria": "GoSherpa home",
+          "nav.aria": "Page sections",
+          "nav.comics": "Comics",
+          "nav.features": "Features",
+          "nav.agents": "Agents",
+          "nav.try": "Try it",
+          "language.aria": "Choose language",
+          "hero.aria": "GoSherpa comic hero",
+          "hero.eyebrow": "Structural code intelligence for Go projects",
+          "hero.copy": "Ask a code-structure question. Get a small, reliable answer: symbols, references, call paths, impact, tests, and agent context directly from your Go repository.",
+          "hero.actions.aria": "Primary actions",
+          "hero.github": "View on GitHub",
+          "hero.cli": "Read the CLI reference",
+          "hero.points.aria": "Quick overview",
+          "hero.point.symbol": "Symbol lookup",
+          "hero.point.refs": "References",
+          "hero.point.calls": "Callers & callees",
+          "hero.point.impact": "Impact",
+          "hero.point.pr": "PR context",
+          "hero.point.json": "JSON for agents",
+          "why.kicker": "Why GoSherpa",
+          "why.title": "When code turns into a mountain range, GoSherpa shows the route.",
+          "why.lead": "GoSherpa reads your Go project structurally, not magically. The CLI gives you calm, repeatable answers you can scan in the terminal, use in reviews, or pass as compact context to coding agents.",
+          "ask.aria": "Typical questions and answers",
+          "ask.defined.q": "Where is this defined?",
+          "ask.defined.a": "Symbol, file, signature, and line number.",
+          "ask.uses.q": "Who uses this?",
+          "ask.uses.a": "References, direct callers, and relevant tests.",
+          "ask.calls.q": "What does this function call?",
+          "ask.calls.a": "Callees and local call paths through your repository.",
+          "ask.diff.q": "What does my diff affect?",
+          "ask.diff.a": "Affected packages, risk, and useful test commands.",
+          "comics.kicker": "Comic guides",
+          "comics.title": "Three situations where GoSherpa helps right away.",
+          "comics.lead": "The images tell the story, the CLI provides the details.",
+          "comics.symbols.alt": "GoSherpa shows a developer the right symbol marker and its reference paths.",
+          "comics.symbols.title": "Find symbols",
+          "comics.symbols.copy": "From name to definition: GoSherpa shows the signature, package, file, docs, and matching results without making you click through the project.",
+          "comics.impact.alt": "GoSherpa highlights the impact of a code change and points to test paths.",
+          "comics.impact.title": "Estimate impact",
+          "comics.impact.copy": "A small change can touch several routes. GoSherpa shows affected packages, changed symbols, risk, and the tests that matter now.",
+          "comics.agents.alt": "GoSherpa condenses scattered code maps into a clear route for developers and coding agents.",
+          "comics.agents.title": "Pass along context",
+          "comics.agents.copy": "Readable for humans, stable for tools: context commands export source excerpts, relationships, tests, limits, and JSON in a compact form.",
+          "features.kicker": "What the software can do",
+          "features.title": "Concrete answers instead of code fog.",
+          "features.lead": "GoSherpa is deliberately built as a CLI: small commands, stable output, human-readable first, and JSON when automation needs it.",
+          "features.table.aria": "GoSherpa capabilities",
+          "features.symbols.title": "Symbol atlas",
+          "features.symbols.copy": "Lists structs, interfaces, functions, and methods in the project.",
+          "features.refs.title": "Search & references",
+          "features.refs.copy": "Finds partial matches and Go-aware references, optionally filtered by kind.",
+          "features.calls.title": "Call relationships",
+          "features.calls.copy": "Shows direct callers, callees, and short local paths between functions.",
+          "features.deps.title": "Dependencies",
+          "features.deps.copy": "Makes package imports, local dependents, and interface implementations visible.",
+          "features.pr.title": "PR intelligence",
+          "features.pr.copy": "Summarizes diffs and names risk, affected areas, and verification.",
+          "features.context.title": "Agent context",
+          "features.context.copy": "Exports bounded, deterministic context packages for Codex, Claude Code, Cursor, and CI.",
+          "agents.kicker": "For humans and agents",
+          "agents.title": "A shared view of the same repository intelligence.",
+          "agents.lead": "GoSherpa is not trying to replace your IDE. It makes the structure of your codebase visible so you can read, change, and review with less guessing.",
+          "agents.developers.title": "Developers",
+          "agents.developers.copy": "Understand faster where something lives, who uses it, and how large the next step really is.",
+          "agents.review.title": "Review",
+          "agents.review.copy": "PR summaries, affected tests, and risk notes directly from the diff.",
+          "agents.automation.title": "Automation",
+          "agents.automation.copy": "Stable JSON envelopes for scripts, CI, and coding agents that do not need a novel about the project.",
+          "terminal.aria": "Example output",
+          "terminal.symbol": "# Understand a symbol",
+          "terminal.tests": "# Affected tests for a diff",
+          "terminal.context": "# Compact agent context",
+          "cta.kicker": "Try it",
+          "cta.title": "Start locally in a few commands.",
+          "cta.copy": "GoSherpa is an early MVP, but the basic route is in place: build, test, ask, understand. For GitHub Pages, this page is prepared as a static root page.",
+          "cta.repo": "Open repository",
+          "cta.readme": "View README",
+          "cta.install.aria": "Installation commands",
+          "footer.note": "GoSherpa - MIT License - Early MVP",
+          "footer.cli": "CLI Reference",
+          "footer.status": "Status"
+        },
+        fr: {
+          "meta.title": "GoSherpa - Comprendre la structure du code sans vous perdre",
+          "meta.description": "GoSherpa est une CLI calme et déterministe pour les projets Go : trouver des symboles, comprendre les références, estimer l'impact et exporter du contexte pour agents.",
+          "meta.ogDescription": "Intelligence structurelle du code pour les projets Go, expliquée comme un guide BD convivial.",
+          "meta.locale": "fr_FR",
+          "header.aria": "Navigation principale",
+          "brand.aria": "Accueil GoSherpa",
+          "nav.aria": "Sections de la page",
+          "nav.comics": "BD",
+          "nav.features": "Fonctions",
+          "nav.agents": "Agents",
+          "nav.try": "Essayer",
+          "language.aria": "Choisir la langue",
+          "hero.aria": "Héros BD de GoSherpa",
+          "hero.eyebrow": "Intelligence structurelle du code pour les projets Go",
+          "hero.copy": "Posez une question sur la structure du code. Obtenez une réponse courte et fiable : symboles, références, chemins d'appel, impact, tests et contexte agent directement depuis votre dépôt Go.",
+          "hero.actions.aria": "Actions principales",
+          "hero.github": "Voir sur GitHub",
+          "hero.cli": "Lire la référence CLI",
+          "hero.points.aria": "Aperçu rapide",
+          "hero.point.symbol": "Recherche de symboles",
+          "hero.point.refs": "Références",
+          "hero.point.calls": "Appelants & appelés",
+          "hero.point.impact": "Impact",
+          "hero.point.pr": "Contexte PR",
+          "hero.point.json": "JSON pour agents",
+          "why.kicker": "Pourquoi GoSherpa",
+          "why.title": "Quand le code devient une chaîne de montagnes, GoSherpa indique la route.",
+          "why.lead": "GoSherpa lit votre projet Go de façon structurelle, pas magique. La CLI fournit des réponses calmes et répétables à parcourir dans le terminal, à utiliser en revue ou à transmettre comme contexte compact à des agents de code.",
+          "ask.aria": "Questions et réponses typiques",
+          "ask.defined.q": "Où est-ce défini ?",
+          "ask.defined.a": "Symbole, fichier, signature et numéro de ligne.",
+          "ask.uses.q": "Qui l'utilise ?",
+          "ask.uses.a": "Références, appelants directs et tests pertinents.",
+          "ask.calls.q": "Qu'appelle cette fonction ?",
+          "ask.calls.a": "Fonctions appelées et chemins d'appel locaux dans votre dépôt.",
+          "ask.diff.q": "Quels éléments mon diff touche-t-il ?",
+          "ask.diff.a": "Packages affectés, risque et commandes de test utiles.",
+          "comics.kicker": "Guides BD",
+          "comics.title": "Trois situations où GoSherpa aide immédiatement.",
+          "comics.lead": "Les images racontent l'histoire, la CLI fournit les détails.",
+          "comics.symbols.alt": "GoSherpa montre à un développeur le bon marqueur de symbole et ses chemins de référence.",
+          "comics.symbols.title": "Trouver des symboles",
+          "comics.symbols.copy": "Du nom à la définition : GoSherpa affiche la signature, le package, le fichier, la documentation et les résultats pertinents sans vous faire parcourir tout le projet.",
+          "comics.impact.alt": "GoSherpa met en évidence l'impact d'une modification de code et indique les chemins de test.",
+          "comics.impact.title": "Évaluer l'impact",
+          "comics.impact.copy": "Un petit changement peut toucher plusieurs routes. GoSherpa montre les packages affectés, les symboles modifiés, le risque et les tests qui comptent maintenant.",
+          "comics.agents.alt": "GoSherpa condense des cartes de code dispersées en une route claire pour les développeurs et les agents de code.",
+          "comics.agents.title": "Transmettre le contexte",
+          "comics.agents.copy": "Lisible pour les humains, stable pour les outils : les commandes de contexte exportent extraits source, relations, tests, limites et JSON sous une forme compacte.",
+          "features.kicker": "Ce que le logiciel sait faire",
+          "features.title": "Des réponses concrètes au lieu du brouillard de code.",
+          "features.lead": "GoSherpa est volontairement conçu comme une CLI : petites commandes, sorties stables, lisibles par les humains d'abord, avec du JSON quand l'automatisation en a besoin.",
+          "features.table.aria": "Fonctions de GoSherpa",
+          "features.symbols.title": "Atlas des symboles",
+          "features.symbols.copy": "Liste les structs, interfaces, fonctions et méthodes du projet.",
+          "features.refs.title": "Recherche & références",
+          "features.refs.copy": "Trouve des correspondances partielles et des références conscientes de Go, avec filtre optionnel par type.",
+          "features.calls.title": "Relations d'appel",
+          "features.calls.copy": "Affiche les appelants directs, les fonctions appelées et de courts chemins locaux entre fonctions.",
+          "features.deps.title": "Dépendances",
+          "features.deps.copy": "Rend visibles les imports de packages, les dépendants locaux et les implémentations d'interfaces.",
+          "features.pr.title": "Intelligence PR",
+          "features.pr.copy": "Résume les diffs et indique le risque, les zones affectées et la vérification.",
+          "features.context.title": "Contexte agent",
+          "features.context.copy": "Exporte des paquets de contexte bornés et déterministes pour Codex, Claude Code, Cursor et CI.",
+          "agents.kicker": "Pour humains et agents",
+          "agents.title": "Un regard partagé sur la même intelligence de dépôt.",
+          "agents.lead": "GoSherpa ne cherche pas à remplacer votre IDE. Il rend visible la structure de votre base de code afin de lire, modifier et relire avec moins de suppositions.",
+          "agents.developers.title": "Développeurs",
+          "agents.developers.copy": "Comprendre plus vite où vit un élément, qui l'utilise et quelle est vraiment l'ampleur de la prochaine étape.",
+          "agents.review.title": "Revue",
+          "agents.review.copy": "Résumés de PR, tests affectés et notes de risque directement issus du diff.",
+          "agents.automation.title": "Automatisation",
+          "agents.automation.copy": "Enveloppes JSON stables pour scripts, CI et agents de code qui n'ont pas besoin d'un roman sur le projet.",
+          "terminal.aria": "Sorties d'exemple",
+          "terminal.symbol": "# Comprendre un symbole",
+          "terminal.tests": "# Tests affectés par un diff",
+          "terminal.context": "# Contexte agent compact",
+          "cta.kicker": "Essayer",
+          "cta.title": "Démarrez localement en quelques commandes.",
+          "cta.copy": "GoSherpa est un MVP précoce, mais la route de base est là : construire, tester, demander, comprendre. Pour GitHub Pages, cette page est prête comme page racine statique.",
+          "cta.repo": "Ouvrir le dépôt",
+          "cta.readme": "Voir le README",
+          "cta.install.aria": "Commandes d'installation",
+          "footer.note": "GoSherpa - Licence MIT - MVP initial",
+          "footer.cli": "Référence CLI",
+          "footer.status": "Statut"
+        }
+      };
+
+      const supportedLanguages = Object.keys(translations);
+      const defaultLanguage = "de";
+
+      const readSavedLanguage = () => {
+        try {
+          return window.localStorage.getItem("gosherpa-language");
+        } catch {
+          return "";
+        }
+      };
+
+      const saveLanguage = (language) => {
+        try {
+          window.localStorage.setItem("gosherpa-language", language);
+        } catch {
+          // Local storage can be unavailable in strict browser contexts.
+        }
+      };
+
+      const getInitialLanguage = () => {
+        const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
+        if (supportedLanguages.includes(requestedLanguage)) {
+          return requestedLanguage;
+        }
+
+        const savedLanguage = readSavedLanguage();
+        if (supportedLanguages.includes(savedLanguage)) {
+          return savedLanguage;
+        }
+
+        const browserLanguage = navigator.language.slice(0, 2).toLowerCase();
+        return supportedLanguages.includes(browserLanguage) ? browserLanguage : defaultLanguage;
+      };
+
+      const setMetaContent = (selector, content) => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.setAttribute("content", content);
+        }
+      };
+
+      const translateElements = (language) => {
+        const dictionary = translations[language] || translations[defaultLanguage];
+
+        document.documentElement.lang = language;
+        document.title = dictionary["meta.title"];
+        setMetaContent('meta[name="description"]', dictionary["meta.description"]);
+        setMetaContent('meta[property="og:description"]', dictionary["meta.ogDescription"]);
+        setMetaContent('meta[property="og:locale"]', dictionary["meta.locale"]);
+
+        document.querySelectorAll("[data-i18n]").forEach((element) => {
+          const value = dictionary[element.dataset.i18n];
+          if (value !== undefined) {
+            element.textContent = value;
+          }
+        });
+
+        document.querySelectorAll("[data-i18n-label]").forEach((element) => {
+          const value = dictionary[element.dataset.i18nLabel];
+          if (value !== undefined) {
+            element.setAttribute("aria-label", value);
+          }
+        });
+
+        document.querySelectorAll("[data-i18n-alt]").forEach((element) => {
+          const value = dictionary[element.dataset.i18nAlt];
+          if (value !== undefined) {
+            element.setAttribute("alt", value);
+          }
+        });
+
+        document.querySelectorAll("[data-lang-option]").forEach((button) => {
+          const isActive = button.dataset.langOption === language;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+
+        saveLanguage(language);
+      };
+
+      document.querySelectorAll("[data-lang-option]").forEach((button) => {
+        button.addEventListener("click", () => {
+          translateElements(button.dataset.langOption);
+        });
+      });
+
+      translateElements(getInitialLanguage());
+    })();
+  </script>
 </body>
 </html>
