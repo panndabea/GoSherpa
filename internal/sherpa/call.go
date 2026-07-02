@@ -218,7 +218,8 @@ func findCallersInFunctionsWithOptions(root string, functions []functionInfo, ta
 
 	callerFunctions := functions
 	if options.IncludeTests {
-		testFunctions, err := collectTestCallerFunctionInfos(root)
+		testFunctions, testWarnings, err := collectTestCallerFunctionInfos(root, options)
+		warnings = uniqueSorted(append(warnings, testWarnings...))
 		if err != nil {
 			return CallersResult{
 				Target:       target.String(),
@@ -261,7 +262,7 @@ func FindCallPaths(root string, from string, to string, options CallPathOptions)
 		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
-	functions, err := collectFunctionInfos(rootPath)
+	functions, _, _, err := collectCallFunctionInfos(rootPath, CallOptions{})
 	if err != nil {
 		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
@@ -580,7 +581,105 @@ func semanticCallPackageUsable(pkg semantics.Package) bool {
 	return pkg.FileSet != nil && pkg.TypesInfo != nil && len(pkg.Files) > 0
 }
 
-func collectTestCallerFunctionInfos(root string) ([]functionInfo, error) {
+func collectTestCallerFunctionInfos(root string, options CallOptions) ([]functionInfo, []string, error) {
+	functions, warnings, ok := collectTypecheckedTestCallerFunctionInfos(root, options)
+	if ok {
+		return functions, warnings, nil
+	}
+
+	functions, err := collectASTTestCallerFunctionInfos(root)
+	return functions, warnings, err
+}
+
+func collectTypecheckedTestCallerFunctionInfos(root string, options CallOptions) ([]functionInfo, []string, bool) {
+	if !referenceShouldAttemptTypechecked(root) {
+		return nil, nil, false
+	}
+
+	repo, err := loadSemanticCallRepository(root, semantics.LoadOptions{
+		IncludeTests: true,
+		BuildTags:    options.BuildTags,
+	})
+	if err != nil {
+		return nil, []string{fmt.Sprintf("typechecked test caller analysis unavailable: %v", err)}, false
+	}
+
+	return semanticTestCallFunctionInfos(repo), nonNilStrings(repo.Warnings), true
+}
+
+func semanticTestCallFunctionInfos(repo semantics.Repository) []functionInfo {
+	modulePath := readModulePath(repo.Root)
+	seen := make(map[string]struct{})
+
+	var functions []functionInfo
+	for _, pkg := range repo.Packages {
+		if !semanticCallPackageUsable(pkg) {
+			continue
+		}
+
+		functionPackage := testFunctionPackagePath(pkg.PackagePath, pkg.Name)
+		for _, parsedFile := range pkg.Files {
+			imports := callImportAliases(parsedFile, modulePath)
+			for _, decl := range parsedFile.Decls {
+				funcDecl, ok := decl.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+
+				pos := pkg.FileSet.Position(funcDecl.Pos())
+				if !strings.HasSuffix(pos.Filename, "_test.go") {
+					continue
+				}
+
+				receiver := receiverTypeName(funcDecl)
+				name := funcDecl.Name.Name
+				position := positionRelativeToRoot(repo.Root, Position{
+					File:   pos.Filename,
+					Line:   pos.Line,
+					Column: pos.Column,
+				})
+				key := testFunctionInfoKey(position, functionTargetName(funcDecl))
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+
+				functions = append(functions, functionInfo{
+					Package:    functionPackage,
+					ImportPath: pkg.ImportPath,
+					ModulePath: modulePath,
+					Receiver:   receiver,
+					Name:       name,
+					Target:     functionTargetName(funcDecl),
+					Decl:       funcDecl,
+					FileSet:    pkg.FileSet,
+					TypeInfo:   pkg.TypesInfo,
+					Position:   position,
+					Root:       repo.Root,
+					Imports:    imports,
+				})
+			}
+		}
+	}
+
+	sortFunctionInfos(functions)
+
+	return functions
+}
+
+func testFunctionPackagePath(packagePath string, packageName string) string {
+	if isExternalTestPackage(packageName) {
+		return packagePath + "_test"
+	}
+
+	return packagePath
+}
+
+func testFunctionInfoKey(position Position, target string) string {
+	return position.File + ":" + strconv.Itoa(position.Line) + ":" + strconv.Itoa(position.Column) + ":" + target
+}
+
+func collectASTTestCallerFunctionInfos(root string) ([]functionInfo, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return nil, err

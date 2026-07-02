@@ -1144,6 +1144,48 @@ func TestStep() {
 	}
 }
 
+func TestFindCallersWithOptionsUsesTypeInfoForExternalTestReceiverCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service_test
+
+import "example.com/app/internal/service"
+
+func TestStart() {
+	client := &service.Client{}
+	client.Start()
+}
+`)
+
+	result, err := FindCallersWithOptions(tmp, "./internal/service.Client.Start", CallOptions{IncludeTests: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	want := []string{"TestStart"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("expected %v, got %v", want, names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	wantFiles := []string{"internal/service/service_test.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
+	}
+}
+
 func TestFindCallersIgnoresTargetsDefinedOnlyInTestFiles(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1389,6 +1431,47 @@ func (s *Server) Start() {}
 	want := []string{"Server.Start"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsUsesSemanticLoaderForCrossPackageReceiverMethodCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func Entry(client *service.Client) {
+	client.Start()
+}
+`)
+
+	result, err := FindCallPaths(tmp, "./cmd/app.Entry", "./internal/service.Client.Start", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Client.Start"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+
+	files := callTestPathFiles(result.Paths[0])
+	wantFiles := []string{"cmd/app/main.go"}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Fatalf("expected %v, got %v", wantFiles, files)
 	}
 }
 
