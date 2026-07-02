@@ -119,6 +119,17 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantArrays: []string{"tests", "commands", "limitations"},
 		},
 		{
+			name:    "doctor",
+			args:    []string{"doctor", "--json"},
+			command: "doctor",
+			target:  ".",
+			wantFields: map[string]string{
+				"analysisMode": "typechecked",
+				"confidence":   agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"buildTags", "limitations", "suggestions"},
+		},
+		{
 			name:    "context symbol",
 			args:    []string{"context", "symbol", "Target", "--json"},
 			command: "context symbol",

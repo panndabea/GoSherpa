@@ -754,7 +754,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
-		fmt.Fprintln(stderr, "error: --tags is only supported by refs, callers, callees, explain, context, impact, tests affected, implementers, and interfaces")
+		fmt.Fprintln(stderr, "error: --tags is only supported by refs, callers, callees, explain, context, impact, tests affected, implementers, interfaces, pr, and doctor")
 		return exitUsage
 	}
 
@@ -764,6 +764,32 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	switch invocation.Command {
+	case "doctor":
+		if len(invocation.CommandArgs) != 0 {
+			printDoctorUsage(stderr)
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		report := analyzeDoctor(root, invocation.BuildTags)
+		if invocation.JSON {
+			normalizedReport := normalizeDoctorReport(report)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"doctor",
+				normalizedReport.Target,
+				normalizedReport.Warnings,
+				normalizedReport,
+			))
+		}
+
+		fmt.Fprint(stdout, formatDoctorReport(report))
+		return exitSuccess
+
 	case "context":
 		if len(invocation.CommandArgs) < 1 {
 			printContextUsage(stderr)
@@ -1515,7 +1541,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func knownCommand(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr", "doctor":
 		return true
 	default:
 		return false
@@ -1524,7 +1550,7 @@ func knownCommand(command string) bool {
 
 func supportsJSON(command string) bool {
 	switch command {
-	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr":
+	case "symbol", "symbols", "search", "refs", "impact", "tests", "deps", "implementers", "interfaces", "path", "paths", "callers", "callees", "explain", "context", "pr", "doctor":
 		return true
 	default:
 		return false
@@ -1563,7 +1589,7 @@ func supportsContextOption(command string) bool {
 
 func supportsTagsOption(invocation cliInvocation) bool {
 	switch invocation.Command {
-	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr":
+	case "refs", "callers", "callees", "explain", "context", "impact", "implementers", "interfaces", "pr", "doctor":
 		return true
 	case "tests":
 		return isTestsAffectedInvocation(invocation)
@@ -2322,6 +2348,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
 	fmt.Fprintln(writer, "  context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--source-radius <n>]")
 	fmt.Fprintln(writer, "  context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>]")
+	fmt.Fprintln(writer, "  doctor")
 	fmt.Fprintln(writer, "  explain <symbol> [--tests]")
 	fmt.Fprintln(writer, "  symbols")
 	fmt.Fprintln(writer, "  symbol <target> [--context]")
@@ -2381,6 +2408,10 @@ func printImpactDiffUsage(writer io.Writer) {
 
 func printPRUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] pr --base <ref>")
+}
+
+func printDoctorUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] doctor")
 }
 
 func printImpactSubcommandUsage(writer io.Writer, kind string) {

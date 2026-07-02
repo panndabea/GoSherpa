@@ -49,6 +49,7 @@ As Go projects grow, the important answer is often spread across files, packages
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, affected packages/tests, reading order, confidence, and limitations |
+| Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -108,6 +109,8 @@ Then explore the repository:
 ./gosherpa context package ./internal/sherpa --json
 ./gosherpa context diff --base HEAD
 ./gosherpa context diff --base HEAD --json
+./gosherpa doctor
+./gosherpa doctor --json
 ./gosherpa explain ParseFile
 ./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json
@@ -181,6 +184,7 @@ Prefer not to build a binary yet?
 go run ./cmd/gosherpa symbols
 go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
+go run ./cmd/gosherpa doctor
 go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
@@ -226,6 +230,7 @@ Implemented:
 - Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, reading order, confidence, limitations, and JSON output
+- Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot, confidence, limitations, warnings, and JSON output
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands

@@ -225,7 +225,9 @@ Done when:
 
 ### 7. `gosherpa doctor`
 
-Add a command that explains analysis readiness.
+Status: first slice implemented as `gosherpa doctor` with human and JSON output.
+
+Keep improving the command that explains analysis readiness.
 
 It should report:
 

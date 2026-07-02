@@ -188,6 +188,10 @@ does not include the target symbol. `context file.data.analysisMode` and
 and symbols come from typechecked package loading. `context diff.data.analysisMode`
 is currently `git-diff+ast`.
 
+`doctor.data.analysisMode` reports repository readiness rather than a code
+relationship graph. It is `typechecked` when package loading completed and
+`unavailable` when package loading failed.
+
 ## `callers` Data
 
 Envelope:
@@ -337,6 +341,70 @@ Data:
 - `readingOrder`: ordered source locations to inspect next.
 
 `data.warnings` is absent; use envelope `warnings`.
+
+## `doctor` Data
+
+Envelope:
+
+- `command`: `doctor`
+- `target`: `.`
+
+Data:
+
+```json
+{
+  "target": ".",
+  "environment": {
+    "goVersion": "go1.24.4",
+    "goos": "darwin",
+    "goarch": "arm64"
+  },
+  "repository": {
+    "root": "/repo",
+    "modulePath": "example.com/app",
+    "goModPath": "go.mod",
+    "goWork": {
+      "detected": false
+    },
+    "goFiles": 12,
+    "testFiles": 4,
+    "generatedFiles": 0,
+    "nestedModules": []
+  },
+  "buildTags": [],
+  "packageLoad": {
+    "status": "ok",
+    "analysisMode": "typechecked",
+    "packageCount": 3,
+    "packages": [],
+    "warningCount": 0
+  },
+  "snapshot": {
+    "supported": false,
+    "status": "not_implemented",
+    "message": "Persistent snapshots are not implemented yet; commands analyze the repository on demand."
+  },
+  "analysisMode": "typechecked",
+  "confidence": "medium",
+  "limitations": [],
+  "suggestions": []
+}
+```
+
+- `environment`: Go runtime and platform used by the GoSherpa binary.
+- `repository`: resolved module root, module path, file counts, `go.work`
+  detection, and nested-module hints.
+- `buildTags`: normalized build tags supplied through `--tags`.
+- `packageLoad`: status of typechecked package loading. `status` is `ok`,
+  `warnings`, or `failed`.
+- `snapshot`: current snapshot support and status.
+- `analysisMode`: readiness mode, currently `typechecked` or `unavailable`.
+- `confidence`: `low` when warnings are emitted, otherwise `medium`.
+- `limitations`: boundaries of the readiness check.
+- `suggestions`: deterministic next steps.
+
+Package load warnings live on the shared envelope. `data.warnings` is absent;
+use envelope `warnings`.
 
 ## Impact And Test Data
 

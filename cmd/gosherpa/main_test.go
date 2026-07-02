@@ -540,6 +540,15 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesDoctor(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "doctor") {
+		t.Fatalf("expected usage to contain doctor command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesTests(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -642,6 +651,143 @@ func TestRunReturnsUsageExitWhenCommandIsMissing(t *testing.T) {
 
 	if !strings.Contains(result.Stderr, "usage: gosherpa [--root <path>] <command> [args]") {
 		t.Fatalf("expected usage in stderr, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsDoctorCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"DOCTOR",
+		"Repository: " + filepath.Clean(tmp),
+		"Module: example.com/app",
+		"Analysis: typechecked",
+		"Confidence: medium",
+		"FILES",
+		"PACKAGE LOAD",
+		"Status: ok",
+		"SNAPSHOT",
+		"LIMITATIONS",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsDoctorCommandJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "doctor", ".", "example.com/app")
+
+	if data["analysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != agentcontext.ConfidenceMedium {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+
+	repository := assertMainTestJSONObject(t, data, "repository")
+	if repository["modulePath"] != "example.com/app" {
+		t.Fatalf("expected repository module path, got %v", repository["modulePath"])
+	}
+	assertMainTestJSONArrayHasLength(t, repository, "nestedModules", 0)
+	goWork := assertMainTestJSONObject(t, repository, "goWork")
+	if goWork["detected"] != false {
+		t.Fatalf("expected no go.work, got %v", goWork["detected"])
+	}
+
+	packageLoad := assertMainTestJSONObject(t, data, "packageLoad")
+	if packageLoad["status"] != "ok" {
+		t.Fatalf("expected package load ok, got %v", packageLoad["status"])
+	}
+	if packageLoad["analysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked package load, got %v", packageLoad["analysisMode"])
+	}
+	if packageLoad["packageCount"].(float64) <= 0 {
+		t.Fatalf("expected loaded packages, got %v", packageLoad["packageCount"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "buildTags", 0)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+	if strings.Contains(result.Stdout, "DOCTOR") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsDoctorCommandWithBuildTagsAndGoWork(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+	writeMainTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use .
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "--tags", "enterprise,integration", "doctor", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "doctor", ".", "example.com/app")
+
+	tags := assertMainTestJSONArrayHasLength(t, data, "buildTags", 2)
+	if tags[0] != "enterprise" || tags[1] != "integration" {
+		t.Fatalf("expected sorted build tags, got %v", tags)
+	}
+
+	repository := assertMainTestJSONObject(t, data, "repository")
+	goWork := assertMainTestJSONObject(t, repository, "goWork")
+	if goWork["detected"] != true {
+		t.Fatalf("expected go.work detection, got %v", goWork["detected"])
+	}
+	if goWork["path"] != "go.work" {
+		t.Fatalf("expected root-relative go.work path, got %v", goWork["path"])
+	}
+	if goWork["scope"] != "root" {
+		t.Fatalf("expected root go.work scope, got %v", goWork["scope"])
+	}
+}
+
+func TestMainPrintsDoctorUsageWhenArgumentIsUnexpected(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "doctor", "extra"})
+
+	want := "usage: gosherpa [--root <path>] doctor\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
 	}
 
 	if result.Stdout != "" {
