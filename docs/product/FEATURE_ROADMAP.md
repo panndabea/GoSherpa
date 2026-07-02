@@ -1364,10 +1364,16 @@ Recommendation:
 
 Go repositories often depend on build tags, generated files, tests, and cgo.
 
+Current status:
+
+- `--tags` is implemented for semantic/loading-aware commands: `refs`,
+  `callers`, `callees`, `explain`, `context`, `impact`, `implementers`,
+  `interfaces`, `pr`, `doctor`, and `tests affected`.
+- `--tests` is implemented for `search`, `callers`, `explain`, and `context`.
+
 Requirements:
 
-- Add `--tags`.
-- Add `--tests`.
+- Extend build-tag and test-scope behavior where it matters.
 - Report package load errors clearly.
 - Avoid silently ignoring packages that failed to load.
 

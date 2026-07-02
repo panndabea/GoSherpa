@@ -11,6 +11,8 @@ the code, README, and license.
   for making GoSherpa a default daily-use tool.
 - [Agent Priority List](product/AGENT_PRIORITY_LIST.md) - prioritized features
   that would make GoSherpa useful as a default coding-agent tool.
+- [Agent JSON Schema v1](product/JSON_SCHEMA_V1.md) - shared JSON envelope and
+  agent-facing command contracts.
 - [Context JSON Schema v1](product/CONTEXT_SCHEMA_V1.md) - context envelope,
   size controls, and truncation metadata.
 - [PRD v0.1: Impact Engine](product/PRD_V01.md) - completed MVP scope.

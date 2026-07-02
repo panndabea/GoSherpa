@@ -104,11 +104,12 @@ before editing.
 
 Needed next:
 
-- documented JSON schemas
-- output size controls such as `--max-files`, `--max-references`, and
-  `--max-bytes`
-- broader and documented `confidence`, `analysisMode`, and `limitations`
-  behavior beyond the existing context reports
+- keep documented JSON schemas aligned with golden fixtures and command output
+- add byte-budget controls such as `--max-bytes`; entry-count controls already
+  exist for `--max-files`, `--max-references`, `--max-symbols`, `--max-tests`,
+  and `--source-radius`
+- broaden and document `confidence`, `analysisMode`, and `limitations`
+  behavior consistently beyond the existing context reports
 - concise human warnings without noisy terminal output
 - consistent behavior for symbol, file, package, and diff targets
 

@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-Status: started.
+Status: in progress. The first Symbol Intelligence slices are implemented.
 
 Implemented first slice:
 

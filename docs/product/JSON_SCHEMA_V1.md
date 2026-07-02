@@ -169,7 +169,7 @@ Call analysis mode values:
 
 Reference, standalone interface analysis, and interface subanalysis in context
 or report-based impact bundles use the same `typechecked` and `ast-fallback`
-labels. Broader context, impact, test, and path commands currently use:
+labels. Broader explain, context, impact, test, and path commands currently use:
 
 - `ast`: syntax plus local type information and repository-local heuristics.
 - `typechecked+ast`: typechecked package loading for selected context fields,
@@ -283,7 +283,7 @@ Data:
 ```json
 {
   "target": "Target",
-  "analysisMode": "ast",
+  "analysisMode": "typechecked+ast",
   "confidence": "medium",
   "limitations": [],
   "symbol": {},
@@ -317,7 +317,8 @@ Data:
 ```
 
 - `target`: normalized symbol target.
-- `analysisMode`: broader explain-bundle mode, currently `ast`.
+- `analysisMode`: broader explain-bundle mode, `typechecked+ast` when one or
+  more composed subanalyses use typechecked package loading and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: explain, call, and test-planning blind spots.
 - `symbol`: symbol profile object.

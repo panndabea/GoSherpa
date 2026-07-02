@@ -59,8 +59,9 @@ packages, affected tests, suggested commands, reading order, confidence, and
 limitations.
 
 The current context JSON already includes `analysisMode`, `confidence`, and
-`limitations`. The remaining hardening work is documented schemas, explicit
-size controls, and broader consistency across agent-facing commands.
+`limitations`, with schema docs and entry-count size controls for context
+exports. The remaining hardening work is byte-budget control and broader
+consistency across agent-facing commands.
 
 Command sketches:
 
@@ -103,8 +104,9 @@ Done when:
 
 - `--json` output has a documented schema.
 - Human output is readable in a terminal.
-- Output has size controls such as `--max-files`, `--max-references`, or
-  `--max-bytes`.
+- Output has entry-count size controls such as `--max-files`,
+  `--max-references`, `--max-symbols`, `--max-tests`, and `--source-radius`;
+  byte-budget controls such as `--max-bytes` are tracked as later hardening.
 - Ambiguous targets return candidates instead of guessing.
 - The command can run against a symbol, file, package, or git diff.
 
