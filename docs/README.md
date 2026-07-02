@@ -1,10 +1,14 @@
 # GoSherpa Docs
 
-Planning and release documents live here so the repository root stays focused on
-the code, README, and license.
+Reference, planning, and release documents live here so the repository root stays
+focused on the code, README, and license.
 
 ## Product
 
+- [CLI Reference](CLI_REFERENCE.md) - full command overview, examples, root
+  selection, and JSON output notes.
+- [Implementation Status](STATUS.md) - implemented MVP capabilities, known
+  limitations, and current roadmap focus.
 - [Feature Roadmap](product/FEATURE_ROADMAP.md) - current product direction and
   implementation status.
 - [Must-Use Readiness](product/MUST_USE_READINESS.md) - near-term decision lens
