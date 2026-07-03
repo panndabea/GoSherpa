@@ -29,20 +29,42 @@ func ResolveRepositoryRoot(input string) (RepositoryRoot, error) {
 		return RepositoryRoot{}, fmt.Errorf("repository root is not a directory: %s", root)
 	}
 
-	goModPath := filepath.Join(root, "go.mod")
-	goModInfo, err := os.Stat(goModPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return RepositoryRoot{}, fmt.Errorf("repository root does not contain go.mod: %s", root)
-		}
-		return RepositoryRoot{}, fmt.Errorf("stat go.mod in repository root %s: %w", root, err)
-	}
-
-	if goModInfo.IsDir() {
-		return RepositoryRoot{}, fmt.Errorf("repository root go.mod is not a file: %s", goModPath)
+	if _, err := repositoryRootManifest(root); err != nil {
+		return RepositoryRoot{}, err
 	}
 
 	return RepositoryRoot{Path: root}, nil
+}
+
+func repositoryRootManifest(root string) (string, error) {
+	for _, name := range []string{"go.mod", "go.work"} {
+		path := filepath.Join(root, name)
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("stat %s in repository root %s: %w", name, root, err)
+		}
+
+		if info.IsDir() {
+			return "", fmt.Errorf("repository root %s is not a file: %s", name, path)
+		}
+
+		return name, nil
+	}
+
+	return "", fmt.Errorf("repository root does not contain go.mod or go.work: %s", root)
+}
+
+func repositoryRootHasManifest(root string) bool {
+	_, err := repositoryRootManifest(root)
+	return err == nil
+}
+
+func repositoryRootHasGoWork(root string) bool {
+	info, err := os.Stat(filepath.Join(root, "go.work"))
+	return err == nil && !info.IsDir()
 }
 
 func absoluteRootPath(root string) (string, error) {

@@ -24,7 +24,12 @@ type packageFileMetadata struct {
 }
 
 func ModulePath(root string) (string, error) {
-	return modulePath(root)
+	value, err := modulePath(root)
+	if err != nil && repositoryRootHasGoWork(root) {
+		return "", nil
+	}
+
+	return value, err
 }
 
 func FindPackageDependencies(root string, targetPackage string) (PackageDependencies, error) {

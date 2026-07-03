@@ -221,7 +221,8 @@ Implemented behavior:
 - Global `--root` flag.
 - Default to `.` when omitted.
 - File paths are normalized relative to the chosen root in output.
-- CLI roots are rejected when they do not contain a direct `go.mod`.
+- CLI roots are rejected when they do not contain a direct `go.mod` or
+  `go.work`.
 - Internal analysis remains testable against loose
   Go files.
 

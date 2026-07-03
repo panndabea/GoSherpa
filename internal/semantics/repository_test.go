@@ -42,6 +42,46 @@ func Run() {
 	assertSemanticTestContains(t, got, "./internal/auth")
 }
 
+func TestLoadRepositoryLoadsGoWorkPackages(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	./app
+	./service
+)
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n")
+	writeSemanticTestFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "app", "go.mod"), `module example.com/app
+
+require example.com/service v0.0.0
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "app", "main.go"), `package app
+
+import "example.com/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+
+	repo, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := semanticTestPackagePaths(repo)
+	assertSemanticTestContains(t, got, "./app")
+	assertSemanticTestContains(t, got, "./service")
+}
+
 func TestLoadRepositoryReportsPackageWarnings(t *testing.T) {
 	tmp := t.TempDir()
 

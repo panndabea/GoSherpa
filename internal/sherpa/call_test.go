@@ -685,6 +685,56 @@ func Run(client *service.Client) {
 	}
 }
 
+func TestFindCallersUsesSemanticLoaderAcrossGoWorkModules(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	./app
+	./service
+)
+`)
+	writeFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n")
+	writeFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "app", "go.mod"), `module example.com/app
+
+require example.com/service v0.0.0
+`)
+	writeFile(t, filepath.Join(tmp, "app", "main.go"), `package app
+
+import "example.com/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+
+	result, err := FindCallers(tmp, "./service.Client.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected workspace caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"app/main.go"}) {
+		t.Fatalf("expected workspace caller file, got %v", files)
+	}
+}
+
 func TestFindCallsReportTypecheckedAnalysisMode(t *testing.T) {
 	tmp := t.TempDir()
 

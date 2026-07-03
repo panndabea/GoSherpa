@@ -3328,6 +3328,62 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCallersCommandFromGoWorkRootAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	./app
+	./service
+)
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "app", "go.mod"), `module example.com/app
+
+require example.com/service v0.0.0
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "app", "main.go"), `package app
+
+import "example.com/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "./service.Client.Start", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callers", "./service.Client.Start", "")
+
+	if data["analysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %v", data["analysisMode"])
+	}
+	callers := assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+	caller, ok := callers[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected caller object, got %T", callers[0])
+	}
+	if caller["name"] != "Run" {
+		t.Fatalf("expected Run caller, got %v", caller["name"])
+	}
+}
+
 func TestMainRunsCallersCommandWithContext(t *testing.T) {
 	tmp := t.TempDir()
 

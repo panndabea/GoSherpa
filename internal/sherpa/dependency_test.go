@@ -31,6 +31,24 @@ func TestModulePath(t *testing.T) {
 	}
 }
 
+func TestExportedModulePathAllowsGoWorkRootWithoutModulePath(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use ./app
+`)
+
+	got, err := ModulePath(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got != "" {
+		t.Fatalf("expected empty workspace module path, got %s", got)
+	}
+}
+
 func TestModulePathReturnsErrorWhenGoModIsMissing(t *testing.T) {
 	tmp := t.TempDir()
 

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -46,11 +47,11 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 		return Repository{}, err
 	}
 
-	patterns := packageLoadPatterns(options)
-	loaded, err := loadPackages(rootPath, options, "")
+	patterns := packageLoadPatterns(rootPath, options)
+	loaded, err := loadPackages(rootPath, options, patterns, "")
 	if err != nil {
 		if packageLoadErrorIsCacheAccess(err.Error()) {
-			if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options); ok {
+			if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options, patterns); ok {
 				return retried, retryErr
 			}
 		}
@@ -60,7 +61,7 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 
 	repo, err := repositoryFromLoaded(rootPath, patterns, loaded)
 	if err != nil && packageLoadHasCacheAccessError(loaded) {
-		if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options); ok {
+		if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options, patterns); ok {
 			return retried, retryErr
 		}
 	}
@@ -68,16 +69,80 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	return repo, err
 }
 
-func packageLoadPatterns(options LoadOptions) []string {
+func packageLoadPatterns(root string, options LoadOptions) []string {
 	patterns := options.Patterns
 	if len(patterns) == 0 {
+		if workspacePatterns, ok := workspacePackageLoadPatterns(root); ok {
+			return workspacePatterns
+		}
+
 		patterns = []string{"./..."}
 	}
 
 	return patterns
 }
 
-func loadPackages(root string, options LoadOptions, goCache string) ([]*packages.Package, error) {
+func workspacePackageLoadPatterns(root string) ([]string, bool) {
+	if fileExists(filepath.Join(root, "go.mod")) {
+		return nil, false
+	}
+
+	goWorkPath := filepath.Join(root, "go.work")
+	contents, err := os.ReadFile(goWorkPath)
+	if err != nil {
+		return nil, false
+	}
+
+	workFile, err := modfile.ParseWork(goWorkPath, contents, nil)
+	if err != nil {
+		return nil, false
+	}
+
+	var patterns []string
+	for _, use := range workFile.Use {
+		if use == nil {
+			continue
+		}
+
+		path := strings.TrimSpace(filepath.ToSlash(use.Path))
+		if path == "" {
+			continue
+		}
+		if filepath.IsAbs(path) {
+			relativePath, err := filepath.Rel(root, filepath.Clean(path))
+			if err != nil || relativePath == "." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || relativePath == ".." {
+				continue
+			}
+			path = filepath.ToSlash(relativePath)
+		}
+
+		path = strings.TrimPrefix(path, "./")
+		cleaned := filepath.ToSlash(filepath.Clean(filepath.FromSlash(path)))
+		if cleaned == "." {
+			patterns = append(patterns, "./...")
+			continue
+		}
+		if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+			continue
+		}
+
+		patterns = append(patterns, "./"+cleaned+"/...")
+	}
+
+	patterns = uniqueSorted(patterns)
+	if len(patterns) == 0 {
+		return nil, false
+	}
+
+	return patterns, true
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func loadPackages(root string, options LoadOptions, patterns []string, goCache string) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName |
 			packages.NeedFiles |
@@ -95,21 +160,21 @@ func loadPackages(root string, options LoadOptions, goCache string) ([]*packages
 		cfg.Env = envWith("GOCACHE", goCache)
 	}
 
-	return packages.Load(cfg, packageLoadPatterns(options)...)
+	return packages.Load(cfg, patterns...)
 }
 
-func retryLoadRepositoryWithWritableCache(root string, options LoadOptions) (Repository, error, bool) {
+func retryLoadRepositoryWithWritableCache(root string, options LoadOptions, patterns []string) (Repository, error, bool) {
 	cache, err := writableGoBuildCache()
 	if err != nil {
 		return Repository{}, nil, false
 	}
 
-	loaded, err := loadPackages(root, options, cache)
+	loaded, err := loadPackages(root, options, patterns, cache)
 	if err != nil {
 		return Repository{}, fmt.Errorf("load packages: %w", err), true
 	}
 
-	repo, err := repositoryFromLoaded(root, packageLoadPatterns(options), loaded)
+	repo, err := repositoryFromLoaded(root, patterns, loaded)
 	return repo, err, true
 }
 

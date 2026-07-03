@@ -27,6 +27,29 @@ func TestResolveRepositoryRootAcceptsDirectoryWithGoMod(t *testing.T) {
 	}
 }
 
+func TestResolveRepositoryRootAcceptsDirectoryWithGoWork(t *testing.T) {
+	tmp := t.TempDir()
+	writeRootTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use ./app
+`)
+
+	got, err := ResolveRepositoryRoot(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := filepath.Abs(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = filepath.Clean(want)
+
+	if got.Path != want {
+		t.Fatalf("expected %s, got %s", want, got.Path)
+	}
+}
+
 func TestResolveRepositoryRootTrimsWhitespace(t *testing.T) {
 	tmp := t.TempDir()
 	writeRootTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
@@ -94,8 +117,8 @@ func TestResolveRepositoryRootRejectsDirectoryWithoutGoMod(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	if !strings.Contains(err.Error(), "repository root does not contain go.mod") {
-		t.Fatalf("expected missing go.mod error, got %v", err)
+	if !strings.Contains(err.Error(), "repository root does not contain go.mod or go.work") {
+		t.Fatalf("expected missing repository manifest error, got %v", err)
 	}
 }
 
@@ -113,6 +136,23 @@ func TestResolveRepositoryRootRejectsGoModDirectory(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "repository root go.mod is not a file") {
 		t.Fatalf("expected go.mod directory error, got %v", err)
+	}
+}
+
+func TestResolveRepositoryRootRejectsGoWorkDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	err := os.Mkdir(filepath.Join(tmp, "go.work"), 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ResolveRepositoryRoot(tmp)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "repository root go.work is not a file") {
+		t.Fatalf("expected go.work directory error, got %v", err)
 	}
 }
 

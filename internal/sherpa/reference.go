@@ -151,8 +151,7 @@ func findReferenceReportForTarget(rootPath string, target referenceTarget, optio
 }
 
 func referenceShouldAttemptTypechecked(root string) bool {
-	info, err := os.Stat(filepath.Join(root, "go.mod"))
-	return err == nil && !info.IsDir()
+	return repositoryRootHasManifest(root)
 }
 
 func normalizeReferenceTarget(root string, name string) (referenceTarget, error) {

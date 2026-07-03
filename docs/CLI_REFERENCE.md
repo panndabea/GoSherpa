@@ -32,7 +32,7 @@ go run ./cmd/gosherpa entrypoints ParseFile
 go run ./cmd/gosherpa path main FindCallers
 ```
 
-Use `--root` to run GoSherpa from another working directory. The path must point to a Go module root containing `go.mod`.
+Use `--root` to run GoSherpa from another working directory. The path must point to a Go module root containing `go.mod` or a Go workspace root containing `go.work`.
 
 ```bash
 ./gosherpa --root /path/to/GoSherpa symbols

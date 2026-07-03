@@ -94,6 +94,7 @@ type functionInfo struct {
 	Position    Position
 	Root        string
 	Imports     map[string]string
+	ImportPaths map[string]string
 }
 
 type callReference struct {
@@ -532,6 +533,7 @@ func collectTypecheckedCallFunctionInfos(root string, options CallOptions) ([]fu
 
 func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {
 	modulePath := readModulePath(repo.Root)
+	importPaths := semanticCallImportPaths(repo)
 
 	var functions []functionInfo
 	for _, pkg := range repo.Packages {
@@ -570,6 +572,7 @@ func semanticCallFunctionInfos(repo semantics.Repository) []functionInfo {
 					Position:    position,
 					Root:        repo.Root,
 					Imports:     imports,
+					ImportPaths: importPaths,
 				})
 			}
 		}
@@ -612,6 +615,7 @@ func collectTypecheckedTestCallerFunctionInfos(root string, options CallOptions)
 
 func semanticTestCallFunctionInfos(repo semantics.Repository) []functionInfo {
 	modulePath := readModulePath(repo.Root)
+	importPaths := semanticCallImportPaths(repo)
 	seen := make(map[string]struct{})
 
 	var functions []functionInfo
@@ -661,6 +665,7 @@ func semanticTestCallFunctionInfos(repo semantics.Repository) []functionInfo {
 					Position:    position,
 					Root:        repo.Root,
 					Imports:     imports,
+					ImportPaths: importPaths,
 				})
 			}
 		}
@@ -669,6 +674,19 @@ func semanticTestCallFunctionInfos(repo semantics.Repository) []functionInfo {
 	sortFunctionInfos(functions)
 
 	return functions
+}
+
+func semanticCallImportPaths(repo semantics.Repository) map[string]string {
+	paths := make(map[string]string)
+	for _, pkg := range repo.Packages {
+		if strings.TrimSpace(pkg.ImportPath) == "" || strings.TrimSpace(pkg.PackagePath) == "" {
+			continue
+		}
+
+		paths[pkg.ImportPath] = pkg.PackagePath
+	}
+
+	return paths
 }
 
 func testFunctionPackagePath(packagePath string, packageName string) string {
@@ -1297,6 +1315,10 @@ func callObjectPackageMatchesTarget(function functionInfo, object types.Object, 
 	objectPackage := object.Pkg()
 	if objectPackage == nil {
 		return function.Package == target.Package
+	}
+
+	if packagePath, ok := function.ImportPaths[objectPackage.Path()]; ok {
+		return packagePath == target.Package
 	}
 
 	if objectPackage.Path() == function.ImportPath {
