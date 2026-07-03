@@ -2,6 +2,7 @@ package impact
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -97,12 +98,13 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 		AffectedImplementations: []string{},
 	}
 
-	report.AffectedSymbols, err = ChangedSymbols(a.Root, base, head)
+	changedSymbols, err := changedSymbolsForDiff(a.Root, base, head)
 	if err != nil {
 		return ImpactReport{}, err
 	}
+	report.AffectedSymbols = changedSymbolNames(changedSymbols)
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -147,7 +149,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, nil, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -253,8 +255,21 @@ func affectedPackagesForChangedPackages(root string, changedPackages []string) (
 	return uniqueSortedStrings(affected), uniqueSortedStrings(warnings)
 }
 
-func affectedTestsForPackages(root string, changedPackages []string, packages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, []string) {
+func changedSymbolsForDiff(root string, base string, head string) ([]changedSymbol, error) {
+	changedLines, err := gitdiff.ChangedLineRanges(root, base, head)
+	if err != nil {
+		return nil, err
+	}
+
+	return symbolsForChangedLineRanges(root, base, head, changedLines)
+}
+
+func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
+
+	for _, test := range directTestsForChangedSymbols(root, changedSymbols, &warnings) {
+		mergeRelatedTest(seen, test)
+	}
 
 	for _, pkg := range packages {
 		tests, err := sherpa.FindTests(root, pkg)
@@ -264,7 +279,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 		}
 
 		for _, test := range tests.Tests {
-			seen[relatedTestKey(test)] = test
+			mergeRelatedTest(seen, test)
 		}
 	}
 
@@ -274,8 +289,12 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 	}
 
 	sortRelatedTests(result)
+	target := "affected packages"
+	if len(changedSymbols) > 0 {
+		target = "changed symbols"
+	}
 	plan := sherpa.PlanTests(result, sherpa.TestPlanOptions{
-		Target:           "affected packages",
+		Target:           target,
 		Kind:             sherpa.TestTargetKindPackage,
 		TargetPackages:   changedPackages,
 		CallerPackages:   packageDifference(packages, changedPackages),
@@ -283,6 +302,80 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 	})
 
 	return result, plan, sherpa.TestPlanCommands(plan), uniqueSortedStrings(warnings)
+}
+
+func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings *[]string) []sherpa.RelatedTest {
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	modulePath := impactModulePath(root)
+	seen := make(map[string]sherpa.RelatedTest)
+	for _, symbol := range normalizeChangedSymbols(symbols) {
+		target := changedSymbolTestTarget(symbol, modulePath)
+		tests, err := sherpa.FindTestsWithOptions(root, target, sherpa.TestOptions{
+			Scope: sherpa.TestScopeDirect,
+		})
+		if err != nil {
+			if warnings != nil {
+				*warnings = append(*warnings, err.Error())
+			}
+			continue
+		}
+
+		for _, test := range tests.Tests {
+			mergeRelatedTest(seen, test)
+		}
+	}
+
+	result := make([]sherpa.RelatedTest, 0, len(seen))
+	for _, test := range seen {
+		result = append(result, test)
+	}
+	sortRelatedTests(result)
+
+	return result
+}
+
+func changedSymbolTestTarget(symbol changedSymbol, modulePath string) string {
+	if symbol.Package == "." && !strings.Contains(modulePath, "/") {
+		return symbol.Name
+	}
+
+	return sherpa.FormatPackageQualifiedTarget(symbol.Package, symbol.Name, modulePath)
+}
+
+func mergeRelatedTest(seen map[string]sherpa.RelatedTest, test sherpa.RelatedTest) {
+	key := relatedTestKey(test)
+	existing, ok := seen[key]
+	if !ok {
+		seen[key] = test
+		return
+	}
+
+	test.DirectReference = test.DirectReference || existing.DirectReference
+	test.ExternalPackage = test.ExternalPackage || existing.ExternalPackage
+	if test.Range == nil {
+		test.Range = existing.Range
+	}
+
+	seen[key] = test
+}
+
+func impactModulePath(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return ""
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "module" {
+			return fields[1]
+		}
+	}
+
+	return ""
 }
 
 func relatedTestKey(test sherpa.RelatedTest) string {

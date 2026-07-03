@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	gitdiff "github.com/panndabea/GoSherpa/internal/git"
@@ -18,17 +19,27 @@ type changedSymbolRange struct {
 	End   int
 }
 
+type changedSymbol struct {
+	Package string
+	Name    string
+}
+
 func ChangedSymbols(root string, base string, head string) ([]string, error) {
 	changedLines, err := gitdiff.ChangedLineRanges(root, base, head)
 	if err != nil {
 		return nil, err
 	}
 
-	return symbolsForChangedLineRanges(root, base, head, changedLines)
+	symbols, err := symbolsForChangedLineRanges(root, base, head, changedLines)
+	if err != nil {
+		return nil, err
+	}
+
+	return changedSymbolNames(symbols), nil
 }
 
-func symbolsForChangedLineRanges(root string, base string, head string, changedLines []gitdiff.ChangedFileLineRanges) ([]string, error) {
-	var symbols []string
+func symbolsForChangedLineRanges(root string, base string, head string, changedLines []gitdiff.ChangedFileLineRanges) ([]changedSymbol, error) {
+	var symbols []changedSymbol
 
 	for _, changedFile := range changedLines {
 		if !changedFileHasGoPath(changedFile) {
@@ -48,7 +59,7 @@ func symbolsForChangedLineRanges(root string, base string, head string, changedL
 		symbols = append(symbols, baseSymbols...)
 	}
 
-	return uniqueSortedStrings(symbols), nil
+	return normalizeChangedSymbols(symbols), nil
 }
 
 func changedFileHasGoPath(changedFile gitdiff.ChangedFileLineRanges) bool {
@@ -63,11 +74,12 @@ func changedFileHasGoPath(changedFile gitdiff.ChangedFileLineRanges) bool {
 	return false
 }
 
-func changedSymbolsForCurrentFile(root string, head string, changedFile gitdiff.ChangedFileLineRanges) ([]string, error) {
+func changedSymbolsForCurrentFile(root string, head string, changedFile gitdiff.ChangedFileLineRanges) ([]changedSymbol, error) {
 	if len(changedFile.Ranges) == 0 {
 		return nil, nil
 	}
-	if _, ok := packageForChangedFile(changedFile.Path); !ok {
+	packagePath, ok := packageForChangedFile(changedFile.Path)
+	if !ok {
 		return nil, nil
 	}
 
@@ -91,10 +103,10 @@ func changedSymbolsForCurrentFile(root string, head string, changedFile gitdiff.
 		return nil, err
 	}
 
-	return changedSymbolsForRanges(symbols, changedFile.Ranges), nil
+	return changedSymbolRecords(packagePath, changedSymbolsForRanges(symbols, changedFile.Ranges)), nil
 }
 
-func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.ChangedFileLineRanges) ([]string, error) {
+func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.ChangedFileLineRanges) ([]changedSymbol, error) {
 	if len(changedFile.OldRanges) == 0 {
 		return nil, nil
 	}
@@ -103,7 +115,8 @@ func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.Cha
 	if oldPath == "" {
 		oldPath = changedFile.Path
 	}
-	if _, ok := packageForChangedFile(oldPath); !ok {
+	packagePath, ok := packageForChangedFile(oldPath)
+	if !ok {
 		return nil, nil
 	}
 
@@ -118,7 +131,7 @@ func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.Cha
 		return nil, err
 	}
 
-	return changedSymbolsForRanges(symbols, changedFile.OldRanges), nil
+	return changedSymbolRecords(packagePath, changedSymbolsForRanges(symbols, changedFile.OldRanges)), nil
 }
 
 func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.ChangedLineRange) []string {
@@ -135,6 +148,60 @@ func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.Chan
 	}
 
 	return changedSymbols
+}
+
+func changedSymbolRecords(packagePath string, names []string) []changedSymbol {
+	records := make([]changedSymbol, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		records = append(records, changedSymbol{
+			Package: packagePath,
+			Name:    name,
+		})
+	}
+
+	return records
+}
+
+func changedSymbolNames(symbols []changedSymbol) []string {
+	names := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		names = append(names, symbol.Name)
+	}
+
+	return uniqueSortedStrings(names)
+}
+
+func normalizeChangedSymbols(symbols []changedSymbol) []changedSymbol {
+	seen := make(map[string]changedSymbol)
+	for _, symbol := range symbols {
+		symbol.Package = strings.TrimSpace(symbol.Package)
+		symbol.Name = strings.TrimSpace(symbol.Name)
+		if symbol.Package == "" || symbol.Name == "" {
+			continue
+		}
+
+		seen[symbol.Package+"\x00"+symbol.Name] = symbol
+	}
+
+	normalized := make([]changedSymbol, 0, len(seen))
+	for _, symbol := range seen {
+		normalized = append(normalized, symbol)
+	}
+
+	sort.Slice(normalized, func(i int, j int) bool {
+		if normalized[i].Package != normalized[j].Package {
+			return normalized[i].Package < normalized[j].Package
+		}
+
+		return normalized[i].Name < normalized[j].Name
+	})
+
+	return normalized
 }
 
 func parseChangedSymbolRanges(filePath string) ([]changedSymbolRange, error) {

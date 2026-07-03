@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/panndabea/GoSherpa/internal/semantics"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
@@ -43,6 +44,107 @@ func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 	assertStrings(t, report.Warnings, []string{})
+}
+
+func TestAnalyzeDiffUsesChangedSymbolsForDirectTestPlan(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestAuthNewSession(t *testing.T) {
+	_ = NewSession()
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler.go"), `package api
+
+import "example.com/app/internal/auth"
+
+func Build() auth.Session {
+	return auth.NewSession()
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler_test.go"), `package api
+
+import (
+	"testing"
+
+	"example.com/app/internal/auth"
+)
+
+func TestAPINewSession(t *testing.T) {
+	_ = auth.NewSession()
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+
+func Touch() string {
+	return "old"
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "session_test.go"), `package billing
+
+import "testing"
+
+func TestBillingNewSession(t *testing.T) {
+	_ = NewSession()
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	session := Session{}
+	return session
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "session.go"), `package billing
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+
+func Touch() string {
+	return "new"
+}
+`)
+
+	report, err := AnalyzeDiff(root, base, "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"NewSession", "Touch"})
+	assertStrings(t, directRelatedTestNames(report.AffectedTests), []string{
+		"./internal/api:TestAPINewSession",
+		"./internal/auth:TestAuthNewSession",
+	})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Direct), []string{"./internal/api", "./internal/auth"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{"./internal/billing"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth", "go test ./internal/billing"})
 }
 
 func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
@@ -515,4 +617,26 @@ func relatedTestNames(tests []RelatedTest) []string {
 	}
 
 	return names
+}
+
+func directRelatedTestNames(tests []RelatedTest) []string {
+	names := make([]string, 0, len(tests))
+	for _, test := range tests {
+		if !test.DirectReference {
+			continue
+		}
+
+		names = append(names, test.Package+":"+test.Name)
+	}
+
+	return names
+}
+
+func testPlanItemPackages(items []sherpa.TestPlanItem) []string {
+	packages := make([]string, 0, len(items))
+	for _, item := range items {
+		packages = append(packages, item.Package)
+	}
+
+	return packages
 }
