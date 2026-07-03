@@ -1315,9 +1315,13 @@ func (c *Client) Start() {}
 `)
 	writeFile(t, filepath.Join(tmp, "internal", "service", "service_test.go"), `package service_test
 
-import "example.com/app/internal/service"
+import (
+	"testing"
 
-func TestStart() {
+	"example.com/app/internal/service"
+)
+
+func TestStart(t *testing.T) {
 	client := &service.Client{}
 	client.Start()
 }
