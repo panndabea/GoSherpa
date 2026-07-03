@@ -258,6 +258,82 @@ is currently `git-diff+ast`.
 relationship graph. It is `typechecked` when package loading completed and
 `unavailable` when package loading failed.
 
+## `analyze` Data
+
+Envelope:
+
+- `command`: `analyze`
+- `target`: `.`
+
+Data:
+
+```json
+{
+  "target": ".",
+  "analysisMode": "typechecked+ast",
+  "confidence": "medium",
+  "limitations": [],
+  "repository": {
+    "modulePath": "example.com/app",
+    "goFiles": 12,
+    "testFiles": 4,
+    "generatedFiles": 0,
+    "packageCount": 3,
+    "testPackageCount": 2,
+    "symbolCount": 42
+  },
+  "buildTags": [],
+  "symbolSummary": {
+    "total": 42,
+    "structs": 8,
+    "interfaces": 3,
+    "functions": 20,
+    "methods": 11,
+    "exported": 18,
+    "tests": 7
+  },
+  "packages": [],
+  "importantSymbols": [],
+  "entrypoints": [],
+  "hotspots": [],
+  "testing": {
+    "testFiles": 4,
+    "testPackageCount": 2,
+    "testPackages": [],
+    "suggestedCommands": []
+  },
+  "readiness": {
+    "analysisMode": "typechecked",
+    "confidence": "medium",
+    "packageLoad": "ok",
+    "packageLoadCount": 3,
+    "snapshotStatus": "not_implemented",
+    "suggestions": []
+  },
+  "suggestions": []
+}
+```
+
+- `analysisMode`: broader repository overview mode. It is
+  `typechecked+ast` when doctor readiness completed typechecked package
+  loading and `ast` when semantic readiness is unavailable.
+- `repository`: compact module, file, package, test, and symbol counts.
+- `symbolSummary`: counts for supported symbol kinds in the overview.
+  `tests` counts discovered test symbols; test symbols are omitted from
+  important symbol and entrypoint lists unless `--tests` is used.
+- `packages`: package inventory entries in the same shape as `packages`.
+- `importantSymbols`: compact public symbol profiles selected as likely API
+  surface or useful first reading targets.
+- `entrypoints`: inventory-based entrypoint candidates such as `main`,
+  exported functions, and optional Go test entrypoints.
+- `hotspots`: simple package signals using local import and symbol counts.
+- `testing`: test package list and suggested `go test` commands.
+- `readiness`: embedded summary of doctor-style package-load and snapshot
+  readiness.
+- `suggestions`: deterministic next commands to continue investigation.
+
+`data.warnings` is absent; use envelope `warnings`.
+
 ## `callers` Data
 
 Envelope:

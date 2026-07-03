@@ -23,6 +23,14 @@ type commandSpec struct {
 
 var commandSpecs = []commandSpec{
 	{
+		Name:    "analyze",
+		Usage:   []string{analyzeUsageLine},
+		Handler: runAnalyzeCommand,
+		JSON:    true,
+		Tests:   true,
+		Tags:    true,
+	},
+	{
 		Name:          "context",
 		Usage:         contextUsageLines,
 		Handler:       runContextCommand,
@@ -179,6 +187,7 @@ var commandSpecs = []commandSpec{
 var commandSpecIndex = indexCommandSpecs(commandSpecs)
 
 const (
+	analyzeUsageLine        = "analyze [path] [--tests]"
 	contextSymbolUsageLine  = "context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextFileUsageLine    = "context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextPackageUsageLine = "context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"

@@ -22,6 +22,17 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 		wantArrays []string
 	}{
 		{
+			name:    "analyze",
+			args:    []string{"analyze", "--json"},
+			command: "analyze",
+			target:  ".",
+			wantFields: map[string]string{
+				"analysisMode": agentcontext.AnalysisModeTypecheckedAST,
+				"confidence":   agentcontext.ConfidenceMedium,
+			},
+			wantArrays: []string{"buildTags", "packages", "importantSymbols", "entrypoints", "hotspots", "limitations", "suggestions"},
+		},
+		{
 			name:    "callers",
 			args:    []string{"callers", "Target", "--json"},
 			command: "callers",

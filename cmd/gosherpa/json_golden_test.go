@@ -15,6 +15,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 		args []string
 	}{
 		{
+			name: "analyze",
+			args: []string{"analyze", "--json"},
+		},
+		{
 			name: "symbol",
 			args: []string{"symbol", "Entry", "--json"},
 		},

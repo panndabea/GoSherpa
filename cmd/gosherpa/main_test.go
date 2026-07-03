@@ -558,6 +558,15 @@ func TestPrintUsageIncludesRoot(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesAnalyze(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "analyze [path] [--tests]") {
+		t.Fatalf("expected usage to contain analyze command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -858,6 +867,179 @@ func TestMainPrintsDoctorUsageWhenArgumentIsUnexpected(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "doctor", "extra"})
 
 	want := "usage: gosherpa [--root <path>] doctor\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsAnalyzeCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "analyze"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"ANALYZE",
+		"Module: example.com/app",
+		"Analysis: typechecked+ast",
+		"Confidence: medium",
+		"SUMMARY",
+		"Packages: 2",
+		"Go files: 3",
+		"Test files: 1",
+		"Symbols: 3",
+		"SYMBOL SUMMARY",
+		"Functions: 3",
+		"Test symbols: 1",
+		"PACKAGE OVERVIEW",
+		"IMPORTANT SYMBOLS",
+		"example.com/app.Entry",
+		"ENTRY POINTS",
+		"HOTSPOTS",
+		"TESTING",
+		"Suggested tests",
+		"go test ./...",
+		"READINESS",
+		"SUGGESTED NEXT COMMANDS",
+		"gosherpa context package .",
+		"LIMITATIONS",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsAnalyzeCommandWithPathArgument(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "analyze", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if !strings.Contains(result.Stdout, "ANALYZE") {
+		t.Fatalf("expected analyze output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsAnalyzeCommandWithRootRelativePathArgument(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "analyze", "."})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if !strings.Contains(result.Stdout, "Module: example.com/app") {
+		t.Fatalf("expected analyze output for root-relative path, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsAnalyzeCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "analyze", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "analyze", ".", "example.com/app")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != agentcontext.ConfidenceMedium {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+
+	repository := assertMainTestJSONObject(t, data, "repository")
+	if repository["packageCount"] != float64(2) {
+		t.Fatalf("expected 2 packages, got %#v", repository["packageCount"])
+	}
+	if repository["symbolCount"] != float64(3) {
+		t.Fatalf("expected 3 production symbols, got %#v", repository["symbolCount"])
+	}
+
+	symbolSummary := assertMainTestJSONObject(t, data, "symbolSummary")
+	if symbolSummary["tests"] != float64(1) {
+		t.Fatalf("expected 1 test symbol, got %#v", symbolSummary["tests"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "packages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "importantSymbols", 3)
+	assertMainTestJSONArrayHasLength(t, data, "entrypoints", 3)
+	assertMainTestJSONArrayHasLength(t, data, "hotspots", 2)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
+	assertMainTestJSONArrayHasLength(t, data, "suggestions", 5)
+
+	testingOverview := assertMainTestJSONObject(t, data, "testing")
+	assertMainTestJSONArrayHasLength(t, testingOverview, "testPackages", 1)
+	assertMainTestJSONArrayHasLength(t, testingOverview, "suggestedCommands", 2)
+
+	readiness := assertMainTestJSONObject(t, data, "readiness")
+	if readiness["packageLoad"] != "ok" {
+		t.Fatalf("expected package load ok, got %#v", readiness["packageLoad"])
+	}
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+	if strings.Contains(result.Stdout, "ANALYZE") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsAnalyzeCommandAsJSONWithTests(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "analyze", "--tests", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "analyze", ".", "example.com/app")
+
+	repository := assertMainTestJSONObject(t, data, "repository")
+	if repository["symbolCount"] != float64(4) {
+		t.Fatalf("expected test-inclusive symbol count 4, got %#v", repository["symbolCount"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "entrypoints", 4)
+}
+
+func TestMainPrintsAnalyzeUsageWhenArgumentIsUnexpected(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "analyze", ".", "extra"})
+
+	want := "usage: gosherpa [--root <path>] analyze [path] [--tests]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1263,7 +1445,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, packages, entrypoints, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
@@ -10,6 +11,45 @@ import (
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
+
+func runAnalyzeCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	if len(invocation.CommandArgs) > 1 {
+		printCommandUsage(stderr, analyzeUsageLine)
+		return exitUsage
+	}
+
+	rootInput := invocation.Root
+	if len(invocation.CommandArgs) == 1 {
+		rootInput = invocation.CommandArgs[0]
+		if !filepath.IsAbs(rootInput) && invocation.Root != "" && invocation.Root != "." {
+			rootInput = filepath.Join(invocation.Root, rootInput)
+		}
+	}
+
+	root, ok := resolveRootPath(rootInput, stderr)
+	if !ok {
+		return exitFailure
+	}
+
+	report, err := analyzeRepository(root, invocation.IncludeTests, invocation.BuildTags)
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "analyze", ".", stderr, err)
+	}
+
+	if invocation.JSON {
+		normalizedReport := analyzeJSONResult(report)
+		return writeJSON(stdout, stderr, newJSONResponse(
+			root,
+			"analyze",
+			normalizedReport.Target,
+			normalizedReport.Warnings,
+			normalizedReport,
+		))
+	}
+
+	fmt.Fprint(stdout, formatAnalyzeReport(report))
+	return exitSuccess
+}
 
 func runDoctorCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
 	if len(invocation.CommandArgs) != 0 {

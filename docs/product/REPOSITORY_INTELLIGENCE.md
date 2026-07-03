@@ -103,6 +103,18 @@ A single command should provide an overview of any Go repository.
 gosherpa analyze .
 ```
 
+First slice implemented:
+
+* repository summary
+* package overview
+* symbol counts
+* important public symbols
+* entry point candidates
+* simple package hotspots
+* testing overview
+* readiness, limitations, and suggested next commands
+* stable JSON output
+
 Output could include:
 
 * repository summary

@@ -276,6 +276,23 @@ func newJSONErrorResponse(root string, command string, target string, errorData 
 	}
 }
 
+func analyzeJSONResult(report analyzeReport) analyzeReport {
+	report = normalizeAnalyzeReport(report)
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.BuildTags = nonNilSlice(report.BuildTags)
+	report.Packages = nonNilSlice(report.Packages)
+	report.ImportantSymbols = nonNilSlice(report.ImportantSymbols)
+	report.EntryPoints = nonNilSlice(report.EntryPoints)
+	report.Hotspots = nonNilSlice(report.Hotspots)
+	report.Testing.TestPackages = nonNilSlice(report.Testing.TestPackages)
+	report.Testing.SuggestedCommands = nonNilSlice(report.Testing.SuggestedCommands)
+	report.Readiness.Suggestions = nonNilSlice(report.Readiness.Suggestions)
+	report.Suggestions = nonNilSlice(report.Suggestions)
+	report.Warnings = nonNilSlice(report.Warnings)
+
+	return report
+}
+
 func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	result.References = nonNilSlice(result.References)
 	result.ReferenceAnalysisMode = strings.TrimSpace(result.ReferenceAnalysisMode)

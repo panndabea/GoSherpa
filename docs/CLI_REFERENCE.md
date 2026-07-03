@@ -14,6 +14,7 @@ go build -o gosherpa ./cmd/gosherpa
 Prefer not to build a binary yet?
 
 ```bash
+go run ./cmd/gosherpa analyze .
 go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
@@ -42,6 +43,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 
 | Capability | Command | Result |
 | --- | --- | --- |
+| Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, important entrypoint candidates, hotspots, tests, readiness, limitations, and suggested next commands |
 | Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, functions, and methods with optional kind, package, and test filters |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
@@ -87,6 +89,9 @@ Found 4 references
 ## Example Commands
 
 ```bash
+./gosherpa analyze .
+./gosherpa analyze . --tests
+./gosherpa analyze . --json
 ./gosherpa symbols
 ./gosherpa symbols --kind struct
 ./gosherpa symbols --kind method --package ./internal/sherpa
@@ -183,5 +188,10 @@ Context commands support size controls for agent workflows: `--max-files`,
 `--max-references`, `--max-symbols`, `--max-tests`, `--source-radius`, and
 `--max-bytes`. The byte budget omits large context fields deterministically and
 keeps JSON valid; any omissions are reported in `data.truncated`.
+
+`analyze --json` provides the repository-level entry point for agents and
+scripts: package summaries, symbol counts, important public symbols,
+entrypoint candidates, simple hotspots, test overview, readiness, limitations,
+and suggested next commands.
 
 See the [Agent JSON Schema](product/JSON_SCHEMA_V1.md) and [Context JSON Schema](product/CONTEXT_SCHEMA_V1.md) for the full machine-readable contracts.

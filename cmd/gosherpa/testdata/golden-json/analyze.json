@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "command": "analyze",
+  "target": ".",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "target": ".",
+    "analysisMode": "typechecked+ast",
+    "confidence": "medium",
+    "limitations": [
+      "Analyze composes repository inventory, package summaries, symbol discovery, and doctor readiness checks.",
+      "Hotspots are simple inventory signals, not runtime profiling or full dependency impact.",
+      "Entry point overview is based on main functions, exported functions, and optional Go test entrypoints.",
+      "Build tags are applied to semantic readiness checks; syntax inventory still follows discovered Go files.",
+      "Persistent repository snapshots are not implemented yet, so analyze reads repository data directly.",
+      "Test symbols are counted but omitted from entry point and important symbol lists unless --tests is used."
+    ],
+    "repository": {
+      "modulePath": "example.com/golden",
+      "goFiles": 3,
+      "testFiles": 1,
+      "generatedFiles": 0,
+      "packageCount": 2,
+      "testPackageCount": 1,
+      "symbolCount": 6
+    },
+    "buildTags": [],
+    "symbolSummary": {
+      "total": 6,
+      "structs": 1,
+      "interfaces": 0,
+      "functions": 5,
+      "methods": 0,
+      "exported": 6,
+      "tests": 1
+    },
+    "packages": [
+      {
+        "package": ".",
+        "packageName": "golden",
+        "goFiles": 1,
+        "testFiles": 1,
+        "symbols": 5,
+        "imports": 0,
+        "localImports": 0,
+        "externalImports": 0,
+        "importedBy": 1,
+        "hasTests": true
+      },
+      {
+        "package": "./cmd/app",
+        "packageName": "main",
+        "goFiles": 1,
+        "testFiles": 0,
+        "symbols": 1,
+        "imports": 1,
+        "localImports": 1,
+        "externalImports": 0,
+        "importedBy": 0,
+        "hasTests": false
+      }
+    ],
+    "importantSymbols": [
+      {
+        "name": "Worker",
+        "kind": "struct",
+        "package": ".",
+        "qualifiedName": "example.com/golden.Worker",
+        "position": {
+          "file": "service.go",
+          "line": 3,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 3,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 3,
+            "column": 21
+          }
+        }
+      },
+      {
+        "name": "Entry",
+        "kind": "function",
+        "package": ".",
+        "qualifiedName": "example.com/golden.Entry",
+        "signature": "func Entry()",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 8,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "First",
+        "kind": "function",
+        "package": ".",
+        "qualifiedName": "example.com/golden.First",
+        "signature": "func First()",
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 10,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 12,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "Second",
+        "kind": "function",
+        "package": ".",
+        "qualifiedName": "example.com/golden.Second",
+        "signature": "func Second()",
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 14,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 16,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "Target",
+        "kind": "function",
+        "package": ".",
+        "qualifiedName": "example.com/golden.Target",
+        "signature": "func Target()",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 17
+          }
+        }
+      },
+      {
+        "name": "Run",
+        "kind": "function",
+        "package": "./cmd/app",
+        "qualifiedName": "./cmd/app.Run",
+        "signature": "func Run()",
+        "position": {
+          "file": "cmd/app/main.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "cmd/app/main.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "cmd/app/main.go",
+            "line": 7,
+            "column": 2
+          }
+        }
+      }
+    ],
+    "entrypoints": [
+      {
+        "name": "Entry",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 8,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "First",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 10,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 10,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 12,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "Second",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 14,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 14,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 16,
+            "column": 2
+          }
+        }
+      },
+      {
+        "name": "Target",
+        "package": ".",
+        "kind": "exported",
+        "position": {
+          "file": "service.go",
+          "line": 18,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 17
+          }
+        }
+      },
+      {
+        "name": "Run",
+        "package": "./cmd/app",
+        "kind": "exported",
+        "position": {
+          "file": "cmd/app/main.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "cmd/app/main.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "cmd/app/main.go",
+            "line": 7,
+            "column": 2
+          }
+        }
+      }
+    ],
+    "hotspots": [
+      {
+        "package": ".",
+        "reason": "imported by 1 local package",
+        "importedBy": 1,
+        "imports": 0,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "goFiles": 1,
+        "testFiles": 1
+      },
+      {
+        "package": "./cmd/app",
+        "reason": "imports 1 local package",
+        "importedBy": 0,
+        "imports": 1,
+        "localImports": 1,
+        "externalImports": 0,
+        "symbols": 1,
+        "goFiles": 1,
+        "testFiles": 0
+      }
+    ],
+    "testing": {
+      "testFiles": 1,
+      "testPackageCount": 1,
+      "testPackages": [
+        "."
+      ],
+      "suggestedCommands": [
+        "go test ./...",
+        "go test ."
+      ]
+    },
+    "readiness": {
+      "analysisMode": "typechecked",
+      "confidence": "medium",
+      "packageLoad": "ok",
+      "packageLoadCount": 2,
+      "snapshotStatus": "not_implemented",
+      "suggestions": [
+        "Run gosherpa context diff --base <ref> or gosherpa context symbol <target> for focused code intelligence.",
+        "Use --tags <list> when inspecting build-tagged code.",
+        "Snapshot reuse is not available yet; expect each command to load repository data directly."
+      ]
+    },
+    "suggestions": [
+      "Inspect package . with gosherpa context package .",
+      "Inspect symbol example.com/golden.Worker with gosherpa context symbol example.com/golden.Worker",
+      "Run gosherpa tests affected --base <ref> when reviewing a change.",
+      "Run gosherpa context diff --base <ref> for focused change context.",
+      "Run gosherpa doctor when analysis confidence looks low."
+    ]
+  }
+}
