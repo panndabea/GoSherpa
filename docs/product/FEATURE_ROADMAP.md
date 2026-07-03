@@ -87,6 +87,8 @@ Implemented:
 - Direct symbol and package impact analysis.
 - Related test discovery with suggested `go test` commands.
 - Package dependency analysis.
+- Package inventory with file, symbol, import, reverse-dependency, and test
+  indicators via `gosherpa packages`.
 - Direct callee analysis with package-aware targets and receiver-variable method
   calls.
 - Direct caller analysis with package-aware targets and receiver-variable method
@@ -1041,6 +1043,9 @@ Done when:
 Goal: help developers understand repository structure beyond individual symbols.
 
 ### 6.1 Package List
+
+Status: implemented with `gosherpa packages` for compact package inventory,
+JSON output, and optional test-inclusive counts via `--tests`.
 
 Human question:
 

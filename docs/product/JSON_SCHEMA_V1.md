@@ -536,6 +536,48 @@ common metadata fields:
 Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
 `to`, and `paths`.
 
+## Package Inventory Data
+
+Envelope:
+
+- `command`: `packages`
+- `target`: empty string
+
+Data:
+
+```json
+{
+  "packages": [
+    {
+      "package": "./internal/sherpa",
+      "packageName": "sherpa",
+      "goFiles": 24,
+      "testFiles": 18,
+      "symbols": 120,
+      "imports": 8,
+      "localImports": 1,
+      "externalImports": 7,
+      "importedBy": 3,
+      "hasTests": true
+    }
+  ]
+}
+```
+
+- `packages`: local package summaries sorted by package path.
+- `goFiles`: non-test `.go` file count.
+- `testFiles`: `_test.go` file count.
+- `symbols`: discovered symbol count. Test symbols are included only when
+  `--tests` is used.
+- `imports`: unique import count. Test-file imports are included only when
+  `--tests` is used.
+- `localImports`: unique imports that resolve to another package in the same
+  module.
+- `externalImports`: unique imports outside the local module.
+- `importedBy`: number of local packages importing this package.
+- `hasTests`: true when the package directory contains at least one `_test.go`
+  file.
+
 ## `context` Call Metadata
 
 `context` data is documented in `docs/product/CONTEXT_SCHEMA_V1.md`.

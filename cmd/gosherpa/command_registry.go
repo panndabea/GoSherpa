@@ -113,6 +113,13 @@ var commandSpecs = []commandSpec{
 		JSON:    true,
 	},
 	{
+		Name:    "packages",
+		Usage:   []string{packagesUsageLine},
+		Handler: runPackagesCommand,
+		JSON:    true,
+		Tests:   true,
+	},
+	{
 		Name:    "implementers",
 		Usage:   []string{implementersUsageLine},
 		Handler: runImplementersCommand,
@@ -191,6 +198,7 @@ const (
 	testsDefaultUsageLine   = "tests <symbol-or-package> [--scope direct|related|all]"
 	testsAffectedUsageLine  = "tests affected --base <ref>"
 	depsUsageLine           = "deps <package>"
+	packagesUsageLine       = "packages [--tests]"
 	implementersUsageLine   = "implementers <interface>"
 	interfacesUsageLine     = "interfaces <type>"
 	pathUsageLine           = "path <from> <to>"

@@ -630,6 +630,15 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesPackages(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "packages [--tests]") {
+		t.Fatalf("expected usage to contain packages command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesCallees(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -1254,7 +1263,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, entrypoints, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 
@@ -4198,6 +4207,66 @@ func Run() {
 	assertMainTestJSONArrayHasLength(t, data, "usedBy", 1)
 
 	if strings.Contains(result.Stdout, "PACKAGE DEPENDENCIES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsPackagesCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+import "example.com/app/internal/parser"
+
+type Service struct{}
+
+func Run() {
+	parser.ParseFile()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package app
+
+import "testing"
+
+func TestRun(t *testing.T) {
+	Run()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "packages", "--tests", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "packages", "", "example.com/app")
+	packages := assertMainTestJSONArrayHasLength(t, data, "packages", 2)
+
+	rootPackage, ok := packages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", packages[0])
+	}
+	if rootPackage["package"] != "." {
+		t.Fatalf("expected root package first, got %#v", rootPackage["package"])
+	}
+	if rootPackage["symbols"] != float64(3) {
+		t.Fatalf("expected test-inclusive symbol count 3, got %#v", rootPackage["symbols"])
+	}
+	if rootPackage["hasTests"] != true {
+		t.Fatalf("expected hasTests true, got %#v", rootPackage["hasTests"])
+	}
+
+	if strings.Contains(result.Stdout, "PACKAGES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }

@@ -121,6 +121,10 @@ type dependenciesJSONData struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+type packagesJSONData struct {
+	Packages []sherpa.PackageSummary `json:"packages"`
+}
+
 type implementersJSONData struct {
 	AnalysisMode string                     `json:"analysisMode"`
 	Confidence   string                     `json:"confidence"`
@@ -403,6 +407,16 @@ func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenc
 		Package: result.Package,
 		Imports: result.Imports,
 		UsedBy:  result.UsedBy,
+	}
+}
+
+func packagesJSONResult(result []sherpa.PackageSummary) []sherpa.PackageSummary {
+	return nonNilSlice(result)
+}
+
+func packagesJSONDataFromResult(result []sherpa.PackageSummary) packagesJSONData {
+	return packagesJSONData{
+		Packages: result,
 	}
 }
 

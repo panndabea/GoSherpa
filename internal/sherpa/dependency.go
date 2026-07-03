@@ -18,6 +18,11 @@ type PackageDependencies struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+type packageFileMetadata struct {
+	PackageName string
+	Imports     []string
+}
+
 func ModulePath(root string) (string, error) {
 	return modulePath(root)
 }
@@ -160,24 +165,36 @@ func packagePathForFile(root string, file string) (string, error) {
 }
 
 func parseImports(path string) ([]string, error) {
+	metadata, err := parsePackageFileMetadata(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return metadata.Imports, nil
+}
+
+func parsePackageFileMetadata(path string) (packageFileMetadata, error) {
 	fileSet := token.NewFileSet()
 
 	file, err := parser.ParseFile(fileSet, path, nil, parser.ImportsOnly)
 	if err != nil {
-		return nil, err
+		return packageFileMetadata{}, err
 	}
 
 	var imports []string
 	for _, importSpec := range file.Imports {
 		importPath, err := strconv.Unquote(importSpec.Path.Value)
 		if err != nil {
-			return nil, fmt.Errorf("parse import path %s: %w", importSpec.Path.Value, err)
+			return packageFileMetadata{}, fmt.Errorf("parse import path %s: %w", importSpec.Path.Value, err)
 		}
 
 		imports = append(imports, importPath)
 	}
 
-	return uniqueSorted(imports), nil
+	return packageFileMetadata{
+		PackageName: file.Name.Name,
+		Imports:     uniqueSorted(imports),
+	}, nil
 }
 
 func collectPackageImports(root string) (map[string][]string, error) {

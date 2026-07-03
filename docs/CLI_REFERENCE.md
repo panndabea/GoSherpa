@@ -26,6 +26,7 @@ go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa pr --base HEAD
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa tests affected --base HEAD
+go run ./cmd/gosherpa packages
 go run ./cmd/gosherpa entrypoints ParseFile
 go run ./cmd/gosherpa path main FindCallers
 ```
@@ -59,6 +60,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
+| Package inventory | `gosherpa packages --tests` | Lists local packages with file, symbol, import, reverse-dependency, and test indicators |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Interface implementers | `gosherpa implementers ./internal/auth.Authenticator` | Lists concrete local types satisfying an interface |
 | Satisfied interfaces | `gosherpa interfaces ./internal/jwt.JWTAuthenticator` | Lists local interfaces satisfied by a type |
@@ -132,6 +134,9 @@ Found 4 references
 ./gosherpa tests ./internal/sherpa
 ./gosherpa tests affected --base HEAD
 ./gosherpa tests affected --base HEAD --json
+./gosherpa packages
+./gosherpa packages --tests
+./gosherpa packages --json
 ./gosherpa deps ./internal/sherpa
 ./gosherpa deps ./internal/sherpa --json
 ./gosherpa implementers ./internal/auth.Authenticator

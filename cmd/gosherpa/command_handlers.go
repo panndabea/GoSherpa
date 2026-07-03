@@ -604,6 +604,39 @@ func runDepsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer
 	return exitSuccess
 }
 
+func runPackagesCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	if len(invocation.CommandArgs) != 0 {
+		printCommandUsage(stderr, packagesUsageLine)
+		return exitUsage
+	}
+
+	root, ok := resolveRootPath(invocation.Root, stderr)
+	if !ok {
+		return exitFailure
+	}
+
+	packages, err := sherpa.FindPackageSummaries(root, sherpa.PackageInventoryOptions{
+		IncludeTests: invocation.IncludeTests,
+	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "packages", "", stderr, err)
+	}
+
+	if invocation.JSON {
+		normalizedPackages := packagesJSONResult(packages)
+		return writeJSON(stdout, stderr, newJSONResponse(
+			root,
+			"packages",
+			"",
+			nil,
+			packagesJSONDataFromResult(normalizedPackages),
+		))
+	}
+
+	fmt.Fprint(stdout, sherpa.FormatPackageSummaries(packages))
+	return exitSuccess
+}
+
 func runImplementersCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
 	if len(invocation.CommandArgs) < 1 {
 		printCommandUsage(stderr, implementersUsageLine)

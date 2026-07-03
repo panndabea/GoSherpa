@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "command": "packages",
+  "target": "",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "packages": [
+      {
+        "package": ".",
+        "packageName": "golden",
+        "goFiles": 1,
+        "testFiles": 1,
+        "symbols": 5,
+        "imports": 0,
+        "localImports": 0,
+        "externalImports": 0,
+        "importedBy": 1,
+        "hasTests": true
+      },
+      {
+        "package": "./cmd/app",
+        "packageName": "main",
+        "goFiles": 1,
+        "testFiles": 0,
+        "symbols": 1,
+        "imports": 1,
+        "localImports": 1,
+        "externalImports": 0,
+        "importedBy": 0,
+        "hasTests": false
+      }
+    ]
+  }
+}
