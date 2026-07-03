@@ -89,6 +89,9 @@ Implemented:
 - Package dependency analysis.
 - Package inventory with file, symbol, import, reverse-dependency, and test
   indicators via `gosherpa packages`.
+- Initial architecture overview with dependency cycles, most coupled packages,
+  high fan-in/fan-out packages, largest packages, leaf packages, and JSON output
+  via `gosherpa architecture`.
 - Direct callee analysis with package-aware targets and receiver-variable method
   calls.
 - Direct caller analysis with package-aware targets and receiver-variable method
@@ -1116,6 +1119,10 @@ Done when:
 
 ### 6.3 Cycles and Layering Signals
 
+Status: first architecture slice implemented as `gosherpa architecture` with
+dependency cycles, most coupled packages, high fan-in/fan-out packages, largest
+packages, leaf packages, optional `--tests`, and JSON output.
+
 Human question:
 
 ```text
@@ -1132,10 +1139,10 @@ gosherpa packages --fan-out
 
 MVP behavior:
 
-- Report local dependency cycles if any.
-- Show high fan-in packages.
-- Show high fan-out packages.
-- Show leaf packages.
+- Report local dependency cycles if any. Implemented.
+- Show high fan-in packages. Implemented.
+- Show high fan-out packages. Implemented.
+- Show leaf packages. Implemented.
 
 Done when:
 

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "command": "architecture",
+  "target": ".",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Architecture signals are structural and do not judge code quality.",
+      "Dynamic runtime relationships, reflection, generated behavior, and framework wiring are not inferred.",
+      "Test-file imports and test-only symbols are excluded unless --tests is set."
+    ],
+    "packageCount": 2,
+    "cycles": [],
+    "mostCoupled": [
+      {
+        "package": ".",
+        "reason": "fan-in 1 + local fan-out 0",
+        "score": 1,
+        "importedBy": 1,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "goFiles": 1,
+        "testFiles": 1,
+        "hasTests": true
+      },
+      {
+        "package": "./cmd/app",
+        "reason": "fan-in 0 + local fan-out 1",
+        "score": 1,
+        "importedBy": 0,
+        "localImports": 1,
+        "externalImports": 0,
+        "symbols": 1,
+        "goFiles": 1,
+        "testFiles": 0,
+        "hasTests": false
+      }
+    ],
+    "highFanIn": [
+      {
+        "package": ".",
+        "reason": "imported by 1 local package(s)",
+        "score": 1,
+        "importedBy": 1,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "goFiles": 1,
+        "testFiles": 1,
+        "hasTests": true
+      }
+    ],
+    "highFanOut": [
+      {
+        "package": "./cmd/app",
+        "reason": "imports 1 local package(s)",
+        "score": 1,
+        "importedBy": 0,
+        "localImports": 1,
+        "externalImports": 0,
+        "symbols": 1,
+        "goFiles": 1,
+        "testFiles": 0,
+        "hasTests": false
+      }
+    ],
+    "largestPackages": [
+      {
+        "package": ".",
+        "reason": "contains 5 symbol(s)",
+        "score": 5,
+        "importedBy": 1,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "goFiles": 1,
+        "testFiles": 1,
+        "hasTests": true
+      },
+      {
+        "package": "./cmd/app",
+        "reason": "contains 1 symbol(s)",
+        "score": 1,
+        "importedBy": 0,
+        "localImports": 1,
+        "externalImports": 0,
+        "symbols": 1,
+        "goFiles": 1,
+        "testFiles": 0,
+        "hasTests": false
+      }
+    ],
+    "leafPackages": [
+      {
+        "package": ".",
+        "reason": "imports no local packages",
+        "score": 1,
+        "importedBy": 1,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "goFiles": 1,
+        "testFiles": 1,
+        "hasTests": true
+      }
+    ]
+  }
+}

@@ -30,6 +30,10 @@ type PackageDependencySummary struct {
 	UsedBy          []string `json:"usedBy"`
 }
 
+type DependencyOptions struct {
+	IncludeTests bool
+}
+
 type packageFileMetadata struct {
 	PackageName string
 	Imports     []string
@@ -98,6 +102,10 @@ func FindPackageDependencies(root string, targetPackage string) (PackageDependen
 }
 
 func FindRepositoryDependencies(root string) (RepositoryDependencies, error) {
+	return FindRepositoryDependenciesWithOptions(root, DependencyOptions{IncludeTests: true})
+}
+
+func FindRepositoryDependenciesWithOptions(root string, options DependencyOptions) (RepositoryDependencies, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
 		return RepositoryDependencies{}, err
@@ -108,7 +116,7 @@ func FindRepositoryDependencies(root string) (RepositoryDependencies, error) {
 		return RepositoryDependencies{}, err
 	}
 
-	importsByPackage, err := collectPackageImports(rootPath)
+	importsByPackage, err := collectPackageImportsWithOptions(rootPath, options)
 	if err != nil {
 		return RepositoryDependencies{}, err
 	}
@@ -258,6 +266,10 @@ func parsePackageFileMetadata(path string) (packageFileMetadata, error) {
 }
 
 func collectPackageImports(root string) (map[string][]string, error) {
+	return collectPackageImportsWithOptions(root, DependencyOptions{IncludeTests: true})
+}
+
+func collectPackageImportsWithOptions(root string, options DependencyOptions) (map[string][]string, error) {
 	files, err := FindGoFiles(root)
 	if err != nil {
 		return nil, err
@@ -268,6 +280,11 @@ func collectPackageImports(root string) (map[string][]string, error) {
 		pkg, err := packagePathForFile(root, file)
 		if err != nil {
 			return nil, err
+		}
+
+		isTestFile := strings.HasSuffix(filepath.ToSlash(file), "_test.go")
+		if isTestFile && !options.IncludeTests {
+			continue
 		}
 
 		if _, ok := importsByPackage[pkg]; !ok {

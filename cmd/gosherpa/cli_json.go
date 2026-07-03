@@ -446,6 +446,28 @@ func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenc
 	}
 }
 
+func architectureJSONResult(result sherpa.ArchitectureReport) sherpa.ArchitectureReport {
+	result.Limitations = nonNilSlice(result.Limitations)
+	result.Cycles = nonNilSlice(result.Cycles)
+	for i, cycle := range result.Cycles {
+		cycle.Packages = nonNilSlice(cycle.Packages)
+		result.Cycles[i] = cycle
+	}
+	result.MostCoupled = nonNilSlice(result.MostCoupled)
+	result.HighFanIn = nonNilSlice(result.HighFanIn)
+	result.HighFanOut = nonNilSlice(result.HighFanOut)
+	result.LargestPackages = nonNilSlice(result.LargestPackages)
+	result.LeafPackages = nonNilSlice(result.LeafPackages)
+	if strings.TrimSpace(result.AnalysisMode) == "" {
+		result.AnalysisMode = sherpa.ArchitectureAnalysisModeAST
+	}
+	if strings.TrimSpace(result.Confidence) == "" {
+		result.Confidence = sherpa.ArchitectureConfidence
+	}
+
+	return result
+}
+
 func repositoryDependenciesJSONResult(result sherpa.RepositoryDependencies) sherpa.RepositoryDependencies {
 	result.Packages = nonNilSlice(result.Packages)
 	for i, pkg := range result.Packages {

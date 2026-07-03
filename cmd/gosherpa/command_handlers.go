@@ -51,6 +51,39 @@ func runAnalyzeCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 	return exitSuccess
 }
 
+func runArchitectureCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	if len(invocation.CommandArgs) != 0 {
+		printCommandUsage(stderr, architectureUsageLine)
+		return exitUsage
+	}
+
+	root, ok := resolveRootPath(invocation.Root, stderr)
+	if !ok {
+		return exitFailure
+	}
+
+	report, err := sherpa.AnalyzeArchitecture(root, sherpa.ArchitectureOptions{
+		IncludeTests: invocation.IncludeTests,
+	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "architecture", ".", stderr, err)
+	}
+
+	if invocation.JSON {
+		normalizedReport := architectureJSONResult(report)
+		return writeJSON(stdout, stderr, newJSONResponse(
+			root,
+			"architecture",
+			".",
+			nil,
+			normalizedReport,
+		))
+	}
+
+	fmt.Fprint(stdout, sherpa.FormatArchitectureReport(report))
+	return exitSuccess
+}
+
 func runDoctorCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
 	if len(invocation.CommandArgs) != 0 {
 		printDoctorUsage(stderr)

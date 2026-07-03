@@ -586,6 +586,15 @@ func TestPrintUsageIncludesAnalyze(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesArchitecture(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "architecture [--tests]") {
+		t.Fatalf("expected usage to contain architecture command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -1083,6 +1092,127 @@ func TestMainPrintsAnalyzeUsageWhenArgumentIsUnexpected(t *testing.T) {
 	}
 }
 
+func TestMainRunsArchitectureCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "architecture"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"ARCHITECTURE",
+		"Analysis: ast",
+		"Confidence: medium",
+		"Packages: 2",
+		"DEPENDENCY CYCLES",
+		"MOST COUPLED PACKAGES",
+		"HIGH FAN-IN PACKAGES",
+		"HIGH FAN-OUT PACKAGES",
+		"LARGEST PACKAGES",
+		"LEAF PACKAGES",
+		"LIMITATIONS",
+		"Test-file imports and test-only symbols are excluded unless --tests is set.",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsArchitectureCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "architecture", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "architecture", ".", "example.com/app")
+
+	if data["analysisMode"] != sherpa.ArchitectureAnalysisModeAST {
+		t.Fatalf("expected architecture analysis mode ast, got %#v", data["analysisMode"])
+	}
+	if data["confidence"] != sherpa.ArchitectureConfidence {
+		t.Fatalf("expected architecture confidence medium, got %#v", data["confidence"])
+	}
+	if data["packageCount"] != float64(2) {
+		t.Fatalf("expected package count 2, got %#v", data["packageCount"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "cycles", 0)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 3)
+	assertMainTestJSONArrayHasLength(t, data, "mostCoupled", 2)
+	assertMainTestJSONArrayHasLength(t, data, "highFanIn", 1)
+	assertMainTestJSONArrayHasLength(t, data, "highFanOut", 1)
+	assertMainTestJSONArrayHasLength(t, data, "largestPackages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "leafPackages", 1)
+
+	if strings.Contains(result.Stdout, "ARCHITECTURE") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsArchitectureCommandWithTests(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "architecture", "--tests", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "architecture", ".", "example.com/app")
+	largestPackages := assertMainTestJSONArrayHasLength(t, data, "largestPackages", 2)
+
+	rootPackage, ok := largestPackages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", largestPackages[0])
+	}
+	if rootPackage["package"] != "." {
+		t.Fatalf("expected root package first, got %#v", rootPackage["package"])
+	}
+	if rootPackage["symbols"] != float64(3) {
+		t.Fatalf("expected test-inclusive symbol count 3, got %#v", rootPackage["symbols"])
+	}
+	if rootPackage["externalImports"] != float64(1) {
+		t.Fatalf("expected test import to be included, got %#v", rootPackage["externalImports"])
+	}
+}
+
+func TestMainPrintsArchitectureUsageWhenArgumentIsUnexpected(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "architecture", "extra"})
+
+	want := "usage: gosherpa [--root <path>] architecture [--tests]\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainRunsTestsCommand(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1475,7 +1605,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, symbols, search, packages, entrypoints, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, architecture, symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 
