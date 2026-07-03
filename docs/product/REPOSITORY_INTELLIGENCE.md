@@ -111,6 +111,7 @@ First slice implemented:
 * important public symbols
 * entry point candidates
 * simple package hotspots
+* structural risk overview
 * testing overview
 * readiness, limitations, and suggested next commands
 * stable JSON output

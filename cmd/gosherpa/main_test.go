@@ -958,6 +958,9 @@ func TestMainRunsAnalyzeCommand(t *testing.T) {
 		"IMPORTANT SYMBOLS",
 		"example.com/app.Entry",
 		"ENTRY POINTS",
+		"RISK",
+		"Level: medium",
+		"fan_in",
 		"HOTSPOTS",
 		"TESTING",
 		"Suggested tests",
@@ -1044,9 +1047,18 @@ func TestMainRunsAnalyzeCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "packages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "importantSymbols", 3)
 	assertMainTestJSONArrayHasLength(t, data, "entrypoints", 3)
+	risk := assertMainTestJSONObject(t, data, "risk")
+	if risk["level"] != sherpa.RiskLevelMedium {
+		t.Fatalf("expected medium risk, got %#v", risk["level"])
+	}
+	if risk["score"] != float64(3) {
+		t.Fatalf("expected risk score 3, got %#v", risk["score"])
+	}
+	assertMainTestJSONArrayHasLength(t, risk, "factors", 4)
+	assertMainTestJSONArrayHasLength(t, risk, "packages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "hotspots", 2)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
-	assertMainTestJSONArrayHasLength(t, data, "suggestions", 5)
+	assertMainTestJSONArrayHasLength(t, data, "suggestions", 6)
 
 	testingOverview := assertMainTestJSONObject(t, data, "testing")
 	assertMainTestJSONArrayHasLength(t, testingOverview, "testPackages", 1)
@@ -1080,6 +1092,10 @@ func TestMainRunsAnalyzeCommandAsJSONWithTests(t *testing.T) {
 	repository := assertMainTestJSONObject(t, data, "repository")
 	if repository["symbolCount"] != float64(4) {
 		t.Fatalf("expected test-inclusive symbol count 4, got %#v", repository["symbolCount"])
+	}
+	risk := assertMainTestJSONObject(t, data, "risk")
+	if risk["symbolCount"] != float64(4) {
+		t.Fatalf("expected test-inclusive risk symbol count 4, got %#v", risk["symbolCount"])
 	}
 	assertMainTestJSONArrayHasLength(t, data, "entrypoints", 4)
 }

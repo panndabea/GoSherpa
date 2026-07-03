@@ -45,7 +45,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 
 | Capability | Command | Result |
 | --- | --- | --- |
-| Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, important entrypoint candidates, hotspots, tests, readiness, limitations, and suggested next commands |
+| Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, entrypoint candidates, structural risk, hotspots, tests, readiness, limitations, and suggested next commands |
 | Architecture overview | `gosherpa architecture` | Reports dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, and leaf packages |
 | Risk overview | `gosherpa risk` | Summarizes structural repository risk from cycles, fan-in/fan-out, public API surface, interfaces, and tests |
 | Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, functions, and methods with optional kind, package, and test filters |
@@ -209,7 +209,7 @@ typechecked package loading.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,
-entrypoint candidates, simple hotspots, test overview, readiness, limitations,
-and suggested next commands.
+entrypoint candidates, structural risk, simple hotspots, test overview,
+readiness, limitations, and suggested next commands.
 
 See the [Agent JSON Schema](product/JSON_SCHEMA_V1.md) and [Context JSON Schema](product/CONTEXT_SCHEMA_V1.md) for the full machine-readable contracts.

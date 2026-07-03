@@ -30,6 +30,7 @@ type analyzeReport struct {
 	Packages         []sherpa.PackageSummary  `json:"packages"`
 	ImportantSymbols []analyzeSymbolProfile   `json:"importantSymbols"`
 	EntryPoints      []sherpa.EntryPoint      `json:"entrypoints"`
+	Risk             sherpa.RiskReport        `json:"risk"`
 	Hotspots         []analyzeHotspot         `json:"hotspots"`
 	Testing          analyzeTestingOverview   `json:"testing"`
 	Readiness        analyzeReadinessSummary  `json:"readiness"`
@@ -115,6 +116,13 @@ func analyzeRepository(root string, includeTests bool, buildTags []string) (anal
 	analysisMode := analyzeAnalysisMode(doctor)
 	warnings := nonNilSlice(doctor.Warnings)
 
+	risk, err := sherpa.AnalyzeRisk(root, sherpa.RiskOptions{
+		IncludeTests: includeTests,
+	})
+	if err != nil {
+		return analyzeReport{}, err
+	}
+
 	report := analyzeReport{
 		Target:       ".",
 		AnalysisMode: analysisMode,
@@ -134,6 +142,7 @@ func analyzeRepository(root string, includeTests bool, buildTags []string) (anal
 		Packages:         packages,
 		ImportantSymbols: analyzeImportantSymbols(selectedSymbols),
 		EntryPoints:      analyzeEntryPoints(selectedSymbols, includeTests),
+		Risk:             risk,
 		Hotspots:         analyzeHotspots(packages),
 		Testing: analyzeTestingOverview{
 			TestFiles:         doctor.Repository.TestFiles,
@@ -172,12 +181,39 @@ func normalizeAnalyzeReport(report analyzeReport) analyzeReport {
 	report.Packages = nonNilSlice(report.Packages)
 	report.ImportantSymbols = nonNilSlice(report.ImportantSymbols)
 	report.EntryPoints = nonNilSlice(report.EntryPoints)
+	report.Risk = normalizeAnalyzeRiskReport(report.Risk)
 	report.Hotspots = nonNilSlice(report.Hotspots)
 	report.Testing.TestPackages = nonNilSlice(report.Testing.TestPackages)
 	report.Testing.SuggestedCommands = nonNilSlice(report.Testing.SuggestedCommands)
 	report.Readiness.Suggestions = nonNilSlice(report.Readiness.Suggestions)
 	report.Suggestions = nonNilSlice(report.Suggestions)
 	report.Warnings = nonNilSlice(uniqueStringsInOrder(report.Warnings))
+
+	return report
+}
+
+func normalizeAnalyzeRiskReport(report sherpa.RiskReport) sherpa.RiskReport {
+	report.Limitations = nonNilSlice(report.Limitations)
+	report.Factors = nonNilSlice(report.Factors)
+	report.Packages = nonNilSlice(report.Packages)
+	for i, pkg := range report.Packages {
+		pkg.Reasons = nonNilSlice(pkg.Reasons)
+		report.Packages[i] = pkg
+	}
+	report.Cycles = nonNilSlice(report.Cycles)
+	for i, cycle := range report.Cycles {
+		cycle.Packages = nonNilSlice(cycle.Packages)
+		report.Cycles[i] = cycle
+	}
+	if strings.TrimSpace(report.AnalysisMode) == "" {
+		report.AnalysisMode = sherpa.RiskAnalysisModeAST
+	}
+	if strings.TrimSpace(report.Confidence) == "" {
+		report.Confidence = sherpa.RiskConfidence
+	}
+	if strings.TrimSpace(report.Level) == "" {
+		report.Level = sherpa.RiskLevelLow
+	}
 
 	return report
 }
@@ -389,6 +425,9 @@ func analyzeTestPackages(packages []sherpa.PackageSummary) []string {
 
 func analyzeSuggestions(report analyzeReport) []string {
 	var suggestions []string
+	if report.Risk.Level == sherpa.RiskLevelMedium || report.Risk.Level == sherpa.RiskLevelHigh {
+		suggestions = append(suggestions, "Inspect structural risk with gosherpa risk")
+	}
 	if len(report.Hotspots) > 0 {
 		suggestions = append(suggestions, "Inspect package "+report.Hotspots[0].Package+" with gosherpa context package "+report.Hotspots[0].Package)
 	}
@@ -586,6 +625,8 @@ func formatAnalyzeReport(report analyzeReport) string {
 	builder.WriteString("\n")
 	writeAnalyzeEntryPoints(&builder, report.EntryPoints)
 	builder.WriteString("\n")
+	writeAnalyzeRisk(&builder, report.Risk)
+	builder.WriteString("\n")
 	writeAnalyzeHotspots(&builder, report.Hotspots)
 	builder.WriteString("\n")
 	writeAnalyzeTesting(&builder, report.Testing)
@@ -664,6 +705,23 @@ func writeAnalyzeHotspots(builder *strings.Builder, hotspots []analyzeHotspot) {
 
 	for _, hotspot := range hotspots {
 		fmt.Fprintf(builder, "  %-28s %s\n", hotspot.Package, hotspot.Reason)
+	}
+}
+
+func writeAnalyzeRisk(builder *strings.Builder, risk sherpa.RiskReport) {
+	risk = normalizeAnalyzeRiskReport(risk)
+
+	builder.WriteString("RISK\n")
+	fmt.Fprintf(builder, "  Level: %s\n", risk.Level)
+	fmt.Fprintf(builder, "  Score: %d\n", risk.Score)
+	if len(risk.Factors) == 0 {
+		builder.WriteString("  Factors: none\n")
+		return
+	}
+
+	builder.WriteString("  Factors:\n")
+	for _, factor := range risk.Factors {
+		fmt.Fprintf(builder, "    - %s: %s\n", factor.Category, factor.Description)
 	}
 }
 

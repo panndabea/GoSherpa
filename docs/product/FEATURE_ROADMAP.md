@@ -89,11 +89,17 @@ Implemented:
 - Package dependency analysis.
 - Package inventory with file, symbol, import, reverse-dependency, and test
   indicators via `gosherpa packages`.
+- Initial `gosherpa analyze` repository overview with package summaries,
+  symbol counts, important public symbols, entry point candidates, structural
+  risk, hotspots, testing overview, readiness, limitations, suggested next
+  commands, and JSON output.
 - Initial architecture overview with dependency cycles, most coupled packages,
   high fan-in/fan-out packages, largest packages, leaf packages, and JSON output
   via `gosherpa architecture`.
 - Initial repository risk overview with structural risk level, score, factors,
   package signals, dependency cycles, and JSON output via `gosherpa risk`.
+- `gosherpa analyze` embeds the same structural risk report used by
+  `gosherpa risk`.
 - Direct callee analysis with package-aware targets and receiver-variable method
   calls.
 - Direct caller analysis with package-aware targets and receiver-variable method

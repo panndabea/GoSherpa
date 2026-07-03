@@ -18,7 +18,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
 - Typechecked reference analysis via `go/packages`, with an AST/per-package fallback when semantic loading is unavailable
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
-- Initial `gosherpa analyze [path]` repository overview with package summaries, symbol counts, important symbols, entrypoint candidates, hotspots, testing overview, readiness, limitations, suggested next commands, and JSON output
+- Initial `gosherpa analyze [path]` repository overview with package summaries, symbol counts, important symbols, entrypoint candidates, structural risk, hotspots, testing overview, readiness, limitations, suggested next commands, and JSON output
 - Initial `gosherpa architecture` overview with dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, leaf packages, limitations, and JSON output
 - Initial `gosherpa risk` overview with structural risk level, score, factors, package signals, dependency cycles, limitations, and JSON output
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output

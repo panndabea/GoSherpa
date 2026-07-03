@@ -290,6 +290,7 @@ func analyzeJSONResult(report analyzeReport) analyzeReport {
 	report.Packages = nonNilSlice(report.Packages)
 	report.ImportantSymbols = nonNilSlice(report.ImportantSymbols)
 	report.EntryPoints = nonNilSlice(report.EntryPoints)
+	report.Risk = riskJSONResult(report.Risk)
 	report.Hotspots = nonNilSlice(report.Hotspots)
 	report.Testing.TestPackages = nonNilSlice(report.Testing.TestPackages)
 	report.Testing.SuggestedCommands = nonNilSlice(report.Testing.SuggestedCommands)
