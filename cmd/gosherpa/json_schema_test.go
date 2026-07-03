@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/panndabea/GoSherpa/internal/agentcontext"
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
@@ -60,6 +61,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			target:  "Target",
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
+				"symbolAnalysisMode":    explainengine.SymbolAnalysisModeTypecheckedAST,
 				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,

@@ -380,6 +380,7 @@ Data:
   "confidence": "medium",
   "limitations": [],
   "symbol": {},
+  "symbolAnalysisMode": "typechecked+ast",
   "purpose": "",
   "risk": {
     "level": "medium",
@@ -415,6 +416,9 @@ Data:
 - `confidence`: deterministic trust label.
 - `limitations`: explain, call, and test-planning blind spots.
 - `symbol`: symbol profile object.
+- `symbolAnalysisMode`: symbol identity mode, currently `typechecked+ast`
+  when the target was resolved from typechecked package loading and `ast` when
+  the AST repository scan fallback was used.
 - `purpose`: extracted symbol purpose, or an empty string when none is found.
 - `risk`: deterministic risk summary.
 - `architectureRole`: deterministic architectural role summary.

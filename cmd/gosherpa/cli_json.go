@@ -175,6 +175,7 @@ type explainJSONData struct {
 	Confidence              string                         `json:"confidence"`
 	Limitations             []string                       `json:"limitations"`
 	Symbol                  sherpa.Symbol                  `json:"symbol"`
+	SymbolAnalysisMode      string                         `json:"symbolAnalysisMode,omitempty"`
 	Purpose                 string                         `json:"purpose"`
 	Risk                    explainengine.RiskSummary      `json:"risk"`
 	ArchitectureRole        explainengine.ArchitectureRole `json:"architectureRole"`
@@ -612,6 +613,7 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 }
 
 func explainJSONResult(report explainengine.Report) explainengine.Report {
+	report.SymbolAnalysisMode = strings.TrimSpace(report.SymbolAnalysisMode)
 	report.References = nonNilSlice(report.References)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.Callers = nonNilSlice(report.Callers)
@@ -638,6 +640,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
 		Limitations:             explainLimitations(report.ReferenceAnalysisMode, report.CallAnalysisMode),
 		Symbol:                  report.Symbol,
+		SymbolAnalysisMode:      report.SymbolAnalysisMode,
 		Purpose:                 report.Purpose,
 		Risk:                    report.Risk,
 		ArchitectureRole:        report.ArchitectureRole,
@@ -658,12 +661,14 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 }
 
 func explainAnalysisMode(report explainengine.Report) string {
-	return bundleAnalysisMode(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
+	return bundleAnalysisMode(report.SymbolAnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
 }
 
 func bundleAnalysisMode(analysisModes ...string) string {
 	for _, mode := range analysisModes {
-		if mode == sherpa.ReferenceAnalysisModeTypechecked ||
+		if mode == agentcontext.AnalysisModeTypecheckedAST ||
+			mode == explainengine.SymbolAnalysisModeTypecheckedAST ||
+			mode == sherpa.ReferenceAnalysisModeTypechecked ||
 			mode == sherpa.CallAnalysisModeTypechecked ||
 			mode == impactengine.InterfaceAnalysisModeTypechecked {
 			return agentcontext.AnalysisModeTypecheckedAST

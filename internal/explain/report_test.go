@@ -65,6 +65,45 @@ func TestAnalyzeWithOptionsIncludesTestCallers(t *testing.T) {
 	assertNames(t, callerFiles(report.Callers), []string{"service.go", "service_test.go"})
 }
 
+func TestAnalyzeUsesBuildTagsForSymbolIdentity(t *testing.T) {
+	root := t.TempDir()
+	writeExplainTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeExplainTestFile(t, filepath.Join(root, "default.go"), `//go:build !enterprise
+
+package app
+
+func Target() {}
+`)
+	writeExplainTestFile(t, filepath.Join(root, "enterprise.go"), `//go:build enterprise
+
+package app
+
+func Target() {}
+`)
+
+	withoutTags, err := Analyze(root, "Target")
+	if err != nil {
+		t.Fatalf("Analyze without tags returned error: %v", err)
+	}
+	if withoutTags.SymbolAnalysisMode != SymbolAnalysisModeTypecheckedAST {
+		t.Fatalf("symbol analysis mode without tags = %q, want %s", withoutTags.SymbolAnalysisMode, SymbolAnalysisModeTypecheckedAST)
+	}
+	if withoutTags.Symbol.Position.File != "default.go" {
+		t.Fatalf("symbol file without tags = %q, want default.go", withoutTags.Symbol.Position.File)
+	}
+
+	withTags, err := AnalyzeWithOptions(root, "Target", AnalyzeOptions{BuildTags: []string{"enterprise"}})
+	if err != nil {
+		t.Fatalf("Analyze with tags returned error: %v", err)
+	}
+	if withTags.SymbolAnalysisMode != SymbolAnalysisModeTypecheckedAST {
+		t.Fatalf("symbol analysis mode with tags = %q, want %s", withTags.SymbolAnalysisMode, SymbolAnalysisModeTypecheckedAST)
+	}
+	if withTags.Symbol.Position.File != "enterprise.go" {
+		t.Fatalf("symbol file with tags = %q, want enterprise.go", withTags.Symbol.Position.File)
+	}
+}
+
 func TestAnalyzeUsesPackageQualifiedCallSignals(t *testing.T) {
 	root := writePackageQualifiedExplainProject(t)
 

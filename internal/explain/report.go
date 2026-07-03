@@ -12,11 +12,18 @@ import (
 
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/symbolindex"
+)
+
+const (
+	SymbolAnalysisModeAST            = "ast"
+	SymbolAnalysisModeTypecheckedAST = "typechecked+ast"
 )
 
 type Report struct {
 	Target                  string               `json:"target"`
 	Symbol                  sherpa.Symbol        `json:"symbol"`
+	SymbolAnalysisMode      string               `json:"symbolAnalysisMode,omitempty"`
 	Purpose                 string               `json:"purpose"`
 	Risk                    RiskSummary          `json:"risk"`
 	ArchitectureRole        ArchitectureRole     `json:"architectureRole"`
@@ -78,12 +85,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		return Report{}, fmt.Errorf("explain target must be a symbol: %s", target)
 	}
 
-	symbols, err := sherpa.ParseRepository(root)
-	if err != nil {
-		return Report{}, err
-	}
-
-	symbol, err := findSymbol(root, symbols, impactResult.Target)
+	symbol, symbolAnalysisMode, symbolWarnings, err := findSymbolIdentity(root, impactResult.Target, options)
 	if err != nil {
 		return Report{}, err
 	}
@@ -91,13 +93,14 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 	report := Report{
 		Target:                impactResult.Target,
 		Symbol:                symbol,
+		SymbolAnalysisMode:    symbolAnalysisMode,
 		References:            impactResult.References,
 		ReferenceAnalysisMode: impactResult.ReferenceAnalysisMode,
 		AffectedPackages:      impactResult.Packages,
 		RelatedTests:          impactResult.RelatedTests,
 		TestCommands:          impactResult.TestCommands,
 		TestPlan:              impactResult.TestPlan,
-		Warnings:              impactResult.Warnings,
+		Warnings:              append(append([]string{}, impactResult.Warnings...), symbolWarnings...),
 	}
 
 	purpose, err := symbolPurpose(root, symbol)
@@ -130,6 +133,38 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 	report.ReadingOrder = readingOrder(report)
 
 	return normalizeReport(report), nil
+}
+
+func findSymbolIdentity(root string, target string, options AnalyzeOptions) (sherpa.Symbol, string, []string, error) {
+	var warnings []string
+	index, err := symbolindex.Load(root, symbolindex.LoadOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err == nil {
+		symbol, found, err := index.FindSymbol(target)
+		if err != nil {
+			return sherpa.Symbol{}, "", nil, err
+		}
+		if found {
+			return symbol, SymbolAnalysisModeTypecheckedAST, index.Warnings, nil
+		}
+
+		warnings = append(warnings, index.Warnings...)
+	} else {
+		warnings = append(warnings, fmt.Sprintf("typechecked symbol identity unavailable: %v", err))
+	}
+
+	symbols, err := sherpa.ParseRepository(root)
+	if err != nil {
+		return sherpa.Symbol{}, "", warnings, err
+	}
+
+	symbol, err := findSymbol(root, symbols, target)
+	if err != nil {
+		return sherpa.Symbol{}, "", warnings, err
+	}
+
+	return symbol, SymbolAnalysisModeAST, warnings, nil
 }
 
 func findSymbol(root string, symbols []sherpa.Symbol, target string) (sherpa.Symbol, error) {
@@ -547,6 +582,7 @@ func limitRelatedTests(values []sherpa.RelatedTest, limit int) []sherpa.RelatedT
 }
 
 func normalizeReport(report Report) Report {
+	report.SymbolAnalysisMode = strings.TrimSpace(report.SymbolAnalysisMode)
 	report.Risk.Reasons = nonNil(uniqueStrings(report.Risk.Reasons))
 	report.ArchitectureRole.Reasons = nonNil(uniqueStrings(report.ArchitectureRole.Reasons))
 	report.References = nonNil(report.References)

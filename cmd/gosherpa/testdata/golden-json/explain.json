@@ -47,6 +47,7 @@
       },
       "receiver": ""
     },
+    "symbolAnalysisMode": "typechecked+ast",
     "purpose": "",
     "risk": {
       "level": "medium",
