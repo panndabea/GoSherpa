@@ -341,6 +341,7 @@ func mergeRelatedTests(existing []RelatedTest, incoming []RelatedTest) []Related
 		if ok {
 			current.DirectReference = current.DirectReference || test.DirectReference
 			current.ExternalPackage = current.ExternalPackage || test.ExternalPackage
+			current.Targets = uniqueSorted(append(current.Targets, test.Targets...))
 			merged[key] = current
 			continue
 		}

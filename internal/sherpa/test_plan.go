@@ -13,10 +13,11 @@ type TestPlan struct {
 }
 
 type TestPlanItem struct {
-	Command string `json:"command"`
-	Reason  string `json:"reason"`
-	Package string `json:"package,omitempty"`
-	Test    string `json:"test,omitempty"`
+	Command string   `json:"command"`
+	Reason  string   `json:"reason"`
+	Package string   `json:"package,omitempty"`
+	Test    string   `json:"test,omitempty"`
+	Targets []string `json:"targets,omitempty"`
 }
 
 type TestPlanOptions struct {
@@ -25,6 +26,7 @@ type TestPlanOptions struct {
 	TargetPackages   []string
 	CallerPackages   []string
 	FallbackPackages []string
+	Targets          []string
 }
 
 func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
@@ -36,40 +38,49 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 	targetPackages := uniqueSorted(options.TargetPackages)
 	callerPackages := uniqueSorted(options.CallerPackages)
 	fallbackPackages := uniqueSorted(options.FallbackPackages)
+	defaultTargets := uniqueSorted(options.Targets)
 	targetPackageSet := stringSet(targetPackages)
 	callerPackageSet := stringSet(callerPackages)
 
 	directGroups := make(map[string][]string)
 	relatedGroups := make(map[string][]string)
 	callerGroups := make(map[string][]string)
+	directTargets := make(map[string][]string)
+	relatedTargets := make(map[string][]string)
+	callerTargets := make(map[string][]string)
 
 	for _, test := range tests {
 		pkg := strings.TrimSpace(test.Package)
 		if pkg == "" {
 			continue
 		}
+		testTargets := uniqueSorted(test.Targets)
 
 		switch {
 		case test.DirectReference:
 			directGroups[pkg] = append(directGroups[pkg], test.Name)
+			directTargets[pkg] = append(directTargets[pkg], testTargets...)
 		case hasString(callerPackageSet, pkg):
 			callerGroups[pkg] = append(callerGroups[pkg], test.Name)
+			callerTargets[pkg] = append(callerTargets[pkg], testTargets...)
 		case len(targetPackageSet) == 0 || hasString(targetPackageSet, pkg):
 			relatedGroups[pkg] = append(relatedGroups[pkg], test.Name)
+			relatedTargets[pkg] = append(relatedTargets[pkg], testTargets...)
 		default:
 			callerGroups[pkg] = append(callerGroups[pkg], test.Name)
+			callerTargets[pkg] = append(callerTargets[pkg], testTargets...)
 		}
 	}
 
 	plan := TestPlan{
-		Direct: testPlanItemsFromGroups(directGroups, func(pkg string, names []string) string {
-			return directTestPlanReason(target, pkg, names)
+		Direct: testPlanItemsFromGroups(directGroups, directTargets, defaultTargets, func(pkg string, names []string, targets []string) string {
+			return directTestPlanReason(target, pkg, names, targets)
 		}),
-		Related: testPlanItemsFromGroups(relatedGroups, func(pkg string, names []string) string {
-			return relatedTestPlanReason(options.Kind, target, pkg, names)
+		Related: testPlanItemsFromGroups(relatedGroups, relatedTargets, defaultTargets, func(pkg string, names []string, targets []string) string {
+			return relatedTestPlanReason(options.Kind, target, pkg, names, targets)
 		}),
-		CallerPackages: testPlanItemsFromGroups(callerGroups, func(pkg string, names []string) string {
-			return callerPackageTestPlanReason(pkg, names)
+		CallerPackages: testPlanItemsFromGroups(callerGroups, callerTargets, defaultTargets, func(pkg string, names []string, targets []string) string {
+			return callerPackageTestPlanReason(pkg, names, targets)
 		}),
 	}
 
@@ -82,8 +93,9 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 
 		plan.Fallback = append(plan.Fallback, TestPlanItem{
 			Command: command,
-			Reason:  fallbackTestPlanReason(pkg),
+			Reason:  fallbackTestPlanReason(pkg, defaultTargets),
 			Package: pkg,
+			Targets: defaultTargets,
 		})
 		existingCommands[command] = struct{}{}
 	}
@@ -141,7 +153,7 @@ func FallbackTestPlan(commands []string) TestPlan {
 	return NormalizeTestPlan(plan)
 }
 
-func testPlanItemsFromGroups(groups map[string][]string, reason func(string, []string) string) []TestPlanItem {
+func testPlanItemsFromGroups(groups map[string][]string, targetsByPackage map[string][]string, defaultTargets []string, reason func(string, []string, []string) string) []TestPlanItem {
 	packages := make([]string, 0, len(groups))
 	for pkg := range groups {
 		packages = append(packages, pkg)
@@ -151,10 +163,15 @@ func testPlanItemsFromGroups(groups map[string][]string, reason func(string, []s
 	items := make([]TestPlanItem, 0, len(packages))
 	for _, pkg := range packages {
 		names := uniqueSorted(groups[pkg])
+		targets := uniqueSorted(targetsByPackage[pkg])
+		if len(targets) == 0 {
+			targets = defaultTargets
+		}
 		item := TestPlanItem{
 			Command: testPackageCommand(pkg),
-			Reason:  reason(pkg, names),
+			Reason:  reason(pkg, names, targets),
 			Package: pkg,
+			Targets: targets,
 		}
 		if len(names) == 1 {
 			item.Test = names[0]
@@ -166,24 +183,51 @@ func testPlanItemsFromGroups(groups map[string][]string, reason func(string, []s
 	return items
 }
 
-func directTestPlanReason(target string, pkg string, names []string) string {
-	return "Direct tests in " + pkg + " reference " + target + testPlanNamesSuffix(names)
+func directTestPlanReason(target string, pkg string, names []string, targets []string) string {
+	return "Direct tests in " + pkg + " reference " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
 }
 
-func relatedTestPlanReason(kind TestTargetKind, target string, pkg string, names []string) string {
+func relatedTestPlanReason(kind TestTargetKind, target string, pkg string, names []string, targets []string) string {
 	if kind == TestTargetKindPackage {
+		if len(targets) > 0 {
+			return "Tests in target package " + pkg + " cover " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
+		}
 		return "Tests in target package " + pkg + testPlanNamesSuffix(names)
+	}
+	if len(targets) > 0 {
+		return "Same-package tests in " + pkg + " cover " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
 	}
 
 	return "Same-package tests in " + pkg + " are related to " + target + testPlanNamesSuffix(names)
 }
 
-func callerPackageTestPlanReason(pkg string, names []string) string {
+func callerPackageTestPlanReason(pkg string, names []string, targets []string) string {
+	if len(targets) > 0 {
+		return "Tests in caller package " + pkg + " cover impacted code paths from " + testPlanTargetPhrase("changed symbols", targets) + testPlanNamesSuffix(names)
+	}
+
 	return "Tests in caller package " + pkg + " cover impacted code paths" + testPlanNamesSuffix(names)
 }
 
-func fallbackTestPlanReason(pkg string) string {
+func fallbackTestPlanReason(pkg string, targets []string) string {
+	if len(targets) > 0 {
+		return "Run package tests for " + pkg + " to compile impacted code from " + testPlanTargetPhrase("changed symbols", targets) + " and cover tests not matched directly."
+	}
+
 	return "Run package tests for " + pkg + " to compile impacted code and cover tests not matched directly."
+}
+
+func testPlanTargetPhrase(target string, targets []string) string {
+	target = strings.TrimSpace(target)
+	targets = uniqueSorted(targets)
+	if len(targets) == 0 {
+		return target
+	}
+	if target == "" || target == "target" {
+		return strings.Join(targets, ", ")
+	}
+
+	return target + " " + strings.Join(targets, ", ")
 }
 
 func testPlanNamesSuffix(names []string) string {

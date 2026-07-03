@@ -146,9 +146,13 @@ Related tests:
     "column": 1
   },
   "directReference": true,
-  "externalPackage": false
+  "externalPackage": false,
+  "targets": ["./internal/service.Target"]
 }
 ```
+
+`targets` is optional. Diff-oriented reports use it to name the changed symbol
+or symbols that made a test relevant when that relationship is known.
 
 Entrypoints:
 
@@ -191,8 +195,9 @@ Test plans:
 }
 ```
 
-Each test plan item has `command` and `reason`, with optional `package` and
-`test`.
+Each test plan item has `command` and `reason`, with optional `package`, `test`,
+and `targets`. Diff-oriented reports use `targets` to connect a recommended
+test command to changed symbols when known.
 
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
@@ -603,6 +608,11 @@ Impact data keeps its existing arrays such as `references`, `callers`,
 keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
 includes `scope` with one of `direct`, `related`, or `all`; the default
 `related` scope focuses direct references when they exist.
+
+Diff-oriented test plans group commands into `direct`, `related`,
+`callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
+list for compatibility, and attach changed-symbol `targets` to affected tests
+and plan items when known.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

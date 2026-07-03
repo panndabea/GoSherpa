@@ -41,6 +41,7 @@ type RelatedTest struct {
 	Range           *SourceRange `json:"range,omitempty"`
 	DirectReference bool         `json:"directReference"`
 	ExternalPackage bool         `json:"externalPackage"`
+	Targets         []string     `json:"targets,omitempty"`
 }
 
 type TestsResult struct {

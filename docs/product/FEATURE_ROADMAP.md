@@ -130,6 +130,9 @@ Implemented:
 - Package-qualified symbol impact for references and affected tests.
 - Transitive caller impact for symbol changes.
 - Affected-test planning for transitive caller packages.
+- Structured test planning with direct, related, caller-package, and fallback
+  groups, including changed-symbol targets and reasons for diff-oriented
+  reports.
 - Reference kind classification for definitions, calls, type usages, field
   accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
 - Source ranges with columns for symbols, references, callers, callees, call
@@ -934,6 +937,8 @@ matching when semantic data is unavailable. Package-qualified symbol impact
 disambiguates references and affected tests. Symbol impact includes transitive
 callers in affected packages.
 Affected-test planning includes package tests for affected caller packages.
+Diff-oriented test plans include changed-symbol targets and reasons on affected
+tests and grouped plan items.
 
 Human question:
 
@@ -1006,6 +1011,9 @@ Done when:
   other packages. Implemented.
 - Symbol impact reports transitive callers in affected packages. Implemented.
 - Symbol impact suggests package tests for transitive caller packages.
+  Implemented.
+- Diff-based test plans attach changed-symbol targets to affected tests and
+  grouped direct, related, caller-package, and fallback recommendations.
   Implemented.
 - JSON and human output are covered by focused tests and golden fixtures for
   diff impact, affected tests, and file/package/symbol impact.

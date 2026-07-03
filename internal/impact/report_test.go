@@ -150,6 +150,9 @@ func Touch() string {
 	})
 	assertStrings(t, testPlanItemPackages(report.TestPlan.Direct), []string{"./internal/api", "./internal/auth"})
 	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{"./internal/billing"})
+	assertStrings(t, testPlanItemTargets(report.TestPlan.Direct, "./internal/api"), []string{"./internal/auth.NewSession"})
+	assertStrings(t, testPlanItemTargets(report.TestPlan.Direct, "./internal/auth"), []string{"./internal/auth.NewSession"})
+	assertStrings(t, testPlanItemTargets(report.TestPlan.Related, "./internal/billing"), []string{"./internal/billing.Touch"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth", "go test ./internal/billing"})
 }
 
@@ -645,4 +648,14 @@ func testPlanItemPackages(items []sherpa.TestPlanItem) []string {
 	}
 
 	return packages
+}
+
+func testPlanItemTargets(items []sherpa.TestPlanItem, pkg string) []string {
+	for _, item := range items {
+		if item.Package == pkg {
+			return item.Targets
+		}
+	}
+
+	return nil
 }

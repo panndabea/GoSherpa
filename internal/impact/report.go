@@ -325,6 +325,9 @@ func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSy
 
 func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
+	modulePath := impactModulePath(root)
+	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
+	changedTargetsByPackage := changedSymbolPlanTargetsByPackage(changedSymbols, modulePath)
 
 	for _, test := range directTestsForChangedSymbols(root, changedSymbols, &warnings) {
 		mergeRelatedTest(seen, test)
@@ -341,6 +344,9 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 		}
 
 		for _, test := range tests.Tests {
+			if targets := changedTargetsByPackage[pkg]; len(targets) > 0 {
+				test.Targets = uniqueSortedStrings(append(test.Targets, targets...))
+			}
 			mergeRelatedTest(seen, test)
 		}
 	}
@@ -361,6 +367,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 		TargetPackages:   changedPackages,
 		CallerPackages:   packageDifference(packages, changedPackages),
 		FallbackPackages: packages,
+		Targets:          changedTargets,
 	})
 
 	return result, plan, sherpa.TestPlanCommands(plan), uniqueSortedStrings(warnings)
@@ -413,6 +420,7 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 		}
 
 		for _, test := range tests.Tests {
+			test.Targets = uniqueSortedStrings(append(test.Targets, target))
 			mergeRelatedTest(seen, test)
 		}
 	}
@@ -424,6 +432,38 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 	sortRelatedTests(result)
 
 	return result
+}
+
+func changedSymbolPlanTargets(symbols []changedSymbol, modulePath string) []string {
+	var targets []string
+	for _, symbol := range normalizeChangedSymbols(symbols) {
+		target := changedSymbolTestTarget(symbol, modulePath)
+		if strings.TrimSpace(target) == "" {
+			continue
+		}
+
+		targets = append(targets, target)
+	}
+
+	return uniqueSortedStrings(targets)
+}
+
+func changedSymbolPlanTargetsByPackage(symbols []changedSymbol, modulePath string) map[string][]string {
+	targetsByPackage := make(map[string][]string)
+	for _, symbol := range normalizeChangedSymbols(symbols) {
+		target := changedSymbolTestTarget(symbol, modulePath)
+		if strings.TrimSpace(target) == "" {
+			continue
+		}
+
+		targetsByPackage[symbol.Package] = append(targetsByPackage[symbol.Package], target)
+	}
+
+	for pkg, targets := range targetsByPackage {
+		targetsByPackage[pkg] = uniqueSortedStrings(targets)
+	}
+
+	return targetsByPackage
 }
 
 func changedSymbolTestTarget(symbol changedSymbol, modulePath string) string {
@@ -444,6 +484,7 @@ func mergeRelatedTest(seen map[string]sherpa.RelatedTest, test sherpa.RelatedTes
 
 	test.DirectReference = test.DirectReference || existing.DirectReference
 	test.ExternalPackage = test.ExternalPackage || existing.ExternalPackage
+	test.Targets = uniqueSortedStrings(append(test.Targets, existing.Targets...))
 	if test.Range == nil {
 		test.Range = existing.Range
 	}

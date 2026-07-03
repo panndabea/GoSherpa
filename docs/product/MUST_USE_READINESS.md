@@ -130,6 +130,10 @@ repository. A strong context command makes GoSherpa the first stop.
 Make test recommendations explain the tradeoff between fast confidence and broad
 coverage.
 
+Current status: first structured slice implemented. Test plans expose direct,
+related, caller-package, and fallback groups with reasons, and diff-oriented
+reports attach changed-symbol targets when known.
+
 Recommended groups:
 
 - direct tests that reference the changed symbol

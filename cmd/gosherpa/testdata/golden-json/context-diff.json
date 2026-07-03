@@ -59,7 +59,10 @@
           }
         },
         "directReference": false,
-        "externalPackage": false
+        "externalPackage": false,
+        "targets": [
+          "example.com/golden.Added"
+        ]
       }
     ],
     "testCommands": [
@@ -71,17 +74,23 @@
       "related": [
         {
           "command": "go test .",
-          "reason": "Tests in target package .: TestTarget.",
+          "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "targets": [
+            "example.com/golden.Added"
+          ]
         }
       ],
       "callerPackages": [],
       "fallback": [
         {
           "command": "go test ./cmd/app",
-          "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
-          "package": "./cmd/app"
+          "reason": "Run package tests for ./cmd/app to compile impacted code from changed symbols example.com/golden.Added and cover tests not matched directly.",
+          "package": "./cmd/app",
+          "targets": [
+            "example.com/golden.Added"
+          ]
         }
       ]
     },

@@ -26,7 +26,8 @@ Every context result includes:
 - `risk`: deterministic risk level and reasons.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan with `direct`, `related`, `callerPackages`,
-  and `fallback` items.
+  and `fallback` items. Plan items may include `targets` when diff context can
+  connect a recommendation to changed symbols.
 - `readingOrder`: ordered source locations to inspect next.
 - `analysisMode`: deterministic analysis mode label.
 - `referenceAnalysisMode`: optional trust label for reference subanalysis when
@@ -117,3 +118,5 @@ test planning.
 `context diff` adds base ref, changed files, changed packages, affected
 symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
 interface signals, `interfaceAnalysisMode`, affected tests, and test planning.
+Affected tests and test-plan items may include `targets` naming changed symbols
+that explain why the test or package command is recommended.
