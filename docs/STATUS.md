@@ -20,6 +20,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Ranked `gosherpa search <terms>` for partial, case-insensitive symbol discovery with kind, package, test, and limit filters
 - Initial `gosherpa analyze [path]` repository overview with package summaries, symbol counts, important symbols, entrypoint candidates, hotspots, testing overview, readiness, limitations, suggested next commands, and JSON output
 - Initial `gosherpa architecture` overview with dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, leaf packages, limitations, and JSON output
+- Initial `gosherpa risk` overview with structural risk level, score, factors, package signals, dependency cycles, limitations, and JSON output
 - Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
 - Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, confidence, limitations, and JSON output
 - Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output

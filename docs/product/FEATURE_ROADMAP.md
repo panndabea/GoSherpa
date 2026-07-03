@@ -92,6 +92,8 @@ Implemented:
 - Initial architecture overview with dependency cycles, most coupled packages,
   high fan-in/fan-out packages, largest packages, leaf packages, and JSON output
   via `gosherpa architecture`.
+- Initial repository risk overview with structural risk level, score, factors,
+  package signals, dependency cycles, and JSON output via `gosherpa risk`.
 - Direct callee analysis with package-aware targets and receiver-variable method
   calls.
 - Direct caller analysis with package-aware targets and receiver-variable method
@@ -1022,6 +1024,11 @@ Done when:
   diff impact, affected tests, and file/package/symbol impact.
 
 ### 5.4 Change Risk Summary
+
+Status: first repository-level slice implemented as `gosherpa risk` with
+structural risk factors for dependency cycles, package fan-in/fan-out, public
+API surface, interfaces, and test presence. Target-specific `impact --summary`
+wording remains future work.
 
 Human question:
 

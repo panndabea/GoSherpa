@@ -468,6 +468,32 @@ func architectureJSONResult(result sherpa.ArchitectureReport) sherpa.Architectur
 	return result
 }
 
+func riskJSONResult(result sherpa.RiskReport) sherpa.RiskReport {
+	result.Limitations = nonNilSlice(result.Limitations)
+	result.Factors = nonNilSlice(result.Factors)
+	result.Packages = nonNilSlice(result.Packages)
+	for i, pkg := range result.Packages {
+		pkg.Reasons = nonNilSlice(pkg.Reasons)
+		result.Packages[i] = pkg
+	}
+	result.Cycles = nonNilSlice(result.Cycles)
+	for i, cycle := range result.Cycles {
+		cycle.Packages = nonNilSlice(cycle.Packages)
+		result.Cycles[i] = cycle
+	}
+	if strings.TrimSpace(result.AnalysisMode) == "" {
+		result.AnalysisMode = sherpa.RiskAnalysisModeAST
+	}
+	if strings.TrimSpace(result.Confidence) == "" {
+		result.Confidence = sherpa.RiskConfidence
+	}
+	if strings.TrimSpace(result.Level) == "" {
+		result.Level = sherpa.RiskLevelLow
+	}
+
+	return result
+}
+
 func repositoryDependenciesJSONResult(result sherpa.RepositoryDependencies) sherpa.RepositoryDependencies {
 	result.Packages = nonNilSlice(result.Packages)
 	for i, pkg := range result.Packages {

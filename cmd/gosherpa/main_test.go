@@ -595,6 +595,15 @@ func TestPrintUsageIncludesArchitecture(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesRisk(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "risk [--tests]") {
+		t.Fatalf("expected usage to contain risk command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -1213,6 +1222,129 @@ func TestMainPrintsArchitectureUsageWhenArgumentIsUnexpected(t *testing.T) {
 	}
 }
 
+func TestMainRunsRiskCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "risk"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"RISK",
+		"Level: medium",
+		"Score: 3",
+		"SUMMARY",
+		"Packages: 2",
+		"Exported symbols: 3",
+		"FACTORS",
+		"fan_in",
+		"public_api",
+		"PACKAGE SIGNALS",
+		"DEPENDENCY CYCLES",
+		"LIMITATIONS",
+		"Risk is a deterministic structural summary, not a prediction of defects.",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsRiskCommandAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "risk", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "risk", ".", "example.com/app")
+
+	if data["level"] != sherpa.RiskLevelMedium {
+		t.Fatalf("expected medium risk, got %#v", data["level"])
+	}
+	if data["score"] != float64(3) {
+		t.Fatalf("expected score 3, got %#v", data["score"])
+	}
+	if data["packageCount"] != float64(2) {
+		t.Fatalf("expected package count 2, got %#v", data["packageCount"])
+	}
+	if data["exportedSymbols"] != float64(3) {
+		t.Fatalf("expected exported symbols 3, got %#v", data["exportedSymbols"])
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 3)
+	assertMainTestJSONArrayHasLength(t, data, "factors", 4)
+	assertMainTestJSONArrayHasLength(t, data, "packages", 2)
+	assertMainTestJSONArrayHasLength(t, data, "cycles", 0)
+
+	if strings.Contains(result.Stdout, "RISK") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsRiskCommandWithTests(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "risk", "--tests", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "risk", ".", "example.com/app")
+
+	if data["symbolCount"] != float64(4) {
+		t.Fatalf("expected test-inclusive symbol count 4, got %#v", data["symbolCount"])
+	}
+	if data["exportedSymbols"] != float64(4) {
+		t.Fatalf("expected test-inclusive exported symbols 4, got %#v", data["exportedSymbols"])
+	}
+
+	packages := assertMainTestJSONArrayHasLength(t, data, "packages", 2)
+	rootPackage, ok := packages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", packages[0])
+	}
+	if rootPackage["externalImports"] != float64(1) {
+		t.Fatalf("expected test import to be included, got %#v", rootPackage["externalImports"])
+	}
+}
+
+func TestMainPrintsRiskUsageWhenArgumentIsUnexpected(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "risk", "extra"})
+
+	want := "usage: gosherpa [--root <path>] risk [--tests]\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 func TestMainRunsTestsCommand(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1605,7 +1737,7 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, architecture, symbols, search, packages, entrypoints, callers, explain, and context") {
+	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, architecture, risk, symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
 	}
 

@@ -118,7 +118,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestsOption && !supportsTestsOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --tests is only supported by analyze, architecture, symbols, search, packages, entrypoints, callers, explain, and context")
+		fmt.Fprintln(stderr, "error: --tests is only supported by analyze, architecture, risk, symbols, search, packages, entrypoints, callers, explain, and context")
 		return exitUsage
 	}
 

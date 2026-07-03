@@ -84,6 +84,39 @@ func runArchitectureCommand(invocation cliInvocation, stdout io.Writer, stderr i
 	return exitSuccess
 }
 
+func runRiskCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	if len(invocation.CommandArgs) != 0 {
+		printCommandUsage(stderr, riskUsageLine)
+		return exitUsage
+	}
+
+	root, ok := resolveRootPath(invocation.Root, stderr)
+	if !ok {
+		return exitFailure
+	}
+
+	report, err := sherpa.AnalyzeRisk(root, sherpa.RiskOptions{
+		IncludeTests: invocation.IncludeTests,
+	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "risk", ".", stderr, err)
+	}
+
+	if invocation.JSON {
+		normalizedReport := riskJSONResult(report)
+		return writeJSON(stdout, stderr, newJSONResponse(
+			root,
+			"risk",
+			".",
+			nil,
+			normalizedReport,
+		))
+	}
+
+	fmt.Fprint(stdout, sherpa.FormatRiskReport(report))
+	return exitSuccess
+}
+
 func runDoctorCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
 	if len(invocation.CommandArgs) != 0 {
 		printDoctorUsage(stderr)

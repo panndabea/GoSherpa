@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "command": "risk",
+  "target": ".",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "level": "medium",
+    "score": 3,
+    "limitations": [
+      "Risk is a deterministic structural summary, not a prediction of defects.",
+      "Runtime behavior, reflection, generated behavior, and framework wiring are not inferred.",
+      "Test-file imports and test-only symbols are excluded unless --tests is set."
+    ],
+    "packageCount": 2,
+    "symbolCount": 6,
+    "exportedSymbols": 6,
+    "interfaces": 0,
+    "testPackages": 1,
+    "factors": [
+      {
+        "level": "medium",
+        "category": "fan_in",
+        "description": "A package is imported by 1 local package(s).",
+        "score": 1
+      },
+      {
+        "level": "medium",
+        "category": "fan_out",
+        "description": "A package imports 1 local package(s).",
+        "score": 1
+      },
+      {
+        "level": "medium",
+        "category": "public_api",
+        "description": "Repository exposes 6 exported symbol(s).",
+        "score": 1
+      },
+      {
+        "level": "low",
+        "category": "tests",
+        "description": "Tests found in 1 package(s).",
+        "score": 0
+      }
+    ],
+    "packages": [
+      {
+        "package": ".",
+        "level": "low",
+        "score": 2,
+        "reasons": [
+          "Imported by 1 local package.",
+          "Exposes 5 exported symbol(s)."
+        ],
+        "importedBy": 1,
+        "localImports": 0,
+        "externalImports": 0,
+        "symbols": 5,
+        "exportedSymbols": 5,
+        "interfaces": 0,
+        "goFiles": 1,
+        "testFiles": 1,
+        "hasTests": true,
+        "inCycle": false
+      },
+      {
+        "package": "./cmd/app",
+        "level": "low",
+        "score": 2,
+        "reasons": [
+          "Imports 1 local package(s).",
+          "Exposes 1 exported symbol(s)."
+        ],
+        "importedBy": 0,
+        "localImports": 1,
+        "externalImports": 0,
+        "symbols": 1,
+        "exportedSymbols": 1,
+        "interfaces": 0,
+        "goFiles": 1,
+        "testFiles": 0,
+        "hasTests": false,
+        "inCycle": false
+      }
+    ],
+    "cycles": []
+  }
+}

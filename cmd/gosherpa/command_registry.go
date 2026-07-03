@@ -39,6 +39,13 @@ var commandSpecs = []commandSpec{
 		Tests:   true,
 	},
 	{
+		Name:    "risk",
+		Usage:   []string{riskUsageLine},
+		Handler: runRiskCommand,
+		JSON:    true,
+		Tests:   true,
+	},
+	{
 		Name:          "context",
 		Usage:         contextUsageLines,
 		Handler:       runContextCommand,
@@ -198,6 +205,7 @@ var commandSpecIndex = indexCommandSpecs(commandSpecs)
 const (
 	analyzeUsageLine        = "analyze [path] [--tests]"
 	architectureUsageLine   = "architecture [--tests]"
+	riskUsageLine           = "risk [--tests]"
 	contextSymbolUsageLine  = "context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextFileUsageLine    = "context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextPackageUsageLine = "context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
