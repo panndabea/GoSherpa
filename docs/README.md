@@ -13,6 +13,9 @@ focused on the code, README, and license.
   implementation status.
 - [Must-Use Readiness](product/MUST_USE_READINESS.md) - near-term decision lens
   for making GoSherpa a default daily-use tool.
+- [Agent Recommendation Criteria](product/AGENT_RECOMMENDATION_CRITERIA.md) -
+  knockout criteria and implementation checklist for recommending GoSherpa to
+  coding agents.
 - [Agent Priority List](product/AGENT_PRIORITY_LIST.md) - prioritized features
   that would make GoSherpa useful as a default coding-agent tool.
 - [Agent JSON Schema v1](product/JSON_SCHEMA_V1.md) - shared JSON envelope and
