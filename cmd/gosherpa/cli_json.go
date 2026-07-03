@@ -124,6 +124,10 @@ type dependenciesJSONData struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+type repositoryDependenciesJSONData struct {
+	Packages []sherpa.PackageDependencySummary `json:"packages"`
+}
+
 type packagesJSONData struct {
 	Packages []sherpa.PackageSummary `json:"packages"`
 }
@@ -439,6 +443,25 @@ func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenc
 		Package: result.Package,
 		Imports: result.Imports,
 		UsedBy:  result.UsedBy,
+	}
+}
+
+func repositoryDependenciesJSONResult(result sherpa.RepositoryDependencies) sherpa.RepositoryDependencies {
+	result.Packages = nonNilSlice(result.Packages)
+	for i, pkg := range result.Packages {
+		pkg.Imports = nonNilSlice(pkg.Imports)
+		pkg.LocalImports = nonNilSlice(pkg.LocalImports)
+		pkg.ExternalImports = nonNilSlice(pkg.ExternalImports)
+		pkg.UsedBy = nonNilSlice(pkg.UsedBy)
+		result.Packages[i] = pkg
+	}
+
+	return result
+}
+
+func repositoryDependenciesJSONDataFromResult(result sherpa.RepositoryDependencies) repositoryDependenciesJSONData {
+	return repositoryDependenciesJSONData{
+		Packages: result.Packages,
 	}
 }
 

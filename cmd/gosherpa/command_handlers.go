@@ -612,8 +612,39 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 }
 
 func runDepsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
-	if len(invocation.CommandArgs) < 1 {
-		printCommandUsage(stderr, depsUsageLine)
+	if invocation.All {
+		if len(invocation.CommandArgs) != 0 {
+			printDepsUsage(stderr)
+			return exitUsage
+		}
+
+		root, ok := resolveRootPath(invocation.Root, stderr)
+		if !ok {
+			return exitFailure
+		}
+
+		report, err := sherpa.FindRepositoryDependencies(root)
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "deps", "all", stderr, err)
+		}
+
+		if invocation.JSON {
+			normalizedReport := repositoryDependenciesJSONResult(report)
+			return writeJSON(stdout, stderr, newJSONResponse(
+				root,
+				"deps",
+				"all",
+				nil,
+				repositoryDependenciesJSONDataFromResult(normalizedReport),
+			))
+		}
+
+		fmt.Fprint(stdout, sherpa.FormatRepositoryDependencies(report))
+		return exitSuccess
+	}
+
+	if len(invocation.CommandArgs) != 1 {
+		printDepsUsage(stderr)
 		return exitUsage
 	}
 

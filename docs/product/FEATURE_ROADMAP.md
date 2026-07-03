@@ -1084,6 +1084,10 @@ Done when:
 
 ### 6.2 Dependency Graph
 
+Status: first all-package slice implemented with `gosherpa deps --all` for
+human and JSON output, including local imports, external imports, and reverse
+dependencies.
+
 Human question:
 
 ```text
@@ -1101,9 +1105,9 @@ gosherpa deps --graph
 MVP behavior:
 
 - Improve current `deps` output.
-- Support all-package dependency overview.
-- Distinguish local imports from external imports.
-- Show reverse dependencies.
+- Support all-package dependency overview. Implemented.
+- Distinguish local imports from external imports. Implemented for `--all`.
+- Show reverse dependencies. Implemented.
 - Support depth-limited traversal.
 
 Done when:

@@ -14,6 +14,7 @@ type commandSpec struct {
 	Package       bool
 	Kind          bool
 	Tests         bool
+	All           bool
 	Context       bool
 	ContextLimits bool
 	Tags          bool
@@ -116,9 +117,10 @@ var commandSpecs = []commandSpec{
 	},
 	{
 		Name:    "deps",
-		Usage:   []string{depsUsageLine},
+		Usage:   depsUsageLines,
 		Handler: runDepsCommand,
 		JSON:    true,
+		All:     true,
 	},
 	{
 		Name:    "packages",
@@ -206,7 +208,8 @@ const (
 	prUsageLine             = "pr --base <ref>"
 	testsDefaultUsageLine   = "tests <symbol-or-package> [--scope direct|related|all]"
 	testsAffectedUsageLine  = "tests affected --base <ref>"
-	depsUsageLine           = "deps <package>"
+	depsPackageUsageLine    = "deps <package>"
+	depsAllUsageLine        = "deps --all"
 	packagesUsageLine       = "packages [--tests]"
 	implementersUsageLine   = "implementers <interface>"
 	interfacesUsageLine     = "interfaces <type>"
@@ -235,6 +238,10 @@ var (
 	testsUsageLines = []string{
 		testsDefaultUsageLine,
 		testsAffectedUsageLine,
+	}
+	depsUsageLines = []string{
+		depsPackageUsageLine,
+		depsAllUsageLine,
 	}
 )
 

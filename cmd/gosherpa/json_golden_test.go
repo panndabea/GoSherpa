@@ -79,6 +79,10 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 			args: []string{"deps", ".", "--json"},
 		},
 		{
+			name: "deps-all",
+			args: []string{"deps", "--all", "--json"},
+		},
+		{
 			name: "packages",
 			args: []string{"packages", "--json"},
 		},

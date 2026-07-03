@@ -33,6 +33,14 @@ var cliFlagSpecs = []cliFlagSpec{
 		},
 	},
 	{
+		Name: "--all",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			invocation.All = true
+			invocation.HasAllOption = true
+			return nil
+		},
+	},
+	{
 		Name: "--context",
 		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
 			invocation.ShowContext = true

@@ -39,6 +39,49 @@ func FormatPackageDependencies(deps PackageDependencies) string {
 	return builder.String()
 }
 
+func FormatRepositoryDependencies(report RepositoryDependencies) string {
+	var builder strings.Builder
+
+	builder.WriteString("DEPENDENCIES\n\n")
+	if len(report.Packages) == 0 {
+		builder.WriteString("  none\n")
+		return builder.String()
+	}
+
+	for i, pkg := range report.Packages {
+		if i > 0 {
+			builder.WriteString("\n")
+		}
+
+		builder.WriteString(pkg.Package)
+		builder.WriteString("\n")
+
+		writeDependencyList(&builder, "LOCAL IMPORTS", pkg.LocalImports)
+		writeDependencyList(&builder, "EXTERNAL IMPORTS", pkg.ExternalImports)
+		writeDependencyList(&builder, "USED BY", pkg.UsedBy)
+	}
+
+	fmt.Fprintf(&builder, "\nFound %d packages\n", len(report.Packages))
+
+	return builder.String()
+}
+
+func writeDependencyList(builder *strings.Builder, title string, values []string) {
+	builder.WriteString("  ")
+	builder.WriteString(title)
+	builder.WriteString("\n")
+	if len(values) == 0 {
+		builder.WriteString("    none\n")
+		return
+	}
+
+	for _, value := range values {
+		builder.WriteString("    ")
+		builder.WriteString(value)
+		builder.WriteString("\n")
+	}
+}
+
 func PrintPackageDependencies(deps PackageDependencies) {
 	fmt.Print(FormatPackageDependencies(deps))
 }

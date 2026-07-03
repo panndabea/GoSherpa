@@ -38,6 +38,8 @@ type cliInvocation struct {
 	HasBaseOption      bool
 	IncludeTests       bool
 	HasTestsOption     bool
+	All                bool
+	HasAllOption       bool
 	ShowContext        bool
 	HasContextOption   bool
 	BuildTags          []string
@@ -120,6 +122,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasAllOption && !supportsAllOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --all is only supported by deps")
+		return exitUsage
+	}
+
 	if invocation.HasContextOption && invocation.JSON {
 		fmt.Fprintln(stderr, "error: --context is only supported for human output")
 		return exitUsage
@@ -197,6 +204,11 @@ func supportsContextLimitOption(command string) bool {
 func supportsTestsOption(command string) bool {
 	spec, ok := commandSpecFor(command)
 	return ok && spec.Tests
+}
+
+func supportsAllOption(command string) bool {
+	spec, ok := commandSpecFor(command)
+	return ok && spec.All
 }
 
 func supportsContextOption(command string) bool {
@@ -436,6 +448,10 @@ func printImpactSubcommandUsage(writer io.Writer, kind string) {
 
 func printTestsUsage(writer io.Writer) {
 	printUsageLines(writer, testsUsageLines)
+}
+
+func printDepsUsage(writer io.Writer) {
+	printUsageLines(writer, depsUsageLines)
 }
 
 func printTestsAffectedUsage(writer io.Writer) {

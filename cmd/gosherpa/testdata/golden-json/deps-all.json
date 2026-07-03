@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "command": "deps",
+  "target": "all",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "packages": [
+      {
+        "package": ".",
+        "imports": [
+          "testing"
+        ],
+        "localImports": [],
+        "externalImports": [
+          "testing"
+        ],
+        "usedBy": [
+          "./cmd/app"
+        ]
+      },
+      {
+        "package": "./cmd/app",
+        "imports": [
+          "."
+        ],
+        "localImports": [
+          "."
+        ],
+        "externalImports": [],
+        "usedBy": []
+      }
+    ]
+  }
+}

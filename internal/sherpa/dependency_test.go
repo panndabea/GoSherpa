@@ -384,6 +384,87 @@ import "example.com/app/internal/auth"
 	}
 }
 
+func TestFindRepositoryDependenciesReportsAllPackages(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package app
+
+import (
+	"fmt"
+
+	"example.com/app/internal/store"
+)
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "store", "store.go"), "package store\n")
+	writeFile(t, filepath.Join(tmp, "cmd", "api", "main.go"), `package main
+
+import (
+	"net/http"
+
+	"example.com/app"
+	"example.com/app/internal/store"
+)
+`)
+
+	report, err := FindRepositoryDependencies(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(report.Packages) != 3 {
+		t.Fatalf("expected 3 packages, got %#v", report.Packages)
+	}
+
+	rootPackage := findDependencySummary(t, report.Packages, ".")
+	assertContainsString(t, rootPackage.LocalImports, "./internal/store")
+	assertContainsString(t, rootPackage.ExternalImports, "fmt")
+	assertContainsString(t, rootPackage.UsedBy, "./cmd/api")
+
+	cmdPackage := findDependencySummary(t, report.Packages, "./cmd/api")
+	assertContainsString(t, cmdPackage.LocalImports, ".")
+	assertContainsString(t, cmdPackage.LocalImports, "./internal/store")
+	assertContainsString(t, cmdPackage.ExternalImports, "net/http")
+
+	storePackage := findDependencySummary(t, report.Packages, "./internal/store")
+	assertContainsString(t, storePackage.UsedBy, ".")
+	assertContainsString(t, storePackage.UsedBy, "./cmd/api")
+}
+
+func TestFindRepositoryDependenciesDeduplicatesAndSorts(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "auth", "service.go"), `package auth
+
+import (
+	"fmt"
+	"fmt"
+)
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "api", "main.go"), `package main
+
+import "example.com/app/internal/auth"
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "api", "worker.go"), `package main
+
+import "example.com/app/internal/auth"
+`)
+
+	report, err := FindRepositoryDependencies(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authPackage := findDependencySummary(t, report.Packages, "./internal/auth")
+	if countString(authPackage.ExternalImports, "fmt") != 1 {
+		t.Fatalf("expected fmt once, got %v", authPackage.ExternalImports)
+	}
+	if countString(authPackage.UsedBy, "./cmd/api") != 1 {
+		t.Fatalf("expected ./cmd/api once, got %v", authPackage.UsedBy)
+	}
+}
+
 func writeFile(t *testing.T, path string, contents string) {
 	t.Helper()
 
@@ -425,4 +506,17 @@ func assertContainsString(t *testing.T, values []string, want string) {
 	if !containsString(values, want) {
 		t.Fatalf("expected %v to contain %s", values, want)
 	}
+}
+
+func findDependencySummary(t *testing.T, packages []PackageDependencySummary, packagePath string) PackageDependencySummary {
+	t.Helper()
+
+	for _, pkg := range packages {
+		if pkg.Package == packagePath {
+			return pkg
+		}
+	}
+
+	t.Fatalf("expected package %s in %#v", packagePath, packages)
+	return PackageDependencySummary{}
 }

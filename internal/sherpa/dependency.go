@@ -18,6 +18,18 @@ type PackageDependencies struct {
 	UsedBy  []string `json:"usedBy"`
 }
 
+type RepositoryDependencies struct {
+	Packages []PackageDependencySummary `json:"packages"`
+}
+
+type PackageDependencySummary struct {
+	Package         string   `json:"package"`
+	Imports         []string `json:"imports"`
+	LocalImports    []string `json:"localImports"`
+	ExternalImports []string `json:"externalImports"`
+	UsedBy          []string `json:"usedBy"`
+}
+
 type packageFileMetadata struct {
 	PackageName string
 	Imports     []string
@@ -83,6 +95,49 @@ func FindPackageDependencies(root string, targetPackage string) (PackageDependen
 	deps.UsedBy = uniqueSorted(usedBy)
 
 	return deps, nil
+}
+
+func FindRepositoryDependencies(root string) (RepositoryDependencies, error) {
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return RepositoryDependencies{}, err
+	}
+
+	modPath, err := modulePath(rootPath)
+	if err != nil {
+		return RepositoryDependencies{}, err
+	}
+
+	importsByPackage, err := collectPackageImports(rootPath)
+	if err != nil {
+		return RepositoryDependencies{}, err
+	}
+
+	usedByByPackage := collectUsedByPackages(importsByPackage, modPath)
+	packages := make([]string, 0, len(importsByPackage))
+	for pkg := range importsByPackage {
+		packages = append(packages, pkg)
+	}
+	sort.Strings(packages)
+
+	report := RepositoryDependencies{
+		Packages: make([]PackageDependencySummary, 0, len(packages)),
+	}
+	for _, pkg := range packages {
+		localImports, externalImports := splitDisplayImports(importsByPackage[pkg], modPath)
+		imports := append([]string{}, localImports...)
+		imports = append(imports, externalImports...)
+
+		report.Packages = append(report.Packages, PackageDependencySummary{
+			Package:         pkg,
+			Imports:         uniqueSorted(imports),
+			LocalImports:    localImports,
+			ExternalImports: externalImports,
+			UsedBy:          uniqueSorted(usedByByPackage[pkg]),
+		})
+	}
+
+	return report, nil
 }
 
 func modulePath(root string) (string, error) {
@@ -232,6 +287,50 @@ func collectPackageImports(root string) (map[string][]string, error) {
 	}
 
 	return importsByPackage, nil
+}
+
+func collectUsedByPackages(importsByPackage map[string][]string, modulePath string) map[string][]string {
+	usedByByPackage := map[string][]string{}
+	for packagePath := range importsByPackage {
+		usedByByPackage[packagePath] = nil
+	}
+
+	for packagePath, imports := range importsByPackage {
+		for _, importPath := range imports {
+			localPath, ok := localPackagePath(importPath, modulePath)
+			if !ok || localPath == packagePath {
+				continue
+			}
+
+			if _, ok := importsByPackage[localPath]; !ok {
+				continue
+			}
+
+			usedByByPackage[localPath] = append(usedByByPackage[localPath], packagePath)
+		}
+	}
+
+	for packagePath, usedBy := range usedByByPackage {
+		usedByByPackage[packagePath] = uniqueSorted(usedBy)
+	}
+
+	return usedByByPackage
+}
+
+func splitDisplayImports(imports []string, modulePath string) ([]string, []string) {
+	var localImports []string
+	var externalImports []string
+	for _, importPath := range imports {
+		localPath, ok := localPackagePath(importPath, modulePath)
+		if ok {
+			localImports = append(localImports, localPath)
+			continue
+		}
+
+		externalImports = append(externalImports, importPath)
+	}
+
+	return uniqueSorted(localImports), uniqueSorted(externalImports)
 }
 
 func localPackagePath(importPath string, modulePath string) (string, bool) {

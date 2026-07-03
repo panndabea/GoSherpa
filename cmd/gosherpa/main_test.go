@@ -185,6 +185,25 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsAllFlag(t *testing.T) {
+	got, err := parseCLIArgs([]string{"deps", "--all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Command != "deps" {
+		t.Fatalf("expected command deps, got %s", got.Command)
+	}
+
+	if !got.All || !got.HasAllOption {
+		t.Fatal("expected all option")
+	}
+
+	if len(got.CommandArgs) != 0 {
+		t.Fatalf("expected no command args, got %v", got.CommandArgs)
+	}
+}
+
 func TestParseCLIArgsAcceptsContextFlag(t *testing.T) {
 	tests := [][]string{
 		{"--context", "symbol", "Run"},
@@ -645,6 +664,17 @@ func TestPrintUsageIncludesPackages(t *testing.T) {
 
 	if !strings.Contains(output.String(), "packages [--tests]") {
 		t.Fatalf("expected usage to contain packages command, got:\n%s", output.String())
+	}
+}
+
+func TestPrintUsageIncludesDeps(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	for _, want := range []string{"deps <package>", "deps --all"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
+		}
 	}
 }
 
@@ -1447,6 +1477,22 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 
 	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsAllFlagForOtherCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "symbols", "--all"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --all is only supported by deps") {
+		t.Fatalf("expected all flag error, got:\n%s", result.Stderr)
 	}
 
 	if result.Stdout != "" {
@@ -4462,6 +4508,126 @@ func Run() {
 
 	if strings.Contains(result.Stdout, "PACKAGE DEPENDENCIES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsDepsAllCommand(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+import (
+	"fmt"
+
+	"example.com/app/internal/parser"
+)
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app"
+
+func Run() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "deps", "--all", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"DEPENDENCIES",
+		".",
+		"./cmd/app",
+		"./internal/parser",
+		"LOCAL IMPORTS",
+		"./internal/parser",
+		"EXTERNAL IMPORTS",
+		"fmt",
+		"USED BY",
+		"Found 3 packages",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, tmp) {
+		t.Fatalf("expected root-relative output, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsDepsAllCommandAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+import "example.com/app/internal/parser"
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app"
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "deps", "--all", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "deps", "all", "example.com/app")
+	packages := assertMainTestJSONArrayHasLength(t, data, "packages", 3)
+
+	rootPackage, ok := packages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", packages[0])
+	}
+	if rootPackage["package"] != "." {
+		t.Fatalf("expected root package first, got %#v", rootPackage["package"])
+	}
+	assertMainTestJSONArrayHasLength(t, rootPackage, "localImports", 1)
+	assertMainTestJSONArrayHasLength(t, rootPackage, "externalImports", 0)
+	assertMainTestJSONArrayHasLength(t, rootPackage, "usedBy", 1)
+
+	if strings.Contains(result.Stdout, "DEPENDENCIES") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainPrintsDepsUsageWhenAllHasArguments(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "deps", "--all", "."})
+
+	want := "usage: gosherpa [--root <path>] deps <package>\n" +
+		"       gosherpa [--root <path>] deps --all\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
 	}
 }
 

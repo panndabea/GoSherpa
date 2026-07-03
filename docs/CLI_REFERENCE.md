@@ -64,6 +64,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package inventory | `gosherpa packages --tests` | Lists local packages with file, symbol, import, reverse-dependency, and test indicators |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
+| Dependency overview | `gosherpa deps --all` | Shows local and external imports plus reverse dependencies for every package |
 | Interface implementers | `gosherpa implementers ./internal/auth.Authenticator` | Lists concrete local types satisfying an interface |
 | Satisfied interfaces | `gosherpa interfaces ./internal/jwt.JWTAuthenticator` | Lists local interfaces satisfied by a type |
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
@@ -143,7 +144,9 @@ Found 4 references
 ./gosherpa packages --tests
 ./gosherpa packages --json
 ./gosherpa deps ./internal/sherpa
+./gosherpa deps --all
 ./gosherpa deps ./internal/sherpa --json
+./gosherpa deps --all --json
 ./gosherpa implementers ./internal/auth.Authenticator
 ./gosherpa implementers ./internal/auth.Authenticator --json
 ./gosherpa interfaces ./internal/jwt.JWTAuthenticator

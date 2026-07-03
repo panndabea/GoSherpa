@@ -56,6 +56,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
 - Package inventory with `gosherpa packages`, including file, symbol, import, reverse-dependency, and test indicators
+- All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering
 - Source ranges with columns for symbols, references, callers, callees, call paths, and related tests in JSON output
 
