@@ -24,6 +24,7 @@ type prReport struct {
 	AffectedImplementations []string                   `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
 	Risk                    explainengine.RiskSummary  `json:"risk"`
+	RepositoryRisk          sherpa.RiskReport          `json:"repositoryRisk"`
 	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
 	TestCommands            []string                   `json:"testCommands"`
 	TestPlan                sherpa.TestPlan            `json:"testPlan"`
@@ -35,6 +36,11 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 	impactReport, err := impactengine.AnalyzeDiffWithOptions(root, base, "", impactengine.AnalyzerOptions{
 		BuildTags: buildTags,
 	})
+	if err != nil {
+		return prReport{}, err
+	}
+
+	repositoryRisk, err := sherpa.AnalyzeRisk(root, sherpa.RiskOptions{})
 	if err != nil {
 		return prReport{}, err
 	}
@@ -54,6 +60,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
+		RepositoryRisk:          repositoryRisk,
 		Warnings:                impactReport.Warnings,
 	}
 	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
@@ -75,6 +82,7 @@ func normalizePRReport(report prReport) prReport {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.RepositoryRisk = riskJSONResult(report.RepositoryRisk)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
@@ -176,6 +184,8 @@ func formatPRReport(report prReport) string {
 
 	writePRRisk(&builder, report.Risk)
 	builder.WriteString("\n")
+	writePRRepositoryRisk(&builder, report.RepositoryRisk)
+	builder.WriteString("\n")
 	writePRValues(&builder, "CHANGED FILES", report.ChangedFiles)
 	builder.WriteString("\n")
 	writePRValues(&builder, "CHANGED PACKAGES", report.ChangedPackages)
@@ -211,6 +221,23 @@ func writePRRisk(builder *strings.Builder, risk explainengine.RiskSummary) {
 	fmt.Fprintf(builder, "  Level: %s\n", level)
 	for _, reason := range risk.Reasons {
 		fmt.Fprintf(builder, "  %s\n", reason)
+	}
+}
+
+func writePRRepositoryRisk(builder *strings.Builder, risk sherpa.RiskReport) {
+	risk = riskJSONResult(risk)
+
+	builder.WriteString("REPOSITORY RISK\n")
+	fmt.Fprintf(builder, "  Level: %s\n", risk.Level)
+	fmt.Fprintf(builder, "  Score: %d\n", risk.Score)
+	if len(risk.Factors) == 0 {
+		builder.WriteString("  Factors: none\n")
+		return
+	}
+
+	builder.WriteString("  Factors:\n")
+	for _, factor := range risk.Factors {
+		fmt.Fprintf(builder, "    - %s: %s\n", factor.Category, factor.Description)
 	}
 }
 

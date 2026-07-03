@@ -126,8 +126,8 @@ Implemented:
 - `gosherpa impact diff --base <ref>` with human and JSON output.
 - `gosherpa tests affected --base <ref>` with human and JSON output.
 - `gosherpa pr --base <ref>` with human and JSON output for PR-style changed
-  files, packages, symbols, risk notes, affected tests, and verification
-  commands.
+  files, packages, symbols, diff risk notes, structural repository risk,
+  affected tests, and verification commands.
 - `gosherpa impact file|package|symbol` with human and JSON output.
 - Interface and implementer impact signals based on local method sets with
   import-aware signature matching and embedded-interface expansion.

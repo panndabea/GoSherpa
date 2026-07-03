@@ -2703,6 +2703,10 @@ func TestMainRunsPRCommand(t *testing.T) {
 		"RISK",
 		"Level: medium",
 		"dependent packages",
+		"REPOSITORY RISK",
+		"Score: 3",
+		"fan_in",
+		"public_api",
 		"CHANGED FILES",
 		"internal/auth/session.go",
 		"CHANGED PACKAGES",
@@ -2765,6 +2769,13 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	if risk["level"] != "medium" {
 		t.Fatalf("expected medium risk, got %v", risk["level"])
 	}
+	repositoryRisk := assertMainTestJSONObject(t, data, "repositoryRisk")
+	if repositoryRisk["level"] != sherpa.RiskLevelMedium {
+		t.Fatalf("expected medium repository risk, got %#v", repositoryRisk["level"])
+	}
+	if repositoryRisk["score"] != float64(3) {
+		t.Fatalf("expected repository risk score 3, got %#v", repositoryRisk["score"])
+	}
 
 	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
 	assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1)
@@ -2774,6 +2785,10 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "verificationCommands", 3)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
+	assertMainTestJSONArrayHasLength(t, repositoryRisk, "limitations", 3)
+	assertMainTestJSONArrayHasLength(t, repositoryRisk, "factors", 4)
+	assertMainTestJSONArrayHasLength(t, repositoryRisk, "packages", 2)
+	assertMainTestJSONArrayHasLength(t, repositoryRisk, "cycles", 0)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])

@@ -62,7 +62,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, changed-symbol impact, affected packages, and affected tests |
-| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, risk, affected tests, and verification commands |
+| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, diff risk, repository risk, affected tests, and verification commands |
 | Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
@@ -206,6 +206,9 @@ Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `context diff` can report `git-diff+typechecked+ast` plus
 `referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
 typechecked package loading.
+
+`pr --json` keeps the diff-oriented `risk` summary and also includes
+`repositoryRisk`, the full structural `RiskReport` from `gosherpa risk`.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,

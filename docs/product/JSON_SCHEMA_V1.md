@@ -624,6 +624,10 @@ includes `affectedInterfaces`, `affectedImplementations`, and
 `pr` expose `interfaceAnalysisMode` for the same underlying diff report when
 available.
 
+`pr` keeps the diff-oriented `risk` object and additionally includes
+`repositoryRisk`, a full structural risk report in the same shape emitted by
+`risk --json`.
+
 ## Interface And Path Data
 
 `implementers`, `interfaces`, `path`, and `paths` data objects include the

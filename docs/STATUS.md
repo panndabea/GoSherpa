@@ -49,7 +49,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
-- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, risk notes, affected tests, and verification commands
+- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, diff risk notes, structural repository risk, affected tests, and verification commands
 - Diff-oriented reports enrich changed top-level symbols with typechecked reference and call impact when package loading is available, exposing `git-diff+typechecked+ast`, `referenceAnalysisMode`, and `callAnalysisMode`
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
