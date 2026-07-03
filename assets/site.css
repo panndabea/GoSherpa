@@ -147,7 +147,7 @@ pre {
   background-image:
     linear-gradient(90deg, rgba(3, 31, 40, 0.95), rgba(3, 31, 40, 0.8) 36%, rgba(3, 31, 40, 0.22) 68%, rgba(3, 31, 40, 0.04)),
     linear-gradient(0deg, rgba(6, 28, 36, 0.84), rgba(6, 28, 36, 0) 42%),
-    url("pictures/gosherpa-hero-bg-v2.png");
+    url("../pictures/gosherpa-hero-bg-v2.png");
   background-position: center, center, center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -515,7 +515,7 @@ section {
   color: #ffffff;
   background:
     linear-gradient(90deg, rgba(8, 29, 35, 0.88), rgba(17, 94, 93, 0.82)),
-    url("pictures/gosherpa-comic-agents.webp") center / cover no-repeat;
+    url("../pictures/gosherpa-comic-agents.webp") center / cover no-repeat;
 }
 
 .cta .wrap {
@@ -632,7 +632,7 @@ footer {
     background-image:
       linear-gradient(90deg, rgba(3, 31, 40, 0.96), rgba(3, 31, 40, 0.84) 58%, rgba(3, 31, 40, 0.46)),
       linear-gradient(0deg, rgba(6, 28, 36, 0.88), rgba(6, 28, 36, 0) 48%),
-      url("pictures/gosherpa-hero-bg-v2.png");
+      url("../pictures/gosherpa-hero-bg-v2.png");
     background-position: center, center, 58% 50%;
   }
 
