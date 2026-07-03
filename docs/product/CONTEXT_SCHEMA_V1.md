@@ -29,17 +29,26 @@ Every context result includes:
   and `fallback` items.
 - `readingOrder`: ordered source locations to inspect next.
 - `analysisMode`: deterministic analysis mode label.
+- `referenceAnalysisMode`: optional trust label for reference subanalysis when
+  the context kind includes changed-symbol or symbol-reference impact
+  (`typechecked` or `ast-fallback`).
+- `callAnalysisMode`: optional trust label for call graph subanalysis when the
+  context kind includes caller/callee or changed-symbol impact (`typechecked`
+  or `ast-fallback`).
 - `interfaceAnalysisMode`: optional trust label for affected interface and
   implementation signals when interface subanalysis ran (`typechecked` or
   `ast-fallback`).
 - `confidence`: deterministic confidence label.
 - `limitations`: known blind spots and conservative boundaries.
 
-Current context analysis modes include `ast`, `typechecked+ast`, and
-`git-diff+ast`. Symbol context uses `typechecked+ast` when symbol identity comes
-from typechecked package loading. File and package context use `typechecked+ast`
-when package files and symbols come from typechecked package loading while
-impact and test signals still use syntax/local repository analysis.
+Current context analysis modes include `ast`, `typechecked+ast`,
+`git-diff+ast`, and `git-diff+typechecked+ast`. Symbol context uses
+`typechecked+ast` when symbol identity comes from typechecked package loading.
+File and package context use `typechecked+ast` when package files and symbols
+come from typechecked package loading while impact and test signals still use
+syntax/local repository analysis. Diff context uses
+`git-diff+typechecked+ast` when changed-symbol, reference, call, or interface
+signals include typechecked package loading, and `git-diff+ast` otherwise.
 
 Location-bearing context entries reuse the shared position and range shapes from
 `JSON_SCHEMA_V1.md`. References, callers, callees, affected tests, and related
@@ -106,5 +115,5 @@ contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
 test planning.
 
 `context diff` adds base ref, changed files, changed packages, affected
-symbols, affected packages, interface signals, `interfaceAnalysisMode`,
-affected tests, and test planning.
+symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
+interface signals, `interfaceAnalysisMode`, affected tests, and test planning.

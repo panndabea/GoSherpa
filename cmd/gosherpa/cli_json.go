@@ -107,12 +107,15 @@ type testsJSONData struct {
 }
 
 type testsAffectedJSONData struct {
-	AnalysisMode  string                     `json:"analysisMode"`
-	Confidence    string                     `json:"confidence"`
-	Limitations   []string                   `json:"limitations"`
-	AffectedTests []impactengine.RelatedTest `json:"affectedTests"`
-	Commands      []string                   `json:"commands"`
-	TestPlan      sherpa.TestPlan            `json:"testPlan"`
+	AnalysisMode          string                     `json:"analysisMode"`
+	Confidence            string                     `json:"confidence"`
+	Limitations           []string                   `json:"limitations"`
+	ReferenceAnalysisMode string                     `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode      string                     `json:"callAnalysisMode,omitempty"`
+	InterfaceAnalysisMode string                     `json:"interfaceAnalysisMode,omitempty"`
+	AffectedTests         []impactengine.RelatedTest `json:"affectedTests"`
+	Commands              []string                   `json:"commands"`
+	TestPlan              sherpa.TestPlan            `json:"testPlan"`
 }
 
 type dependenciesJSONData struct {
@@ -375,7 +378,13 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 
 func impactReportAnalysisMode(report impactengine.ImpactReport, fallback string) string {
 	if fallback == analysisModeDiff {
-		return fallback
+		if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
+			report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
+			report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+			return analysisModeDiffTypechecked
+		}
+
+		return analysisModeDiff
 	}
 
 	return bundleAnalysisMode(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
@@ -403,13 +412,18 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 }
 
 func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffectedJSONData {
+	analysisMode := impactReportAnalysisMode(report, analysisModeDiff)
+
 	return testsAffectedJSONData{
-		AnalysisMode:  analysisModeDiff,
-		Confidence:    jsonConfidence(report.Warnings, analysisModeDiff),
-		Limitations:   testLimitations(analysisModeDiff),
-		AffectedTests: report.AffectedTests,
-		Commands:      report.TestCommands,
-		TestPlan:      report.TestPlan,
+		AnalysisMode:          analysisMode,
+		Confidence:            jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
+		Limitations:           testLimitations(analysisMode),
+		ReferenceAnalysisMode: report.ReferenceAnalysisMode,
+		CallAnalysisMode:      report.CallAnalysisMode,
+		InterfaceAnalysisMode: report.InterfaceAnalysisMode,
+		AffectedTests:         report.AffectedTests,
+		Commands:              report.TestCommands,
+		TestPlan:              report.TestPlan,
 	}
 }
 
@@ -615,6 +629,8 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
+	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
@@ -684,6 +700,7 @@ func explainAnalysisMode(report explainengine.Report) string {
 func bundleAnalysisMode(analysisModes ...string) string {
 	for _, mode := range analysisModes {
 		if mode == agentcontext.AnalysisModeTypecheckedAST ||
+			mode == agentcontext.AnalysisModeDiffTypechecked ||
 			mode == explainengine.SymbolAnalysisModeTypecheckedAST ||
 			mode == sherpa.ReferenceAnalysisModeTypechecked ||
 			mode == sherpa.CallAnalysisModeTypechecked ||
@@ -795,10 +812,15 @@ func impactBundleLimitations(analysisMode string, referenceAnalysisMode string, 
 }
 
 func impactLimitations(analysisMode string) []string {
-	if analysisMode == analysisModeDiff {
+	if analysisMode == analysisModeDiff || analysisMode == analysisModeDiffTypechecked {
+		semanticLine := "Impact analysis uses syntax plus local package dependency and interface signals."
+		if analysisMode == analysisModeDiffTypechecked {
+			semanticLine = "Impact analysis uses git diff plus typechecked symbol, reference, call, or interface signals where available."
+		}
+
 		return []string{
 			"Diff impact is based on git changed files and hunk-level changed symbol extraction.",
-			"Impact analysis uses syntax plus local package dependency and interface signals.",
+			semanticLine,
 			"Statement-level semantic consequences are not fully inferred.",
 			"Dynamic dispatch, reflection, and function values are not resolved.",
 		}
@@ -813,9 +835,14 @@ func impactLimitations(analysisMode string) []string {
 }
 
 func testLimitations(analysisMode string) []string {
-	if analysisMode == analysisModeDiff {
+	if analysisMode == analysisModeDiff || analysisMode == analysisModeDiffTypechecked {
+		semanticLine := "Affected test planning is based on changed packages, affected packages, and syntactic test references."
+		if analysisMode == analysisModeDiffTypechecked {
+			semanticLine = "Affected test planning includes typechecked changed-symbol impact where available, then falls back to package-level commands."
+		}
+
 		return []string{
-			"Affected test planning is based on changed packages, affected packages, and syntactic test references.",
+			semanticLine,
 			"Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
 			"Fallback commands are package-level when direct test functions are not known.",
 		}

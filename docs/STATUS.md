@@ -48,6 +48,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
 - `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, risk notes, affected tests, and verification commands
+- Diff-oriented reports enrich changed top-level symbols with typechecked reference and call impact when package loading is available, exposing `git-diff+typechecked+ast`, `referenceAnalysisMode`, and `callAnalysisMode`
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
 - Changed-symbol extraction from git diff hunks, including deleted symbols from base files
@@ -63,7 +64,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Reference search uses `go/packages`-backed typechecked loading when available and falls back to AST/per-package type information; caller, callee, path, and interface impact analysis remain conservative and mostly local.
 - Test files are skipped by reference, callee, path, default caller, and default entrypoint analysis; `callers --tests`, `entrypoints --tests`, and `explain --tests` include test-file callers on demand.
 - Symbol impact includes transitive callers and package tests for affected caller packages.
-- Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, but it does not infer every semantic consequence of changed statements.
+- Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, enriches current changed symbols with typechecked reference/call impact when available, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
 - Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.

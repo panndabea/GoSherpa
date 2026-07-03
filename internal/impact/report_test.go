@@ -41,6 +41,12 @@ func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
 	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
 	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
 	assertStrings(t, report.AffectedSymbols, []string{"NewSession"})
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 	assertStrings(t, report.Warnings, []string{})

@@ -31,6 +31,8 @@
     "affectedSymbols": [
       "Added"
     ],
+    "referenceAnalysisMode": "typechecked",
+    "callAnalysisMode": "typechecked",
     "affectedInterfaces": [],
     "affectedImplementations": [],
     "interfaceAnalysisMode": "typechecked",
@@ -102,13 +104,15 @@
         }
       }
     ],
-    "analysisMode": "git-diff+ast",
+    "analysisMode": "git-diff+typechecked+ast",
     "confidence": "medium",
     "limitations": [
-      "Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
+      "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
       "Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
-      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names."
+      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+      "Reference analysis mode: typechecked.",
+      "Call analysis mode: typechecked."
     ]
   }
 }

@@ -6,13 +6,15 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
-    "analysisMode": "git-diff+ast",
+    "analysisMode": "git-diff+typechecked+ast",
     "confidence": "medium",
     "limitations": [
       "Diff impact is based on git changed files and hunk-level changed symbol extraction.",
-      "Impact analysis uses syntax plus local package dependency and interface signals.",
+      "Impact analysis uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Statement-level semantic consequences are not fully inferred.",
-      "Dynamic dispatch, reflection, and function values are not resolved."
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Reference analysis used typechecked package loading where available.",
+      "Call analysis used typechecked package loading where available."
     ],
     "changedFiles": [
       "service.go"
@@ -27,6 +29,8 @@
     "affectedSymbols": [
       "Added"
     ],
+    "referenceAnalysisMode": "typechecked",
+    "callAnalysisMode": "typechecked",
     "affectedInterfaces": [],
     "affectedImplementations": [],
     "interfaceAnalysisMode": "typechecked",

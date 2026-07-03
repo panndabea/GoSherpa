@@ -18,6 +18,8 @@ type prReport struct {
 	ChangedPackages         []string                   `json:"changedPackages"`
 	ChangedSymbols          []string                   `json:"changedSymbols"`
 	AffectedPackages        []string                   `json:"affectedPackages"`
+	ReferenceAnalysisMode   string                     `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                     `json:"callAnalysisMode,omitempty"`
 	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
 	AffectedImplementations []string                   `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
@@ -39,11 +41,13 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 
 	report := prReport{
 		Base:                    base,
-		AnalysisMode:            analysisModeDiff,
+		AnalysisMode:            impactReportAnalysisMode(impactReport, analysisModeDiff),
 		ChangedFiles:            impactReport.ChangedFiles,
 		ChangedPackages:         impactReport.ChangedPackages,
 		ChangedSymbols:          impactReport.AffectedSymbols,
 		AffectedPackages:        impactReport.AffectedPackages,
+		ReferenceAnalysisMode:   strings.TrimSpace(impactReport.ReferenceAnalysisMode),
+		CallAnalysisMode:        strings.TrimSpace(impactReport.CallAnalysisMode),
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
 		InterfaceAnalysisMode:   strings.TrimSpace(impactReport.InterfaceAnalysisMode),
@@ -52,8 +56,8 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 		TestPlan:                impactReport.TestPlan,
 		Warnings:                impactReport.Warnings,
 	}
-	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode, report.InterfaceAnalysisMode)
-	report.Limitations = impactLimitations(report.AnalysisMode)
+	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
+	report.Limitations = impactBundleLimitations(report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode)
 	report.Risk = prRiskSummary(report)
 	report.VerificationCommands = prVerificationCommands(report.TestCommands)
 
@@ -65,6 +69,8 @@ func normalizePRReport(report prReport) prReport {
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.ChangedSymbols = nonNilSlice(report.ChangedSymbols)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
+	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
@@ -157,6 +163,12 @@ func formatPRReport(report prReport) string {
 	fmt.Fprintf(&builder, "Base: %s\n", report.Base)
 	fmt.Fprintf(&builder, "Analysis: %s\n", report.AnalysisMode)
 	fmt.Fprintf(&builder, "Confidence: %s\n", report.Confidence)
+	if report.ReferenceAnalysisMode != "" {
+		fmt.Fprintf(&builder, "Reference analysis: %s\n", report.ReferenceAnalysisMode)
+	}
+	if report.CallAnalysisMode != "" {
+		fmt.Fprintf(&builder, "Call analysis: %s\n", report.CallAnalysisMode)
+	}
 	if report.InterfaceAnalysisMode != "" {
 		fmt.Fprintf(&builder, "Interface analysis: %s\n", report.InterfaceAnalysisMode)
 	}

@@ -241,6 +241,8 @@ labels. Broader explain, context, impact, test, and path commands currently use:
 - `typechecked+ast`: typechecked package loading for selected context fields,
   combined with syntax/local impact and test signals.
 - `git-diff+ast`: git diff discovery plus AST/local repository analysis.
+- `git-diff+typechecked+ast`: git diff discovery plus at least one
+  typechecked changed-symbol, reference, call, or interface subanalysis.
 
 `callers.data.analysisMode` and `callees.data.analysisMode` use these values.
 `explain.data.callAnalysisMode` and `context symbol.data.callAnalysisMode` use
@@ -252,7 +254,9 @@ typechecked package loading, or `ast` when that semantic path is unavailable or
 does not include the target symbol. `context file.data.analysisMode` and
 `context package.data.analysisMode` can be `typechecked+ast` when package files
 and symbols come from typechecked package loading. `context diff.data.analysisMode`
-is currently `git-diff+ast`.
+is `git-diff+typechecked+ast` when changed-symbol, reference, call, or
+interface signals use typechecked package loading, and `git-diff+ast`
+otherwise.
 
 `doctor.data.analysisMode` reports repository readiness rather than a code
 relationship graph. It is `typechecked` when package loading completed and
@@ -585,9 +589,12 @@ use envelope `warnings`.
 `impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`,
 `tests`, and `tests affected` data objects include the common metadata fields:
 
-- `analysisMode`: `ast`, `typechecked+ast`, or `git-diff+ast`. Direct impact
-  queries use `typechecked+ast` when one or more composed subanalyses used
-  typechecked package loading; diff-based queries use `git-diff+ast`.
+- `analysisMode`: `ast`, `typechecked+ast`, `git-diff+ast`, or
+  `git-diff+typechecked+ast`. Direct impact queries use `typechecked+ast` when
+  one or more composed subanalyses used typechecked package loading; diff-based
+  queries use `git-diff+typechecked+ast` when changed-symbol, reference, call,
+  or interface subanalysis used typechecked package loading and `git-diff+ast`
+  otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific impact or test-planning blind spots.
 
@@ -598,10 +605,14 @@ includes `scope` with one of `direct`, `related`, or `all`; the default
 `related` scope focuses direct references when they exist.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
-when those subanalyses ran. Report-based impact data (`impact file`,
-`impact package`, `impact symbol`, and `impact diff`) also includes
-`affectedInterfaces`, `affectedImplementations`, and `interfaceAnalysisMode`
-when interface subanalysis ran.
+when those subanalyses ran. Diff-oriented report data (`impact diff`,
+`tests affected`, and `pr`) may also include `referenceAnalysisMode` and
+`callAnalysisMode` when changed-symbol impact ran. Report-based impact data
+(`impact file`, `impact package`, `impact symbol`, and `impact diff`) also
+includes `affectedInterfaces`, `affectedImplementations`, and
+`interfaceAnalysisMode` when interface subanalysis ran; `tests affected` and
+`pr` expose `interfaceAnalysisMode` for the same underlying diff report when
+available.
 
 ## Interface And Path Data
 

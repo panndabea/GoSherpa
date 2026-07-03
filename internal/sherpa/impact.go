@@ -29,8 +29,24 @@ type ImpactResult struct {
 	Warnings              []string            `json:"warnings"`
 }
 
+type ImpactBatchResult struct {
+	Target string
+	Result ImpactResult
+	Err    error
+}
+
 type ImpactOptions struct {
 	BuildTags []string
+}
+
+type impactAnalysisCache struct {
+	References         *referenceAnalysisCache
+	SkipTests          bool
+	CallFunctions      []functionInfo
+	CallAnalysisMode   string
+	CallWarnings       []string
+	CallErr            error
+	CallFunctionsReady bool
 }
 
 func FindImpact(root string, target string) (ImpactResult, error) {
@@ -48,6 +64,47 @@ func FindImpactWithOptions(root string, target string, options ImpactOptions) (I
 	}
 
 	return findSymbolImpact(rootPath, target, options)
+}
+
+func FindSymbolImpactSignalsWithOptions(root string, targets []string, options ImpactOptions) []ImpactBatchResult {
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return impactBatchErrorResults(targets, err)
+	}
+
+	cache := newImpactAnalysisCache(rootPath, options)
+	cache.SkipTests = true
+	results := make([]ImpactBatchResult, 0, len(targets))
+	for _, target := range targets {
+		result, err := findSymbolImpactWithCache(rootPath, target, options, cache)
+		results = append(results, ImpactBatchResult{
+			Target: target,
+			Result: result,
+			Err:    err,
+		})
+	}
+
+	return results
+}
+
+func impactBatchErrorResults(targets []string, err error) []ImpactBatchResult {
+	results := make([]ImpactBatchResult, 0, len(targets))
+	for _, target := range targets {
+		results = append(results, ImpactBatchResult{
+			Target: target,
+			Err:    err,
+		})
+	}
+
+	return results
+}
+
+func newImpactAnalysisCache(root string, options ImpactOptions) *impactAnalysisCache {
+	return &impactAnalysisCache{
+		References: newReferenceAnalysisCache(root, ReferenceOptions{
+			BuildTags: options.BuildTags,
+		}),
+	}
 }
 
 func isImpactPackageTarget(target string) bool {
@@ -119,14 +176,22 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 }
 
 func findSymbolImpact(root string, target string, options ImpactOptions) (ImpactResult, error) {
+	return findSymbolImpactWithCache(root, target, options, nil)
+}
+
+func findSymbolImpactWithCache(root string, target string, options ImpactOptions, cache *impactAnalysisCache) (ImpactResult, error) {
 	normalizedTarget, err := normalizeReferenceTarget(root, target)
 	if err != nil {
 		return ImpactResult{}, err
 	}
 
-	referenceReport, err := FindReferenceReportWithOptions(root, target, ReferenceOptions{
+	var referenceCache *referenceAnalysisCache
+	if cache != nil {
+		referenceCache = cache.References
+	}
+	referenceReport, err := findReferenceReportForTarget(root, normalizedTarget, ReferenceOptions{
 		BuildTags: options.BuildTags,
-	})
+	}, referenceCache)
 	if err != nil {
 		return ImpactResult{}, err
 	}
@@ -139,16 +204,14 @@ func findSymbolImpact(root string, target string, options ImpactOptions) (Impact
 		Warnings:              referenceReport.Warnings,
 	}
 
-	if normalizedTarget.Package == "" {
-		callers, analysisMode, warnings, err := impactSymbolCallers(root, target, options)
-		result.Warnings = append(result.Warnings, warnings...)
-		if err == nil {
-			result.CallAnalysisMode = analysisMode
-			result.Callers = callers
-		} else if !isImpactNonFunctionTargetError(err) {
-			result.CallAnalysisMode = analysisMode
-			result.Warnings = append(result.Warnings, err.Error())
-		}
+	callers, analysisMode, warnings, err := impactSymbolCallersWithCache(root, target, options, cache)
+	result.Warnings = append(result.Warnings, warnings...)
+	if err == nil {
+		result.CallAnalysisMode = analysisMode
+		result.Callers = callers
+	} else if !isImpactNonFunctionTargetError(err) {
+		result.CallAnalysisMode = analysisMode
+		result.Warnings = append(result.Warnings, err.Error())
 	}
 
 	result.Packages = impactedPackages(root, result.References, result.Callers)
@@ -161,30 +224,51 @@ func findSymbolImpact(root string, target string, options ImpactOptions) (Impact
 		result.Warnings = append(result.Warnings, err.Error())
 	}
 
-	tests, warnings := impactSymbolTests(root, target, result.Packages, targetPackages)
-	result.RelatedTests = tests.Tests
-	result.TestCommands = tests.Commands
-	result.TestPlan = tests.TestPlan
-	result.Warnings = append(result.Warnings, warnings...)
+	if cache == nil || !cache.SkipTests {
+		tests, warnings := impactSymbolTests(root, target, result.Packages, targetPackages)
+		result.RelatedTests = tests.Tests
+		result.TestCommands = tests.Commands
+		result.TestPlan = tests.TestPlan
+		result.Warnings = append(result.Warnings, warnings...)
+	}
 
 	return result, nil
 }
 
 func impactSymbolCallers(root string, target string, options ImpactOptions) ([]Caller, string, []string, error) {
+	return impactSymbolCallersWithCache(root, target, options, nil)
+}
+
+func impactSymbolCallersWithCache(root string, target string, options ImpactOptions, cache *impactAnalysisCache) ([]Caller, string, []string, error) {
 	normalizedTarget, err := normalizeCallTarget(root, target)
 	if err != nil {
 		return nil, "", nil, err
 	}
 
-	functions, analysisMode, warnings, err := collectCallFunctionInfos(root, CallOptions{
-		BuildTags: options.BuildTags,
-	})
+	functions, analysisMode, warnings, err := collectImpactCallFunctionInfos(root, options, cache)
 	if err != nil {
 		return nil, analysisMode, warnings, err
 	}
 
 	callers, err := collectTransitiveCallersFromFunctions(functions, normalizedTarget)
 	return callers, analysisMode, warnings, err
+}
+
+func collectImpactCallFunctionInfos(root string, options ImpactOptions, cache *impactAnalysisCache) ([]functionInfo, string, []string, error) {
+	if cache == nil {
+		return collectCallFunctionInfos(root, CallOptions{
+			BuildTags: options.BuildTags,
+		})
+	}
+
+	if !cache.CallFunctionsReady {
+		cache.CallFunctionsReady = true
+		cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr = collectCallFunctionInfos(root, CallOptions{
+			BuildTags: options.BuildTags,
+		})
+	}
+
+	return cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr
 }
 
 func impactSymbolTests(root string, target string, packages []string, targetPackages []string) (TestsResult, []string) {

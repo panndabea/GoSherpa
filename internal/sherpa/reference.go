@@ -68,6 +68,12 @@ type referencePackage struct {
 	Info       types.Info
 }
 
+type referenceAnalysisCache struct {
+	Attempted bool
+	Packages  []referencePackage
+	Warnings  []string
+}
+
 func FindReferences(root string, name string) ([]Reference, error) {
 	return FindReferencesWithOptions(root, name, ReferenceOptions{})
 }
@@ -96,10 +102,18 @@ func FindReferenceReportWithOptions(root string, name string, options ReferenceO
 		return ReferenceReport{}, err
 	}
 
+	return findReferenceReportForTarget(rootPath, target, options, nil)
+}
+
+func findReferenceReportForTarget(rootPath string, target referenceTarget, options ReferenceOptions, cache *referenceAnalysisCache) (ReferenceReport, error) {
 	var report ReferenceReport
 	if referenceShouldAttemptTypechecked(rootPath) {
 		var ok bool
-		report, ok = findTypecheckedReferenceReport(rootPath, target, options)
+		if cache != nil {
+			report, ok = findTypecheckedReferenceReportFromCache(rootPath, target, options, cache)
+		} else {
+			report, ok = findTypecheckedReferenceReport(rootPath, target, options)
+		}
 		if ok {
 			return report, nil
 		}
@@ -273,29 +287,49 @@ func parseReferencePackages(root string, files []string) ([]referencePackage, er
 }
 
 func findTypecheckedReferenceReport(root string, target referenceTarget, options ReferenceOptions) (ReferenceReport, bool) {
+	cache := newReferenceAnalysisCache(root, options)
+	return findTypecheckedReferenceReportFromCache(root, target, options, cache)
+}
+
+func newReferenceAnalysisCache(root string, options ReferenceOptions) *referenceAnalysisCache {
+	cache := &referenceAnalysisCache{}
+	if !referenceShouldAttemptTypechecked(root) {
+		return cache
+	}
+
+	cache.Attempted = true
 	repo, err := loadSemanticReferenceRepository(root, semantics.LoadOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
+		cache.Warnings = []string{fmt.Sprintf("typechecked reference analysis unavailable: %v", err)}
+		return cache
+	}
+
+	cache.Packages = semanticReferencePackages(repo)
+	cache.Warnings = nonNilStrings(repo.Warnings)
+	if len(cache.Packages) == 0 {
+		cache.Warnings = append([]string{"typechecked reference analysis unavailable: no typechecked packages loaded"}, repo.Warnings...)
+	}
+
+	return cache
+}
+
+func findTypecheckedReferenceReportFromCache(root string, target referenceTarget, options ReferenceOptions, cache *referenceAnalysisCache) (ReferenceReport, bool) {
+	if cache == nil || !cache.Attempted {
+		return ReferenceReport{}, false
+	}
+	if len(cache.Packages) == 0 {
 		return ReferenceReport{
 			Target:       target.String(),
 			AnalysisMode: ReferenceAnalysisModeASTFallback,
-			Warnings:     []string{fmt.Sprintf("typechecked reference analysis unavailable: %v", err)},
+			Warnings:     nonNilStrings(cache.Warnings),
 		}, false
 	}
 
-	packages := semanticReferencePackages(repo)
-	if len(packages) == 0 {
-		return ReferenceReport{
-			Target:       target.String(),
-			AnalysisMode: ReferenceAnalysisModeASTFallback,
-			Warnings:     append([]string{"typechecked reference analysis unavailable: no typechecked packages loaded"}, repo.Warnings...),
-		}, false
-	}
-
-	targetObjects := semanticReferenceTargetObjects(packages, target)
+	targetObjects := semanticReferenceTargetObjects(cache.Packages, target)
 	var refs []Reference
-	for _, pkg := range packages {
+	for _, pkg := range cache.Packages {
 		refs = append(refs, findTypecheckedReferencesInPackage(root, pkg, target, targetObjects)...)
 	}
 
@@ -306,7 +340,7 @@ func findTypecheckedReferenceReport(root string, target referenceTarget, options
 		Target:       target.String(),
 		References:   nonNilReferences(refs),
 		AnalysisMode: ReferenceAnalysisModeTypechecked,
-		Warnings:     nonNilStrings(repo.Warnings),
+		Warnings:     nonNilStrings(cache.Warnings),
 	}, true
 }
 

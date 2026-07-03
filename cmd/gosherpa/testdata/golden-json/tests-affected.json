@@ -6,13 +6,16 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
-    "analysisMode": "git-diff+ast",
+    "analysisMode": "git-diff+typechecked+ast",
     "confidence": "medium",
     "limitations": [
-      "Affected test planning is based on changed packages, affected packages, and syntactic test references.",
+      "Affected test planning includes typechecked changed-symbol impact where available, then falls back to package-level commands.",
       "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],
+    "referenceAnalysisMode": "typechecked",
+    "callAnalysisMode": "typechecked",
+    "interfaceAnalysisMode": "typechecked",
     "affectedTests": [
       {
         "name": "TestTarget",

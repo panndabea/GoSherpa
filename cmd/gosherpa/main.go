@@ -17,10 +17,11 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
-	analysisModeAST  = agentcontext.AnalysisModeAST
-	analysisModeDiff = agentcontext.AnalysisModeDiff
-	confidenceMedium = agentcontext.ConfidenceMedium
-	confidenceLow    = agentcontext.ConfidenceLow
+	analysisModeAST             = agentcontext.AnalysisModeAST
+	analysisModeDiff            = agentcontext.AnalysisModeDiff
+	analysisModeDiffTypechecked = agentcontext.AnalysisModeDiffTypechecked
+	confidenceMedium            = agentcontext.ConfidenceMedium
+	confidenceLow               = agentcontext.ConfidenceLow
 )
 
 type cliInvocation struct {

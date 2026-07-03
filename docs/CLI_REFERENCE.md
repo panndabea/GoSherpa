@@ -51,13 +51,13 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, confidence, and limitations |
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
-| Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, affected packages/tests, reading order, confidence, and limitations |
+| Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
-| Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, affected packages, and affected tests |
+| Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, changed-symbol impact, affected packages, and affected tests |
 | PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, risk, affected tests, and verification commands |
 | Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
@@ -188,6 +188,11 @@ Context commands support size controls for agent workflows: `--max-files`,
 `--max-references`, `--max-symbols`, `--max-tests`, `--source-radius`, and
 `--max-bytes`. The byte budget omits large context fields deterministically and
 keeps JSON valid; any omissions are reported in `data.truncated`.
+
+Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
+`context diff` can report `git-diff+typechecked+ast` plus
+`referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
+typechecked package loading.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,

@@ -24,6 +24,8 @@ type DiffReport struct {
 	ChangedPackages         []string                    `json:"changedPackages"`
 	AffectedPackages        []string                    `json:"affectedPackages"`
 	AffectedSymbols         []string                    `json:"affectedSymbols"`
+	ReferenceAnalysisMode   string                      `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                      `json:"callAnalysisMode,omitempty"`
 	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
 	AffectedImplementations []string                    `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                      `json:"interfaceAnalysisMode,omitempty"`
@@ -54,20 +56,22 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		ChangedPackages:         impactReport.ChangedPackages,
 		AffectedPackages:        impactReport.AffectedPackages,
 		AffectedSymbols:         impactReport.AffectedSymbols,
+		ReferenceAnalysisMode:   impactReport.ReferenceAnalysisMode,
+		CallAnalysisMode:        impactReport.CallAnalysisMode,
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
 		InterfaceAnalysisMode:   impactReport.InterfaceAnalysisMode,
 		AffectedTests:           impactReport.AffectedTests,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
-		AnalysisMode:            AnalysisModeDiff,
+		AnalysisMode:            diffAnalysisMode(impactReport),
 		Limits:                  reportLimits(options.Limits),
 		Warnings:                impactReport.Warnings,
 	}
 	report.Purpose = diffPurpose(report)
 	report.Risk = diffRiskSummary(report)
 	report.ReadingOrder = diffReadingOrder(report)
-	report.Limitations = diffLimitations(options.IncludeTests)
+	report.Limitations = diffLimitations(options.IncludeTests, report)
 	report.Confidence = diffConfidence(report)
 	report = applyDiffLimits(report, options.Limits)
 
@@ -185,12 +189,32 @@ func diffReadingOrder(report DiffReport) []explainengine.ReadingStep {
 	return steps
 }
 
-func diffLimitations(includeTests bool) []string {
+func diffAnalysisMode(report impactengine.ImpactReport) string {
+	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
+		report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
+		report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+		return AnalysisModeDiffTypechecked
+	}
+
+	return AnalysisModeDiff
+}
+
+func diffLimitations(includeTests bool, report DiffReport) []string {
 	values := []string{
-		"Diff context uses git diff plus syntax-level repository analysis, not full module loading.",
 		"Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
 		"Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+	}
+	if report.AnalysisMode == AnalysisModeDiffTypechecked {
+		values = append([]string{"Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available."}, values...)
+	} else {
+		values = append([]string{"Diff context uses git diff plus syntax-level repository analysis, not full module loading."}, values...)
+	}
+	if strings.TrimSpace(report.ReferenceAnalysisMode) != "" {
+		values = append(values, "Reference analysis mode: "+report.ReferenceAnalysisMode+".")
+	}
+	if strings.TrimSpace(report.CallAnalysisMode) != "" {
+		values = append(values, "Call analysis mode: "+report.CallAnalysisMode+".")
 	}
 
 	if includeTests {
@@ -202,6 +226,12 @@ func diffLimitations(includeTests bool) []string {
 
 func diffConfidence(report DiffReport) string {
 	if len(report.Warnings) > 0 {
+		return ConfidenceLow
+	}
+	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback {
+		return ConfidenceLow
+	}
+	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback {
 		return ConfidenceLow
 	}
 	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
@@ -216,6 +246,8 @@ func normalizeDiffReport(report DiffReport) DiffReport {
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
+	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)

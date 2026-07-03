@@ -2372,8 +2372,10 @@ func TestMainRunsPRCommand(t *testing.T) {
 	for _, want := range []string{
 		"PR REVIEW",
 		"Base: HEAD",
-		"Analysis: git-diff+ast",
+		"Analysis: git-diff+typechecked+ast",
 		"Confidence: medium",
+		"Reference analysis: typechecked",
+		"Call analysis: typechecked",
 		"RISK",
 		"Level: medium",
 		"dependent packages",
@@ -2420,8 +2422,14 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "pr", "HEAD", "example.com/app")
 
-	if data["analysisMode"] != "git-diff+ast" {
+	if data["analysisMode"] != "git-diff+typechecked+ast" {
 		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
 	}
 	if data["confidence"] != "medium" {
 		t.Fatalf("expected medium confidence, got %v", data["confidence"])
@@ -2441,7 +2449,7 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "verificationCommands", 3)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -2508,7 +2516,9 @@ func NewSession() Session {
 		"PURPOSE",
 		"Diff changes 1 file across 1 Go package.",
 		"ANALYSIS",
-		"Mode: git-diff+ast",
+		"Mode: git-diff+typechecked+ast",
+		"Reference analysis: typechecked",
+		"Call analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",
 		"CHANGED FILES",
@@ -2591,8 +2601,14 @@ func NewSession() Session {
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
 
-	if data["analysisMode"] != "git-diff+ast" {
+	if data["analysisMode"] != "git-diff+typechecked+ast" {
 		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
 	}
 	if data["confidence"] != "medium" {
 		t.Fatalf("expected medium confidence, got %v", data["confidence"])
@@ -2612,7 +2628,7 @@ func NewSession() Session {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
+	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])

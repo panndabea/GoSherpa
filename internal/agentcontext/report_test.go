@@ -535,8 +535,14 @@ func NewSession() Session {
 	if report.Purpose == "" {
 		t.Fatal("expected purpose")
 	}
-	if report.AnalysisMode != AnalysisModeDiff {
-		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeDiff)
+	if report.AnalysisMode != AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeDiffTypechecked)
+	}
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
 	}
 	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
 		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
@@ -562,8 +568,8 @@ func NewSession() Session {
 	if len(report.ReadingOrder) != 3 {
 		t.Fatalf("expected 3 reading order steps, got %#v", report.ReadingOrder)
 	}
-	if len(report.Limitations) != 4 {
-		t.Fatalf("expected 4 limitations, got %#v", report.Limitations)
+	if len(report.Limitations) != 6 {
+		t.Fatalf("expected 6 limitations, got %#v", report.Limitations)
 	}
 }
 
@@ -581,10 +587,7 @@ func TestAnalyzeDiffNotesTestsOptionInLimitations(t *testing.T) {
 		t.Fatalf("AnalyzeDiff returned error: %v", err)
 	}
 
-	if len(report.Limitations) != 5 {
-		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
-	}
-	if !strings.Contains(report.Limitations[4], "--tests") {
+	if !strings.Contains(report.Limitations[len(report.Limitations)-1], "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
 	}
 }
