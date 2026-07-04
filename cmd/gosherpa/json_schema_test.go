@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -229,4 +230,162 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMainContextDiffJSONSchemaContract(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+
+	wantFields := map[string]string{
+		"analysisMode":          agentcontext.AnalysisModeDiffTypechecked,
+		"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
+		"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+		"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+		"confidence":            agentcontext.ConfidenceMedium,
+	}
+	for field, want := range wantFields {
+		if data[field] != want {
+			t.Fatalf("expected data.%s %q, got %v", field, want, data[field])
+		}
+	}
+
+	for _, field := range []string{
+		"changedFiles",
+		"changedPackages",
+		"affectedPackages",
+		"affectedSymbols",
+		"affectedInterfaces",
+		"affectedImplementations",
+		"affectedTests",
+		"testCommands",
+		"limitations",
+		"readingOrder",
+	} {
+		if _, ok := data[field].([]any); !ok {
+			t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
+		}
+	}
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "CONTEXT DIFF") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainContextDiffJSONLimitContract(t *testing.T) {
+	tmp := writeMainContextDiffLimitProject(t)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"context", "diff",
+		"--base", "HEAD",
+		"--max-files", "1",
+		"--max-symbols", "1",
+		"--max-tests", "1",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+
+	limits, ok := data["limits"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected limits object, got %T", data["limits"])
+	}
+	if limits["maxFiles"] != float64(1) || limits["maxSymbols"] != float64(1) || limits["maxTests"] != float64(1) {
+		t.Fatalf("unexpected limits: %#v", limits)
+	}
+
+	truncated, ok := data["truncated"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected truncated object, got %T", data["truncated"])
+	}
+	for _, field := range []string{"changedFiles", "affectedSymbols", "affectedTests", "readingOrder"} {
+		if truncated[field] == nil {
+			t.Fatalf("expected %s truncation, got %#v", field, truncated)
+		}
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
+	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 2)
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
+func writeMainContextDiffLimitProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "first.go"), `package app
+
+func First() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "first_test.go"), `package app
+
+import "testing"
+
+func TestFirst(t *testing.T) {
+	First()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "second.go"), `package app
+
+func Second() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "second_test.go"), `package app
+
+import "testing"
+
+func TestSecond(t *testing.T) {
+	Second()
+}
+`)
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "first.go"), `package app
+
+func First() {}
+
+func AddedFirst() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "second.go"), `package app
+
+func Second() {}
+
+func AddedSecond() {}
+`)
+
+	return tmp
 }
