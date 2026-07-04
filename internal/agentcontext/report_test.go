@@ -100,6 +100,101 @@ func Target() {}
 	}
 }
 
+func TestAnalyzeSymbolUsesWorkspaceSemanticContext(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.work"), `go 1.24.4
+
+use (
+	./app
+	./service
+)
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "app", "go.mod"), `module example.com/app
+
+go 1.24.4
+
+require example.com/service v0.0.0
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "app", "processor", "processor.go"), `package processor
+
+import "example.com/service"
+
+type LocalProcessor struct{}
+
+func (LocalProcessor) Process(service.Payload) error {
+	return nil
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "app", "main.go"), `package app
+
+import (
+	"example.com/app/processor"
+	"example.com/service"
+)
+
+func Run() {
+	local := processor.LocalProcessor{}
+	_ = local.Process(service.Payload{})
+}
+`)
+
+	report, err := AnalyzeSymbol(root, "./app/processor.LocalProcessor.Process", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.Identity.Package != "./app/processor" {
+		t.Fatalf("identity package = %q, want ./app/processor", report.Identity.Package)
+	}
+	if report.SourceContext.Position.File != "app/processor/processor.go" {
+		t.Fatalf("source context file = %q, want app/processor/processor.go", report.SourceContext.Position.File)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if len(report.Callers) != 1 || report.Callers[0].Name != "Run" || report.Callers[0].Position.File != "app/main.go" {
+		t.Fatalf("expected workspace Run caller, got %#v", report.Callers)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if !agentContextStringSliceContains(report.AffectedInterfaces, "./service.Processor") {
+		t.Fatalf("expected service Processor interface, got %#v", report.AffectedInterfaces)
+	}
+	if !agentContextStringSliceContains(report.AffectedImplementations, "./app/processor.LocalProcessor") {
+		t.Fatalf("expected app LocalProcessor implementation, got %#v", report.AffectedImplementations)
+	}
+
+	importPathReport, err := AnalyzeSymbol(root, "example.com/app/processor.LocalProcessor.Process", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol with import path target returned error: %v", err)
+	}
+	if importPathReport.Identity.Package != "./app/processor" {
+		t.Fatalf("import path identity package = %q, want ./app/processor", importPathReport.Identity.Package)
+	}
+	if importPathReport.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("import path analysis mode = %q, want %s with warnings %#v", importPathReport.AnalysisMode, AnalysisModeTypecheckedAST, importPathReport.Warnings)
+	}
+	if !agentContextStringSliceContains(importPathReport.AffectedInterfaces, "./service.Processor") {
+		t.Fatalf("expected import path target to report service Processor interface, got %#v", importPathReport.AffectedInterfaces)
+	}
+	if !agentContextStringSliceContains(importPathReport.AffectedImplementations, "./app/processor.LocalProcessor") {
+		t.Fatalf("expected import path target to report app LocalProcessor implementation, got %#v", importPathReport.AffectedImplementations)
+	}
+}
+
 func TestAnalyzeSymbolUsesBuildTagsForSemanticIdentity(t *testing.T) {
 	root := t.TempDir()
 	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
@@ -689,6 +784,16 @@ func TestTarget(t *testing.T) {
 func agentContextReportHasSymbol(symbols []sherpa.Symbol, name string) bool {
 	for _, symbol := range symbols {
 		if symbol.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func agentContextStringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
 			return true
 		}
 	}

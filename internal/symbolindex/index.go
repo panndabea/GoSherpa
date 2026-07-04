@@ -247,8 +247,13 @@ func normalizePackagePath(root string, packagePath string, modulePath string) (s
 		} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
 			return "", fmt.Errorf("non-local package-qualified symbol targets are not supported: %s", packagePath)
 		}
-	} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
-		return "", fmt.Errorf("module path is required for package-qualified symbol target: %s", packagePath)
+	} else {
+		if localPath, ok := sherpa.WorkspacePackagePathForImportPath(root, value); ok {
+			return localPath, nil
+		}
+		if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
+			return "", fmt.Errorf("module path is required for package-qualified symbol target: %s", packagePath)
+		}
 	}
 
 	value = strings.TrimPrefix(value, "./")

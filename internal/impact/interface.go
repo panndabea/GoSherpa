@@ -1282,6 +1282,9 @@ func normalizeSignalPackagePath(root string, packagePath string) string {
 			value = "./" + strings.TrimPrefix(value, modulePath+"/")
 		}
 	}
+	if localPath, ok := sherpa.WorkspacePackagePathForImportPath(root, value); ok {
+		return localPath
+	}
 
 	value = strings.TrimPrefix(value, "./")
 	cleaned := path.Clean(value)
