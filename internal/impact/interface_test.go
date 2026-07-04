@@ -141,6 +141,58 @@ func (EnterpriseRunner) Run() error {
 	}
 }
 
+func TestFindImplementersUsesTypecheckedLoaderAcrossGoWorkModules(t *testing.T) {
+	root := t.TempDir()
+
+	writeImpactTestFile(t, filepath.Join(root, "go.work"), `go 1.24.4
+
+use (
+	./app
+	./service
+)
+`)
+	writeImpactTestFile(t, filepath.Join(root, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "app", "go.mod"), `module example.com/app
+
+go 1.24.4
+
+require example.com/service v0.0.0
+`)
+	writeImpactTestFile(t, filepath.Join(root, "app", "processor", "processor.go"), `package processor
+
+import "example.com/service"
+
+type LocalProcessor struct{}
+
+func (LocalProcessor) Process(service.Payload) error {
+	return nil
+}
+`)
+
+	result, err := FindImplementers(root, "./service.Processor")
+	if err != nil {
+		t.Fatalf("FindImplementers returned error: %v", err)
+	}
+
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
+	if len(result.Implementers) != 1 {
+		t.Fatalf("expected 1 implementer, got %#v", result.Implementers)
+	}
+	if result.Implementers[0].Name != "./app/processor.LocalProcessor" {
+		t.Fatalf("expected LocalProcessor implementer, got %#v", result.Implementers[0])
+	}
+}
+
 func TestFindInterfacesFallsBackWhenTypecheckedLoadingFails(t *testing.T) {
 	oldLoader := loadSemanticInterfaceRepository
 	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {

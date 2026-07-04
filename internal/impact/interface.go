@@ -307,8 +307,14 @@ func buildTypecheckedInterfaceGraph(root string, options InterfaceOptions) (inte
 }
 
 func interfaceShouldAttemptTypechecked(root string) bool {
-	info, err := os.Stat(filepath.Join(root, "go.mod"))
-	return err == nil && !info.IsDir()
+	for _, name := range []string{"go.mod", "go.work"} {
+		info, err := os.Stat(filepath.Join(root, name))
+		if err == nil && !info.IsDir() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func semanticInterfaceGraph(repo semantics.Repository) interfaceGraph {
