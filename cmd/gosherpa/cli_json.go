@@ -645,6 +645,8 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
+	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.ArchitectureRole.Reasons = nonNilSlice(report.ArchitectureRole.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)
 	report.Limitations = nonNilSlice(report.Limitations)

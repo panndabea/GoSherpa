@@ -60,7 +60,7 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	}
 
 	repo, err := repositoryFromLoaded(rootPath, patterns, loaded)
-	if err != nil && packageLoadHasCacheAccessError(loaded) {
+	if packageLoadHasCacheAccessError(loaded) {
 		if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options, patterns); ok {
 			return retried, retryErr
 		}

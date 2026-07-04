@@ -2201,6 +2201,7 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
 		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
@@ -2255,6 +2256,7 @@ func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
@@ -2304,6 +2306,7 @@ func TestMainRunsContextSymbolCommandWithLimitsAsJSON(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	limits, ok := data["limits"].(map[string]any)
 	if !ok {
@@ -2355,6 +2358,7 @@ func TestMainRunsContextSymbolCommandWithMaxBytesAsJSON(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	limits, ok := data["limits"].(map[string]any)
 	if !ok {
@@ -2493,6 +2497,7 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context file", "service.go", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	if data["file"] != "service.go" {
 		t.Fatalf("expected service.go file, got %v", data["file"])
@@ -2614,6 +2619,7 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context package", ".", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	if data["package"] != "." {
 		t.Fatalf("expected package ., got %v", data["package"])
@@ -2939,6 +2945,7 @@ func NewSession() Session {
 
 	payload := decodeMainTestJSON(t, result.Stdout)
 	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
 
 	if data["analysisMode"] != "git-diff+typechecked+ast" {
 		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
@@ -2976,6 +2983,48 @@ func NewSession() Session {
 	if strings.Contains(result.Stdout, "CONTEXT DIFF") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
+}
+
+func TestMainRunsContextDiffCommandWithLimitsAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"context", "diff",
+		"--base", "HEAD",
+		"--max-files", "1",
+		"--max-symbols", "1",
+		"--max-tests", "1",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	limits := assertMainTestJSONObject(t, data, "limits")
+	if limits["maxFiles"] != float64(1) || limits["maxSymbols"] != float64(1) || limits["maxTests"] != float64(1) {
+		t.Fatalf("unexpected context diff limits: %#v", limits)
+	}
+
+	truncated := assertMainTestJSONObject(t, data, "truncated")
+	if truncated["affectedTests"] != float64(1) || truncated["readingOrder"] != float64(1) {
+		t.Fatalf("expected affected test and reading order truncation, got %#v", truncated)
+	}
+
+	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
+	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 2)
 }
 
 func TestMainRunsImpactDiffCommand(t *testing.T) {
@@ -5321,13 +5370,55 @@ func assertMainTestJSONEnvelope(t *testing.T, payload map[string]any, root strin
 	return data
 }
 
-func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) []any {
+func assertMainTestContextJSONContract(t *testing.T, payload map[string]any, data map[string]any) {
+	t.Helper()
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected context warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+	assertMainTestJSONArray(t, payload, "warnings")
+
+	analysisMode, ok := data["analysisMode"].(string)
+	if !ok || strings.TrimSpace(analysisMode) == "" {
+		t.Fatalf("expected non-empty context analysisMode string, got %#v", data["analysisMode"])
+	}
+
+	confidence, ok := data["confidence"].(string)
+	if !ok || (confidence != agentcontext.ConfidenceMedium && confidence != agentcontext.ConfidenceLow) {
+		t.Fatalf("expected context confidence %q or %q, got %#v", agentcontext.ConfidenceMedium, agentcontext.ConfidenceLow, data["confidence"])
+	}
+
+	risk := assertMainTestJSONObject(t, data, "risk")
+	if level, ok := risk["level"].(string); !ok || strings.TrimSpace(level) == "" {
+		t.Fatalf("expected non-empty context risk level, got %#v", risk["level"])
+	}
+	assertMainTestJSONArray(t, risk, "reasons")
+
+	assertMainTestJSONArray(t, data, "testCommands")
+	assertMainTestJSONArray(t, data, "limitations")
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	assertMainTestJSONArray(t, testPlan, "direct")
+	assertMainTestJSONArray(t, testPlan, "related")
+	assertMainTestJSONArray(t, testPlan, "callerPackages")
+	assertMainTestJSONArray(t, testPlan, "fallback")
+	assertMainTestJSONArray(t, data, "readingOrder")
+}
+
+func assertMainTestJSONArray(t *testing.T, payload map[string]any, key string) []any {
 	t.Helper()
 
 	values, ok := payload[key].([]any)
 	if !ok {
 		t.Fatalf("expected %s to be a JSON array, got %T", key, payload[key])
 	}
+
+	return values
+}
+
+func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key string, length int) []any {
+	t.Helper()
+
+	values := assertMainTestJSONArray(t, payload, key)
 
 	if len(values) != length {
 		t.Fatalf("expected %s length %d, got %d", key, length, len(values))
