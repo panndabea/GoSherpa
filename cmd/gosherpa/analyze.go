@@ -451,7 +451,7 @@ func analyzeLimitations(includeTests bool) []string {
 		"Hotspots are simple inventory signals, not runtime profiling or full dependency impact.",
 		"Entry point overview is based on main functions, exported functions, and optional Go test entrypoints.",
 		"Build tags are applied to semantic readiness checks; syntax inventory still follows discovered Go files.",
-		"Persistent repository snapshots are not implemented yet, so analyze reads repository data directly.",
+		"Snapshots currently store repository inventory and freshness metadata; analyze still reads repository data directly.",
 	}
 	if !includeTests {
 		limitations = append(limitations, "Test symbols are counted but omitted from entry point and important symbol lists unless --tests is used.")

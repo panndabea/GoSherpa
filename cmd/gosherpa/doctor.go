@@ -10,6 +10,7 @@ import (
 
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
 )
 
 const (
@@ -71,10 +72,18 @@ type doctorPackageSummary struct {
 }
 
 type doctorSnapshotStatus struct {
-	Supported bool   `json:"supported"`
-	Status    string `json:"status"`
-	Path      string `json:"path,omitempty"`
-	Message   string `json:"message"`
+	Supported          bool     `json:"supported"`
+	Status             string   `json:"status"`
+	Path               string   `json:"path,omitempty"`
+	Message            string   `json:"message"`
+	FormatVersion      int      `json:"formatVersion,omitempty"`
+	CreatedAt          string   `json:"createdAt,omitempty"`
+	Fingerprint        string   `json:"fingerprint,omitempty"`
+	CurrentFingerprint string   `json:"currentFingerprint,omitempty"`
+	FileCount          int      `json:"fileCount,omitempty"`
+	PackageCount       int      `json:"packageCount,omitempty"`
+	SymbolCount        int      `json:"symbolCount,omitempty"`
+	StaleReasons       []string `json:"staleReasons"`
 }
 
 func analyzeDoctor(root string, buildTags []string) doctorReport {
@@ -91,7 +100,7 @@ func analyzeDoctor(root string, buildTags []string) doctorReport {
 			GoModPath: "go.mod",
 		},
 		BuildTags: normalizedTags,
-		Snapshot:  inspectDoctorSnapshot(root),
+		Snapshot:  inspectDoctorSnapshot(root, normalizedTags),
 	}
 
 	modulePath, err := sherpa.ModulePath(root)
@@ -154,6 +163,7 @@ func normalizeDoctorReport(report doctorReport) doctorReport {
 	report.Repository.Root = filepath.Clean(report.Repository.Root)
 	report.Repository.NestedModules = nonNilSlice(report.Repository.NestedModules)
 	report.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(report.BuildTags))
+	report.Snapshot.StaleReasons = nonNilSlice(report.Snapshot.StaleReasons)
 	report.PackageLoad.Packages = nonNilSlice(report.PackageLoad.Packages)
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Suggestions = nonNilSlice(report.Suggestions)
@@ -202,7 +212,7 @@ func doctorLimitations() []string {
 		"Doctor checks repository readiness; it does not prove every downstream analysis is complete.",
 		"Package loading follows the current Go environment and any provided --tags values.",
 		"Generated files are included when Go package loading includes them; generated-file policy is currently informational.",
-		"Persistent repository snapshots are not implemented yet, so commands analyze the repository on demand.",
+		"Snapshots currently store repository inventory and freshness metadata; query commands still analyze the repository on demand.",
 	}
 }
 
@@ -226,8 +236,13 @@ func doctorSuggestions(report doctorReport) []string {
 	if len(report.Repository.NestedModules) > 0 {
 		suggestions = append(suggestions, "Nested modules were found; inspect them with separate --root values when needed.")
 	}
-	if !report.Snapshot.Supported {
-		suggestions = append(suggestions, "Snapshot reuse is not available yet; expect each command to load repository data directly.")
+	switch report.Snapshot.Status {
+	case snapshotstore.StatusMissing:
+		suggestions = append(suggestions, "Run gosherpa snapshot to create a reusable repository inventory snapshot.")
+	case snapshotstore.StatusStale:
+		suggestions = append(suggestions, "Run gosherpa snapshot to refresh the stale repository snapshot.")
+	case snapshotstore.StatusInvalid:
+		suggestions = append(suggestions, "Recreate the repository snapshot with gosherpa snapshot.")
 	}
 
 	return uniqueStringsInOrder(suggestions)
@@ -273,7 +288,21 @@ func formatDoctorReport(report doctorReport) string {
 	if strings.TrimSpace(report.Snapshot.Path) != "" {
 		fmt.Fprintf(&builder, "  Path: %s\n", report.Snapshot.Path)
 	}
+	if report.Snapshot.FormatVersion > 0 {
+		fmt.Fprintf(&builder, "  Format: %d\n", report.Snapshot.FormatVersion)
+	}
+	if strings.TrimSpace(report.Snapshot.CreatedAt) != "" {
+		fmt.Fprintf(&builder, "  Created: %s\n", report.Snapshot.CreatedAt)
+	}
+	if report.Snapshot.FileCount > 0 || report.Snapshot.PackageCount > 0 || report.Snapshot.SymbolCount > 0 {
+		fmt.Fprintf(&builder, "  Files: %d\n", report.Snapshot.FileCount)
+		fmt.Fprintf(&builder, "  Packages: %d\n", report.Snapshot.PackageCount)
+		fmt.Fprintf(&builder, "  Symbols: %d\n", report.Snapshot.SymbolCount)
+	}
 	fmt.Fprintf(&builder, "  %s\n", report.Snapshot.Message)
+	if len(report.Snapshot.StaleReasons) > 0 {
+		writeDoctorValues(&builder, "  Stale reasons", report.Snapshot.StaleReasons)
+	}
 	builder.WriteString("\n")
 
 	writeDoctorSection(&builder, "SUGGESTIONS", report.Suggestions)
@@ -449,21 +478,24 @@ func doctorShouldSkipDir(name string) bool {
 	}
 }
 
-func inspectDoctorSnapshot(root string) doctorSnapshotStatus {
-	path := filepath.Join(root, ".gosherpa")
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		return doctorSnapshotStatus{
-			Supported: false,
-			Status:    "not_implemented",
-			Path:      ".gosherpa",
-			Message:   "Persistent snapshots are not implemented yet; the existing .gosherpa directory is ignored.",
-		}
-	}
+func inspectDoctorSnapshot(root string, buildTags []string) doctorSnapshotStatus {
+	result := snapshotstore.Inspect(root, snapshotstore.BuildOptions{
+		BuildTags: buildTags,
+	})
 
 	return doctorSnapshotStatus{
-		Supported: false,
-		Status:    "not_implemented",
-		Message:   "Persistent snapshots are not implemented yet; commands analyze the repository on demand.",
+		Supported:          result.Supported,
+		Status:             result.Status,
+		Path:               result.Path,
+		Message:            result.Message,
+		FormatVersion:      result.FormatVersion,
+		CreatedAt:          result.CreatedAt,
+		Fingerprint:        result.Fingerprint,
+		CurrentFingerprint: result.CurrentFingerprint,
+		FileCount:          result.FileCount,
+		PackageCount:       result.PackageCount,
+		SymbolCount:        result.SymbolCount,
+		StaleReasons:       result.StaleReasons,
 	}
 }
 

@@ -222,6 +222,11 @@ GoSherpa stays in the workflow during a long task.
 
 Add a persistent repository snapshot for repeated queries.
 
+Status: first slice implemented with explicit `gosherpa snapshot` creation,
+versioned `.gosherpa/snapshot.json` output, file freshness metadata, package and
+symbol inventory, build tags, git state, and `doctor` diagnostics for missing,
+valid, stale, and invalid snapshots. Automatic query reuse is still future work.
+
 Command sketches:
 
 ```bash

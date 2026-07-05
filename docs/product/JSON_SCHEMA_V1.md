@@ -316,7 +316,7 @@ Data:
     "confidence": "medium",
     "packageLoad": "ok",
     "packageLoadCount": 3,
-    "snapshotStatus": "not_implemented",
+    "snapshotStatus": "missing",
     "suggestions": []
   },
   "suggestions": []
@@ -565,9 +565,11 @@ Data:
     "warningCount": 0
   },
   "snapshot": {
-    "supported": false,
-    "status": "not_implemented",
-    "message": "Persistent snapshots are not implemented yet; commands analyze the repository on demand."
+    "supported": true,
+    "status": "missing",
+    "path": ".gosherpa/snapshot.json",
+    "message": "No snapshot found. Run gosherpa snapshot to create one.",
+    "staleReasons": []
   },
   "analysisMode": "typechecked",
   "confidence": "medium",
@@ -582,7 +584,9 @@ Data:
 - `buildTags`: normalized build tags supplied through `--tags`.
 - `packageLoad`: status of typechecked package loading. `status` is `ok`,
   `warnings`, or `failed`.
-- `snapshot`: current snapshot support and status.
+- `snapshot`: current snapshot support and status. Status is `missing`,
+  `valid`, `stale`, or `invalid`; valid and stale snapshots include version,
+  creation, count, fingerprint, and stale-reason metadata.
 - `analysisMode`: readiness mode, currently `typechecked` or `unavailable`.
 - `confidence`: `low` when warnings are emitted, otherwise `medium`.
 - `limitations`: boundaries of the readiness check.
@@ -590,6 +594,49 @@ Data:
 
 Package load warnings live on the shared envelope. `data.warnings` is absent;
 use envelope `warnings`.
+
+## `snapshot` Data
+
+Envelope:
+
+- `command`: `snapshot`
+- `target`: `.`
+
+Data:
+
+```json
+{
+  "status": "valid",
+  "path": ".gosherpa/snapshot.json",
+  "snapshot": {
+    "formatVersion": 1,
+    "createdAt": "2026-07-05T12:00:00Z",
+    "root": "/repo",
+    "modulePath": "example.com/app",
+    "goVersion": "go1.24.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "buildTags": [],
+    "gitState": "ref:refs/heads/main@abc123",
+    "fingerprint": "...",
+    "files": [],
+    "packages": [],
+    "symbols": []
+  }
+}
+```
+
+- `status`: `valid` after a successful write.
+- `path`: root-relative snapshot path.
+- `snapshot.formatVersion`: cache format version.
+- `snapshot.files`: Go files plus module/workspace manifests used for
+  freshness checks; entries include path, size, mod time, and SHA-256.
+- `snapshot.packages`: package inventory in the same shape as `packages`.
+- `snapshot.symbols`: parsed symbol inventory in the same shape as `symbols`.
+
+Snapshot creation is explicit. Other query commands still analyze the
+repository directly in this slice; use `doctor` to check whether the snapshot is
+missing, valid, stale, or invalid.
 
 ## Impact And Test Data
 

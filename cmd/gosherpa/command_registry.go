@@ -63,6 +63,13 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
+		Name:    "snapshot",
+		Usage:   []string{snapshotUsageLine},
+		Handler: runSnapshotCommand,
+		JSON:    true,
+		Tags:    true,
+	},
+	{
 		Name:    "explain",
 		Usage:   []string{explainUsageLine},
 		Handler: runExplainCommand,
@@ -211,6 +218,7 @@ const (
 	contextPackageUsageLine = "context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextDiffUsageLine    = "context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
 	doctorUsageLine         = "doctor"
+	snapshotUsageLine       = "snapshot"
 	explainUsageLine        = "explain <symbol> [--tests]"
 	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests]"
 	symbolUsageLine         = "symbol <target> [--context]"

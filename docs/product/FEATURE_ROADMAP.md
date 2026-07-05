@@ -1505,8 +1505,9 @@ Needed docs:
 ## Suggested Release Milestones
 
 This milestone section is a historical planning sketch. Several early and
-mid-stage items now have first slices implemented, while later integration work
-such as snapshots, MCP, shell completion, and TUI remains future work.
+mid-stage items now have first slices implemented, including explicit snapshot
+creation. Later integration work such as snapshot reuse, MCP, shell completion,
+and TUI remains future work.
 
 ### v0.1: Historical MVP Baseline
 

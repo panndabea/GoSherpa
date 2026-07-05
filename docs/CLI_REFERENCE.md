@@ -21,6 +21,7 @@ go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa doctor
+go run ./cmd/gosherpa snapshot
 go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
@@ -57,6 +58,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
+| Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -127,6 +129,8 @@ Found 4 references
 ./gosherpa context diff --base HEAD --json
 ./gosherpa doctor
 ./gosherpa doctor --json
+./gosherpa snapshot
+./gosherpa snapshot --json
 ./gosherpa explain ParseFile
 ./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json

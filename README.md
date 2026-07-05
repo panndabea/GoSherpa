@@ -42,6 +42,7 @@ cd GoSherpa
 go test ./...
 go run ./cmd/gosherpa analyze .
 go run ./cmd/gosherpa doctor
+go run ./cmd/gosherpa snapshot
 go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa explain ParseFile
 ```
@@ -68,6 +69,7 @@ Use `--root` to run GoSherpa from another working directory:
 | --- | --- |
 | `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
+| `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot |
 | `gosherpa symbols --kind function --package ./internal/sherpa` | Structs, interfaces, functions, and methods with optional kind, package, and test filters |
 | `gosherpa symbol ParseFile` | One symbol's package, signature, docs, and source location |
 | `gosherpa search parse file` | Ranked partial symbol matches |

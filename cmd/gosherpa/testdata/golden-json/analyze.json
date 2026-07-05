@@ -14,7 +14,7 @@
       "Hotspots are simple inventory signals, not runtime profiling or full dependency impact.",
       "Entry point overview is based on main functions, exported functions, and optional Go test entrypoints.",
       "Build tags are applied to semantic readiness checks; syntax inventory still follows discovered Go files.",
-      "Persistent repository snapshots are not implemented yet, so analyze reads repository data directly.",
+      "Snapshots currently store repository inventory and freshness metadata; analyze still reads repository data directly.",
       "Test symbols are counted but omitted from entry point and important symbol lists unless --tests is used."
     ],
     "repository": {
@@ -442,11 +442,11 @@
       "confidence": "medium",
       "packageLoad": "ok",
       "packageLoadCount": 2,
-      "snapshotStatus": "not_implemented",
+      "snapshotStatus": "missing",
       "suggestions": [
         "Run gosherpa context diff --base <ref> or gosherpa context symbol <target> for focused code intelligence.",
         "Use --tags <list> when inspecting build-tagged code.",
-        "Snapshot reuse is not available yet; expect each command to load repository data directly."
+        "Run gosherpa snapshot to create a reusable repository inventory snapshot."
       ]
     },
     "suggestions": [

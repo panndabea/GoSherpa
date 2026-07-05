@@ -662,6 +662,15 @@ func TestPrintUsageIncludesDoctor(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesSnapshot(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "snapshot") {
+		t.Fatalf("expected usage to contain snapshot command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesTests(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -866,6 +875,14 @@ func TestMainRunsDoctorCommandJSON(t *testing.T) {
 		t.Fatalf("expected loaded packages, got %v", packageLoad["packageCount"])
 	}
 
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["status"] != "missing" {
+		t.Fatalf("expected missing snapshot, got %v", snapshot["status"])
+	}
+	if snapshot["supported"] != true {
+		t.Fatalf("expected snapshot support, got %v", snapshot["supported"])
+	}
+
 	assertMainTestJSONArrayHasLength(t, data, "buildTags", 0)
 	assertMainTestJSONArrayHasLength(t, data, "limitations", 4)
 
@@ -915,6 +932,159 @@ func TestMainPrintsDoctorUsageWhenArgumentIsUnexpected(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "doctor", "extra"})
 
 	want := "usage: gosherpa [--root <path>] doctor\n"
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if result.Stderr != want {
+		t.Fatalf("expected %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsSnapshotCommand(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{
+		"SNAPSHOT",
+		"Status: valid",
+		"Path: .gosherpa/snapshot.json",
+		"Module: example.com/app",
+		"CONTENTS",
+		"Files:",
+		"Packages:",
+		"Symbols:",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(tmp, ".gosherpa", "snapshot.json")); err != nil {
+		t.Fatalf("expected snapshot file: %v", err)
+	}
+}
+
+func TestMainRunsSnapshotCommandJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "--tags", "enterprise", "snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "snapshot", ".", "example.com/app")
+	if data["status"] != "valid" {
+		t.Fatalf("expected valid snapshot status, got %v", data["status"])
+	}
+	if data["path"] != ".gosherpa/snapshot.json" {
+		t.Fatalf("expected snapshot path, got %v", data["path"])
+	}
+
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["modulePath"] != "example.com/app" {
+		t.Fatalf("expected module path, got %v", snapshot["modulePath"])
+	}
+	if snapshot["formatVersion"] != float64(1) {
+		t.Fatalf("expected format version 1, got %v", snapshot["formatVersion"])
+	}
+	if snapshot["fingerprint"] == "" {
+		t.Fatalf("expected fingerprint, got %v", snapshot["fingerprint"])
+	}
+	assertMainTestJSONArrayHasLength(t, snapshot, "buildTags", 1)
+	assertMainTestJSONArrayHasLength(t, snapshot, "files", 4)
+	assertMainTestJSONArrayHasLength(t, snapshot, "packages", 2)
+	assertMainTestJSONArrayHasLength(t, snapshot, "symbols", 4)
+
+	if strings.Contains(result.Stdout, "SNAPSHOT\n") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainDoctorReportsValidSnapshot(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "doctor", ".", "example.com/app")
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["status"] != "valid" {
+		t.Fatalf("expected valid snapshot, got %v", snapshot["status"])
+	}
+	if snapshot["fileCount"].(float64) <= 0 {
+		t.Fatalf("expected file count, got %v", snapshot["fileCount"])
+	}
+	assertMainTestJSONArrayHasLength(t, snapshot, "staleReasons", 0)
+}
+
+func TestMainDoctorReportsStaleSnapshot(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+
+func NewChange() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "doctor", ".", "example.com/app")
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["status"] != "stale" {
+		t.Fatalf("expected stale snapshot, got %v", snapshot["status"])
+	}
+	staleReasons := assertMainTestJSONArrayHasLength(t, snapshot, "staleReasons", 1)
+	if staleReasons[0] != "repository files changed" {
+		t.Fatalf("expected file-change stale reason, got %v", staleReasons)
+	}
+}
+
+func TestMainPrintsSnapshotUsageWhenArgumentIsUnexpected(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "snapshot", "extra"})
+
+	want := "usage: gosherpa [--root <path>] snapshot\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
