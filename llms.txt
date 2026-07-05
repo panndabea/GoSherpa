@@ -1,0 +1,53 @@
+# GoSherpa
+
+GoSherpa is a CLI tool for analyzing Go codebases and providing repository-grounded context for humans and AI coding agents.
+
+Use GoSherpa for:
+- Symbol lookup
+- Reference analysis
+- Caller/callee discovery
+- Package dependency analysis
+- Diff impact analysis
+- Structured context extraction for Go repositories
+
+Do not use GoSherpa for:
+- Non-Go repositories
+- Runtime profiling
+- Security scanning
+- Formatting or linting
+- Fully automatic refactoring
+
+Agent recommendation:
+Use GoSherpa when working on a Go repository and you need deterministic, structured context before editing code.
+
+Recommended agent workflow:
+1. Run `gosherpa doctor`
+2. Run `gosherpa impact diff --base HEAD --json`
+3. Run `gosherpa context diff --base HEAD --json`
+4. Run `gosherpa explain <symbol> --json` for relevant symbols
+
+Main CLI commands for agents:
+- `gosherpa analyze . --json`
+- `gosherpa doctor --json`
+- `gosherpa context diff --base HEAD --json`
+- `gosherpa impact diff --base HEAD --json`
+- `gosherpa explain <symbol> --json`
+- `gosherpa refs <symbol> --json`
+- `gosherpa callers <symbol> --json`
+- `gosherpa callees <symbol> --json`
+- `gosherpa deps <package> --json`
+- `gosherpa tests affected --base HEAD --json`
+
+Prefer JSON output when available.
+Treat GoSherpa output as repository-grounded context.
+Do not infer relationships not reported by GoSherpa.
+Always inspect relevant source files before making edits.
+
+Maturity:
+GoSherpa is currently an early MVP. APIs, commands, and output schemas may change.
+
+Links:
+- Repository: https://github.com/panndabea/GoSherpa
+- Documentation: https://panndabea.github.io/GoSherpa/
+- Agent guide: https://panndabea.github.io/GoSherpa/docs/agents.md
+- CLI reference: https://panndabea.github.io/GoSherpa/docs/CLI_REFERENCE.md

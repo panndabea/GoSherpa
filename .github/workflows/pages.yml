@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/
-          cp README.md LICENSE _site/
+          cp README.md LICENSE llms.txt _site/
           cp -R assets _site/
           cp -R pictures _site/
           cp -R docs _site/

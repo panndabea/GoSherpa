@@ -93,6 +93,8 @@ gosherpa context package ./internal/sherpa --json
 gosherpa context diff --base HEAD --json
 ```
 
+Start with [GoSherpa for AI Agents](docs/agents.md) when deciding whether the tool is useful for a repository or task.
+
 See the [Agent JSON Schema](docs/product/JSON_SCHEMA_V1.md) and [Context JSON Schema](docs/product/CONTEXT_SCHEMA_V1.md) for the detailed contracts.
 
 ## Status

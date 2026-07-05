@@ -10,6 +10,7 @@ window.GoSherpaTranslations = {
       "nav.comics": "Comics",
       "nav.features": "Funktionen",
       "nav.agents": "Agents",
+      "nav.agentGuide": "Agent Guide",
       "nav.try": "Ausprobieren",
       "language.aria": "Sprache auswählen",
       "hero.aria": "GoSherpa Comic-Hero",
@@ -37,6 +38,10 @@ window.GoSherpaTranslations = {
       "ask.calls.a": "Callees und lokale Call-Pfade durch dein Repository.",
       "ask.diff.q": "Was betrifft mein Diff?",
       "ask.diff.a": "Betroffene Packages, Risiko und sinnvolle Testbefehle.",
+      "agentic.kicker": "Agentische Workflows",
+      "agentic.title": "Gebaut für agentische Workflows.",
+      "agentic.copy": "GoSherpa liefert deterministischen, strukturierten Kontext für Go-Repositories. AI Coding Agents können damit Symbole, Referenzen, Caller, Callees, Abhängigkeiten und Diff-Impact prüfen, bevor sie Code ändern.",
+      "agentic.link": "Agent Guide lesen",
       "comics.kicker": "Comic-Guides",
       "comics.title": "Drei Situationen, in denen GoSherpa sofort hilft.",
       "comics.lead": "Die Bilder erzählen die Geschichte, die CLI liefert die Details.",
@@ -86,6 +91,7 @@ window.GoSherpaTranslations = {
       "cta.install.aria": "Installationsbefehle",
       "footer.note": "GoSherpa - MIT-Lizenz - Frühes MVP",
       "footer.cli": "CLI-Referenz",
+      "footer.agents": "GoSherpa for AI Agents",
       "footer.status": "Status"
     },
     en: {
@@ -99,6 +105,7 @@ window.GoSherpaTranslations = {
       "nav.comics": "Comics",
       "nav.features": "Features",
       "nav.agents": "Agents",
+      "nav.agentGuide": "Agent guide",
       "nav.try": "Try it",
       "language.aria": "Choose language",
       "hero.aria": "GoSherpa comic hero",
@@ -126,6 +133,10 @@ window.GoSherpaTranslations = {
       "ask.calls.a": "Callees and local call paths through your repository.",
       "ask.diff.q": "What does my diff affect?",
       "ask.diff.a": "Affected packages, risk, and useful test commands.",
+      "agentic.kicker": "Agentic workflows",
+      "agentic.title": "Built for agentic workflows",
+      "agentic.copy": "GoSherpa provides deterministic, structured context for Go repositories. AI coding agents can use it to inspect symbols, references, callers, callees, dependencies, and diff impact before editing code.",
+      "agentic.link": "Read the agent guide",
       "comics.kicker": "Comic guides",
       "comics.title": "Three situations where GoSherpa helps right away.",
       "comics.lead": "The images tell the story, the CLI provides the details.",
@@ -175,6 +186,7 @@ window.GoSherpaTranslations = {
       "cta.install.aria": "Installation commands",
       "footer.note": "GoSherpa - MIT License - Early MVP",
       "footer.cli": "CLI Reference",
+      "footer.agents": "GoSherpa for AI Agents",
       "footer.status": "Status"
     },
     fr: {
@@ -188,6 +200,7 @@ window.GoSherpaTranslations = {
       "nav.comics": "BD",
       "nav.features": "Fonctions",
       "nav.agents": "Agents",
+      "nav.agentGuide": "Guide agents",
       "nav.try": "Essayer",
       "language.aria": "Choisir la langue",
       "hero.aria": "Héros BD de GoSherpa",
@@ -215,6 +228,10 @@ window.GoSherpaTranslations = {
       "ask.calls.a": "Fonctions appelées et chemins d'appel locaux dans votre dépôt.",
       "ask.diff.q": "Quels éléments mon diff touche-t-il ?",
       "ask.diff.a": "Packages affectés, risque et commandes de test utiles.",
+      "agentic.kicker": "Workflows agentiques",
+      "agentic.title": "Conçu pour les workflows agentiques",
+      "agentic.copy": "GoSherpa fournit un contexte déterministe et structuré pour les dépôts Go. Les agents de code IA peuvent l'utiliser pour inspecter symboles, références, appelants, appelés, dépendances et impact de diff avant de modifier le code.",
+      "agentic.link": "Lire le guide agents",
       "comics.kicker": "Guides BD",
       "comics.title": "Trois situations où GoSherpa aide immédiatement.",
       "comics.lead": "Les images racontent l'histoire, la CLI fournit les détails.",
@@ -264,6 +281,7 @@ window.GoSherpaTranslations = {
       "cta.install.aria": "Commandes d'installation",
       "footer.note": "GoSherpa - Licence MIT - MVP initial",
       "footer.cli": "Référence CLI",
+      "footer.agents": "GoSherpa for AI Agents",
       "footer.status": "Statut"
     }
   };

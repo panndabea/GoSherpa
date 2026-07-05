@@ -347,6 +347,32 @@ section {
   margin-bottom: 0;
 }
 
+.agentic-head {
+  margin-bottom: 0;
+}
+
+.agentic-head .section-title {
+  margin-bottom: 1rem;
+}
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 44px;
+  color: var(--sea);
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+}
+
+.text-link:hover,
+.text-link:focus-visible {
+  color: var(--pine);
+  outline: none;
+}
+
 .comic-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
