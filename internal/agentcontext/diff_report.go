@@ -183,6 +183,7 @@ func diffReadingOrder(report DiffReport) []explainengine.ReadingStep {
 			Title:    "Test: " + test.Name,
 			Reason:   "Check expected behavior and regression coverage.",
 			Position: test.Position,
+			Range:    test.Range,
 		})
 	}
 

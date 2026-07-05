@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
@@ -358,6 +359,8 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	if len(report.ReadingOrder) != 5 {
 		t.Fatalf("expected 5 reading order steps, got %#v", report.ReadingOrder)
 	}
+	assertAgentContextReadingStepRange(t, report.ReadingOrder[1], "service.go", 3, 1, 5, 2)
+	assertAgentContextReadingStepRange(t, report.ReadingOrder[4], "service_test.go", 5, 1, 7, 2)
 	if len(report.Limitations) != 5 {
 		t.Fatalf("expected 5 limitations, got %#v", report.Limitations)
 	}
@@ -799,6 +802,20 @@ func agentContextStringSliceContains(values []string, want string) bool {
 	}
 
 	return false
+}
+
+func assertAgentContextReadingStepRange(t *testing.T, step explainengine.ReadingStep, file string, startLine int, startColumn int, endLine int, endColumn int) {
+	t.Helper()
+
+	if step.Range == nil {
+		t.Fatalf("expected reading step %q to include a range", step.Title)
+	}
+	if step.Range.Start.File != file || step.Range.Start.Line != startLine || step.Range.Start.Column != startColumn {
+		t.Fatalf("unexpected range start for %q: %#v", step.Title, step.Range.Start)
+	}
+	if step.Range.End.File != file || step.Range.End.Line != endLine || step.Range.End.Column != endColumn {
+		t.Fatalf("unexpected range end for %q: %#v", step.Title, step.Range.End)
+	}
 }
 
 func writeAgentContextTestFile(t *testing.T, path string, contents string) {

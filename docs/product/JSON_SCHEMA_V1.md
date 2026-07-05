@@ -201,7 +201,7 @@ test command to changed symbols when known.
 
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
-`{ "title": string, "reason": string, "position": position }`.
+`{ "title": string, "reason": string, "position": position, "range": sourceRange? }`.
 
 ## Common Analysis Metadata
 
@@ -521,7 +521,9 @@ Data:
 - `relatedTests`: tests related to the symbol.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan.
-- `readingOrder`: ordered source locations to inspect next.
+- `readingOrder`: ordered source locations to inspect next. Entries include
+  `position` and may include `range` when backed by a symbol, call, or test
+  source range.
 
 `data.warnings` is absent; use envelope `warnings`.
 

@@ -51,6 +51,10 @@ func TestAnalyzeBuildsSymbolProfile(t *testing.T) {
 		"Caller: Entry",
 		"Test: TestTarget",
 	})
+	assertExplainReadingStepRange(t, report.ReadingOrder[0], "service.go", 8, 1, 10, 2)
+	assertExplainReadingStepRange(t, report.ReadingOrder[1], "service.go", 9, 2, 9, 8)
+	assertExplainReadingStepRange(t, report.ReadingOrder[2], "service.go", 4, 2, 4, 8)
+	assertExplainReadingStepRange(t, report.ReadingOrder[3], "service_test.go", 5, 1, 7, 2)
 }
 
 func TestAnalyzeWithOptionsIncludesTestCallers(t *testing.T) {
@@ -319,6 +323,20 @@ func readingStepTitles(steps []ReadingStep) []string {
 	}
 
 	return titles
+}
+
+func assertExplainReadingStepRange(t *testing.T, step ReadingStep, file string, startLine int, startColumn int, endLine int, endColumn int) {
+	t.Helper()
+
+	if step.Range == nil {
+		t.Fatalf("expected reading step %q to include a range", step.Title)
+	}
+	if step.Range.Start.File != file || step.Range.Start.Line != startLine || step.Range.Start.Column != startColumn {
+		t.Fatalf("unexpected range start for %q: %#v", step.Title, step.Range.Start)
+	}
+	if step.Range.End.File != file || step.Range.End.Line != endLine || step.Range.End.Column != endColumn {
+		t.Fatalf("unexpected range end for %q: %#v", step.Title, step.Range.End)
+	}
 }
 
 func assertNames(t *testing.T, got []string, want []string) {

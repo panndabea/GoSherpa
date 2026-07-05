@@ -147,7 +147,7 @@ Implemented:
 - Reference kind classification for definitions, calls, type usages, field
   accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
 - Source ranges with columns for symbols, references, callers, callees, call
-  paths, and related tests in JSON output.
+  paths, related tests, and range-backed reading-order entries in JSON output.
 
 Current limitations:
 
@@ -175,8 +175,8 @@ Current limitations:
 - Unqualified standalone call graph targets can be ambiguous across packages;
   GoSherpa reports candidates and package-qualified examples for
   disambiguation.
-- Reading-order entries still expose compact positions rather than full source
-  ranges.
+- Reading-order entries include optional source ranges when backed by symbols,
+  calls, or tests.
 - Test callers are available with `callers --tests`, `entrypoints --tests`,
   and `explain --tests`; tests are still skipped by some other analysis paths
   and are not yet first-class.

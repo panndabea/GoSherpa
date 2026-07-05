@@ -59,9 +59,10 @@ type ArchitectureRole struct {
 }
 
 type ReadingStep struct {
-	Title    string          `json:"title"`
-	Reason   string          `json:"reason"`
-	Position sherpa.Position `json:"position"`
+	Title    string              `json:"title"`
+	Reason   string              `json:"reason"`
+	Position sherpa.Position     `json:"position"`
+	Range    *sherpa.SourceRange `json:"range,omitempty"`
 }
 
 type symbolTarget struct {
@@ -431,6 +432,7 @@ func readingOrder(report Report) []ReadingStep {
 		Title:    "Definition",
 		Reason:   "Start with the symbol declaration and nearby implementation.",
 		Position: report.Symbol.Position,
+		Range:    report.Symbol.Range,
 	})
 
 	for _, callee := range limitCallees(report.Callees, 3) {
@@ -438,6 +440,7 @@ func readingOrder(report Report) []ReadingStep {
 			Title:    "Callee: " + callee.Name,
 			Reason:   "Understand direct work delegated by this symbol.",
 			Position: callee.Position,
+			Range:    callee.Range,
 		})
 	}
 
@@ -446,6 +449,7 @@ func readingOrder(report Report) []ReadingStep {
 			Title:    "Caller: " + caller.Name,
 			Reason:   "See how callers depend on this symbol.",
 			Position: caller.Position,
+			Range:    caller.Range,
 		})
 	}
 
@@ -454,6 +458,7 @@ func readingOrder(report Report) []ReadingStep {
 			Title:    "Test: " + test.Name,
 			Reason:   "Check expected behavior and regression coverage.",
 			Position: test.Position,
+			Range:    test.Range,
 		})
 	}
 

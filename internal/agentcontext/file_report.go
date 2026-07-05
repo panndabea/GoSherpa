@@ -319,6 +319,7 @@ func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
 			Title:    "Symbol: " + symbol.DisplayName(),
 			Reason:   "Inspect the symbols declared in the target file.",
 			Position: symbol.Position,
+			Range:    symbol.Range,
 		})
 	}
 
@@ -327,6 +328,7 @@ func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
 			Title:    "Test: " + test.Name,
 			Reason:   "Check expected behavior and regression coverage.",
 			Position: test.Position,
+			Range:    test.Range,
 		})
 	}
 

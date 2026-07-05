@@ -384,6 +384,18 @@
           "file": "service.go",
           "line": 3,
           "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 3,
+            "column": 6
+          },
+          "end": {
+            "file": "service.go",
+            "line": 3,
+            "column": 21
+          }
         }
       },
       {
@@ -393,6 +405,18 @@
           "file": "service.go",
           "line": 5,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 8,
+            "column": 2
+          }
         }
       },
       {
@@ -402,6 +426,18 @@
           "file": "service.go",
           "line": 10,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 10,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 12,
+            "column": 2
+          }
         }
       },
       {
@@ -411,6 +447,18 @@
           "file": "service.go",
           "line": 14,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 14,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 16,
+            "column": 2
+          }
         }
       },
       {
@@ -420,6 +468,18 @@
           "file": "service.go",
           "line": 18,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 18,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 18,
+            "column": 17
+          }
         }
       },
       {
@@ -429,6 +489,18 @@
           "file": "service_test.go",
           "line": 5,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         }
       }
     ],

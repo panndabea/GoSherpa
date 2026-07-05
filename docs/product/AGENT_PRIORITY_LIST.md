@@ -282,8 +282,7 @@ Done for the first slice:
 ### 7. Source Snippet Ranges
 
 Status: implemented for symbols, references, callers, callees, call path steps,
-and related tests in JSON output. Reading-order entries still use compact
-positions.
+related tests, and range-backed reading-order entries in JSON output.
 
 Expose file, line, column, and optional range information.
 

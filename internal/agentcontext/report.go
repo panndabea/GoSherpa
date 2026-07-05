@@ -153,6 +153,7 @@ func symbolReadingOrder(report Report) []explainengine.ReadingStep {
 			Title:    "Definition",
 			Reason:   "Start with the symbol declaration and nearby implementation.",
 			Position: report.Symbol.Position,
+			Range:    report.Symbol.Range,
 		},
 	}
 
@@ -161,6 +162,7 @@ func symbolReadingOrder(report Report) []explainengine.ReadingStep {
 			Title:    "Callee: " + callee.Name,
 			Reason:   "Understand direct work delegated by this symbol.",
 			Position: callee.Position,
+			Range:    callee.Range,
 		})
 	}
 
@@ -169,6 +171,7 @@ func symbolReadingOrder(report Report) []explainengine.ReadingStep {
 			Title:    "Caller: " + caller.Name,
 			Reason:   "See how callers depend on this symbol.",
 			Position: caller.Position,
+			Range:    caller.Range,
 		})
 	}
 
@@ -177,6 +180,7 @@ func symbolReadingOrder(report Report) []explainengine.ReadingStep {
 			Title:    "Test: " + test.Name,
 			Reason:   "Check expected behavior and regression coverage.",
 			Position: test.Position,
+			Range:    test.Range,
 		})
 	}
 

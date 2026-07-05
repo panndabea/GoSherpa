@@ -28,7 +28,9 @@ Every context result includes:
 - `testPlan`: grouped test plan with `direct`, `related`, `callerPackages`,
   and `fallback` items. Plan items may include `targets` when diff context can
   connect a recommendation to changed symbols.
-- `readingOrder`: ordered source locations to inspect next.
+- `readingOrder`: ordered source locations to inspect next. Entries include
+  `position` and may include `range` when backed by a symbol, call, or test
+  source range.
 - `analysisMode`: deterministic analysis mode label.
 - `referenceAnalysisMode`: optional trust label for reference subanalysis when
   the context kind includes changed-symbol or symbol-reference impact

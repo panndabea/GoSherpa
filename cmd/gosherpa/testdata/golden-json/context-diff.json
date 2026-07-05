@@ -110,6 +110,18 @@
           "file": "service_test.go",
           "line": 5,
           "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
         }
       }
     ],
