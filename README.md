@@ -10,6 +10,7 @@
 
   <p>
     <img alt="Go 1.24.4" src="https://img.shields.io/badge/Go-1.24.4-00ADD8?style=for-the-badge&amp;logo=go&amp;logoColor=white">
+    <a href="https://github.com/panndabea/GoSherpa/actions/workflows/ci.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/panndabea/GoSherpa/ci.yml?branch=main&amp;label=tests&amp;style=for-the-badge&amp;logo=github"></a>
     <img alt="Status: Early MVP" src="https://img.shields.io/badge/status-early%20MVP-2F855A?style=for-the-badge">
     <img alt="Interface: CLI" src="https://img.shields.io/badge/interface-CLI-111827?style=for-the-badge">
     <img alt="Analysis: Go semantics + AST" src="https://img.shields.io/badge/analysis-Go%20semantics%20%2B%20AST-F6AD55?style=for-the-badge">
