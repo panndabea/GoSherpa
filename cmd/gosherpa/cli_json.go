@@ -663,6 +663,7 @@ func entrypointsJSONDataFromResult(result sherpa.EntryPointsResult) entrypointsJ
 
 func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.References = nonNilSlice(report.References)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.Callers = nonNilSlice(report.Callers)
 	report.Callees = nonNilSlice(report.Callees)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)

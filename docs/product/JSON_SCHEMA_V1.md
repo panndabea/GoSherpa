@@ -251,7 +251,9 @@ labels. Broader explain, context, impact, test, and path commands currently use:
 
 `callers.data.analysisMode` and `callees.data.analysisMode` use these values.
 `explain.data.callAnalysisMode` and `context symbol.data.callAnalysisMode` use
-the same values.
+the same values. `explain.data.referenceAnalysisMode` and
+`context symbol.data.referenceAnalysisMode` use the reference trust values
+`typechecked` or `ast-fallback`.
 
 `context symbol.data.analysisMode` is different: it describes the broader
 context bundle mode. It can be `typechecked+ast` when symbol identity comes from
@@ -747,12 +749,15 @@ Data:
 ## `context` Call Metadata
 
 `context` data is documented in `docs/product/CONTEXT_SCHEMA_V1.md`.
-`context symbol` additionally includes explicit call analysis trust metadata:
+`context symbol` additionally includes explicit reference and call analysis
+trust metadata:
 
 - `analysisMode`: broader context analysis mode, `typechecked+ast` when symbol
   identity comes from typechecked package loading and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: context, call, and test-planning blind spots.
+- `referenceAnalysisMode`: reference trust mode, either `typechecked` or
+  `ast-fallback`.
 - `callAnalysisMode`: call graph trust mode, either `typechecked` or
   `ast-fallback`.
 - `interfaceAnalysisMode`: trust mode for interface and implementation impact

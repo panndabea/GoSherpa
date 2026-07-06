@@ -44,6 +44,9 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
 		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
 	}
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
 	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
 		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
 	}
@@ -57,6 +60,9 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 		t.Fatalf("expected typechecked symbol limitation, got %#v", report.Limitations)
 	}
 	if !strings.Contains(report.Limitations[1], "typechecked") {
+		t.Fatalf("expected typechecked reference limitation, got %#v", report.Limitations)
+	}
+	if !strings.Contains(report.Limitations[2], "typechecked") {
 		t.Fatalf("expected typechecked call limitation, got %#v", report.Limitations)
 	}
 	if len(report.Callers) != 1 || report.Callers[0].Name != "Entry" {

@@ -57,6 +57,7 @@ func TestFormat(t *testing.T) {
 		},
 		TestCommands:          []string{"go test ."},
 		AnalysisMode:          AnalysisModeAST,
+		ReferenceAnalysisMode: sherpa.ReferenceAnalysisModeTypechecked,
 		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
 		Confidence:            ConfidenceMedium,
 		Limitations: []string{
@@ -80,6 +81,7 @@ func TestFormat(t *testing.T) {
 		"Target handles the main service step.",
 		"ANALYSIS",
 		"Mode: ast",
+		"Reference analysis: typechecked",
 		"Interface analysis: typechecked",
 		"Confidence: medium",
 		"Risk: medium",

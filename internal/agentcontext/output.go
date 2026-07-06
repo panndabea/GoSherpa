@@ -204,6 +204,9 @@ func writeAnalysis(builder *strings.Builder, report Report) {
 	}
 
 	fmt.Fprintf(builder, "  Mode: %s\n", mode)
+	if strings.TrimSpace(report.ReferenceAnalysisMode) != "" {
+		fmt.Fprintf(builder, "  Reference analysis: %s\n", report.ReferenceAnalysisMode)
+	}
 	if strings.TrimSpace(report.CallAnalysisMode) != "" {
 		fmt.Fprintf(builder, "  Call analysis: %s\n", report.CallAnalysisMode)
 	}

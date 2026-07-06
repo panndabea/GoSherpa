@@ -34,6 +34,7 @@ type Report struct {
 	Risk                    explainengine.RiskSummary      `json:"risk"`
 	ArchitectureRole        explainengine.ArchitectureRole `json:"architectureRole"`
 	References              []sherpa.Reference             `json:"references"`
+	ReferenceAnalysisMode   string                         `json:"referenceAnalysisMode,omitempty"`
 	Callers                 []sherpa.Caller                `json:"callers"`
 	Callees                 []sherpa.Callee                `json:"callees"`
 	CallAnalysisMode        string                         `json:"callAnalysisMode"`
@@ -77,21 +78,9 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 	limits := normalizeLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
-	warnings := append([]string{}, explainReport.Warnings...)
-	analysisMode := AnalysisModeAST
 	symbol := explainReport.Symbol
-	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
-	warnings = append(warnings, semanticSnapshot.warnings...)
-	if semanticOK {
-		semanticSymbol, found, err := semanticSnapshot.symbol(root, target)
-		if err != nil {
-			return Report{}, err
-		}
-		if found {
-			symbol = semanticSymbol
-			analysisMode = AnalysisModeTypecheckedAST
-		}
-	}
+	warnings := append([]string{}, explainReport.Warnings...)
+	analysisMode := contextSymbolAnalysisMode(explainReport.SymbolAnalysisMode)
 
 	sourceContext, err := sherpa.ReadSourceContext(root, symbol.Position, radius)
 	if err != nil {
@@ -107,6 +96,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		Risk:                    explainReport.Risk,
 		ArchitectureRole:        explainReport.ArchitectureRole,
 		References:              explainReport.References,
+		ReferenceAnalysisMode:   explainReport.ReferenceAnalysisMode,
 		Callers:                 explainReport.Callers,
 		Callees:                 explainReport.Callees,
 		CallAnalysisMode:        explainReport.CallAnalysisMode,
@@ -123,11 +113,20 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
-	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.CallAnalysisMode)
+	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode)
 	report.Confidence = confidence(report)
 	report = applySymbolLimits(report, limits)
 
 	return normalizeReport(report), nil
+}
+
+func contextSymbolAnalysisMode(symbolAnalysisMode string) string {
+	switch strings.TrimSpace(symbolAnalysisMode) {
+	case explainengine.SymbolAnalysisModeTypecheckedAST:
+		return AnalysisModeTypecheckedAST
+	default:
+		return AnalysisModeAST
+	}
 }
 
 func applySymbolLimits(report Report, limits LimitOptions) Report {
@@ -226,9 +225,10 @@ func identityFromSymbol(target string, symbol sherpa.Symbol) Identity {
 	}
 }
 
-func limitations(includeTestCallers bool, analysisMode string, callAnalysisMode string) []string {
+func limitations(includeTestCallers bool, analysisMode string, referenceAnalysisMode string, callAnalysisMode string) []string {
 	values := []string{
 		symbolContextAnalysisLimitation(analysisMode),
+		referenceAnalysisLimitation(referenceAnalysisMode),
 		callAnalysisLimitation(callAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
@@ -251,6 +251,17 @@ func symbolContextAnalysisLimitation(analysisMode string) string {
 	}
 }
 
+func referenceAnalysisLimitation(referenceAnalysisMode string) string {
+	switch referenceAnalysisMode {
+	case sherpa.ReferenceAnalysisModeTypechecked:
+		return "Reference analysis used typechecked package loading where available."
+	case sherpa.ReferenceAnalysisModeASTFallback:
+		return "Reference analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Reference analysis used syntax plus local type information."
+	}
+}
+
 func callAnalysisLimitation(callAnalysisMode string) string {
 	switch callAnalysisMode {
 	case sherpa.CallAnalysisModeTypechecked:
@@ -266,6 +277,12 @@ func confidence(report Report) string {
 	if len(report.Warnings) > 0 || len(report.SourceContext.Lines) == 0 {
 		return ConfidenceLow
 	}
+	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback {
+		return ConfidenceLow
+	}
+	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback {
+		return ConfidenceLow
+	}
 	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
 		return ConfidenceLow
 	}
@@ -275,6 +292,7 @@ func confidence(report Report) string {
 
 func normalizeReport(report Report) Report {
 	report.References = nonNilSlice(report.References)
+	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.Callers = nonNilSlice(report.Callers)
 	report.Callees = nonNilSlice(report.Callees)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)

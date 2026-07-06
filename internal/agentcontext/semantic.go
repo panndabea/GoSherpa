@@ -12,7 +12,6 @@ import (
 )
 
 type contextSemanticSnapshot struct {
-	index          symbolindex.Index
 	modulePath     string
 	symbols        []sherpa.Symbol
 	filesByPackage map[string][]string
@@ -30,7 +29,6 @@ func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemant
 	}
 
 	snapshot := contextSemanticSnapshot{
-		index:          index,
 		modulePath:     index.ModulePath,
 		symbols:        append([]sherpa.Symbol{}, index.Symbols...),
 		filesByPackage: cloneFilesByPackage(index.FilesByPackage),
@@ -81,10 +79,6 @@ func (snapshot contextSemanticSnapshot) symbolsInPackage(root string, packagePat
 	sortSymbols(symbols)
 
 	return symbols, uniqueStrings(warnings)
-}
-
-func (snapshot contextSemanticSnapshot) symbol(_ string, target string) (sherpa.Symbol, bool, error) {
-	return snapshot.index.FindSymbol(target)
 }
 
 func cloneFilesByPackage(values map[string][]string) map[string][]string {

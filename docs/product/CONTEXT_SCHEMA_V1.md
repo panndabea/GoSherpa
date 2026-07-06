@@ -106,8 +106,9 @@ If the requested byte budget is smaller than the minimum report shell, the
 ## Context Kinds
 
 `context symbol` adds symbol identity, definition, source context, references,
-callers, callees, `callAnalysisMode`, affected packages, interface signals,
-`interfaceAnalysisMode`, related tests, and test planning.
+`referenceAnalysisMode`, callers, callees, `callAnalysisMode`, affected
+packages, interface signals, `interfaceAnalysisMode`, related tests, and test
+planning.
 
 `context file` adds file identity, package identity, file symbols, source
 contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
