@@ -77,6 +77,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeTypecheckedAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
@@ -89,6 +90,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"changedFiles", "changedPackages", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
@@ -101,6 +103,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"changedPackages", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
@@ -115,6 +118,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeTypecheckedAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"affectedSymbols", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
@@ -128,6 +132,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeTypecheckedAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "limitations", "relatedTests"},
@@ -163,6 +168,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeTypecheckedAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"references", "callers", "callees", "limitations", "readingOrder"},
@@ -175,6 +181,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"symbols", "sourceContexts", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},
@@ -187,6 +194,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+				"testAnalysisMode":      agentcontext.AnalysisModeAST,
 				"confidence":            agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"files", "symbols", "sourceContexts", "affectedInterfaces", "affectedImplementations", "limitations", "affectedTests"},

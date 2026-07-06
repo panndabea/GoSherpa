@@ -54,6 +54,7 @@
         "externalPackage": false
       }
     ],
+    "testAnalysisMode": "ast",
     "testCommands": [
       "go test .",
       "go test ./cmd/app"

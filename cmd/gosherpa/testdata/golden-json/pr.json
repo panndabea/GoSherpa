@@ -153,6 +153,7 @@
         ]
       }
     ],
+    "testAnalysisMode": "typechecked+ast",
     "testCommands": [
       "go test .",
       "go test ./cmd/app"

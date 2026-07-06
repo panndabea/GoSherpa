@@ -659,6 +659,12 @@ keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
 includes `scope` with one of `direct`, `related`, or `all`; the default
 `related` scope focuses direct references when they exist.
 
+Composite impact, context, explain, tests-affected, and PR data that includes
+test recommendations may also include `testAnalysisMode`. It is `typechecked+ast`
+when direct symbol test-reference analysis loaded repository packages and `ast`
+when test planning stayed package/syntax based. Related test-analysis warnings
+are reported through the top-level `warnings` array.
+
 Diff-oriented test plans group commands into `direct`, `related`,
 `callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
 list for compatibility, and attach changed-symbol `targets` to affected tests

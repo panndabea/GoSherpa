@@ -37,6 +37,7 @@ type Report struct {
 	AffectedImplementations []string             `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string               `json:"interfaceAnalysisMode,omitempty"`
 	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
+	TestAnalysisMode        string               `json:"testAnalysisMode,omitempty"`
 	TestCommands            []string             `json:"testCommands"`
 	TestPlan                sherpa.TestPlan      `json:"testPlan"`
 	ReadingOrder            []ReadingStep        `json:"readingOrder"`
@@ -99,6 +100,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		ReferenceAnalysisMode: impactResult.ReferenceAnalysisMode,
 		AffectedPackages:      impactResult.Packages,
 		RelatedTests:          impactResult.RelatedTests,
+		TestAnalysisMode:      impactResult.TestAnalysisMode,
 		TestCommands:          impactResult.TestCommands,
 		TestPlan:              impactResult.TestPlan,
 		Warnings:              append(append([]string{}, impactResult.Warnings...), symbolWarnings...),
@@ -599,6 +601,7 @@ func normalizeReport(report Report) Report {
 	report.AffectedImplementations = nonNil(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.RelatedTests = nonNil(report.RelatedTests)
+	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNil(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.ReadingOrder = nonNil(report.ReadingOrder)

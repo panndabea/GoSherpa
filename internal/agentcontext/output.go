@@ -208,6 +208,7 @@ func writeAnalysis(builder *strings.Builder, report Report) {
 		fmt.Fprintf(builder, "  Call analysis: %s\n", report.CallAnalysisMode)
 	}
 	writeInterfaceAnalysis(builder, report.InterfaceAnalysisMode)
+	writeTestAnalysis(builder, report.TestAnalysisMode)
 	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
@@ -230,6 +231,7 @@ func writeFileAnalysis(builder *strings.Builder, report FileReport) {
 
 	fmt.Fprintf(builder, "  Mode: %s\n", mode)
 	writeInterfaceAnalysis(builder, report.InterfaceAnalysisMode)
+	writeTestAnalysis(builder, report.TestAnalysisMode)
 	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
@@ -252,6 +254,7 @@ func writePackageAnalysis(builder *strings.Builder, report PackageReport) {
 
 	fmt.Fprintf(builder, "  Mode: %s\n", mode)
 	writeInterfaceAnalysis(builder, report.InterfaceAnalysisMode)
+	writeTestAnalysis(builder, report.TestAnalysisMode)
 	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
@@ -268,6 +271,15 @@ func writeInterfaceAnalysis(builder *strings.Builder, analysisMode string) {
 	}
 
 	fmt.Fprintf(builder, "  Interface analysis: %s\n", analysisMode)
+}
+
+func writeTestAnalysis(builder *strings.Builder, analysisMode string) {
+	analysisMode = strings.TrimSpace(analysisMode)
+	if analysisMode == "" {
+		return
+	}
+
+	fmt.Fprintf(builder, "  Test analysis: %s\n", analysisMode)
 }
 
 func writeTruncation(builder *strings.Builder, truncation *Truncation) {

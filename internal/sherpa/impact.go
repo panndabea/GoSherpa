@@ -24,6 +24,7 @@ type ImpactResult struct {
 	Dependencies          PackageDependencies `json:"dependencies"`
 	Packages              []string            `json:"packages"`
 	RelatedTests          []RelatedTest       `json:"relatedTests"`
+	TestAnalysisMode      string              `json:"testAnalysisMode,omitempty"`
 	TestCommands          []string            `json:"testCommands"`
 	TestPlan              TestPlan            `json:"testPlan"`
 	Warnings              []string            `json:"warnings"`
@@ -164,14 +165,15 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 	})
 
 	return ImpactResult{
-		Target:       deps.Package,
-		Kind:         ImpactKindPackage,
-		Dependencies: deps,
-		Packages:     packages,
-		RelatedTests: tests,
-		TestCommands: TestPlanCommands(plan),
-		TestPlan:     plan,
-		Warnings:     warnings,
+		Target:           deps.Package,
+		Kind:             ImpactKindPackage,
+		Dependencies:     deps,
+		Packages:         packages,
+		RelatedTests:     tests,
+		TestAnalysisMode: TestAnalysisModeAST,
+		TestCommands:     TestPlanCommands(plan),
+		TestPlan:         plan,
+		Warnings:         warnings,
 	}, nil
 }
 
@@ -227,8 +229,10 @@ func findSymbolImpactWithCache(root string, target string, options ImpactOptions
 	if cache == nil || !cache.SkipTests {
 		tests, warnings := impactSymbolTests(root, target, result.Packages, targetPackages)
 		result.RelatedTests = tests.Tests
+		result.TestAnalysisMode = tests.AnalysisMode
 		result.TestCommands = tests.Commands
 		result.TestPlan = tests.TestPlan
+		result.Warnings = append(result.Warnings, tests.Warnings...)
 		result.Warnings = append(result.Warnings, warnings...)
 	}
 

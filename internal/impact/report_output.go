@@ -26,6 +26,10 @@ func FormatSymbolReport(report ImpactReport) string {
 func FormatAffectedTestsReport(report ImpactReport) string {
 	var builder strings.Builder
 
+	if writeReportAnalysis(&builder, report) {
+		builder.WriteString("\n")
+	}
+
 	writeReportRelatedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
 	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
@@ -81,13 +85,19 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 }
 
 func writeReportAnalysis(builder *strings.Builder, report ImpactReport) bool {
-	analysisMode := strings.TrimSpace(report.InterfaceAnalysisMode)
-	if analysisMode == "" {
+	interfaceAnalysisMode := strings.TrimSpace(report.InterfaceAnalysisMode)
+	testAnalysisMode := strings.TrimSpace(report.TestAnalysisMode)
+	if interfaceAnalysisMode == "" && testAnalysisMode == "" {
 		return false
 	}
 
 	builder.WriteString("ANALYSIS\n")
-	fmt.Fprintf(builder, "  Interface analysis: %s\n", analysisMode)
+	if interfaceAnalysisMode != "" {
+		fmt.Fprintf(builder, "  Interface analysis: %s\n", interfaceAnalysisMode)
+	}
+	if testAnalysisMode != "" {
+		fmt.Fprintf(builder, "  Test analysis: %s\n", testAnalysisMode)
+	}
 
 	return true
 }

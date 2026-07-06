@@ -36,6 +36,7 @@ type ImpactReport struct {
 	AffectedImplementations []string      `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string        `json:"interfaceAnalysisMode,omitempty"`
 	AffectedTests           []RelatedTest `json:"affectedTests"`
+	TestAnalysisMode        string        `json:"testAnalysisMode,omitempty"`
 	TestCommands            []string      `json:"testCommands"`
 	TestPlan                TestPlan      `json:"testPlan"`
 	Warnings                []string      `json:"warnings"`
@@ -44,6 +45,7 @@ type ImpactReport struct {
 type changedSymbolImpact struct {
 	Packages              []string
 	Tests                 []sherpa.RelatedTest
+	TestAnalysisMode      string
 	ReferenceAnalysisMode string
 	CallAnalysisMode      string
 	Warnings              []string
@@ -116,8 +118,9 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, symbolImpact.Packages...))
 	report.ReferenceAnalysisMode = symbolImpact.ReferenceAnalysisMode
 	report.CallAnalysisMode = symbolImpact.CallAnalysisMode
+	report.TestAnalysisMode = symbolImpact.TestAnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, symbolImpact.Warnings...))
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -162,7 +165,7 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -210,6 +213,7 @@ func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
 		CallAnalysisMode:      result.CallAnalysisMode,
 		AffectedTests:         result.RelatedTests,
+		TestAnalysisMode:      result.TestAnalysisMode,
 		TestCommands:          result.TestCommands,
 		TestPlan:              result.TestPlan,
 		Warnings:              result.Warnings,
@@ -310,6 +314,7 @@ func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSy
 		}
 		impact.ReferenceAnalysisMode = mergeReferenceAnalysisMode(impact.ReferenceAnalysisMode, result.ReferenceAnalysisMode)
 		impact.CallAnalysisMode = mergeCallAnalysisMode(impact.CallAnalysisMode, result.CallAnalysisMode)
+		impact.TestAnalysisMode = mergeTestAnalysisMode(impact.TestAnalysisMode, result.TestAnalysisMode)
 		impact.Warnings = append(impact.Warnings, result.Warnings...)
 	}
 
@@ -323,13 +328,16 @@ func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSy
 	return impact
 }
 
-func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, []string) {
+func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
 	modulePath := impactModulePath(root)
 	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
 	changedTargetsByPackage := changedSymbolPlanTargetsByPackage(changedSymbols, modulePath)
+	testAnalysisMode := ""
 
-	for _, test := range directTestsForChangedSymbols(root, changedSymbols, &warnings) {
+	directTests, directTestAnalysisMode := directTestsForChangedSymbols(root, changedSymbols, &warnings)
+	testAnalysisMode = mergeTestAnalysisMode(testAnalysisMode, directTestAnalysisMode)
+	for _, test := range directTests {
 		mergeRelatedTest(seen, test)
 	}
 	for _, test := range extraTests {
@@ -342,6 +350,8 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 			warnings = append(warnings, err.Error())
 			continue
 		}
+		testAnalysisMode = mergeTestAnalysisMode(testAnalysisMode, tests.AnalysisMode)
+		warnings = append(warnings, tests.Warnings...)
 
 		for _, test := range tests.Tests {
 			if targets := changedTargetsByPackage[pkg]; len(targets) > 0 {
@@ -370,7 +380,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 		Targets:          changedTargets,
 	})
 
-	return result, plan, sherpa.TestPlanCommands(plan), uniqueSortedStrings(warnings)
+	return result, plan, sherpa.TestPlanCommands(plan), normalizeTestAnalysisMode(testAnalysisMode), uniqueSortedStrings(warnings)
 }
 
 func mergeReferenceAnalysisMode(current string, next string) string {
@@ -379,6 +389,19 @@ func mergeReferenceAnalysisMode(current string, next string) string {
 
 func mergeCallAnalysisMode(current string, next string) string {
 	return mergeAnalysisMode(current, next, sherpa.CallAnalysisModeTypechecked, sherpa.CallAnalysisModeASTFallback)
+}
+
+func mergeTestAnalysisMode(current string, next string) string {
+	return mergeAnalysisMode(current, next, sherpa.TestAnalysisModeTypecheckedAST, sherpa.TestAnalysisModeAST)
+}
+
+func normalizeTestAnalysisMode(mode string) string {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		return sherpa.TestAnalysisModeAST
+	}
+
+	return mode
 }
 
 func mergeAnalysisMode(current string, next string, typechecked string, fallback string) string {
@@ -400,13 +423,14 @@ func mergeAnalysisMode(current string, next string, typechecked string, fallback
 	return current
 }
 
-func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings *[]string) []sherpa.RelatedTest {
+func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings *[]string) ([]sherpa.RelatedTest, string) {
 	if len(symbols) == 0 {
-		return nil
+		return nil, ""
 	}
 
 	modulePath := impactModulePath(root)
 	seen := make(map[string]sherpa.RelatedTest)
+	testAnalysisMode := ""
 	for _, symbol := range normalizeChangedSymbols(symbols) {
 		target := changedSymbolTestTarget(symbol, modulePath)
 		tests, err := sherpa.FindTestsWithOptions(root, target, sherpa.TestOptions{
@@ -417,6 +441,10 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 				*warnings = append(*warnings, err.Error())
 			}
 			continue
+		}
+		testAnalysisMode = mergeTestAnalysisMode(testAnalysisMode, tests.AnalysisMode)
+		if warnings != nil {
+			*warnings = append(*warnings, tests.Warnings...)
 		}
 
 		for _, test := range tests.Tests {
@@ -431,7 +459,7 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 	}
 	sortRelatedTests(result)
 
-	return result
+	return result, testAnalysisMode
 }
 
 func changedSymbolPlanTargets(symbols []changedSymbol, modulePath string) []string {
@@ -547,6 +575,7 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.AffectedImplementations = nonNilStrings(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.TestCommands = nonNilStrings(report.TestCommands)
+	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Warnings = nonNilStrings(report.Warnings)
 

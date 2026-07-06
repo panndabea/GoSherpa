@@ -73,6 +73,7 @@ func writeDiffAnalysis(builder *strings.Builder, report DiffReport) {
 		fmt.Fprintf(builder, "  Call analysis: %s\n", report.CallAnalysisMode)
 	}
 	writeInterfaceAnalysis(builder, report.InterfaceAnalysisMode)
+	writeTestAnalysis(builder, report.TestAnalysisMode)
 	fmt.Fprintf(builder, "  Confidence: %s\n", confidence)
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)

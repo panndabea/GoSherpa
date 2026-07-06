@@ -26,6 +26,7 @@ type prReport struct {
 	Risk                    explainengine.RiskSummary  `json:"risk"`
 	RepositoryRisk          sherpa.RiskReport          `json:"repositoryRisk"`
 	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
+	TestAnalysisMode        string                     `json:"testAnalysisMode,omitempty"`
 	TestCommands            []string                   `json:"testCommands"`
 	TestPlan                sherpa.TestPlan            `json:"testPlan"`
 	VerificationCommands    []string                   `json:"verificationCommands"`
@@ -58,6 +59,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 		AffectedImplementations: impactReport.AffectedImplementations,
 		InterfaceAnalysisMode:   strings.TrimSpace(impactReport.InterfaceAnalysisMode),
 		AffectedTests:           impactReport.AffectedTests,
+		TestAnalysisMode:        strings.TrimSpace(impactReport.TestAnalysisMode),
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
 		RepositoryRisk:          repositoryRisk,
@@ -84,6 +86,7 @@ func normalizePRReport(report prReport) prReport {
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.RepositoryRisk = riskJSONResult(report.RepositoryRisk)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
+	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.VerificationCommands = nonNilSlice(report.VerificationCommands)
@@ -179,6 +182,9 @@ func formatPRReport(report prReport) string {
 	}
 	if report.InterfaceAnalysisMode != "" {
 		fmt.Fprintf(&builder, "Interface analysis: %s\n", report.InterfaceAnalysisMode)
+	}
+	if report.TestAnalysisMode != "" {
+		fmt.Fprintf(&builder, "Test analysis: %s\n", report.TestAnalysisMode)
 	}
 	builder.WriteString("\n")
 
