@@ -2,13 +2,15 @@ package sherpa
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
 func TestFormatTests(t *testing.T) {
 	result := TestsResult{
-		Target: "ParseFile",
-		Kind:   TestTargetKindSymbol,
+		Target:       "ParseFile",
+		Kind:         TestTargetKindSymbol,
+		AnalysisMode: TestAnalysisModeTypecheckedAST,
 		Tests: []RelatedTest{
 			{
 				Name:    "TestParserPackage",
@@ -56,6 +58,9 @@ func TestFormatTests(t *testing.T) {
 TARGET
   ParseFile (symbol)
 
+ANALYSIS
+  Mode: typechecked+ast
+
 RELATED TESTS
   %-36s internal/parser/parser_test.go:5
   %-36s cmd/app/main_test.go:9 (direct, external)
@@ -90,6 +95,9 @@ func TestFormatTestsWithEmptyLists(t *testing.T) {
 TARGET
   Missing (symbol)
 
+ANALYSIS
+  Mode: ast
+
 RELATED TESTS
   none
 
@@ -106,5 +114,19 @@ TEST PLAN
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatTestsWithWarnings(t *testing.T) {
+	result := TestsResult{
+		Target:       "Target",
+		Kind:         TestTargetKindSymbol,
+		AnalysisMode: TestAnalysisModeAST,
+		Warnings:     []string{"typechecked test reference analysis unavailable: loader failed"},
+	}
+
+	got := FormatTests(result)
+	if !strings.Contains(got, "WARNINGS\n  - typechecked test reference analysis unavailable: loader failed\n") {
+		t.Fatalf("expected warning output, got:\n%s", got)
 	}
 }

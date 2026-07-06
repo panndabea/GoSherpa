@@ -1568,7 +1568,7 @@ func TestUsesParser(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"TESTS", "ParseFile (symbol)", "RELATED TESTS", "TestUsesParser", "TEST PLAN", "DIRECT", "FALLBACK", "go test ./cmd/app", "go test ./internal/parser"} {
+	for _, want := range []string{"TESTS", "ParseFile (symbol)", "ANALYSIS", "Mode: typechecked+ast", "RELATED TESTS", "TestUsesParser", "TEST PLAN", "DIRECT", "FALLBACK", "go test ./cmd/app", "go test ./internal/parser"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1665,6 +1665,14 @@ func TestUsesParser(t *testing.T) {
 
 	if data["kind"] != "symbol" {
 		t.Fatalf("expected kind symbol, got %v", data["kind"])
+	}
+
+	if data["analysisMode"] != "typechecked+ast" {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+
+	if data["confidence"] != "medium" {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
 	}
 
 	if data["scope"] != "related" {

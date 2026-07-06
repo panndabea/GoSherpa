@@ -1,9 +1,13 @@
 package sherpa
 
 import (
+	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/panndabea/GoSherpa/internal/semantics"
 )
 
 func TestFindTestsForPackageIncludesSameAndExternalPackageTests(t *testing.T) {
@@ -340,8 +344,54 @@ func TestStart(t *testing.T) {
 	if !test.DirectReference {
 		t.Fatalf("expected direct reference marker, got %v", test)
 	}
+	if result.AnalysisMode != TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
 	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./internal/service" {
 		t.Fatalf("expected direct test plan item for ./internal/service, got %#v", result.TestPlan)
+	}
+}
+
+func TestFindTestsReportsTypecheckedReferenceWarnings(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	original := loadSemanticTestRepository
+	loadSemanticTestRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		loadSemanticTestRepository = original
+	}()
+
+	result, err := FindTests(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.AnalysisMode != TestAnalysisModeAST {
+		t.Fatalf("expected ast fallback mode, got %q", result.AnalysisMode)
+	}
+	if len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "loader failed") {
+		t.Fatalf("expected loader warning, got %#v", result.Warnings)
+	}
+
+	test := findRelatedTest(result.Tests, "TestTarget")
+	if test == nil || !test.DirectReference {
+		t.Fatalf("expected AST fallback to preserve direct test reference, got %#v", result.Tests)
 	}
 }
 

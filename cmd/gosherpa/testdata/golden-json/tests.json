@@ -6,11 +6,11 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
-    "analysisMode": "ast",
+    "analysisMode": "typechecked+ast",
     "confidence": "medium",
     "limitations": [
-      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
-      "Dynamic table-test names may be incomplete.",
+      "Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
+      "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],
     "kind": "symbol",

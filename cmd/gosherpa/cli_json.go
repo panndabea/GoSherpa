@@ -396,6 +396,10 @@ func impactReportAnalysisMode(report impactengine.ImpactReport, fallback string)
 }
 
 func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
+	if result.AnalysisMode == "" {
+		result.AnalysisMode = analysisModeAST
+	}
+	result.Warnings = nonNilSlice(result.Warnings)
 	result.Tests = nonNilSlice(result.Tests)
 	result.Commands = nonNilSlice(result.Commands)
 	result.TestPlan = sherpa.NormalizeTestPlan(result.TestPlan)
@@ -405,9 +409,9 @@ func testsJSONResult(result sherpa.TestsResult) sherpa.TestsResult {
 
 func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 	return testsJSONData{
-		AnalysisMode: analysisModeAST,
-		Confidence:   jsonConfidence(nil, analysisModeAST),
-		Limitations:  testLimitations(analysisModeAST),
+		AnalysisMode: result.AnalysisMode,
+		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:  testLimitations(result.AnalysisMode),
 		Kind:         result.Kind,
 		Scope:        result.Scope,
 		Tests:        result.Tests,
@@ -927,6 +931,14 @@ func testLimitations(analysisMode string) []string {
 
 		return []string{
 			semanticLine,
+			"Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
+			"Fallback commands are package-level when direct test functions are not known.",
+		}
+	}
+
+	if analysisMode == agentcontext.AnalysisModeTypecheckedAST {
+		return []string{
+			"Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
 			"Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
 			"Fallback commands are package-level when direct test functions are not known.",
 		}

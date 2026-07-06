@@ -138,7 +138,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			command: "tests",
 			target:  "Target",
 			wantFields: map[string]string{
-				"analysisMode": agentcontext.AnalysisModeAST,
+				"analysisMode": agentcontext.AnalysisModeTypecheckedAST,
 				"confidence":   agentcontext.ConfidenceMedium,
 			},
 			wantArrays: []string{"tests", "commands", "limitations"},

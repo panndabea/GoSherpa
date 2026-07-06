@@ -648,7 +648,8 @@ missing, valid, stale, or invalid.
   one or more composed subanalyses used typechecked package loading; diff-based
   queries use `git-diff+typechecked+ast` when changed-symbol, reference, call,
   or interface subanalysis used typechecked package loading and `git-diff+ast`
-  otherwise.
+  otherwise. Direct `tests` queries use `typechecked+ast` when direct symbol
+  test-reference analysis loaded repository packages and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific impact or test-planning blind spots.
 

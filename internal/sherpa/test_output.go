@@ -14,6 +14,17 @@ func FormatTests(result TestsResult) string {
 	fmt.Fprintf(&builder, "  %s (%s)\n", result.Target, result.Kind)
 	builder.WriteString("\n")
 
+	builder.WriteString("ANALYSIS\n")
+	fmt.Fprintf(&builder, "  Mode: %s\n", normalizeTestAnalysisMode(result.AnalysisMode))
+	if len(result.Warnings) > 0 {
+		builder.WriteString("\n")
+		builder.WriteString("WARNINGS\n")
+		for _, warning := range result.Warnings {
+			fmt.Fprintf(&builder, "  - %s\n", warning)
+		}
+	}
+	builder.WriteString("\n")
+
 	builder.WriteString("RELATED TESTS\n")
 	if len(result.Tests) == 0 {
 		builder.WriteString("  none\n")
@@ -50,6 +61,14 @@ func FormatTests(result TestsResult) string {
 
 func PrintTests(result TestsResult) {
 	fmt.Print(FormatTests(result))
+}
+
+func normalizeTestAnalysisMode(mode string) string {
+	if mode == "" {
+		return TestAnalysisModeAST
+	}
+
+	return mode
 }
 
 func relatedTestTags(test RelatedTest) string {

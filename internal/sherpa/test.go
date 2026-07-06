@@ -33,6 +33,11 @@ type TestOptions struct {
 	Scope TestScope
 }
 
+const (
+	TestAnalysisModeAST            = "ast"
+	TestAnalysisModeTypecheckedAST = "typechecked+ast"
+)
+
 type RelatedTest struct {
 	Name            string       `json:"name"`
 	Package         string       `json:"package"`
@@ -45,12 +50,14 @@ type RelatedTest struct {
 }
 
 type TestsResult struct {
-	Target   string         `json:"target"`
-	Kind     TestTargetKind `json:"kind"`
-	Scope    TestScope      `json:"scope,omitempty"`
-	Tests    []RelatedTest  `json:"tests"`
-	Commands []string       `json:"commands"`
-	TestPlan TestPlan       `json:"testPlan"`
+	Target       string         `json:"target"`
+	Kind         TestTargetKind `json:"kind"`
+	Scope        TestScope      `json:"scope,omitempty"`
+	AnalysisMode string         `json:"analysisMode"`
+	Warnings     []string       `json:"warnings"`
+	Tests        []RelatedTest  `json:"tests"`
+	Commands     []string       `json:"commands"`
+	TestPlan     TestPlan       `json:"testPlan"`
 }
 
 type testFileInfo struct {
@@ -68,6 +75,14 @@ type literalSubtest struct {
 }
 
 type testReferenceKeys map[string]struct{}
+
+type testReferenceAnalysis struct {
+	Keys         testReferenceKeys
+	AnalysisMode string
+	Warnings     []string
+}
+
+var loadSemanticTestRepository = semantics.LoadRepository
 
 func FindTests(root string, target string) (TestsResult, error) {
 	return FindTestsWithOptions(root, target, TestOptions{Scope: TestScopeAll})
@@ -145,7 +160,8 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 	packages := map[string]struct{}{
 		normalizedTarget: {},
 	}
-	tests := filterTestsForScope(collectRelatedTests(root, testFiles, packages, referenceTarget{}), TestTargetKindPackage, options.Scope)
+	relatedTests, _, _ := collectRelatedTests(root, testFiles, packages, referenceTarget{})
+	tests := filterTestsForScope(relatedTests, TestTargetKindPackage, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget,
 		Kind:             TestTargetKindPackage,
@@ -154,12 +170,13 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 	})
 
 	return TestsResult{
-		Target:   normalizedTarget,
-		Kind:     TestTargetKindPackage,
-		Scope:    options.Scope,
-		Tests:    tests,
-		Commands: TestPlanCommands(plan),
-		TestPlan: plan,
+		Target:       normalizedTarget,
+		Kind:         TestTargetKindPackage,
+		Scope:        options.Scope,
+		AnalysisMode: TestAnalysisModeAST,
+		Tests:        tests,
+		Commands:     TestPlanCommands(plan),
+		TestPlan:     plan,
 	}, nil
 }
 
@@ -183,7 +200,8 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 		return TestsResult{}, err
 	}
 
-	tests := filterTestsForScope(collectRelatedTests(root, testFiles, packages, normalizedTarget), TestTargetKindSymbol, options.Scope)
+	relatedTests, analysisMode, warnings := collectRelatedTests(root, testFiles, packages, normalizedTarget)
+	tests := filterTestsForScope(relatedTests, TestTargetKindSymbol, options.Scope)
 	targetPackages := sortedMapKeys(packages)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget.String(),
@@ -193,12 +211,14 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 	})
 
 	return TestsResult{
-		Target:   normalizedTarget.String(),
-		Kind:     TestTargetKindSymbol,
-		Scope:    options.Scope,
-		Tests:    tests,
-		Commands: TestPlanCommands(plan),
-		TestPlan: plan,
+		Target:       normalizedTarget.String(),
+		Kind:         TestTargetKindSymbol,
+		Scope:        options.Scope,
+		AnalysisMode: analysisMode,
+		Warnings:     warnings,
+		Tests:        tests,
+		Commands:     TestPlanCommands(plan),
+		TestPlan:     plan,
 	}, nil
 }
 
@@ -286,10 +306,10 @@ func fileDefinesReferenceTarget(file *ast.File, target referenceTarget) bool {
 	return false
 }
 
-func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget) []RelatedTest {
+func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget) ([]RelatedTest, string, []string) {
 	var tests []RelatedTest
 	modulePath := readModulePath(root)
-	typecheckedDirectReferences := typecheckedDirectTestReferenceKeys(root, target)
+	typecheckedDirectReferences := analyzeTypecheckedDirectTestReferences(root, target)
 
 	for _, testFile := range testFiles {
 		_, packageMatches := packages[testFile.Package]
@@ -303,7 +323,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 
 			directReference := false
 			if target.Name != "" {
-				directReference = typecheckedDirectReferences.Contains(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name) ||
+				directReference = typecheckedDirectReferences.Keys.Contains(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name) ||
 					functionReferencesTarget(funcDecl, target, packageMatches, imports)
 			}
 
@@ -326,7 +346,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				subtestDirectReference := false
 				if target.Name != "" {
 					subtestName := funcDecl.Name.Name + "/" + subtest.Name
-					subtestDirectReference = typecheckedDirectReferences.Contains(root, testFile.FileSet, subtest.Pos, subtestName) ||
+					subtestDirectReference = typecheckedDirectReferences.Keys.Contains(root, testFile.FileSet, subtest.Pos, subtestName) ||
 						nodeReferencesTarget(subtest.Func.Body, target, packageMatches, imports)
 				}
 
@@ -350,7 +370,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 
 	sortRelatedTests(tests)
 
-	return tests
+	return tests, typecheckedDirectReferences.AnalysisMode, nonNilStrings(typecheckedDirectReferences.Warnings)
 }
 
 func filterTestsForScope(tests []RelatedTest, kind TestTargetKind, scope TestScope) []RelatedTest {
@@ -387,24 +407,33 @@ func directRelatedTests(tests []RelatedTest) []RelatedTest {
 	return direct
 }
 
-func typecheckedDirectTestReferenceKeys(root string, target referenceTarget) testReferenceKeys {
+func analyzeTypecheckedDirectTestReferences(root string, target referenceTarget) testReferenceAnalysis {
 	if target.Name == "" || !referenceShouldAttemptTypechecked(root) {
-		return nil
+		return testReferenceAnalysis{AnalysisMode: TestAnalysisModeAST}
 	}
 
-	repo, err := semantics.LoadRepository(root, semantics.LoadOptions{IncludeTests: true})
+	repo, err := loadSemanticTestRepository(root, semantics.LoadOptions{IncludeTests: true})
 	if err != nil {
-		return nil
+		return testReferenceAnalysis{
+			AnalysisMode: TestAnalysisModeAST,
+			Warnings:     []string{fmt.Sprintf("typechecked test reference analysis unavailable: %v", err)},
+		}
 	}
 
 	packages := semanticReferencePackages(repo)
 	if len(packages) == 0 {
-		return nil
+		return testReferenceAnalysis{
+			AnalysisMode: TestAnalysisModeAST,
+			Warnings:     append([]string{"typechecked test reference analysis unavailable: no typechecked packages loaded"}, repo.Warnings...),
+		}
 	}
 
 	targetObjects := semanticReferenceTargetObjects(packages, target)
 	if len(targetObjects) == 0 {
-		return nil
+		return testReferenceAnalysis{
+			AnalysisMode: TestAnalysisModeTypecheckedAST,
+			Warnings:     nonNilStrings(repo.Warnings),
+		}
 	}
 
 	keys := make(testReferenceKeys)
@@ -431,7 +460,11 @@ func typecheckedDirectTestReferenceKeys(root string, target referenceTarget) tes
 		}
 	}
 
-	return keys
+	return testReferenceAnalysis{
+		Keys:         keys,
+		AnalysisMode: TestAnalysisModeTypecheckedAST,
+		Warnings:     nonNilStrings(repo.Warnings),
+	}
 }
 
 func typecheckedNodeReferencesTarget(info types.Info, node ast.Node, targetObjects map[types.Object]struct{}) bool {

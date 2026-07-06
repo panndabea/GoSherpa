@@ -293,11 +293,13 @@ func impactSymbolTests(root string, target string, packages []string, targetPack
 	})
 
 	return TestsResult{
-		Target:   symbolTests.Target,
-		Kind:     TestTargetKindSymbol,
-		Tests:    mergedTests,
-		Commands: TestPlanCommands(plan),
-		TestPlan: plan,
+		Target:       symbolTests.Target,
+		Kind:         TestTargetKindSymbol,
+		AnalysisMode: symbolTests.AnalysisMode,
+		Warnings:     nonNilStrings(symbolTests.Warnings),
+		Tests:        mergedTests,
+		Commands:     TestPlanCommands(plan),
+		TestPlan:     plan,
 	}, uniqueSorted(warnings)
 }
 
@@ -316,7 +318,8 @@ func impactTestsForPackages(root string, packages []string) ([]RelatedTest, []st
 		packageSet[pkg] = struct{}{}
 	}
 
-	return collectRelatedTests(root, testFiles, packageSet, referenceTarget{}), nil
+	tests, _, _ := collectRelatedTests(root, testFiles, packageSet, referenceTarget{})
+	return tests, nil
 }
 
 func impactTests(root string, target string) (TestsResult, []string) {

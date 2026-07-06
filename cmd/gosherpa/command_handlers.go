@@ -668,7 +668,7 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 			root,
 			"tests",
 			normalizedResult.Target,
-			nil,
+			normalizedResult.Warnings,
 			testsJSONDataFromResult(normalizedResult),
 		))
 	}
