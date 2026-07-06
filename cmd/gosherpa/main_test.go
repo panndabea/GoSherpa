@@ -5562,7 +5562,9 @@ func assertMainTestJSONEnvelope(t *testing.T, payload map[string]any, root strin
 		t.Fatalf("expected modulePath %s, got %v", modulePath, payload["modulePath"])
 	}
 
-	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	if warnings := assertMainTestJSONArray(t, payload, "warnings"); len(warnings) != 0 {
+		t.Fatalf("expected warnings length 0, got %d: %#v", len(warnings), warnings)
+	}
 
 	data, ok := payload["data"].(map[string]any)
 	if !ok {
