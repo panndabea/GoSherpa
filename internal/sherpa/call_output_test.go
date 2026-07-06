@@ -129,6 +129,43 @@ Found 1 callees
 	}
 }
 
+func TestFormatCalleesShowsLimitations(t *testing.T) {
+	result := CalleesResult{
+		Target:       "Run",
+		AnalysisMode: CallAnalysisModeTypechecked,
+		Limitations: []string{
+			"Function value calls may hide concrete call edges at service.go:9.",
+		},
+		Callees: []Callee{
+			{
+				Name: "callback",
+				Position: Position{
+					File: "service.go",
+					Line: 9,
+				},
+			},
+		},
+	}
+
+	got := FormatCallees(result)
+	want := fmt.Sprintf(`CALLEES
+
+Run
+Analysis: typechecked
+
+  %-36s service.go:9
+
+LIMITATIONS
+  Function value calls may hide concrete call edges at service.go:9.
+
+Found 1 callees
+`, "callback")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatCallers(t *testing.T) {
 	result := CallersResult{
 		Target: "ParseFile",

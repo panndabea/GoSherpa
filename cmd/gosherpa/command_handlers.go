@@ -882,7 +882,7 @@ func runPathCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer
 			root,
 			invocation.Command,
 			callPathJSONTarget(normalizedResult),
-			nil,
+			normalizedResult.Warnings,
 			callPathsJSONDataFromResult(normalizedResult),
 		))
 	}

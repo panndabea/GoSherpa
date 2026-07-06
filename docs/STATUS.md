@@ -35,6 +35,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package dependency analysis
 - Direct caller and callee analysis with package-aware targets and receiver-variable method calls
 - Shortest and limited repository-local call path analysis
+- Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, and function literal calls
 - Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, exported functions, and functions with no local callers
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
@@ -72,7 +73,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
 - Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
-- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call.
+- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Snapshot creation and stale/missing/valid diagnostics are implemented, but query commands still analyze repository data directly instead of reusing snapshots.

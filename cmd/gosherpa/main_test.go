@@ -4287,6 +4287,38 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCalleesCommandReportsDynamicLimitationsAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process() }
+
+func Run(processor Processor, callback func()) {
+	processor.Process()
+	callback()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "callees", "Run", "--json", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callees", "Run", "example.com/app")
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+
+	assertMainTestStringArrayContains(t, limitations, "Interface dispatch may hide concrete call edges at service.go:6.")
+	assertMainTestStringArrayContains(t, limitations, "Function value calls may hide concrete call edges at service.go:7.")
+}
+
 func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "refs"})
@@ -5595,6 +5627,18 @@ func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key 
 	}
 
 	return values
+}
+
+func assertMainTestStringArrayContains(t *testing.T, values []any, want string) {
+	t.Helper()
+
+	for _, value := range values {
+		if value == want {
+			return
+		}
+	}
+
+	t.Fatalf("expected JSON array to contain %q, got %#v", want, values)
 }
 
 func assertMainTestJSONObject(t *testing.T, payload map[string]any, key string) map[string]any {

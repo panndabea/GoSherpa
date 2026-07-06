@@ -169,7 +169,8 @@ Current limitations:
   `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Callers, callees, paths, and entrypoints still do not resolve dynamic
   dispatch, reflection, function values, or every imported-package receiver
-  call.
+  call. Caller, callee, and path outputs now surface detected dynamic-call
+  uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP
   routers and CLI command handlers are not inferred yet.
 - Unqualified standalone call graph targets can be ambiguous across packages;
@@ -803,6 +804,10 @@ Done when:
   points.
 
 ### 4.4 Dynamic Call Limitations
+
+Status: first slice implemented for `callers`, `callees`, `path`, and `paths`
+with concrete limitations for visible interface dispatch, function value calls,
+reflection, goroutine starts, and function literal calls.
 
 Human question:
 

@@ -31,6 +31,7 @@ type CalleesResult struct {
 	Target       string   `json:"target"`
 	AnalysisMode string   `json:"analysisMode"`
 	Warnings     []string `json:"warnings"`
+	Limitations  []string `json:"limitations"`
 	Callees      []Callee `json:"callees"`
 }
 
@@ -44,6 +45,7 @@ type CallersResult struct {
 	Target       string   `json:"target"`
 	AnalysisMode string   `json:"analysisMode"`
 	Warnings     []string `json:"warnings"`
+	Limitations  []string `json:"limitations"`
 	Callers      []Caller `json:"callers"`
 }
 
@@ -69,9 +71,12 @@ type CallPath struct {
 }
 
 type CallPathsResult struct {
-	From  string     `json:"from"`
-	To    string     `json:"to"`
-	Paths []CallPath `json:"paths"`
+	From         string     `json:"from"`
+	To           string     `json:"to"`
+	AnalysisMode string     `json:"analysisMode"`
+	Warnings     []string   `json:"warnings"`
+	Limitations  []string   `json:"limitations"`
+	Paths        []CallPath `json:"paths"`
 }
 
 type callTarget struct {
@@ -128,6 +133,21 @@ type callPathSearchState struct {
 	Steps []CallPathStep
 }
 
+type callUncertaintyKind string
+
+const (
+	callUncertaintyInterfaceDispatch callUncertaintyKind = "interface-dispatch"
+	callUncertaintyFunctionValue     callUncertaintyKind = "function-value"
+	callUncertaintyReflection        callUncertaintyKind = "reflection"
+	callUncertaintyGoroutine         callUncertaintyKind = "goroutine"
+	callUncertaintyFunctionLiteral   callUncertaintyKind = "function-literal"
+)
+
+type callUncertaintySignal struct {
+	Kind     callUncertaintyKind
+	Position Position
+}
+
 var loadSemanticCallRepository = semantics.LoadRepository
 
 func FindCallees(root string, target string) (CalleesResult, error) {
@@ -168,11 +188,13 @@ func findCalleesInFunctions(functions []functionInfo, target callTarget, analysi
 	}
 
 	callees := collectCalleesFromFunction(function)
+	limitations := collectDynamicCallLimitations([]functionInfo{function})
 
 	return CalleesResult{
 		Target:       target.String(),
 		AnalysisMode: analysisMode,
 		Warnings:     nonNilStrings(warnings),
+		Limitations:  nonNilStrings(limitations),
 		Callees:      callees,
 	}, nil
 }
@@ -234,11 +256,13 @@ func findCallersInFunctionsWithOptions(root string, functions []functionInfo, ta
 	}
 
 	callers := collectCallersFromFunctions(callerFunctions, functionCallTarget(function))
+	limitations := collectDynamicCallLimitations(callerFunctions)
 
 	return CallersResult{
 		Target:       target.String(),
 		AnalysisMode: analysisMode,
 		Warnings:     nonNilStrings(warnings),
+		Limitations:  nonNilStrings(limitations),
 		Callers:      callers,
 	}, nil
 }
@@ -264,19 +288,34 @@ func FindCallPaths(root string, from string, to string, options CallPathOptions)
 		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
 	}
 
-	functions, _, _, err := collectCallFunctionInfos(rootPath, CallOptions{})
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath, CallOptions{})
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
+		return CallPathsResult{
+			From:         normalizedFrom.String(),
+			To:           normalizedTo.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
 	fromFunction, err := findFunctionInfo(functions, normalizedFrom)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
+		return CallPathsResult{
+			From:         normalizedFrom.String(),
+			To:           normalizedTo.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
 	toFunction, err := findFunctionInfo(functions, normalizedTo)
 	if err != nil {
-		return CallPathsResult{From: normalizedFrom.String(), To: normalizedTo.String()}, err
+		return CallPathsResult{
+			From:         normalizedFrom.String(),
+			To:           normalizedTo.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
 	}
 
 	graph := buildCallGraph(functions)
@@ -288,9 +327,12 @@ func FindCallPaths(root string, from string, to string, options CallPathOptions)
 	)
 
 	return CallPathsResult{
-		From:  normalizedFrom.String(),
-		To:    normalizedTo.String(),
-		Paths: paths,
+		From:         normalizedFrom.String(),
+		To:           normalizedTo.String(),
+		AnalysisMode: analysisMode,
+		Warnings:     nonNilStrings(warnings),
+		Limitations:  collectDynamicCallLimitations(functions),
+		Paths:        paths,
 	}, nil
 }
 
@@ -1441,6 +1483,275 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	sortCallReferences(references)
 
 	return references
+}
+
+func collectDynamicCallLimitations(functions []functionInfo) []string {
+	signalsByKind := make(map[callUncertaintyKind][]Position)
+	for _, function := range functions {
+		for _, signal := range collectCallUncertaintySignals(function) {
+			signalsByKind[signal.Kind] = append(signalsByKind[signal.Kind], signal.Position)
+		}
+	}
+
+	kinds := []callUncertaintyKind{
+		callUncertaintyInterfaceDispatch,
+		callUncertaintyFunctionValue,
+		callUncertaintyReflection,
+		callUncertaintyGoroutine,
+		callUncertaintyFunctionLiteral,
+	}
+
+	var limitations []string
+	for _, kind := range kinds {
+		positions := uniqueCallLimitationPositions(signalsByKind[kind])
+		if len(positions) == 0 {
+			continue
+		}
+
+		limitations = append(limitations, formatCallUncertaintyLimitation(kind, positions))
+	}
+
+	return limitations
+}
+
+func collectCallUncertaintySignals(function functionInfo) []callUncertaintySignal {
+	if function.Decl.Body == nil {
+		return nil
+	}
+
+	var signals []callUncertaintySignal
+	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		switch typed := node.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.GoStmt:
+			if typed.Call != nil {
+				signals = append(signals, callUncertaintySignal{
+					Kind:     callUncertaintyGoroutine,
+					Position: callExpressionPosition(function, typed.Call.Fun),
+				})
+			}
+			return true
+		case *ast.CallExpr:
+			if _, ok := typed.Fun.(*ast.FuncLit); ok {
+				signals = append(signals, callUncertaintySignal{
+					Kind:     callUncertaintyFunctionLiteral,
+					Position: callExpressionPosition(function, typed.Fun),
+				})
+			}
+			if callUsesInterfaceDispatch(function, typed.Fun) {
+				signals = append(signals, callUncertaintySignal{
+					Kind:     callUncertaintyInterfaceDispatch,
+					Position: callExpressionPosition(function, typed.Fun),
+				})
+			}
+			if callUsesFunctionValue(function, typed.Fun) {
+				signals = append(signals, callUncertaintySignal{
+					Kind:     callUncertaintyFunctionValue,
+					Position: callExpressionPosition(function, typed.Fun),
+				})
+			}
+			if callUsesReflection(function, typed.Fun) {
+				signals = append(signals, callUncertaintySignal{
+					Kind:     callUncertaintyReflection,
+					Position: callExpressionPosition(function, typed.Fun),
+				})
+			}
+		}
+
+		return true
+	})
+
+	return signals
+}
+
+func callUsesInterfaceDispatch(function functionInfo, expr ast.Expr) bool {
+	selection := callSelection(function, expr)
+	if selection == nil {
+		return false
+	}
+
+	if _, ok := selection.Obj().(*types.Func); !ok {
+		return false
+	}
+
+	return callTypeIsInterface(selection.Recv())
+}
+
+func callUsesFunctionValue(function functionInfo, expr ast.Expr) bool {
+	if function.TypeInfo == nil {
+		return false
+	}
+	if _, ok := expr.(*ast.FuncLit); ok {
+		return false
+	}
+
+	if functionValueCallObjectIsStaticFunction(function, expr) {
+		return false
+	}
+
+	typ := function.TypeInfo.TypeOf(expr)
+	return callTypeIsSignature(typ)
+}
+
+func functionValueCallObjectIsStaticFunction(function functionInfo, expr ast.Expr) bool {
+	selection := callSelection(function, expr)
+	if selection != nil {
+		if _, ok := selection.Obj().(*types.Func); ok {
+			return true
+		}
+	}
+
+	object := callObject(function, expr)
+	if object == nil {
+		return false
+	}
+
+	if _, ok := object.(*types.Func); ok {
+		return true
+	}
+	if _, ok := object.(*types.Builtin); ok {
+		return true
+	}
+	if _, ok := object.(*types.TypeName); ok {
+		return true
+	}
+
+	return false
+}
+
+func callUsesReflection(function functionInfo, expr ast.Expr) bool {
+	if object := callObject(function, expr); callObjectFromPackage(object, "reflect") {
+		return true
+	}
+
+	selection := callSelection(function, expr)
+	return selection != nil && callObjectFromPackage(selection.Obj(), "reflect")
+}
+
+func callObjectFromPackage(object types.Object, packagePath string) bool {
+	if object == nil || object.Pkg() == nil {
+		return false
+	}
+
+	return object.Pkg().Path() == packagePath
+}
+
+func callTypeIsSignature(typ types.Type) bool {
+	if typ == nil {
+		return false
+	}
+
+	_, ok := typ.Underlying().(*types.Signature)
+	return ok
+}
+
+func callTypeIsInterface(typ types.Type) bool {
+	if typ == nil {
+		return false
+	}
+
+	switch typed := typ.(type) {
+	case *types.Interface:
+		return true
+	case *types.Named:
+		return callTypeIsInterface(typed.Underlying())
+	case *types.Pointer:
+		return callTypeIsInterface(typed.Elem())
+	case *types.TypeParam:
+		return callTypeIsInterface(typed.Constraint())
+	default:
+		return false
+	}
+}
+
+func callExpressionPosition(function functionInfo, expr ast.Expr) Position {
+	pos := function.FileSet.Position(expr.Pos())
+	return positionRelativeToRoot(function.Root, Position{
+		File:   pos.Filename,
+		Line:   pos.Line,
+		Column: pos.Column,
+	})
+}
+
+func uniqueCallLimitationPositions(positions []Position) []Position {
+	seen := make(map[string]struct{})
+	var result []Position
+	for _, position := range positions {
+		key := callLimitationPositionString(position)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		result = append(result, position)
+	}
+
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].File != result[j].File {
+			return result[i].File < result[j].File
+		}
+		if result[i].Line != result[j].Line {
+			return result[i].Line < result[j].Line
+		}
+
+		return result[i].Column < result[j].Column
+	})
+
+	return result
+}
+
+func formatCallUncertaintyLimitation(kind callUncertaintyKind, positions []Position) string {
+	location := formatCallLimitationLocations(positions)
+	switch kind {
+	case callUncertaintyInterfaceDispatch:
+		return "Interface dispatch may hide concrete call edges at " + location + "."
+	case callUncertaintyFunctionValue:
+		return "Function value calls may hide concrete call edges at " + location + "."
+	case callUncertaintyReflection:
+		return "Reflection may hide dynamic call relationships at " + location + "."
+	case callUncertaintyGoroutine:
+		return "Goroutine starts may make execution paths incomplete at " + location + "."
+	case callUncertaintyFunctionLiteral:
+		return "Function literal calls are not expanded into call graph edges at " + location + "."
+	default:
+		return "Dynamic call behavior may be incomplete at " + location + "."
+	}
+}
+
+func formatCallLimitationLocations(positions []Position) string {
+	const maxPositions = 3
+
+	limit := len(positions)
+	if limit > maxPositions {
+		limit = maxPositions
+	}
+
+	locations := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		locations = append(locations, callLimitationPositionString(positions[i]))
+	}
+
+	if len(positions) > maxPositions {
+		locations = append(locations, fmt.Sprintf("%d more", len(positions)-maxPositions))
+	}
+
+	return strings.Join(locations, ", ")
+}
+
+func callLimitationPositionString(position Position) string {
+	if position.File == "" || position.Line <= 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("%s:%d", position.File, position.Line)
 }
 
 func callReferenceName(function functionInfo, expr ast.Expr) (string, bool) {

@@ -565,6 +565,7 @@ func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfac
 func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 	result.Callers = nonNilSlice(result.Callers)
 	result.Warnings = nonNilSlice(result.Warnings)
+	result.Limitations = nonNilSlice(result.Limitations)
 
 	return result
 }
@@ -573,7 +574,7 @@ func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
 	return callersJSONData{
 		AnalysisMode: result.AnalysisMode,
 		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
-		Limitations:  callLimitations(result.AnalysisMode),
+		Limitations:  appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
 		Callers:      result.Callers,
 	}
 }
@@ -581,6 +582,7 @@ func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
 func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
 	result.Callees = nonNilSlice(result.Callees)
 	result.Warnings = nonNilSlice(result.Warnings)
+	result.Limitations = nonNilSlice(result.Limitations)
 
 	return result
 }
@@ -589,13 +591,15 @@ func calleesJSONDataFromResult(result sherpa.CalleesResult) calleesJSONData {
 	return calleesJSONData{
 		AnalysisMode: result.AnalysisMode,
 		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
-		Limitations:  callLimitations(result.AnalysisMode),
+		Limitations:  appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
 		Callees:      result.Callees,
 	}
 }
 
 func callPathsJSONResult(result sherpa.CallPathsResult) sherpa.CallPathsResult {
 	result.Paths = nonNilSlice(result.Paths)
+	result.Warnings = nonNilSlice(result.Warnings)
+	result.Limitations = nonNilSlice(result.Limitations)
 	for i := range result.Paths {
 		result.Paths[i].Steps = nonNilSlice(result.Paths[i].Steps)
 	}
@@ -608,10 +612,15 @@ func callPathJSONTarget(result sherpa.CallPathsResult) string {
 }
 
 func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONData {
+	analysisMode := strings.TrimSpace(result.AnalysisMode)
+	if analysisMode == "" {
+		analysisMode = analysisModeAST
+	}
+
 	return callPathsJSONData{
-		AnalysisMode: analysisModeAST,
-		Confidence:   jsonConfidence(nil, analysisModeAST),
-		Limitations:  callPathLimitations(),
+		AnalysisMode: analysisMode,
+		Confidence:   jsonConfidence(result.Warnings, analysisMode),
+		Limitations:  appendLimitations(callPathLimitations(analysisMode), result.Limitations),
 		From:         result.From,
 		To:           result.To,
 		Paths:        result.Paths,
@@ -841,9 +850,10 @@ func callAnalysisLimitation(analysisMode string) string {
 	}
 }
 
-func callPathLimitations() []string {
+func callPathLimitations(analysisMode string) []string {
 	return []string{
-		"Path analysis uses repository-local call graph edges from syntax plus local type information.",
+		callAnalysisLimitation(analysisMode),
+		"Path analysis uses repository-local call graph edges.",
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Only bounded shortest paths requested by the command are returned.",
 	}
@@ -949,6 +959,25 @@ func interfaceLimitations(analysisMode string) []string {
 			"External implementations outside the repository are not reported.",
 		}
 	}
+}
+
+func appendLimitations(base []string, extra []string) []string {
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	combined := make([]string, 0, len(base)+len(extra))
+	for _, limitation := range append(append([]string{}, base...), extra...) {
+		limitation = strings.TrimSpace(limitation)
+		if limitation == "" {
+			continue
+		}
+		if _, ok := seen[limitation]; ok {
+			continue
+		}
+
+		seen[limitation] = struct{}{}
+		combined = append(combined, limitation)
+	}
+
+	return combined
 }
 
 func nonNilSlice[T any](values []T) []T {

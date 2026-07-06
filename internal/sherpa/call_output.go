@@ -18,6 +18,7 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 		var builder strings.Builder
 		fmt.Fprintf(&builder, "no callees found: %s\n", result.Target)
 		writeCallAnalysis(&builder, result.AnalysisMode)
+		writeCallLimitations(&builder, result.Limitations)
 		writeCallWarnings(&builder, result.Warnings)
 		return builder.String()
 	}
@@ -49,6 +50,7 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 
 	builder.WriteString("\n")
 	writeCallWarnings(&builder, result.Warnings)
+	writeCallLimitations(&builder, result.Limitations)
 	fmt.Fprintf(&builder, "Found %d callees\n", len(result.Callees))
 
 	return builder.String()
@@ -71,6 +73,7 @@ func formatCallers(result CallersResult, contexts []SourceContext) string {
 		var builder strings.Builder
 		fmt.Fprintf(&builder, "no callers found: %s\n", result.Target)
 		writeCallAnalysis(&builder, result.AnalysisMode)
+		writeCallLimitations(&builder, result.Limitations)
 		writeCallWarnings(&builder, result.Warnings)
 		return builder.String()
 	}
@@ -102,6 +105,7 @@ func formatCallers(result CallersResult, contexts []SourceContext) string {
 
 	builder.WriteString("\n")
 	writeCallWarnings(&builder, result.Warnings)
+	writeCallLimitations(&builder, result.Limitations)
 	fmt.Fprintf(&builder, "Found %d callers\n", len(result.Callers))
 
 	return builder.String()
@@ -137,9 +141,31 @@ func writeCallWarnings(builder *strings.Builder, warnings []string) {
 	builder.WriteString("\n")
 }
 
+func writeCallLimitations(builder *strings.Builder, limitations []string) {
+	if len(limitations) == 0 {
+		return
+	}
+
+	builder.WriteString("LIMITATIONS\n")
+	for _, limitation := range limitations {
+		limitation = strings.TrimSpace(limitation)
+		if limitation == "" {
+			continue
+		}
+
+		fmt.Fprintf(builder, "  %s\n", limitation)
+	}
+	builder.WriteString("\n")
+}
+
 func FormatCallPaths(result CallPathsResult) string {
 	if len(result.Paths) == 0 {
-		return fmt.Sprintf("no call path found: %s -> %s\n", result.From, result.To)
+		var builder strings.Builder
+		fmt.Fprintf(&builder, "no call path found: %s -> %s\n", result.From, result.To)
+		writeCallAnalysis(&builder, result.AnalysisMode)
+		writeCallWarnings(&builder, result.Warnings)
+		writeCallLimitations(&builder, result.Limitations)
+		return builder.String()
 	}
 
 	var builder strings.Builder
@@ -147,8 +173,14 @@ func FormatCallPaths(result CallPathsResult) string {
 	if len(result.Paths) == 1 {
 		builder.WriteString("CALL PATH\n")
 		builder.WriteString("\n")
+		writeCallAnalysis(&builder, result.AnalysisMode)
+		if strings.TrimSpace(result.AnalysisMode) != "" {
+			builder.WriteString("\n")
+		}
 		writeCallPath(&builder, result.From, result.Paths[0], "")
 		builder.WriteString("\n")
+		writeCallWarnings(&builder, result.Warnings)
+		writeCallLimitations(&builder, result.Limitations)
 		fmt.Fprintf(&builder, "Found %d path\n", len(result.Paths))
 
 		return builder.String()
@@ -157,6 +189,7 @@ func FormatCallPaths(result CallPathsResult) string {
 	builder.WriteString("CALL PATHS\n")
 	builder.WriteString("\n")
 	fmt.Fprintf(&builder, "%s -> %s\n", result.From, result.To)
+	writeCallAnalysis(&builder, result.AnalysisMode)
 	builder.WriteString("\n")
 
 	for i, path := range result.Paths {
@@ -165,6 +198,8 @@ func FormatCallPaths(result CallPathsResult) string {
 		builder.WriteString("\n")
 	}
 
+	writeCallWarnings(&builder, result.Warnings)
+	writeCallLimitations(&builder, result.Limitations)
 	fmt.Fprintf(&builder, "Found %d paths\n", len(result.Paths))
 
 	return builder.String()

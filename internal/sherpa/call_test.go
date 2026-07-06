@@ -228,6 +228,64 @@ func Run() {
 	}
 }
 
+func TestFindCalleesReportsDynamicCallLimitations(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "reflect"
+
+type Processor interface { Process() }
+
+func Run(processor Processor, callback func()) {
+	processor.Process()
+	callback()
+	go callback()
+	reflect.ValueOf(callback).Call(nil)
+	func() {}()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertContainsCallLimitation(t, result.Limitations, "Interface dispatch", "service.go:8")
+	assertContainsCallLimitation(t, result.Limitations, "Function value", "service.go:9")
+	assertContainsCallLimitation(t, result.Limitations, "Reflection", "service.go:11")
+	assertContainsCallLimitation(t, result.Limitations, "Goroutine", "service.go:10")
+	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:12")
+}
+
+func TestFindCallPathsReportsDynamicCallLimitations(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry(callback func()) {
+	callback()
+	Middle()
+}
+
+func Middle() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function value", "service.go:4")
+}
+
 func TestCollectCallersFromFunctions(t *testing.T) {
 	function := parseCallTestFunction(t, `package sample
 
@@ -1901,6 +1959,25 @@ func callTestCalleeFiles(callees []Callee) []string {
 	}
 
 	return files
+}
+
+func assertContainsCallLimitation(t *testing.T, limitations []string, substrings ...string) {
+	t.Helper()
+
+	for _, limitation := range limitations {
+		matches := true
+		for _, substring := range substrings {
+			if !strings.Contains(limitation, substring) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return
+		}
+	}
+
+	t.Fatalf("expected limitations to contain %v, got %#v", substrings, limitations)
 }
 
 func callTestCallerNames(callers []Caller) []string {
