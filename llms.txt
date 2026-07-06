@@ -49,5 +49,5 @@ GoSherpa is currently an early MVP. APIs, commands, and output schemas may chang
 Links:
 - Repository: https://github.com/panndabea/GoSherpa
 - Documentation: https://panndabea.github.io/GoSherpa/
-- Agent guide: https://panndabea.github.io/GoSherpa/docs/agents.md
+- Agent guide: https://panndabea.github.io/GoSherpa/agents.md
 - CLI reference: https://panndabea.github.io/GoSherpa/docs/CLI_REFERENCE.md

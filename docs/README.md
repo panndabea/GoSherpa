@@ -1,13 +1,13 @@
 # GoSherpa Docs
 
-Reference, planning, and release documents live here so the repository root stays
-focused on the code, README, and license.
+Reference, planning, and release documents mostly live here. The repository root
+keeps the main README, license, and agent guide easy to find.
 
 ## Product
 
 - [CLI Reference](CLI_REFERENCE.md) - full command overview, examples, root
   selection, and JSON output notes.
-- [GoSherpa for AI Agents](agents.md) - practical decision guide, agent
+- [GoSherpa for AI Agents](../agents.md) - practical decision guide, agent
   workflow, JSON usage, and limitations for coding agents.
 - [Implementation Status](STATUS.md) - implemented MVP capabilities, known
   limitations, and current roadmap focus.
