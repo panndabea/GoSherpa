@@ -140,6 +140,60 @@ func Enterprise() {}
 	}
 }
 
+func TestLoadRepositoryRetriesEmptyLoadWithWritableCache(t *testing.T) {
+	tmp := t.TempDir()
+
+	goFile := filepath.Join(tmp, "service.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, goFile, "package app\n")
+
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+	})
+
+	calls := 0
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls++
+		switch calls {
+		case 1:
+			if semanticTestEnvValue(cfg.Env, "GOCACHE") != "" {
+				t.Fatalf("first package load unexpectedly set GOCACHE: %v", cfg.Env)
+			}
+			return nil, nil
+		case 2:
+			goCache := semanticTestEnvValue(cfg.Env, "GOCACHE")
+			if !strings.Contains(filepath.ToSlash(goCache), "gosherpa-go-build-cache") {
+				t.Fatalf("expected retry with gosherpa GOCACHE, got %q", goCache)
+			}
+			return []*packages.Package{
+				{
+					ID:              "example.com/app",
+					Name:            "app",
+					PkgPath:         "example.com/app",
+					Dir:             tmp,
+					GoFiles:         []string{goFile},
+					CompiledGoFiles: []string{goFile},
+				},
+			}, nil
+		default:
+			t.Fatalf("unexpected package load call %d", calls)
+			return nil, nil
+		}
+	}
+
+	repo, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("package load calls = %d, want 2", calls)
+	}
+
+	got := semanticTestPackagePaths(repo)
+	assertSemanticTestContains(t, got, ".")
+}
+
 func TestNormalizeBuildTagsSplitsDeduplicatesAndSorts(t *testing.T) {
 	got := NormalizeBuildTags([]string{"integration, enterprise", "enterprise", "debug"})
 	want := []string{"debug", "enterprise", "integration"}
@@ -246,6 +300,17 @@ func semanticTestCompiledFileExists(repo Repository, name string) bool {
 	}
 
 	return false
+}
+
+func semanticTestEnvValue(env []string, key string) string {
+	prefix := key + "="
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			return strings.TrimPrefix(entry, prefix)
+		}
+	}
+
+	return ""
 }
 
 func writeSemanticTestFile(t *testing.T, path string, contents string) {

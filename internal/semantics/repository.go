@@ -41,6 +41,8 @@ type Package struct {
 	TypesInfo       *types.Info
 }
 
+var packageLoader = packages.Load
+
 func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	rootPath, err := absoluteRoot(root)
 	if err != nil {
@@ -57,6 +59,11 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 		}
 
 		return Repository{}, fmt.Errorf("load packages: %w", err)
+	}
+	if len(loaded) == 0 {
+		if retried, retryErr, ok := retryLoadRepositoryWithWritableCache(rootPath, options, patterns); ok {
+			return retried, retryErr
+		}
 	}
 
 	repo, err := repositoryFromLoaded(rootPath, patterns, loaded)
@@ -160,7 +167,7 @@ func loadPackages(root string, options LoadOptions, patterns []string, goCache s
 		cfg.Env = envWith("GOCACHE", goCache)
 	}
 
-	return packages.Load(cfg, patterns...)
+	return packageLoader(cfg, patterns...)
 }
 
 func retryLoadRepositoryWithWritableCache(root string, options LoadOptions, patterns []string) (Repository, error, bool) {
