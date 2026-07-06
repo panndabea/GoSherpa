@@ -52,6 +52,7 @@ Build a local binary when you are ready:
 ```bash
 go build -o gosherpa ./cmd/gosherpa
 ./gosherpa search parse file
+./gosherpa analyze --use-snapshot
 ./gosherpa symbols --use-snapshot
 ./gosherpa refs ParseFile --kind call
 ./gosherpa entrypoints ParseFile
@@ -71,6 +72,7 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
 | `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot |
+| `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory when available |
 | `gosherpa symbols --use-snapshot` | Reuses a valid snapshot for symbol inventory queries, with live-analysis fallback warnings |
 | `gosherpa symbols --kind function --package ./internal/sherpa` | Structs, interfaces, functions, and methods with optional kind, package, and test filters |
 | `gosherpa symbol ParseFile` | One symbol's package, signature, docs, and source location |

@@ -10,6 +10,7 @@ import (
 	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
 )
 
 const (
@@ -17,7 +18,16 @@ const (
 	analyzeMaxEntryPoints      = 12
 	analyzeMaxHotspots         = 5
 	analyzeMaxTestCommands     = 6
+
+	analyzeAnalysisModeSnapshotAST         = "snapshot+ast"
+	analyzeAnalysisModeSnapshotTypechecked = "snapshot+typechecked+ast"
 )
+
+type analyzeOptions struct {
+	IncludeTests bool
+	BuildTags    []string
+	UseSnapshot  bool
+}
 
 type analyzeReport struct {
 	Target           string                   `json:"target"`
@@ -96,28 +106,24 @@ type analyzeReadinessSummary struct {
 	Suggestions      []string `json:"suggestions"`
 }
 
-func analyzeRepository(root string, includeTests bool, buildTags []string) (analyzeReport, error) {
-	doctor := analyzeDoctor(root, buildTags)
+func analyzeRepository(root string, options analyzeOptions) (analyzeReport, error) {
+	doctor := analyzeDoctor(root, options.BuildTags)
 
-	packages, err := sherpa.FindPackageSummaries(root, sherpa.PackageInventoryOptions{
-		IncludeTests: includeTests,
-	})
+	packages, symbols, inventoryMode, inventoryWarnings, err := analyzeInventory(root, options)
 	if err != nil {
 		return analyzeReport{}, err
 	}
 
-	symbols, err := sherpa.ParseRepository(root)
-	if err != nil {
-		return analyzeReport{}, err
-	}
-
-	selectedSymbols := analyzeSelectedSymbols(symbols, includeTests)
+	selectedSymbols := analyzeSelectedSymbols(symbols, options.IncludeTests)
 	testPackages := analyzeTestPackages(packages)
 	analysisMode := analyzeAnalysisMode(doctor)
-	warnings := nonNilSlice(doctor.Warnings)
+	if inventoryMode == analysisModeSnapshot {
+		analysisMode = analyzeSnapshotAnalysisMode(analysisMode)
+	}
+	warnings := append(nonNilSlice(doctor.Warnings), inventoryWarnings...)
 
 	risk, err := sherpa.AnalyzeRisk(root, sherpa.RiskOptions{
-		IncludeTests: includeTests,
+		IncludeTests: options.IncludeTests,
 	})
 	if err != nil {
 		return analyzeReport{}, err
@@ -127,7 +133,6 @@ func analyzeRepository(root string, includeTests bool, buildTags []string) (anal
 		Target:       ".",
 		AnalysisMode: analysisMode,
 		Confidence:   jsonConfidence(warnings, analysisMode),
-		Limitations:  analyzeLimitations(includeTests),
 		Repository: analyzeRepositorySummary{
 			ModulePath:       doctor.Repository.ModulePath,
 			GoFiles:          doctor.Repository.GoFiles,
@@ -137,11 +142,11 @@ func analyzeRepository(root string, includeTests bool, buildTags []string) (anal
 			TestPackageCount: len(testPackages),
 			SymbolCount:      len(selectedSymbols),
 		},
-		BuildTags:        semantics.NormalizeBuildTags(buildTags),
+		BuildTags:        semantics.NormalizeBuildTags(options.BuildTags),
 		SymbolSummary:    analyzeSymbolSummaryFromSymbols(selectedSymbols, symbols),
 		Packages:         packages,
 		ImportantSymbols: analyzeImportantSymbols(selectedSymbols),
-		EntryPoints:      analyzeEntryPoints(selectedSymbols, includeTests),
+		EntryPoints:      analyzeEntryPoints(selectedSymbols, options.IncludeTests),
 		Risk:             risk,
 		Hotspots:         analyzeHotspots(packages),
 		Testing: analyzeTestingOverview{
@@ -160,9 +165,51 @@ func analyzeRepository(root string, includeTests bool, buildTags []string) (anal
 		},
 		Warnings: warnings,
 	}
+	report.Limitations = analyzeLimitations(options.IncludeTests, inventoryMode == analysisModeSnapshot)
 	report.Suggestions = analyzeSuggestions(report)
 
 	return normalizeAnalyzeReport(report), nil
+}
+
+func analyzeInventory(root string, options analyzeOptions) ([]sherpa.PackageSummary, []sherpa.Symbol, string, []string, error) {
+	var warnings []string
+	if options.UseSnapshot {
+		stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{
+			BuildTags: options.BuildTags,
+		})
+		if inspect.Status == snapshotstore.StatusValid {
+			packages, err := analyzePackagesFromSnapshotOrLive(root, stored, options.IncludeTests)
+			if err != nil {
+				return nil, nil, "", warnings, err
+			}
+
+			return packages, cloneSlice(stored.Symbols), analysisModeSnapshot, warnings, nil
+		}
+
+		warnings = append(warnings, snapshotFallbackWarning(inspect))
+	}
+
+	packages, err := sherpa.FindPackageSummaries(root, sherpa.PackageInventoryOptions{
+		IncludeTests: options.IncludeTests,
+	})
+	if err != nil {
+		return nil, nil, "", warnings, err
+	}
+
+	symbols, err := sherpa.ParseRepository(root)
+	if err != nil {
+		return nil, nil, "", warnings, err
+	}
+
+	return packages, symbols, "", warnings, nil
+}
+
+func analyzePackagesFromSnapshotOrLive(root string, stored snapshotstore.Snapshot, includeTests bool) ([]sherpa.PackageSummary, error) {
+	if includeTests {
+		return cloneSlice(stored.Packages), nil
+	}
+
+	return sherpa.FindPackageSummaries(root, sherpa.PackageInventoryOptions{})
 }
 
 func normalizeAnalyzeReport(report analyzeReport) analyzeReport {
@@ -445,13 +492,28 @@ func analyzeSuggestions(report analyzeReport) []string {
 	return uniqueStringsInOrder(suggestions)
 }
 
-func analyzeLimitations(includeTests bool) []string {
+func analyzeSnapshotAnalysisMode(base string) string {
+	if base == agentcontext.AnalysisModeTypecheckedAST {
+		return analyzeAnalysisModeSnapshotTypechecked
+	}
+
+	return analyzeAnalysisModeSnapshotAST
+}
+
+func analyzeLimitations(includeTests bool, usingSnapshot bool) []string {
 	limitations := []string{
 		"Analyze composes repository inventory, package summaries, symbol discovery, and doctor readiness checks.",
 		"Hotspots are simple inventory signals, not runtime profiling or full dependency impact.",
 		"Entry point overview is based on main functions, exported functions, and optional Go test entrypoints.",
 		"Build tags are applied to semantic readiness checks; syntax inventory still follows discovered Go files.",
-		"Snapshots currently store repository inventory and freshness metadata; analyze still reads repository data directly.",
+	}
+	if usingSnapshot {
+		limitations = append(limitations, "Analyze reused a valid snapshot for symbol inventory; risk and readiness still use live repository analysis.")
+		if !includeTests {
+			limitations = append(limitations, "Package summaries still use live analysis without --tests because snapshots store test-inclusive package inventory.")
+		}
+	} else {
+		limitations = append(limitations, "Analyze reads repository inventory directly unless --use-snapshot is provided with a valid snapshot.")
 	}
 	if !includeTests {
 		limitations = append(limitations, "Test symbols are counted but omitted from entry point and important symbol lists unless --tests is used.")

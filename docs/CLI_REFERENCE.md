@@ -43,12 +43,13 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ```
 
 Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
-reused by `symbols`, `symbol`, `search`, and `packages --tests` with
+reused by `analyze`, `symbols`, `symbol`, `search`, and `packages --tests` with
 `--use-snapshot`. Missing, stale, or invalid snapshots fall back to live
 repository analysis and report a warning.
 
 ```bash
 ./gosherpa snapshot
+./gosherpa analyze --use-snapshot
 ./gosherpa symbols --use-snapshot
 ./gosherpa search parse --use-snapshot --json
 ./gosherpa packages --tests --use-snapshot
@@ -71,7 +72,7 @@ repository analysis and report a warning.
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
-| Snapshot-backed inventory | `gosherpa symbols --use-snapshot` | Reuses a valid snapshot for symbol inventory queries, with live-analysis fallback warnings |
+| Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory where available, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -111,6 +112,7 @@ Found 4 references
 ```bash
 ./gosherpa analyze .
 ./gosherpa analyze . --tests
+./gosherpa analyze --use-snapshot
 ./gosherpa analyze . --json
 ./gosherpa architecture
 ./gosherpa architecture --tests

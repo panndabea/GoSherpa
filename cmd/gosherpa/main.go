@@ -145,7 +145,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by symbols, symbol, search, and packages")
+		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, and packages")
 		return exitUsage
 	}
 

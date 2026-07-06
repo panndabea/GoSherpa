@@ -187,6 +187,7 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 
 func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 	tests := [][]string{
+		{"analyze", "--use-snapshot"},
 		{"--use-snapshot", "symbols"},
 		{"search", "target", "--use-snapshot"},
 	}
@@ -601,7 +602,7 @@ func TestPrintUsageIncludesAnalyze(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
 
-	if !strings.Contains(output.String(), "analyze [path] [--tests]") {
+	if !strings.Contains(output.String(), "analyze [path] [--tests] [--use-snapshot]") {
 		t.Fatalf("expected usage to contain analyze command, got:\n%s", output.String())
 	}
 }
@@ -1290,10 +1291,46 @@ func TestMainRunsAnalyzeCommandAsJSONWithTests(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "entrypoints", 4)
 }
 
+func TestMainRunsAnalyzeCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "analyze", "--tests", "--use-snapshot", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "analyze", ".", "example.com/app")
+	if data["analysisMode"] != analyzeAnalysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot analysis mode, got %v", data["analysisMode"])
+	}
+	if data["confidence"] != agentcontext.ConfidenceMedium {
+		t.Fatalf("expected medium confidence, got %v", data["confidence"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	repository := assertMainTestJSONObject(t, data, "repository")
+	if repository["symbolCount"] != float64(4) {
+		t.Fatalf("expected test-inclusive symbol count 4, got %#v", repository["symbolCount"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "packages", 2)
+	if !mainTestJSONArrayContainsSubstring(data["limitations"].([]any), "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", data["limitations"])
+	}
+}
+
 func TestMainPrintsAnalyzeUsageWhenArgumentIsUnexpected(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "analyze", ".", "extra"})
 
-	want := "usage: gosherpa [--root <path>] analyze [path] [--tests]\n"
+	want := "usage: gosherpa [--root <path>] analyze [path] [--tests] [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -1967,7 +2004,7 @@ func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by symbols, symbol, search, and packages") {
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, and packages") {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 

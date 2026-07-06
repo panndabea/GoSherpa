@@ -14,7 +14,7 @@
       "Hotspots are simple inventory signals, not runtime profiling or full dependency impact.",
       "Entry point overview is based on main functions, exported functions, and optional Go test entrypoints.",
       "Build tags are applied to semantic readiness checks; syntax inventory still follows discovered Go files.",
-      "Snapshots currently store repository inventory and freshness metadata; analyze still reads repository data directly.",
+      "Analyze reads repository inventory directly unless --use-snapshot is provided with a valid snapshot.",
       "Test symbols are counted but omitted from entry point and important symbol lists unless --tests is used."
     ],
     "repository": {

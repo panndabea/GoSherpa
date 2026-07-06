@@ -31,7 +31,11 @@ func runAnalyzeCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 		return exitFailure
 	}
 
-	report, err := analyzeRepository(root, invocation.IncludeTests, invocation.BuildTags)
+	report, err := analyzeRepository(root, analyzeOptions{
+		IncludeTests: invocation.IncludeTests,
+		BuildTags:    invocation.BuildTags,
+		UseSnapshot:  invocation.UseSnapshot,
+	})
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "analyze", ".", stderr, err)
 	}

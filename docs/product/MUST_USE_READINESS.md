@@ -203,7 +203,9 @@ Add an explicit persistent repository snapshot for repeated queries.
 Status: first slice implemented as `gosherpa snapshot`, writing a versioned
 `.gosherpa/snapshot.json` inventory with file freshness metadata, package
 summaries, symbols, build tags, and git state. `gosherpa doctor` reports
-missing, valid, stale, and invalid snapshots. Command reuse remains future work.
+missing, valid, stale, and invalid snapshots. `analyze`, `symbols`, `symbol`,
+`search`, and test-inclusive `packages --tests` can opt in to snapshot reuse;
+broader command reuse remains future work.
 
 Command sketch:
 

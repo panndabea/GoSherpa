@@ -25,12 +25,13 @@ type commandSpec struct {
 
 var commandSpecs = []commandSpec{
 	{
-		Name:    "analyze",
-		Usage:   []string{analyzeUsageLine},
-		Handler: runAnalyzeCommand,
-		JSON:    true,
-		Tests:   true,
-		Tags:    true,
+		Name:     "analyze",
+		Usage:    []string{analyzeUsageLine},
+		Handler:  runAnalyzeCommand,
+		JSON:     true,
+		Tests:    true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
 		Name:    "architecture",
@@ -215,7 +216,7 @@ var commandSpecs = []commandSpec{
 var commandSpecIndex = indexCommandSpecs(commandSpecs)
 
 const (
-	analyzeUsageLine        = "analyze [path] [--tests]"
+	analyzeUsageLine        = "analyze [path] [--tests] [--use-snapshot]"
 	architectureUsageLine   = "architecture [--tests]"
 	riskUsageLine           = "risk [--tests]"
 	contextSymbolUsageLine  = "context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"

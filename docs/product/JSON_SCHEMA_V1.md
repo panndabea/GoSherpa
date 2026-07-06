@@ -327,7 +327,10 @@ Data:
 
 - `analysisMode`: broader repository overview mode. It is
   `typechecked+ast` when doctor readiness completed typechecked package
-  loading and `ast` when semantic readiness is unavailable.
+  loading and `ast` when semantic readiness is unavailable. With
+  `--use-snapshot` and a valid snapshot, `analyze` reports
+  `snapshot+typechecked+ast` or `snapshot+ast` to show that inventory came from
+  the snapshot while readiness and risk still used live analysis.
 - `repository`: compact module, file, package, test, and symbol counts.
 - `symbolSummary`: counts for supported symbol kinds in the overview.
   `tests` counts discovered test symbols; test symbols are omitted from
@@ -636,11 +639,13 @@ Data:
 - `snapshot.packages`: package inventory in the same shape as `packages`.
 - `snapshot.symbols`: parsed symbol inventory in the same shape as `symbols`.
 
-Snapshot creation is explicit. `symbols`, `symbol`, `search`, and
+Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`, and
 test-inclusive `packages --tests` can opt in to snapshot reuse with
-`--use-snapshot`. When a valid snapshot is used, these command data objects may
-include `"analysisMode": "snapshot"`. Missing, stale, or invalid snapshots fall
-back to live repository analysis and report the reason in the shared envelope
+`--use-snapshot`. When a valid snapshot is used, inventory command data objects
+may include `"analysisMode": "snapshot"`; `analyze` reports
+`"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness
+remain live-analysis signals. Missing, stale, or invalid snapshots fall back to
+live repository analysis and report the reason in the shared envelope
 `warnings`. Deeper semantic, context, impact, and call-graph queries still
 analyze repository data directly in this slice; use `doctor` to check whether
 the snapshot is missing, valid, stale, or invalid.

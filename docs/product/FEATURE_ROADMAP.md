@@ -1511,8 +1511,8 @@ Needed docs:
 
 This milestone section is a historical planning sketch. Several early and
 mid-stage items now have first slices implemented, including explicit snapshot
-creation. Later integration work such as snapshot reuse, MCP, shell completion,
-and TUI remains future work.
+creation and opt-in inventory reuse. Later integration work such as broader
+snapshot reuse, MCP, shell completion, and TUI remains future work.
 
 ### v0.1: Historical MVP Baseline
 
