@@ -1,9 +1,13 @@
 package sherpa
 
 import (
+	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/panndabea/GoSherpa/internal/semantics"
 )
 
 func TestFindImpactForSymbol(t *testing.T) {
@@ -71,6 +75,49 @@ func TestUsesParser(t *testing.T) {
 	wantCommands := []string{"go test ./cmd/app", "go test ./internal/parser"}
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
+	}
+}
+
+func TestFindImpactPropagatesTestAnalysisWarnings(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	original := loadSemanticTestRepository
+	loadSemanticTestRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		loadSemanticTestRepository = original
+	}()
+
+	result, err := FindImpact(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.TestAnalysisMode != TestAnalysisModeAST {
+		t.Fatalf("expected ast test analysis fallback, got %q", result.TestAnalysisMode)
+	}
+	if len(result.Warnings) == 0 || !strings.Contains(strings.Join(result.Warnings, "\n"), "typechecked test reference analysis unavailable: loader failed") {
+		t.Fatalf("expected propagated test analysis warning, got %#v", result.Warnings)
+	}
+
+	test := findRelatedTest(result.RelatedTests, "TestTarget")
+	if test == nil || !test.DirectReference {
+		t.Fatalf("expected AST fallback to preserve direct test reference, got %#v", result.RelatedTests)
 	}
 }
 
