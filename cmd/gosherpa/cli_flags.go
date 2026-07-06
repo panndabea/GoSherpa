@@ -49,6 +49,14 @@ var cliFlagSpecs = []cliFlagSpec{
 		},
 	},
 	{
+		Name: "--use-snapshot",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			invocation.UseSnapshot = true
+			invocation.HasSnapshotOption = true
+			return nil
+		},
+	},
+	{
 		Name:       "--tags",
 		TakesValue: true,
 		Apply:      applyBuildTagsFlag,

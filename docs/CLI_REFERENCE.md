@@ -42,6 +42,18 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
+Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
+reused by `symbols`, `symbol`, `search`, and `packages --tests` with
+`--use-snapshot`. Missing, stale, or invalid snapshots fall back to live
+repository analysis and report a warning.
+
+```bash
+./gosherpa snapshot
+./gosherpa symbols --use-snapshot
+./gosherpa search parse --use-snapshot --json
+./gosherpa packages --tests --use-snapshot
+```
+
 ## Command Overview
 
 | Capability | Command | Result |
@@ -59,6 +71,7 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
+| Snapshot-backed inventory | `gosherpa symbols --use-snapshot` | Reuses a valid snapshot for symbol inventory queries, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -109,13 +122,16 @@ Found 4 references
 ./gosherpa symbols --kind struct
 ./gosherpa symbols --kind method --package ./internal/sherpa
 ./gosherpa symbols --tests
+./gosherpa symbols --use-snapshot
 ./gosherpa symbols --json
 ./gosherpa symbol ParseFile
+./gosherpa symbol ParseFile --use-snapshot
 ./gosherpa symbol ParseFile --json
 ./gosherpa search parse file
 ./gosherpa search parse file --kind function --limit 5
 ./gosherpa search ParseFile --package ./internal/sherpa
 ./gosherpa search ParseFile --tests
+./gosherpa search ParseFile --use-snapshot
 ./gosherpa search parse file --json
 ./gosherpa context symbol ParseFile
 ./gosherpa context symbol ParseFile --tests
@@ -156,6 +172,7 @@ Found 4 references
 ./gosherpa tests affected --base HEAD --json
 ./gosherpa packages
 ./gosherpa packages --tests
+./gosherpa packages --tests --use-snapshot
 ./gosherpa packages --json
 ./gosherpa deps ./internal/sherpa
 ./gosherpa deps --all

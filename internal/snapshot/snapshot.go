@@ -151,13 +151,13 @@ func Load(root string) (Snapshot, error) {
 	return normalizeSnapshot(snapshot), nil
 }
 
-func Inspect(root string, options BuildOptions) InspectResult {
+func LoadReusable(root string, options BuildOptions) (Snapshot, InspectResult) {
 	path := Path(root)
 	displayPath := displayPath(root, path)
 	stored, err := Load(root)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return normalizeInspectResult(InspectResult{
+			return Snapshot{}, normalizeInspectResult(InspectResult{
 				Supported: true,
 				Status:    StatusMissing,
 				Path:      displayPath,
@@ -165,7 +165,7 @@ func Inspect(root string, options BuildOptions) InspectResult {
 			})
 		}
 
-		return normalizeInspectResult(InspectResult{
+		return Snapshot{}, normalizeInspectResult(InspectResult{
 			Supported:    true,
 			Status:       StatusInvalid,
 			Path:         displayPath,
@@ -174,9 +174,9 @@ func Inspect(root string, options BuildOptions) InspectResult {
 		})
 	}
 
-	current, currentErr := Build(root, options)
+	current, currentErr := buildSnapshotInputs(root, options)
 	if currentErr != nil {
-		return normalizeInspectResult(InspectResult{
+		return stored, normalizeInspectResult(InspectResult{
 			Supported:     true,
 			Status:        StatusInvalid,
 			Path:          displayPath,
@@ -199,7 +199,7 @@ func Inspect(root string, options BuildOptions) InspectResult {
 		message = "Snapshot is stale. Run gosherpa snapshot to refresh it."
 	}
 
-	return normalizeInspectResult(InspectResult{
+	return stored, normalizeInspectResult(InspectResult{
 		Supported:          true,
 		Status:             status,
 		Path:               displayPath,
@@ -213,6 +213,11 @@ func Inspect(root string, options BuildOptions) InspectResult {
 		SymbolCount:        len(stored.Symbols),
 		StaleReasons:       reasons,
 	})
+}
+
+func Inspect(root string, options BuildOptions) InspectResult {
+	_, result := LoadReusable(root, options)
+	return result
 }
 
 func Path(root string) string {
@@ -257,6 +262,36 @@ func collectFiles(root string) ([]File, error) {
 	})
 
 	return files, nil
+}
+
+func buildSnapshotInputs(root string, options BuildOptions) (Snapshot, error) {
+	rootPath, err := filepath.Abs(strings.TrimSpace(root))
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("resolve repository root %s: %w", root, err)
+	}
+	rootPath = filepath.Clean(rootPath)
+
+	modulePath, err := sherpa.ModulePath(rootPath)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	files, err := collectFiles(rootPath)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
+	snapshot := Snapshot{
+		FormatVersion: FormatVersion,
+		Root:          rootPath,
+		ModulePath:    modulePath,
+		BuildTags:     semantics.NormalizeBuildTags(options.BuildTags),
+		GitState:      readGitState(rootPath),
+		Files:         files,
+	}
+	snapshot.Fingerprint = fingerprintSnapshotInputs(snapshot)
+
+	return snapshot, nil
 }
 
 func fileMetadata(root string, path string) (File, error) {

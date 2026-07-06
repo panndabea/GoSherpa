@@ -372,7 +372,7 @@ func runSymbolCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 
 	target := invocation.CommandArgs[0]
 
-	symbols, err := sherpa.ParseRepository(root)
+	symbols, warnings, analysisMode, err := loadSymbolsForInventoryCommand(root, invocation)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "symbol", target, stderr, err)
 	}
@@ -383,10 +383,13 @@ func runSymbolCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 	}
 
 	if invocation.JSON {
-		return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, nil, symbolJSONData{
-			Symbol: symbol,
+		return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, warnings, symbolJSONData{
+			AnalysisMode: analysisMode,
+			Symbol:       symbol,
 		}))
 	}
+
+	writeHumanWarnings(stderr, warnings)
 
 	if invocation.ShowContext {
 		context, err := sherpa.ReadSourceContext(root, symbol.Position, sherpa.DefaultSourceContextRadius)
@@ -416,7 +419,7 @@ func runSearchCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 	terms := invocation.CommandArgs
 	target := strings.Join(terms, " ")
 
-	symbols, err := sherpa.ParseRepository(root)
+	symbols, warnings, analysisMode, err := loadSymbolsForInventoryCommand(root, invocation)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "search", target, stderr, err)
 	}
@@ -428,12 +431,14 @@ func runSearchCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 		Limit:     invocation.CallPathLimit,
 	})
 	if invocation.JSON {
-		return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, nil, searchJSONData{
-			Terms:   nonNilSlice(terms),
-			Results: nonNilSlice(results),
+		return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, warnings, searchJSONData{
+			AnalysisMode: analysisMode,
+			Terms:        nonNilSlice(terms),
+			Results:      nonNilSlice(results),
 		}))
 	}
 
+	writeHumanWarnings(stderr, warnings)
 	fmt.Fprint(stdout, sherpa.FormatSymbolSearch(terms, results))
 	return exitSuccess
 }
@@ -444,7 +449,7 @@ func runSymbolsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 		return exitFailure
 	}
 
-	symbols, err := sherpa.ParseRepository(root)
+	symbols, warnings, analysisMode, err := loadSymbolsForInventoryCommand(root, invocation)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "symbols", "", stderr, err)
 	}
@@ -455,11 +460,13 @@ func runSymbolsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 	})
 
 	if invocation.JSON {
-		return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", nil, symbolsJSONData{
-			Symbols: nonNilSlice(symbols),
+		return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", warnings, symbolsJSONData{
+			AnalysisMode: analysisMode,
+			Symbols:      nonNilSlice(symbols),
 		}))
 	}
 
+	writeHumanWarnings(stderr, warnings)
 	fmt.Fprint(stdout, sherpa.FormatSymbols(symbols))
 	return exitSuccess
 }
@@ -752,9 +759,7 @@ func runPackagesCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wr
 		return exitFailure
 	}
 
-	packages, err := sherpa.FindPackageSummaries(root, sherpa.PackageInventoryOptions{
-		IncludeTests: invocation.IncludeTests,
-	})
+	packages, warnings, analysisMode, err := loadPackagesForInventoryCommand(root, invocation)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "packages", "", stderr, err)
 	}
@@ -765,11 +770,12 @@ func runPackagesCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wr
 			root,
 			"packages",
 			"",
-			nil,
-			packagesJSONDataFromResult(normalizedPackages),
+			warnings,
+			packagesJSONDataFromResult(normalizedPackages, analysisMode),
 		))
 	}
 
+	writeHumanWarnings(stderr, warnings)
 	fmt.Fprint(stdout, sherpa.FormatPackageSummaries(packages))
 	return exitSuccess
 }

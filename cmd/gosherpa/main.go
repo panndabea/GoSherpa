@@ -44,6 +44,8 @@ type cliInvocation struct {
 	HasContextOption   bool
 	BuildTags          []string
 	HasTagsOption      bool
+	UseSnapshot        bool
+	HasSnapshotOption  bool
 	KindFilter         string
 	SearchKind         sherpa.SymbolKind
 	ReferenceKind      sherpa.ReferenceKind
@@ -142,6 +144,11 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation.Command) {
+		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by symbols, symbol, search, and packages")
+		return exitUsage
+	}
+
 	if invocation.JSON && knownCommand(invocation.Command) && !supportsJSON(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --json is only supported by known commands")
 		return exitUsage
@@ -214,6 +221,11 @@ func supportsAllOption(command string) bool {
 func supportsContextOption(command string) bool {
 	spec, ok := commandSpecFor(command)
 	return ok && spec.Context
+}
+
+func supportsSnapshotOption(command string) bool {
+	spec, ok := commandSpecFor(command)
+	return ok && spec.Snapshot
 }
 
 func supportsTagsOption(invocation cliInvocation) bool {

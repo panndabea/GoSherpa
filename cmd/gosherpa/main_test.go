@@ -185,6 +185,26 @@ func TestParseCLIArgsAcceptsJSONFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
+	tests := [][]string{
+		{"--use-snapshot", "symbols"},
+		{"search", "target", "--use-snapshot"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.UseSnapshot || !got.HasSnapshotOption {
+				t.Fatalf("expected snapshot option, got %#v", got)
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsAllFlag(t *testing.T) {
 	got, err := parseCLIArgs([]string{"deps", "--all"})
 	if err != nil {
@@ -1933,6 +1953,22 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 
 	if !strings.Contains(result.Stderr, "error: --tests is only supported by analyze, architecture, risk, symbols, search, packages, entrypoints, callers, explain, and context") {
 		t.Fatalf("expected tests flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "refs", "Target", "--use-snapshot"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by symbols, symbol, search, and packages") {
+		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
 	if result.Stdout != "" {
@@ -4349,7 +4385,7 @@ func TestMainPrintsSearchUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "search"})
 
-	want := "usage: gosherpa [--root <path>] search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]\n"
+	want := "usage: gosherpa [--root <path>] search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>] [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -4448,6 +4484,38 @@ func Run() {}
 	if strings.Contains(result.Stdout, "FUNCTIONS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
+}
+
+func TestMainRunsSymbolsCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {}
+`)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbols", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "symbols", "", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshot {
+		t.Fatalf("expected snapshot analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "symbols", 1)
 }
 
 func TestMainRunsSymbolsWithFilters(t *testing.T) {
@@ -4694,6 +4762,61 @@ func TestTarget() {}
 	}
 }
 
+func TestMainSearchFallsBackWhenSnapshotIsStale(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Existing() {}
+`)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Existing() {}
+
+func NewLiveSymbol() {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "search", "newlive", "--use-snapshot", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr for JSON warnings, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	warnings := assertMainTestJSONArrayHasLength(t, payload, "warnings", 1)
+	if !strings.Contains(warnings[0].(string), "Snapshot is stale") {
+		t.Fatalf("expected stale snapshot warning, got %#v", warnings)
+	}
+
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %T", payload["data"])
+	}
+	if data["analysisMode"] != analysisModeAST {
+		t.Fatalf("expected AST fallback analysis mode, got %v", data["analysisMode"])
+	}
+
+	results := assertMainTestJSONArrayHasLength(t, data, "results", 1)
+	first, ok := results[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected search result object, got %T", results[0])
+	}
+	symbol := assertMainTestJSONObject(t, first, "symbol")
+	if symbol["name"] != "NewLiveSymbol" {
+		t.Fatalf("expected live fallback symbol, got %v", symbol["name"])
+	}
+}
+
 func TestMainRunsSymbolCommand(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -4808,6 +4931,39 @@ func Run() {}
 
 	if strings.Contains(result.Stdout, "Name:") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsSymbolCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Run() {}
+`)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbol", "Run", "--use-snapshot", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "symbol", "Run", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshot {
+		t.Fatalf("expected snapshot analysis mode, got %v", data["analysisMode"])
+	}
+	symbol := assertMainTestJSONObject(t, data, "symbol")
+	if symbol["name"] != "Run" {
+		t.Fatalf("expected Run symbol, got %v", symbol["name"])
 	}
 }
 
@@ -5240,6 +5396,106 @@ func ParseFile() {}
 
 	if strings.Contains(result.Stdout, "PACKAGES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsPackagesCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+func Run() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package app
+
+import "testing"
+
+func TestRun(t *testing.T) {
+	Run()
+}
+`)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "packages", "--tests", "--use-snapshot", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "packages", "", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshot {
+		t.Fatalf("expected snapshot analysis mode, got %v", data["analysisMode"])
+	}
+
+	packages := assertMainTestJSONArrayHasLength(t, data, "packages", 1)
+	rootPackage, ok := packages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", packages[0])
+	}
+	if rootPackage["symbols"] != float64(2) {
+		t.Fatalf("expected test-inclusive snapshot symbol count 2, got %#v", rootPackage["symbols"])
+	}
+}
+
+func TestMainPackagesWithoutTestsFallsBackFromSnapshot(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+func Run() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package app
+
+import "testing"
+
+func TestRun(t *testing.T) {
+	Run()
+}
+`)
+
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "packages", "--use-snapshot", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr for JSON warnings, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	warnings := assertMainTestJSONArrayHasLength(t, payload, "warnings", 1)
+	if !strings.Contains(warnings[0].(string), "production-only package counts") {
+		t.Fatalf("expected production-count fallback warning, got %#v", warnings)
+	}
+
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %T", payload["data"])
+	}
+	if data["analysisMode"] != analysisModeAST {
+		t.Fatalf("expected AST fallback analysis mode, got %v", data["analysisMode"])
+	}
+
+	packages := assertMainTestJSONArrayHasLength(t, data, "packages", 1)
+	rootPackage, ok := packages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected package object, got %#v", packages[0])
+	}
+	if rootPackage["symbols"] != float64(1) {
+		t.Fatalf("expected production-only symbol count 1, got %#v", rootPackage["symbols"])
 	}
 }
 

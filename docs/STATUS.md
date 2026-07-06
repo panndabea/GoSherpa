@@ -63,6 +63,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, and range-backed reading-order entries in JSON output
+- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; missing, stale, or invalid snapshots fall back to live analysis with warnings.
 
 ## Known MVP Limitations
 
@@ -76,7 +77,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
-- Snapshot creation and stale/missing/valid diagnostics are implemented, but query commands still analyze repository data directly instead of reusing snapshots.
+- Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `symbols`, `symbol`, `search`, and `packages --tests`; deeper semantic, context, impact, and call-graph queries still analyze repository data directly.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
 

@@ -17,6 +17,7 @@ type commandSpec struct {
 	All           bool
 	Context       bool
 	ContextLimits bool
+	Snapshot      bool
 	Tags          bool
 	TagsWhen      func(cliInvocation) bool
 	BaseWhen      func(cliInvocation) bool
@@ -78,30 +79,33 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
-		Name:    "symbols",
-		Usage:   []string{symbolsUsageLine},
-		Handler: runSymbolsCommand,
-		JSON:    true,
-		Package: true,
-		Kind:    true,
-		Tests:   true,
+		Name:     "symbols",
+		Usage:    []string{symbolsUsageLine},
+		Handler:  runSymbolsCommand,
+		JSON:     true,
+		Package:  true,
+		Kind:     true,
+		Tests:    true,
+		Snapshot: true,
 	},
 	{
-		Name:    "symbol",
-		Usage:   []string{symbolUsageLine},
-		Handler: runSymbolCommand,
-		JSON:    true,
-		Context: true,
+		Name:     "symbol",
+		Usage:    []string{symbolUsageLine},
+		Handler:  runSymbolCommand,
+		JSON:     true,
+		Context:  true,
+		Snapshot: true,
 	},
 	{
-		Name:    "search",
-		Usage:   []string{searchUsageLine},
-		Handler: runSearchCommand,
-		JSON:    true,
-		Limit:   true,
-		Package: true,
-		Kind:    true,
-		Tests:   true,
+		Name:     "search",
+		Usage:    []string{searchUsageLine},
+		Handler:  runSearchCommand,
+		JSON:     true,
+		Limit:    true,
+		Package:  true,
+		Kind:     true,
+		Tests:    true,
+		Snapshot: true,
 	},
 	{
 		Name:    "refs",
@@ -144,11 +148,12 @@ var commandSpecs = []commandSpec{
 		All:     true,
 	},
 	{
-		Name:    "packages",
-		Usage:   []string{packagesUsageLine},
-		Handler: runPackagesCommand,
-		JSON:    true,
-		Tests:   true,
+		Name:     "packages",
+		Usage:    []string{packagesUsageLine},
+		Handler:  runPackagesCommand,
+		JSON:     true,
+		Tests:    true,
+		Snapshot: true,
 	},
 	{
 		Name:    "implementers",
@@ -220,9 +225,9 @@ const (
 	doctorUsageLine         = "doctor"
 	snapshotUsageLine       = "snapshot"
 	explainUsageLine        = "explain <symbol> [--tests]"
-	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests]"
-	symbolUsageLine         = "symbol <target> [--context]"
-	searchUsageLine         = "search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>]"
+	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests] [--use-snapshot]"
+	symbolUsageLine         = "symbol <target> [--context] [--use-snapshot]"
+	searchUsageLine         = "search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>] [--use-snapshot]"
 	refsUsageLine           = "refs <name> [--kind <kind>] [--context]"
 	impactDefaultUsageLine  = "impact <symbol-or-package>"
 	impactFileUsageLine     = "impact file <file>"
@@ -234,7 +239,7 @@ const (
 	testsAffectedUsageLine  = "tests affected --base <ref>"
 	depsPackageUsageLine    = "deps <package>"
 	depsAllUsageLine        = "deps --all"
-	packagesUsageLine       = "packages [--tests]"
+	packagesUsageLine       = "packages [--tests] [--use-snapshot]"
 	implementersUsageLine   = "implementers <interface>"
 	interfacesUsageLine     = "interfaces <type>"
 	pathUsageLine           = "path <from> <to>"

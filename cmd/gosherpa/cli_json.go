@@ -49,16 +49,19 @@ type referencesJSONData struct {
 }
 
 type symbolJSONData struct {
-	Symbol sherpa.Symbol `json:"symbol"`
+	AnalysisMode string        `json:"analysisMode,omitempty"`
+	Symbol       sherpa.Symbol `json:"symbol"`
 }
 
 type symbolsJSONData struct {
-	Symbols []sherpa.Symbol `json:"symbols"`
+	AnalysisMode string          `json:"analysisMode,omitempty"`
+	Symbols      []sherpa.Symbol `json:"symbols"`
 }
 
 type searchJSONData struct {
-	Terms   []string                    `json:"terms"`
-	Results []sherpa.SymbolSearchResult `json:"results"`
+	AnalysisMode string                      `json:"analysisMode,omitempty"`
+	Terms        []string                    `json:"terms"`
+	Results      []sherpa.SymbolSearchResult `json:"results"`
 }
 
 type impactJSONData struct {
@@ -132,7 +135,8 @@ type repositoryDependenciesJSONData struct {
 }
 
 type packagesJSONData struct {
-	Packages []sherpa.PackageSummary `json:"packages"`
+	AnalysisMode string                  `json:"analysisMode,omitempty"`
+	Packages     []sherpa.PackageSummary `json:"packages"`
 }
 
 type implementersJSONData struct {
@@ -531,9 +535,10 @@ func packagesJSONResult(result []sherpa.PackageSummary) []sherpa.PackageSummary 
 	return nonNilSlice(result)
 }
 
-func packagesJSONDataFromResult(result []sherpa.PackageSummary) packagesJSONData {
+func packagesJSONDataFromResult(result []sherpa.PackageSummary, analysisMode string) packagesJSONData {
 	return packagesJSONData{
-		Packages: result,
+		AnalysisMode: analysisMode,
+		Packages:     result,
 	}
 }
 

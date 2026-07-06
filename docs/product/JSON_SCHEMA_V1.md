@@ -634,9 +634,14 @@ Data:
 - `snapshot.packages`: package inventory in the same shape as `packages`.
 - `snapshot.symbols`: parsed symbol inventory in the same shape as `symbols`.
 
-Snapshot creation is explicit. Other query commands still analyze the
-repository directly in this slice; use `doctor` to check whether the snapshot is
-missing, valid, stale, or invalid.
+Snapshot creation is explicit. `symbols`, `symbol`, `search`, and
+test-inclusive `packages --tests` can opt in to snapshot reuse with
+`--use-snapshot`. When a valid snapshot is used, these command data objects may
+include `"analysisMode": "snapshot"`. Missing, stale, or invalid snapshots fall
+back to live repository analysis and report the reason in the shared envelope
+`warnings`. Deeper semantic, context, impact, and call-graph queries still
+analyze repository data directly in this slice; use `doctor` to check whether
+the snapshot is missing, valid, stale, or invalid.
 
 ## Impact And Test Data
 
