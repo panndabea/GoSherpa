@@ -7,7 +7,7 @@ keeps the main README, license, and agent guide easy to find.
 
 - [CLI Reference](CLI_REFERENCE.md) - full command overview, examples, root
   selection, and JSON output notes.
-- [GoSherpa for AI Agents](../agents.md) - practical decision guide, agent
+- [GoSherpa for AI Agents](../AGENT_NOTES.md) - practical decision guide, agent
   workflow, JSON usage, and limitations for coding agents.
 - [Implementation Status](STATUS.md) - implemented MVP capabilities, known
   limitations, and current roadmap focus.

@@ -132,7 +132,7 @@ Current analysis is intentionally conservative:
 
 - Repository: <https://github.com/panndabea/GoSherpa>
 - Documentation: <https://panndabea.github.io/GoSherpa/>
-- Agent guide: <https://panndabea.github.io/GoSherpa/agents.md>
+- Agent guide: <https://panndabea.github.io/GoSherpa/AGENT_NOTES.md>
 - CLI reference: <https://panndabea.github.io/GoSherpa/docs/CLI_REFERENCE.md>
 - Implementation status: <https://panndabea.github.io/GoSherpa/docs/STATUS.md>
 - Agent JSON schema: <https://panndabea.github.io/GoSherpa/docs/product/JSON_SCHEMA_V1.md>
