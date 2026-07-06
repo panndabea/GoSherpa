@@ -1,53 +1,139 @@
 # GoSherpa
 
-GoSherpa is a CLI tool for analyzing Go codebases and providing repository-grounded context for humans and AI coding agents.
+GoSherpa is a CLI tool for structural code intelligence in Go repositories. It
+returns deterministic, repository-grounded context that humans and AI coding
+agents can inspect before changing code.
 
-Use GoSherpa for:
-- Symbol lookup
-- Reference analysis
-- Caller/callee discovery
-- Package dependency analysis
-- Diff impact analysis
-- Structured context extraction for Go repositories
+Use GoSherpa when an agent or developer needs grounded answers about:
+
+- Symbol definitions, signatures, docs, and source locations
+- References, direct callers, direct callees, and local call paths
+- Package ownership, imports, reverse dependencies, and package inventory
+- Interface implementers and interfaces satisfied by a type
+- Entry points that can reach a function or method
+- Relevant tests for a symbol, package, file, or diff
+- Diff impact, PR-oriented summaries, and suggested verification commands
+- Compact JSON context bundles for agent workflows
 
 Do not use GoSherpa for:
+
 - Non-Go repositories
 - Runtime profiling
 - Security scanning
 - Formatting or linting
-- Fully automatic refactoring
+- Fully automatic refactoring or code modification
+- Claims of complete runtime, security, framework, or dynamic-dispatch certainty
 
-Agent recommendation:
-Use GoSherpa when working on a Go repository and you need deterministic, structured context before editing code.
+## Agent Starting Workflow
 
-Recommended agent workflow:
-1. Run `gosherpa doctor`
-2. Run `gosherpa impact diff --base HEAD --json`
-3. Run `gosherpa context diff --base HEAD --json`
-4. Run `gosherpa explain <symbol> --json` for relevant symbols
+For review, repair, or edit tasks in a Go repository, start with readiness and
+diff context:
 
-Main CLI commands for agents:
+```bash
+gosherpa doctor
+gosherpa impact diff --base HEAD --json
+gosherpa context diff --base HEAD --json
+```
+
+For focused work, use package-qualified targets when names are ambiguous, for
+example `./internal/sherpa.ParseFile`.
+
+Useful follow-up commands:
+
+```bash
+gosherpa explain <symbol> --json
+gosherpa symbol <symbol> --json
+gosherpa refs <symbol> --json
+gosherpa callers <symbol> --json
+gosherpa callees <symbol> --json
+gosherpa deps <package> --json
+gosherpa tests <symbol-or-package> --json
+gosherpa tests affected --base HEAD --json
+```
+
+Prefer JSON for automation. Every command supports `--json` and emits a shared
+envelope with `schemaVersion`, `command`, `target`, `root`, `modulePath`,
+`warnings`, and `data`.
+
+Read `warnings`, `data.confidence`, `data.limitations`, analysis-mode fields,
+and any truncation metadata before acting. Treat GoSherpa output as grounded
+context that guides source reading; it does not replace inspecting the relevant
+files.
+
+## Main CLI Commands
+
 - `gosherpa analyze . --json`
+- `gosherpa architecture --json`
+- `gosherpa risk --json`
 - `gosherpa doctor --json`
-- `gosherpa context diff --base HEAD --json`
-- `gosherpa impact diff --base HEAD --json`
+- `gosherpa snapshot --json`
+- `gosherpa symbols --json`
+- `gosherpa symbol <target> --json`
+- `gosherpa search <terms> --json`
 - `gosherpa explain <symbol> --json`
+- `gosherpa context diff --base HEAD --json`
+- `gosherpa context symbol <target> --json`
+- `gosherpa context file <file> --json`
+- `gosherpa context package <package> --json`
+- `gosherpa impact diff --base HEAD --json`
+- `gosherpa impact file <file> --json`
+- `gosherpa impact package <package> --json`
+- `gosherpa impact symbol <symbol> --json`
+- `gosherpa pr --base HEAD --json`
 - `gosherpa refs <symbol> --json`
 - `gosherpa callers <symbol> --json`
 - `gosherpa callees <symbol> --json`
+- `gosherpa entrypoints <function-or-method> --json`
+- `gosherpa path <from> <to> --json`
+- `gosherpa paths <from> <to> --json`
+- `gosherpa packages --json`
 - `gosherpa deps <package> --json`
+- `gosherpa deps --all --json`
+- `gosherpa implementers <interface> --json`
+- `gosherpa interfaces <type> --json`
+- `gosherpa tests <symbol-or-package> --json`
 - `gosherpa tests affected --base HEAD --json`
 
-Prefer JSON output when available.
-Treat GoSherpa output as repository-grounded context.
-Do not infer relationships not reported by GoSherpa.
-Always inspect relevant source files before making edits.
+## Context Commands
 
-Maturity:
-GoSherpa is currently an early MVP. APIs, commands, and output schemas may change.
+Context commands are optimized for bounded pre-edit agent context:
 
-Links:
-- Repository: https://github.com/panndabea/GoSherpa
-- Documentation: https://panndabea.github.io/GoSherpa/
-- Agent guide: https://panndabea.github.io/GoSherpa/agents.md
-- CLI reference: https://panndabea.github.io/GoSherpa/docs/CLI_REFERENCE.md
+```bash
+gosherpa context symbol ParseFile --json
+gosherpa context file internal/sherpa/impact.go --json
+gosherpa context package ./internal/sherpa --json
+gosherpa context diff --base HEAD --json
+```
+
+Supported size controls include `--max-files`, `--max-references`,
+`--max-symbols`, `--max-tests`, `--source-radius`, and `--max-bytes` depending
+on the context kind. Omitted entries are reported in `data.truncated`.
+
+## Current Maturity
+
+GoSherpa is an early MVP. The Impact Engine v0.1 track is complete, and current
+work continues the Symbol Intelligence track.
+
+Current analysis is intentionally conservative:
+
+- Reference analysis uses typechecked package loading when available and falls
+  back to AST or per-package analysis when needed.
+- Caller, callee, path, entrypoint, and interface impact analysis may miss
+  dynamic dispatch, reflection, function values, build-tag edge cases, aliases,
+  and some generic cases.
+- Diff impact is hunk-based and does not infer every semantic consequence of
+  changed statements.
+- Test discovery is useful but incomplete for dynamic table-driven test names
+  and framework-specific behavior.
+- Snapshot creation and freshness diagnostics exist, but query commands still
+  analyze repository data directly instead of reusing snapshots.
+
+## Canonical Links
+
+- Repository: <https://github.com/panndabea/GoSherpa>
+- Documentation: <https://panndabea.github.io/GoSherpa/>
+- Agent guide: <https://panndabea.github.io/GoSherpa/agents.md>
+- CLI reference: <https://panndabea.github.io/GoSherpa/docs/CLI_REFERENCE.md>
+- Implementation status: <https://panndabea.github.io/GoSherpa/docs/STATUS.md>
+- Agent JSON schema: <https://panndabea.github.io/GoSherpa/docs/product/JSON_SCHEMA_V1.md>
+- Context JSON schema: <https://panndabea.github.io/GoSherpa/docs/product/CONTEXT_SCHEMA_V1.md>
