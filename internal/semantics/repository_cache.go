@@ -8,6 +8,7 @@ import (
 	"go/build"
 	"io/fs"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -81,12 +82,17 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 }
 
 func repositoryInputFileMatchCacheKey(path string, info fs.FileInfo, buildContextKey string) string {
-	return strings.Join([]string{
-		filepath.Clean(path),
-		fmt.Sprintf("%d", info.Size()),
-		fmt.Sprintf("%d", info.ModTime().UnixNano()),
-		buildContextKey,
-	}, "\x00")
+	cleaned := filepath.Clean(path)
+	var builder strings.Builder
+	builder.Grow(len(cleaned) + len(buildContextKey) + 64)
+	builder.WriteString(cleaned)
+	builder.WriteByte(0)
+	writeRepositoryBuilderInt64(&builder, info.Size())
+	builder.WriteByte(0)
+	writeRepositoryBuilderInt64(&builder, info.ModTime().UnixNano())
+	builder.WriteByte(0)
+	builder.WriteString(buildContextKey)
+	return builder.String()
 }
 
 func (cache *repositoryCache) Get(key string, fingerprint string) (Repository, bool) {
@@ -189,8 +195,8 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 			return err
 		}
 		writeRepositoryHashLine(hash, filepath.ToSlash(relative))
-		writeRepositoryHashLine(hash, fmt.Sprintf("%d", info.Size()))
-		writeRepositoryHashLine(hash, fmt.Sprintf("%d", info.ModTime().UnixNano()))
+		writeRepositoryHashInt64(hash, info.Size())
+		writeRepositoryHashInt64(hash, info.ModTime().UnixNano())
 
 		return nil
 	})
@@ -320,6 +326,17 @@ func repositoryInputFile(path string, name string, info fs.FileInfo, options Loa
 func writeRepositoryHashLine(hash interface{ Write([]byte) (int, error) }, value string) {
 	_, _ = hash.Write([]byte(value))
 	_, _ = hash.Write([]byte{0})
+}
+
+func writeRepositoryHashInt64(hash interface{ Write([]byte) (int, error) }, value int64) {
+	var buffer [20]byte
+	_, _ = hash.Write(strconv.AppendInt(buffer[:0], value, 10))
+	_, _ = hash.Write([]byte{0})
+}
+
+func writeRepositoryBuilderInt64(builder *strings.Builder, value int64) {
+	var buffer [20]byte
+	_, _ = builder.Write(strconv.AppendInt(buffer[:0], value, 10))
 }
 
 func cloneRepository(repo Repository) Repository {
