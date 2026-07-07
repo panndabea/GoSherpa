@@ -140,6 +140,91 @@ func Enterprise() {}
 	}
 }
 
+func TestLoadRepositoryReusesCacheWhenInputsAreUnchanged(t *testing.T) {
+	tmp := t.TempDir()
+	goFile := filepath.Join(tmp, "service.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, goFile, "package app\n")
+
+	repositoryLoadCache.Clear()
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+		repositoryLoadCache.Clear()
+	})
+
+	calls := 0
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls++
+		return []*packages.Package{
+			{
+				ID:              "example.com/app",
+				Name:            "app",
+				PkgPath:         "example.com/app",
+				Dir:             tmp,
+				GoFiles:         []string{goFile},
+				CompiledGoFiles: []string{goFile},
+			},
+		}, nil
+	}
+
+	first, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 1 {
+		t.Fatalf("package load calls = %d, want 1", calls)
+	}
+	assertSemanticTestContains(t, semanticTestPackagePaths(first), ".")
+	assertSemanticTestContains(t, semanticTestPackagePaths(second), ".")
+}
+
+func TestLoadRepositoryInvalidatesCacheWhenInputsChange(t *testing.T) {
+	tmp := t.TempDir()
+	goFile := filepath.Join(tmp, "service.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, goFile, "package app\n")
+
+	repositoryLoadCache.Clear()
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+		repositoryLoadCache.Clear()
+	})
+
+	calls := 0
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls++
+		return []*packages.Package{
+			{
+				ID:              "example.com/app",
+				Name:            "app",
+				PkgPath:         "example.com/app",
+				Dir:             tmp,
+				GoFiles:         []string{goFile},
+				CompiledGoFiles: []string{goFile},
+			},
+		}, nil
+	}
+
+	if _, err := LoadRepository(tmp, LoadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	writeSemanticTestFile(t, filepath.Join(tmp, "added.go"), "package app\n")
+	if _, err := LoadRepository(tmp, LoadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 2 {
+		t.Fatalf("package load calls = %d, want 2", calls)
+	}
+}
+
 func TestLoadRepositoryRetriesEmptyLoadWithWritableCache(t *testing.T) {
 	tmp := t.TempDir()
 

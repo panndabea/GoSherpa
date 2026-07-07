@@ -43,6 +43,8 @@ type Package struct {
 
 var packageLoader = packages.Load
 
+var repositoryLoadCache = newRepositoryCache(16)
+
 func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	rootPath, err := absoluteRoot(root)
 	if err != nil {
@@ -50,6 +52,23 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 	}
 
 	patterns := packageLoadPatterns(rootPath, options)
+	cacheKey := repositoryCacheKey(rootPath, options, patterns)
+	fingerprint, fingerprintErr := repositoryInputFingerprint(rootPath)
+	if fingerprintErr == nil {
+		if repo, ok := repositoryLoadCache.Get(cacheKey, fingerprint); ok {
+			return repo, nil
+		}
+	}
+
+	repo, err := loadRepositoryUncached(rootPath, options, patterns)
+	if err == nil && fingerprintErr == nil {
+		repositoryLoadCache.Put(cacheKey, fingerprint, repo)
+	}
+
+	return repo, err
+}
+
+func loadRepositoryUncached(rootPath string, options LoadOptions, patterns []string) (Repository, error) {
 	loaded, err := loadPackages(rootPath, options, patterns, "")
 	if err != nil {
 		if packageLoadErrorIsCacheAccess(err.Error()) {
