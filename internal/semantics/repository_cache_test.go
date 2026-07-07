@@ -128,6 +128,16 @@ func TestRepositoryInputFileMatchCacheHitRefreshesEntry(t *testing.T) {
 	assertRepositoryMatchCacheContains(t, cache, cPath, cInfo, buildContextKey)
 }
 
+func TestTouchRepositoryCacheOrderMovesKeyToEnd(t *testing.T) {
+	order := []string{"a", "b", "c"}
+
+	touchRepositoryCacheOrder(order, "b")
+
+	if want := []string{"a", "c", "b"}; !slices.Equal(order, want) {
+		t.Fatalf("cache order = %#v, want %#v", order, want)
+	}
+}
+
 func TestRepositoryBuildTagsIncludesBuildFlagTags(t *testing.T) {
 	got := repositoryBuildTags(LoadOptions{
 		BuildTags:  []string{"enterprise"},

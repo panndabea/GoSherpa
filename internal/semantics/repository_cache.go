@@ -63,7 +63,7 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 	cache.mu.Lock()
 	match, ok := cache.entries[key]
 	if ok {
-		cache.touchLocked(key)
+		touchRepositoryCacheOrder(cache.order, key)
 	}
 	cache.mu.Unlock()
 	if ok {
@@ -77,7 +77,7 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 
 	cache.mu.Lock()
 	if _, ok := cache.entries[key]; ok {
-		cache.touchLocked(key)
+		touchRepositoryCacheOrder(cache.order, key)
 	} else {
 		cache.order = append(cache.order, key)
 	}
@@ -92,14 +92,14 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 	return match, nil
 }
 
-func (cache *repositoryInputFileMatchCache) touchLocked(key string) {
-	for i, cachedKey := range cache.order {
+func touchRepositoryCacheOrder(order []string, key string) {
+	for i, cachedKey := range order {
 		if cachedKey != key {
 			continue
 		}
 
-		copy(cache.order[i:], cache.order[i+1:])
-		cache.order[len(cache.order)-1] = key
+		copy(order[i:], order[i+1:])
+		order[len(order)-1] = key
 		return
 	}
 }
@@ -130,7 +130,7 @@ func (cache *repositoryCache) Get(key string, fingerprint string) (Repository, b
 	if !ok || entry.Fingerprint != fingerprint {
 		return Repository{}, false
 	}
-	cache.touchLocked(key)
+	touchRepositoryCacheOrder(cache.order, key)
 
 	return cloneRepository(entry.Repository), true
 }
@@ -144,7 +144,7 @@ func (cache *repositoryCache) Put(key string, fingerprint string, repo Repositor
 	defer cache.mu.Unlock()
 
 	if _, ok := cache.entries[key]; ok {
-		cache.touchLocked(key)
+		touchRepositoryCacheOrder(cache.order, key)
 	} else {
 		cache.order = append(cache.order, key)
 	}
@@ -157,18 +157,6 @@ func (cache *repositoryCache) Put(key string, fingerprint string, repo Repositor
 		oldest := cache.order[0]
 		cache.order = cache.order[1:]
 		delete(cache.entries, oldest)
-	}
-}
-
-func (cache *repositoryCache) touchLocked(key string) {
-	for i, cachedKey := range cache.order {
-		if cachedKey != key {
-			continue
-		}
-
-		copy(cache.order[i:], cache.order[i+1:])
-		cache.order[len(cache.order)-1] = key
-		return
 	}
 }
 
