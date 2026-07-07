@@ -201,9 +201,7 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 		if err != nil {
 			return err
 		}
-		hash.WriteString(relative)
-		hash.WriteInt64(info.Size())
-		hash.WriteInt64(info.ModTime().UnixNano())
+		hash.WriteFileMetadata(relative, info.Size(), info.ModTime().UnixNano())
 
 		return nil
 	})
@@ -364,10 +362,14 @@ func (writer *repositoryFingerprintHash) WriteString(value string) {
 	_, _ = writer.hash.Write(writer.buffer)
 }
 
-func (writer *repositoryFingerprintHash) WriteInt64(value int64) {
-	var buffer [20]byte
-	_, _ = writer.hash.Write(strconv.AppendInt(buffer[:0], value, 10))
-	_, _ = writer.hash.Write([]byte{0})
+func (writer *repositoryFingerprintHash) WriteFileMetadata(path string, size int64, modTime int64) {
+	writer.buffer = append(writer.buffer[:0], path...)
+	writer.buffer = append(writer.buffer, 0)
+	writer.buffer = strconv.AppendInt(writer.buffer, size, 10)
+	writer.buffer = append(writer.buffer, 0)
+	writer.buffer = strconv.AppendInt(writer.buffer, modTime, 10)
+	writer.buffer = append(writer.buffer, 0)
+	_, _ = writer.hash.Write(writer.buffer)
 }
 
 func (writer *repositoryFingerprintHash) WriteBytes(value []byte) {
