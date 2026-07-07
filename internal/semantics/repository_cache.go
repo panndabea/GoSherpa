@@ -204,6 +204,9 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 func repositoryBuildContext(options LoadOptions) build.Context {
 	context := build.Default
 	context.BuildTags = repositoryBuildTags(options)
+	if compiler := repositoryBuildCompiler(options.BuildFlags); compiler != "" {
+		context.Compiler = compiler
+	}
 	return context
 }
 
@@ -230,6 +233,12 @@ func repositoryBuildFlagTags(flags []string) []string {
 	for i := 0; i < len(flags); i++ {
 		flag := strings.TrimSpace(flags[i])
 		switch {
+		case repositoryBoolBuildFlagEnabled(flag, "-race"):
+			values = append(values, "race")
+		case repositoryBoolBuildFlagEnabled(flag, "-msan"):
+			values = append(values, "msan")
+		case repositoryBoolBuildFlagEnabled(flag, "-asan"):
+			values = append(values, "asan")
 		case flag == "-tags" && i+1 < len(flags):
 			i++
 			values = append(values, flags[i])
@@ -239,6 +248,44 @@ func repositoryBuildFlagTags(flags []string) []string {
 	}
 
 	return values
+}
+
+func repositoryBoolBuildFlagEnabled(flag string, name string) bool {
+	if flag == name {
+		return true
+	}
+	value, ok := strings.CutPrefix(flag, name+"=")
+	if !ok {
+		return false
+	}
+
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "t", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func repositoryBuildCompiler(flags []string) string {
+	for i := 0; i < len(flags); i++ {
+		flag := strings.TrimSpace(flags[i])
+		if flag == "-compiler" && i+1 < len(flags) {
+			i++
+			if compiler := strings.TrimSpace(flags[i]); compiler != "" {
+				return compiler
+			}
+			continue
+		}
+
+		if compiler, ok := strings.CutPrefix(flag, "-compiler="); ok {
+			if compiler = strings.TrimSpace(compiler); compiler != "" {
+				return compiler
+			}
+		}
+	}
+
+	return ""
 }
 
 func repositoryInputCandidate(name string) bool {

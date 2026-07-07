@@ -82,11 +82,23 @@ func TestRepositoryCacheEvictsOldestEntry(t *testing.T) {
 func TestRepositoryBuildTagsIncludesBuildFlagTags(t *testing.T) {
 	got := repositoryBuildTags(LoadOptions{
 		BuildTags:  []string{"enterprise"},
-		BuildFlags: []string{"-race", "-tags=integration,debug", "-tags", "canary nightly"},
+		BuildFlags: []string{"-race", "-msan=false", "-asan=true", "-tags=integration,debug", "-tags", "canary nightly"},
 	})
-	want := []string{"canary", "debug", "enterprise", "integration", "nightly"}
+	want := []string{"asan", "canary", "debug", "enterprise", "integration", "nightly", "race"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("repositoryBuildTags() = %#v, want %#v", got, want)
+	}
+}
+
+func TestRepositoryBuildContextHonorsCompilerBuildFlag(t *testing.T) {
+	got := repositoryBuildContext(LoadOptions{BuildFlags: []string{"-compiler=gccgo"}})
+	if got.Compiler != "gccgo" {
+		t.Fatalf("Compiler = %q, want gccgo", got.Compiler)
+	}
+
+	got = repositoryBuildContext(LoadOptions{BuildFlags: []string{"-compiler", "gc"}})
+	if got.Compiler != "gc" {
+		t.Fatalf("Compiler = %q, want gc", got.Compiler)
 	}
 }
 
