@@ -77,6 +77,36 @@ func TestRepositoryCacheEvictsOldestEntry(t *testing.T) {
 	assertRepositoryCacheHit(t, cache, "c", "fp", "c")
 }
 
+func TestRepositoryCacheHitRefreshesEntry(t *testing.T) {
+	cache := newRepositoryCache(2)
+
+	cache.Put("a", "fp", Repository{Root: "a"})
+	cache.Put("b", "fp", Repository{Root: "b"})
+	assertRepositoryCacheHit(t, cache, "a", "fp", "a")
+	cache.Put("c", "fp", Repository{Root: "c"})
+
+	assertRepositoryCacheHit(t, cache, "a", "fp", "a")
+	if _, ok := cache.Get("b", "fp"); ok {
+		t.Fatal("expected least recently used cache entry to be evicted")
+	}
+	assertRepositoryCacheHit(t, cache, "c", "fp", "c")
+}
+
+func TestRepositoryCachePutRefreshesEntry(t *testing.T) {
+	cache := newRepositoryCache(2)
+
+	cache.Put("a", "old", Repository{Root: "old"})
+	cache.Put("b", "fp", Repository{Root: "b"})
+	cache.Put("a", "new", Repository{Root: "new"})
+	cache.Put("c", "fp", Repository{Root: "c"})
+
+	assertRepositoryCacheHit(t, cache, "a", "new", "new")
+	if _, ok := cache.Get("b", "fp"); ok {
+		t.Fatal("expected least recently used cache entry to be evicted")
+	}
+	assertRepositoryCacheHit(t, cache, "c", "fp", "c")
+}
+
 func TestRepositoryBuildTagsIncludesBuildFlagTags(t *testing.T) {
 	got := repositoryBuildTags(LoadOptions{
 		BuildTags:  []string{"enterprise"},

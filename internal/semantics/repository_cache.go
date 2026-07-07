@@ -113,6 +113,7 @@ func (cache *repositoryCache) Get(key string, fingerprint string) (Repository, b
 	if !ok || entry.Fingerprint != fingerprint {
 		return Repository{}, false
 	}
+	cache.touchLocked(key)
 
 	return cloneRepository(entry.Repository), true
 }
@@ -125,7 +126,9 @@ func (cache *repositoryCache) Put(key string, fingerprint string, repo Repositor
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	if _, ok := cache.entries[key]; !ok {
+	if _, ok := cache.entries[key]; ok {
+		cache.touchLocked(key)
+	} else {
 		cache.order = append(cache.order, key)
 	}
 	cache.entries[key] = repositoryCacheEntry{
@@ -137,6 +140,18 @@ func (cache *repositoryCache) Put(key string, fingerprint string, repo Repositor
 		oldest := cache.order[0]
 		cache.order = cache.order[1:]
 		delete(cache.entries, oldest)
+	}
+}
+
+func (cache *repositoryCache) touchLocked(key string) {
+	for i, cachedKey := range cache.order {
+		if cachedKey != key {
+			continue
+		}
+
+		copy(cache.order[i:], cache.order[i+1:])
+		cache.order[len(cache.order)-1] = key
+		return
 	}
 }
 
