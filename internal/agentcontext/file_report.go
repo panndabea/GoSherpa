@@ -88,7 +88,7 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		symbols = symbolsInFile(allSymbols, file)
 	}
 
-	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	limits := normalizeFileLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
@@ -129,6 +129,7 @@ func applyFileLimits(report FileReport, limits LimitOptions) FileReport {
 	var truncation Truncation
 	originalReadingOrderCount := len(report.ReadingOrder)
 
+	report.AffectedTests = prioritizeContextTests(report.AffectedTests)
 	report.Symbols, truncation.Symbols = limitSlice(report.Symbols, limits.MaxSymbols)
 	report.SourceContexts, truncation.SourceContexts = limitSlice(report.SourceContexts, limits.MaxSymbols)
 	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)

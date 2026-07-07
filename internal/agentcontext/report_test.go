@@ -252,6 +252,133 @@ func TestAnalyzeSymbolIncludesTestCallersWithOption(t *testing.T) {
 	}
 }
 
+func TestNormalizeContextLimitsAppliesDefaultsAndPreservesExplicitValues(t *testing.T) {
+	symbol := normalizeSymbolLimits(0, LimitOptions{MaxTests: 3})
+	if symbol.MaxReferences != DefaultSymbolMaxReferences || symbol.MaxTests != 3 || symbol.MaxBytes != DefaultMaxBytes {
+		t.Fatalf("unexpected symbol limits: %#v", symbol)
+	}
+
+	file := normalizeFileLimits(0, LimitOptions{MaxSymbols: 2})
+	if file.MaxSymbols != 2 || file.MaxTests != DefaultMaxTests || file.MaxBytes != DefaultMaxBytes {
+		t.Fatalf("unexpected file limits: %#v", file)
+	}
+
+	pkg := normalizePackageLimits(0, LimitOptions{MaxFiles: 4})
+	if pkg.MaxFiles != 4 || pkg.MaxSymbols != DefaultPackageMaxSymbols || pkg.MaxTests != DefaultMaxTests {
+		t.Fatalf("unexpected package limits: %#v", pkg)
+	}
+
+	diff := normalizeDiffLimits(LimitOptions{MaxBytes: 1024})
+	if diff.MaxFiles != DefaultDiffMaxFiles || diff.MaxSymbols != DefaultDiffMaxSymbols || diff.MaxTests != DefaultMaxTests || diff.MaxBytes != 1024 {
+		t.Fatalf("unexpected diff limits: %#v", diff)
+	}
+}
+
+func TestAnalyzeSymbolRecordsDefaultLimits(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.Limits == nil {
+		t.Fatal("expected default context limits to be recorded")
+	}
+	if report.Limits.MaxReferences != DefaultSymbolMaxReferences || report.Limits.MaxTests != DefaultMaxTests || report.Limits.MaxBytes != DefaultMaxBytes {
+		t.Fatalf("unexpected default limits: %#v", report.Limits)
+	}
+}
+
+func TestApplySymbolLimitsPrioritizesDirectTests(t *testing.T) {
+	report := Report{
+		Symbol: sherpa.Symbol{
+			Name:     "Target",
+			Kind:     sherpa.SymbolKindFunction,
+			Position: sherpa.Position{File: "service.go", Line: 7},
+		},
+		RelatedTests: []sherpa.RelatedTest{
+			{
+				Name:     "TestPackageOnly",
+				Package:  ".",
+				Position: sherpa.Position{File: "service_test.go", Line: 20},
+			},
+			{
+				Name:            "TestDirect",
+				Package:         ".",
+				Position:        sherpa.Position{File: "service_test.go", Line: 30},
+				DirectReference: true,
+			},
+			{
+				Name:     "TestOther",
+				Package:  ".",
+				Position: sherpa.Position{File: "service_test.go", Line: 40},
+			},
+		},
+	}
+
+	limited := applySymbolLimits(report, LimitOptions{MaxTests: 1})
+	if len(limited.RelatedTests) != 1 || limited.RelatedTests[0].Name != "TestDirect" {
+		t.Fatalf("expected direct test to be retained, got %#v", limited.RelatedTests)
+	}
+	if limited.Truncated == nil || limited.Truncated.RelatedTests != 2 {
+		t.Fatalf("expected related test truncation, got %#v", limited.Truncated)
+	}
+	if len(limited.ReadingOrder) != 2 || limited.ReadingOrder[1].Title != "Test: TestDirect" {
+		t.Fatalf("expected reading order to include direct test, got %#v", limited.ReadingOrder)
+	}
+}
+
+func TestApplySymbolByteLimitPreservesCoreSignalsBeforeVerboseTestPlan(t *testing.T) {
+	report := Report{
+		Symbol: sherpa.Symbol{
+			Name:     "Target",
+			Kind:     sherpa.SymbolKindFunction,
+			Position: sherpa.Position{File: "service.go", Line: 7},
+		},
+		SourceContext: sherpa.SourceContext{
+			Position: sherpa.Position{File: "service.go", Line: 7},
+			Lines: []sherpa.SourceContextLine{
+				{Number: 7, Text: "func Target() {}", Target: true},
+			},
+		},
+		References: []sherpa.Reference{
+			{Position: sherpa.Position{File: "service.go", Line: 7}},
+		},
+		Callers: []sherpa.Caller{
+			{Name: "Entry", Position: sherpa.Position{File: "service.go", Line: 3}},
+		},
+		Callees: []sherpa.Callee{
+			{Name: "Helper", Position: sherpa.Position{File: "service.go", Line: 8}},
+		},
+		TestPlan: sherpa.TestPlan{
+			CallerPackages: []sherpa.TestPlanItem{
+				{
+					Command: "go test ./internal/service",
+					Reason:  strings.Repeat("verbose test plan ", 500),
+					Package: "./internal/service",
+				},
+			},
+		},
+		ReadingOrder: []explainengine.ReadingStep{
+			{Title: "Definition", Position: sherpa.Position{File: "service.go", Line: 7}},
+			{Title: "Caller: Entry", Position: sherpa.Position{File: "service.go", Line: 3}},
+			{Title: "Callee: Helper", Position: sherpa.Position{File: "service.go", Line: 8}},
+		},
+	}
+
+	limited := applySymbolByteLimit(report, 1800)
+	if len(limited.SourceContext.Lines) != 1 || !limited.SourceContext.Lines[0].Target {
+		t.Fatalf("expected target source line to be retained, got %#v", limited.SourceContext.Lines)
+	}
+	if len(limited.References) != 1 || len(limited.Callers) != 1 || len(limited.Callees) != 1 {
+		t.Fatalf("expected core signals to be retained, refs=%#v callers=%#v callees=%#v", limited.References, limited.Callers, limited.Callees)
+	}
+	if limited.Truncated == nil || limited.Truncated.TestPlanItems == 0 {
+		t.Fatalf("expected verbose test plan truncation, got %#v", limited.Truncated)
+	}
+}
+
 func TestAnalyzeSymbolAppliesLimits(t *testing.T) {
 	root := writeAgentContextProject(t)
 

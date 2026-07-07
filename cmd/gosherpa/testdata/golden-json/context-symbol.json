@@ -343,6 +343,11 @@
     ],
     "analysisMode": "typechecked+ast",
     "confidence": "medium",
+    "limits": {
+      "maxReferences": 25,
+      "maxTests": 25,
+      "maxBytes": 24576
+    },
     "limitations": [
       "Symbol context used typechecked package loading for symbol identity, with syntax/local impact and test signals.",
       "Reference analysis used typechecked package loading where available.",

@@ -75,7 +75,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		return Report{}, err
 	}
 
-	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	limits := normalizeSymbolLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	symbol := explainReport.Symbol
@@ -133,6 +133,7 @@ func applySymbolLimits(report Report, limits LimitOptions) Report {
 	var truncation Truncation
 	originalReadingOrderCount := len(report.ReadingOrder)
 
+	report.RelatedTests = prioritizeContextTests(report.RelatedTests)
 	report.References, truncation.References = limitSlice(report.References, limits.MaxReferences)
 	report.Callers, truncation.Callers = limitSlice(report.Callers, limits.MaxReferences)
 	report.Callees, truncation.Callees = limitSlice(report.Callees, limits.MaxReferences)

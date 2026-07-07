@@ -507,6 +507,11 @@
     ],
     "analysisMode": "typechecked+ast",
     "confidence": "medium",
+    "limits": {
+      "maxSymbols": 40,
+      "maxTests": 25,
+      "maxBytes": 24576
+    },
     "limitations": [
       "File context uses package-level impact for affected packages and tests.",
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",

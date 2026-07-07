@@ -11,6 +11,17 @@ type LimitOptions struct {
 	SourceRadius  *int `json:"sourceRadius,omitempty"`
 }
 
+const (
+	DefaultSymbolMaxReferences = 25
+	DefaultFileMaxSymbols      = 40
+	DefaultPackageMaxFiles     = 40
+	DefaultPackageMaxSymbols   = 80
+	DefaultDiffMaxFiles        = 60
+	DefaultDiffMaxSymbols      = 80
+	DefaultMaxTests            = 25
+	DefaultMaxBytes            = 24576
+)
+
 type Truncation struct {
 	Files                   int `json:"files,omitempty"`
 	Symbols                 int `json:"symbols,omitempty"`
@@ -37,12 +48,57 @@ func NewSourceRadius(value int) *int {
 	return &value
 }
 
-func normalizeLimits(sourceRadius int, limits LimitOptions) LimitOptions {
+func normalizeSymbolLimits(sourceRadius int, limits LimitOptions) LimitOptions {
+	limits = normalizeSourceRadius(sourceRadius, limits)
+	limits.MaxReferences = defaultPositiveLimit(limits.MaxReferences, DefaultSymbolMaxReferences)
+	limits.MaxTests = defaultPositiveLimit(limits.MaxTests, DefaultMaxTests)
+	limits.MaxBytes = defaultPositiveLimit(limits.MaxBytes, DefaultMaxBytes)
+
+	return limits
+}
+
+func normalizeFileLimits(sourceRadius int, limits LimitOptions) LimitOptions {
+	limits = normalizeSourceRadius(sourceRadius, limits)
+	limits.MaxSymbols = defaultPositiveLimit(limits.MaxSymbols, DefaultFileMaxSymbols)
+	limits.MaxTests = defaultPositiveLimit(limits.MaxTests, DefaultMaxTests)
+	limits.MaxBytes = defaultPositiveLimit(limits.MaxBytes, DefaultMaxBytes)
+
+	return limits
+}
+
+func normalizePackageLimits(sourceRadius int, limits LimitOptions) LimitOptions {
+	limits = normalizeSourceRadius(sourceRadius, limits)
+	limits.MaxFiles = defaultPositiveLimit(limits.MaxFiles, DefaultPackageMaxFiles)
+	limits.MaxSymbols = defaultPositiveLimit(limits.MaxSymbols, DefaultPackageMaxSymbols)
+	limits.MaxTests = defaultPositiveLimit(limits.MaxTests, DefaultMaxTests)
+	limits.MaxBytes = defaultPositiveLimit(limits.MaxBytes, DefaultMaxBytes)
+
+	return limits
+}
+
+func normalizeDiffLimits(limits LimitOptions) LimitOptions {
+	limits.MaxFiles = defaultPositiveLimit(limits.MaxFiles, DefaultDiffMaxFiles)
+	limits.MaxSymbols = defaultPositiveLimit(limits.MaxSymbols, DefaultDiffMaxSymbols)
+	limits.MaxTests = defaultPositiveLimit(limits.MaxTests, DefaultMaxTests)
+	limits.MaxBytes = defaultPositiveLimit(limits.MaxBytes, DefaultMaxBytes)
+
+	return limits
+}
+
+func normalizeSourceRadius(sourceRadius int, limits LimitOptions) LimitOptions {
 	if limits.SourceRadius == nil && sourceRadius > 0 {
 		limits.SourceRadius = NewSourceRadius(sourceRadius)
 	}
 
 	return limits
+}
+
+func defaultPositiveLimit(value int, fallback int) int {
+	if value > 0 {
+		return value
+	}
+
+	return fallback
 }
 
 func sourceRadiusOrDefault(limits LimitOptions, fallback int) int {

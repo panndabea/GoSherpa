@@ -128,6 +128,12 @@
     ],
     "analysisMode": "git-diff+typechecked+ast",
     "confidence": "medium",
+    "limits": {
+      "maxFiles": 60,
+      "maxSymbols": 80,
+      "maxTests": 25,
+      "maxBytes": 24576
+    },
     "limitations": [
       "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",

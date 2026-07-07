@@ -50,6 +50,8 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		return DiffReport{}, err
 	}
 
+	limits := normalizeDiffLimits(options.Limits)
+
 	report := DiffReport{
 		Target:                  base,
 		Base:                    base,
@@ -67,7 +69,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
 		AnalysisMode:            diffAnalysisMode(impactReport),
-		Limits:                  reportLimits(options.Limits),
+		Limits:                  reportLimits(limits),
 		Warnings:                impactReport.Warnings,
 	}
 	report.Purpose = diffPurpose(report)
@@ -75,7 +77,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 	report.ReadingOrder = diffReadingOrder(report)
 	report.Limitations = diffLimitations(options.IncludeTests, report)
 	report.Confidence = diffConfidence(report)
-	report = applyDiffLimits(report, options.Limits)
+	report = applyDiffLimits(report, limits)
 
 	return normalizeDiffReport(report), nil
 }
@@ -84,6 +86,7 @@ func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
 	var truncation Truncation
 	originalReadingOrderCount := len(report.ReadingOrder)
 
+	report.AffectedTests = prioritizeContextTests(report.AffectedTests)
 	report.ChangedFiles, truncation.ChangedFiles = limitSlice(report.ChangedFiles, limits.MaxFiles)
 	report.AffectedSymbols, truncation.AffectedSymbols = limitSlice(report.AffectedSymbols, limits.MaxSymbols)
 	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)

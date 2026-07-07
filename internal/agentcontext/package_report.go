@@ -95,7 +95,7 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 		symbols = symbolsInPackage(allSymbols, packagePath)
 	}
 
-	limits := normalizeLimits(options.SourceRadius, options.Limits)
+	limits := normalizePackageLimits(options.SourceRadius, options.Limits)
 	radius := sourceRadiusOrDefault(limits, sherpa.DefaultSourceContextRadius)
 
 	sourceContexts, err := sourceContextsForSymbols(root, symbols, radius)
@@ -136,6 +136,7 @@ func applyPackageLimits(report PackageReport, limits LimitOptions) PackageReport
 	var truncation Truncation
 	originalReadingOrderCount := len(report.ReadingOrder)
 
+	report.AffectedTests = prioritizeContextTests(report.AffectedTests)
 	report.Files, truncation.Files = limitSlice(report.Files, limits.MaxFiles)
 	report.Symbols, truncation.Symbols = limitSlice(report.Symbols, limits.MaxSymbols)
 	report.SourceContexts, truncation.SourceContexts = limitSlice(report.SourceContexts, limits.MaxSymbols)

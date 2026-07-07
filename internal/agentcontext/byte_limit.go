@@ -13,7 +13,26 @@ func applySymbolByteLimit(report Report, maxBytes int) Report {
 		return encodedJSONLen(normalizeReport(report))
 	}, &truncation,
 		func() bool {
+			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
+		},
+		func() bool {
 			return trimSourceContextLine(&report.SourceContext, &truncation.SourceLines)
+		},
+		func() bool {
+			if !trimLast(&report.RelatedTests, &truncation.RelatedTests) {
+				return false
+			}
+			report.ReadingOrder = symbolReadingOrder(report)
+			return true
+		},
+		func() bool {
+			return trimLast(&report.AffectedImplementations, &truncation.AffectedImplementations)
+		},
+		func() bool {
+			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
+		},
+		func() bool {
+			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
 		},
 		func() bool {
 			return trimLast(&report.References, &truncation.References)
@@ -33,26 +52,7 @@ func applySymbolByteLimit(report Report, maxBytes int) Report {
 			return true
 		},
 		func() bool {
-			if !trimLast(&report.RelatedTests, &truncation.RelatedTests) {
-				return false
-			}
-			report.ReadingOrder = symbolReadingOrder(report)
-			return true
-		},
-		func() bool {
-			return trimLast(&report.AffectedImplementations, &truncation.AffectedImplementations)
-		},
-		func() bool {
-			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
-		},
-		func() bool {
-			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
-		},
-		func() bool {
 			return trimLast(&report.TestCommands, &truncation.TestCommands)
-		},
-		func() bool {
-			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -69,6 +69,9 @@ func applyFileByteLimit(report FileReport, maxBytes int) FileReport {
 		report.Truncated = reportTruncation(truncation)
 		return encodedJSONLen(normalizeFileReport(report))
 	}, &truncation,
+		func() bool {
+			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
+		},
 		func() bool {
 			return trimLast(&report.SourceContexts, &truncation.SourceContexts)
 		},
@@ -99,9 +102,6 @@ func applyFileByteLimit(report FileReport, maxBytes int) FileReport {
 			return trimLast(&report.TestCommands, &truncation.TestCommands)
 		},
 		func() bool {
-			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
-		},
-		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
 		},
 	)
@@ -116,6 +116,9 @@ func applyPackageByteLimit(report PackageReport, maxBytes int) PackageReport {
 		report.Truncated = reportTruncation(truncation)
 		return encodedJSONLen(normalizePackageReport(report))
 	}, &truncation,
+		func() bool {
+			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
+		},
 		func() bool {
 			return trimLast(&report.SourceContexts, &truncation.SourceContexts)
 		},
@@ -153,9 +156,6 @@ func applyPackageByteLimit(report PackageReport, maxBytes int) PackageReport {
 			return trimLast(&report.TestCommands, &truncation.TestCommands)
 		},
 		func() bool {
-			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
-		},
-		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
 		},
 	)
@@ -170,6 +170,9 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 		report.Truncated = reportTruncation(truncation)
 		return encodedJSONLen(normalizeDiffReport(report))
 	}, &truncation,
+		func() bool {
+			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
+		},
 		func() bool {
 			return trimLast(&report.AffectedSymbols, &truncation.AffectedSymbols)
 		},
@@ -201,9 +204,6 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 		},
 		func() bool {
 			return trimLast(&report.TestCommands, &truncation.TestCommands)
-		},
-		func() bool {
-			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -281,6 +281,9 @@ func trimSourceContextLine(context *sherpa.SourceContext, omitted *int) bool {
 	}
 
 	index := sourceContextLineTrimIndex(context.Lines)
+	if index < 0 {
+		return false
+	}
 	context.Lines = append(context.Lines[:index], context.Lines[index+1:]...)
 	*omitted++
 	return true
@@ -318,7 +321,7 @@ func sourceContextLineTrimIndex(lines []sherpa.SourceContextLine) int {
 		return bestIndex
 	}
 
-	return len(lines) - 1
+	return -1
 }
 
 func trimTestPlanItem(plan *sherpa.TestPlan, omitted *int) bool {
