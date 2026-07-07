@@ -160,6 +160,7 @@ func repositoryCacheKey(root string, options LoadOptions, patterns []string) str
 
 func repositoryInputFingerprint(root string, options LoadOptions) (string, error) {
 	hash := sha256.New()
+	rootPrefix := filepath.Clean(root) + string(filepath.Separator)
 	buildContext := repositoryBuildContext(options)
 	buildContextKey := repositoryBuildContextKey(buildContext)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -190,11 +191,11 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 			return nil
 		}
 
-		relative, err := filepath.Rel(root, path)
+		relative, err := repositoryInputRelativePath(root, rootPrefix, path)
 		if err != nil {
 			return err
 		}
-		writeRepositoryHashLine(hash, filepath.ToSlash(relative))
+		writeRepositoryHashLine(hash, relative)
 		writeRepositoryHashInt64(hash, info.Size())
 		writeRepositoryHashInt64(hash, info.ModTime().UnixNano())
 
@@ -205,6 +206,27 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func repositoryInputRelativePath(root string, rootPrefix string, path string) (string, error) {
+	if relative, ok := strings.CutPrefix(path, rootPrefix); ok {
+		return repositorySlashPath(relative), nil
+	}
+
+	relative, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", err
+	}
+
+	return repositorySlashPath(relative), nil
+}
+
+func repositorySlashPath(path string) string {
+	if filepath.Separator == '/' {
+		return path
+	}
+
+	return filepath.ToSlash(path)
 }
 
 func repositoryBuildContext(options LoadOptions) build.Context {

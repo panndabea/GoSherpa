@@ -178,6 +178,7 @@ func NewValue` + value + `(field string, count int) Value` + value + ` {
 
 func repositoryInputContentFingerprintForBenchmark(root string) (string, error) {
 	hash := sha256.New()
+	rootPrefix := filepath.Clean(root) + string(filepath.Separator)
 	options := LoadOptions{IncludeTests: true}
 	buildContext := repositoryBuildContext(options)
 	buildContextKey := repositoryBuildContextKey(buildContext)
@@ -209,7 +210,7 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 			return nil
 		}
 
-		relative, err := filepath.Rel(root, path)
+		relative, err := repositoryInputRelativePath(root, rootPrefix, path)
 		if err != nil {
 			return err
 		}
@@ -217,7 +218,7 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 		if err != nil {
 			return err
 		}
-		writeRepositoryHashLine(hash, filepath.ToSlash(relative))
+		writeRepositoryHashLine(hash, relative)
 		_, _ = hash.Write(contents)
 		_, _ = hash.Write([]byte{0})
 
