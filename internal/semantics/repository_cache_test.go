@@ -1,6 +1,7 @@
 package semantics
 
 import (
+	"go/build"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -105,6 +106,26 @@ func TestRepositoryCachePutRefreshesEntry(t *testing.T) {
 		t.Fatal("expected least recently used cache entry to be evicted")
 	}
 	assertRepositoryCacheHit(t, cache, "c", "fp", "c")
+}
+
+func TestRepositoryInputFileMatchCacheHitRefreshesEntry(t *testing.T) {
+	cache := newRepositoryInputFileMatchCache(2)
+	root := t.TempDir()
+	buildContext := repositoryBuildContext(LoadOptions{})
+	buildContextKey := repositoryBuildContextKey(buildContext)
+
+	aPath, aInfo := writeRepositoryMatchCacheTestFile(t, root, "a.go")
+	bPath, bInfo := writeRepositoryMatchCacheTestFile(t, root, "b.go")
+	cPath, cInfo := writeRepositoryMatchCacheTestFile(t, root, "c.go")
+
+	assertRepositoryMatchCacheHit(t, cache, aPath, aInfo, buildContext, buildContextKey)
+	assertRepositoryMatchCacheHit(t, cache, bPath, bInfo, buildContext, buildContextKey)
+	assertRepositoryMatchCacheHit(t, cache, aPath, aInfo, buildContext, buildContextKey)
+	assertRepositoryMatchCacheHit(t, cache, cPath, cInfo, buildContext, buildContextKey)
+
+	assertRepositoryMatchCacheContains(t, cache, aPath, aInfo, buildContextKey)
+	assertRepositoryMatchCacheMissing(t, cache, bPath, bInfo, buildContextKey)
+	assertRepositoryMatchCacheContains(t, cache, cPath, cInfo, buildContextKey)
 }
 
 func TestRepositoryBuildTagsIncludesBuildFlagTags(t *testing.T) {
@@ -256,4 +277,55 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 	}
 
 	return hash.SumHex(), nil
+}
+
+func writeRepositoryMatchCacheTestFile(t *testing.T, root string, name string) (string, fs.FileInfo) {
+	t.Helper()
+
+	path := filepath.Join(root, name)
+	if err := os.WriteFile(path, []byte("package app\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return path, info
+}
+
+func assertRepositoryMatchCacheHit(t *testing.T, cache *repositoryInputFileMatchCache, path string, info fs.FileInfo, buildContext build.Context, buildContextKey string) {
+	t.Helper()
+
+	match, err := cache.MatchFile(path, filepath.Base(path), info, buildContext, buildContextKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !match {
+		t.Fatalf("expected %s to match build context", path)
+	}
+}
+
+func assertRepositoryMatchCacheContains(t *testing.T, cache *repositoryInputFileMatchCache, path string, info fs.FileInfo, buildContextKey string) {
+	t.Helper()
+
+	key := repositoryInputFileMatchCacheKey(path, info, buildContextKey)
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	if _, ok := cache.entries[key]; !ok {
+		t.Fatalf("expected match cache to contain %s", path)
+	}
+}
+
+func assertRepositoryMatchCacheMissing(t *testing.T, cache *repositoryInputFileMatchCache, path string, info fs.FileInfo, buildContextKey string) {
+	t.Helper()
+
+	key := repositoryInputFileMatchCacheKey(path, info, buildContextKey)
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	if _, ok := cache.entries[key]; ok {
+		t.Fatalf("expected match cache to evict %s", path)
+	}
 }

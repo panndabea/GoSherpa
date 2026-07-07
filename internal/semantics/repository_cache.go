@@ -62,6 +62,9 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 	key := repositoryInputFileMatchCacheKey(path, info, buildContextKey)
 	cache.mu.Lock()
 	match, ok := cache.entries[key]
+	if ok {
+		cache.touchLocked(key)
+	}
 	cache.mu.Unlock()
 	if ok {
 		return match, nil
@@ -73,7 +76,9 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 	}
 
 	cache.mu.Lock()
-	if _, ok := cache.entries[key]; !ok {
+	if _, ok := cache.entries[key]; ok {
+		cache.touchLocked(key)
+	} else {
 		cache.order = append(cache.order, key)
 	}
 	cache.entries[key] = match
@@ -85,6 +90,18 @@ func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, 
 	cache.mu.Unlock()
 
 	return match, nil
+}
+
+func (cache *repositoryInputFileMatchCache) touchLocked(key string) {
+	for i, cachedKey := range cache.order {
+		if cachedKey != key {
+			continue
+		}
+
+		copy(cache.order[i:], cache.order[i+1:])
+		cache.order[len(cache.order)-1] = key
+		return
+	}
 }
 
 func repositoryInputFileMatchCacheKey(path string, info fs.FileInfo, buildContextKey string) string {
