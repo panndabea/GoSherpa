@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -23,11 +24,69 @@ type repositoryCacheEntry struct {
 	Repository  Repository
 }
 
+type repositoryInputFileMatchCache struct {
+	mu      sync.Mutex
+	max     int
+	entries map[string]bool
+	order   []string
+}
+
+var repositoryInputMatches = newRepositoryInputFileMatchCache(4096)
+
 func newRepositoryCache(max int) *repositoryCache {
 	return &repositoryCache{
 		max:     max,
 		entries: make(map[string]repositoryCacheEntry),
 	}
+}
+
+func newRepositoryInputFileMatchCache(max int) *repositoryInputFileMatchCache {
+	return &repositoryInputFileMatchCache{
+		max:     max,
+		entries: make(map[string]bool),
+	}
+}
+
+func (cache *repositoryInputFileMatchCache) MatchFile(path string, name string, info fs.FileInfo, buildContext build.Context, buildContextKey string) (bool, error) {
+	if cache == nil || cache.max <= 0 {
+		return buildContext.MatchFile(filepath.Dir(path), name)
+	}
+
+	key := repositoryInputFileMatchCacheKey(path, info, buildContextKey)
+	cache.mu.Lock()
+	match, ok := cache.entries[key]
+	cache.mu.Unlock()
+	if ok {
+		return match, nil
+	}
+
+	match, err := buildContext.MatchFile(filepath.Dir(path), name)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.Lock()
+	if _, ok := cache.entries[key]; !ok {
+		cache.order = append(cache.order, key)
+	}
+	cache.entries[key] = match
+	for len(cache.order) > cache.max {
+		oldest := cache.order[0]
+		cache.order = cache.order[1:]
+		delete(cache.entries, oldest)
+	}
+	cache.mu.Unlock()
+
+	return match, nil
+}
+
+func repositoryInputFileMatchCacheKey(path string, info fs.FileInfo, buildContextKey string) string {
+	return strings.Join([]string{
+		filepath.Clean(path),
+		fmt.Sprintf("%d", info.Size()),
+		fmt.Sprintf("%d", info.ModTime().UnixNano()),
+		buildContextKey,
+	}, "\x00")
 }
 
 func (cache *repositoryCache) Get(key string, fingerprint string) (Repository, bool) {
@@ -95,6 +154,8 @@ func repositoryCacheKey(root string, options LoadOptions, patterns []string) str
 
 func repositoryInputFingerprint(root string, options LoadOptions) (string, error) {
 	hash := sha256.New()
+	buildContext := repositoryBuildContext(options)
+	buildContextKey := repositoryBuildContextKey(buildContext)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -108,15 +169,22 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 			}
 			return nil
 		}
-		if !repositoryInputFile(entry.Name(), options.IncludeTests) {
+		if !repositoryInputCandidate(entry.Name()) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		input, err := repositoryInputFile(path, entry.Name(), info, options, buildContext, buildContextKey)
+		if err != nil {
+			return err
+		}
+		if !input {
 			return nil
 		}
 
 		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		info, err := entry.Info()
 		if err != nil {
 			return err
 		}
@@ -133,11 +201,48 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func repositoryInputFile(name string, includeTests bool) bool {
-	if strings.HasSuffix(name, ".go") {
-		if !includeTests && strings.HasSuffix(name, "_test.go") {
-			return false
+func repositoryBuildContext(options LoadOptions) build.Context {
+	context := build.Default
+	context.BuildTags = repositoryBuildTags(options)
+	return context
+}
+
+func repositoryBuildContextKey(buildContext build.Context) string {
+	return strings.Join([]string{
+		buildContext.GOOS,
+		buildContext.GOARCH,
+		buildContext.Compiler,
+		fmt.Sprintf("cgo=%t", buildContext.CgoEnabled),
+		"tags=" + strings.Join(buildContext.BuildTags, ","),
+		"tool=" + strings.Join(buildContext.ToolTags, ","),
+		"release=" + strings.Join(buildContext.ReleaseTags, ","),
+	}, "\x00")
+}
+
+func repositoryBuildTags(options LoadOptions) []string {
+	values := append([]string{}, options.BuildTags...)
+	values = append(values, repositoryBuildFlagTags(options.BuildFlags)...)
+	return NormalizeBuildTags(values)
+}
+
+func repositoryBuildFlagTags(flags []string) []string {
+	var values []string
+	for i := 0; i < len(flags); i++ {
+		flag := strings.TrimSpace(flags[i])
+		switch {
+		case flag == "-tags" && i+1 < len(flags):
+			i++
+			values = append(values, flags[i])
+		case strings.HasPrefix(flag, "-tags="):
+			values = append(values, strings.TrimPrefix(flag, "-tags="))
 		}
+	}
+
+	return values
+}
+
+func repositoryInputCandidate(name string) bool {
+	if strings.HasSuffix(name, ".go") {
 		return true
 	}
 
@@ -146,6 +251,22 @@ func repositoryInputFile(name string, includeTests bool) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func repositoryInputFile(path string, name string, info fs.FileInfo, options LoadOptions, buildContext build.Context, buildContextKey string) (bool, error) {
+	if strings.HasSuffix(name, ".go") {
+		if !options.IncludeTests && strings.HasSuffix(name, "_test.go") {
+			return false, nil
+		}
+		return repositoryInputMatches.MatchFile(path, name, info, buildContext, buildContextKey)
+	}
+
+	switch name {
+	case "go.mod", "go.sum", "go.work", "go.work.sum":
+		return true, nil
+	default:
+		return false, nil
 	}
 }
 

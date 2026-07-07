@@ -317,6 +317,112 @@ func TestLoadRepositoryInvalidatesCacheForTestFileChangesWhenTestsIncluded(t *te
 	}
 }
 
+func TestLoadRepositoryIgnoresBuildTaggedFileChangesWhenTagExcluded(t *testing.T) {
+	tmp := t.TempDir()
+	goFile := filepath.Join(tmp, "service.go")
+	taggedFile := filepath.Join(tmp, "enterprise.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, goFile, "package app\n")
+	writeSemanticTestFile(t, taggedFile, `//go:build enterprise
+
+package app
+
+func EnterpriseOriginal() {}
+`)
+
+	repositoryLoadCache.Clear()
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+		repositoryLoadCache.Clear()
+	})
+
+	calls := 0
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls++
+		return []*packages.Package{
+			{
+				ID:              "example.com/app",
+				Name:            "app",
+				PkgPath:         "example.com/app",
+				Dir:             tmp,
+				GoFiles:         []string{goFile},
+				CompiledGoFiles: []string{goFile},
+			},
+		}, nil
+	}
+
+	if _, err := LoadRepository(tmp, LoadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	writeSemanticTestFile(t, taggedFile, `//go:build enterprise
+
+package app
+
+func EnterpriseChanged() {}
+`)
+	if _, err := LoadRepository(tmp, LoadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 1 {
+		t.Fatalf("package load calls = %d, want 1", calls)
+	}
+}
+
+func TestLoadRepositoryInvalidatesCacheForBuildTaggedFileChangesWhenTagIncluded(t *testing.T) {
+	tmp := t.TempDir()
+	goFile := filepath.Join(tmp, "service.go")
+	taggedFile := filepath.Join(tmp, "enterprise.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, goFile, "package app\n")
+	writeSemanticTestFile(t, taggedFile, `//go:build enterprise
+
+package app
+
+func EnterpriseOriginal() {}
+`)
+
+	repositoryLoadCache.Clear()
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+		repositoryLoadCache.Clear()
+	})
+
+	calls := 0
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls++
+		return []*packages.Package{
+			{
+				ID:              "example.com/app",
+				Name:            "app",
+				PkgPath:         "example.com/app",
+				Dir:             tmp,
+				GoFiles:         []string{goFile, taggedFile},
+				CompiledGoFiles: []string{goFile, taggedFile},
+			},
+		}, nil
+	}
+
+	if _, err := LoadRepository(tmp, LoadOptions{BuildTags: []string{"enterprise"}}); err != nil {
+		t.Fatal(err)
+	}
+	writeSemanticTestFile(t, taggedFile, `//go:build enterprise
+
+package app
+
+func EnterpriseChanged() {}
+`)
+	if _, err := LoadRepository(tmp, LoadOptions{BuildTags: []string{"enterprise"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls != 2 {
+		t.Fatalf("package load calls = %d, want 2", calls)
+	}
+}
+
 func TestLoadRepositoryRetriesEmptyLoadWithWritableCache(t *testing.T) {
 	tmp := t.TempDir()
 

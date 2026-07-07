@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 )
@@ -76,6 +77,17 @@ func TestRepositoryCacheEvictsOldestEntry(t *testing.T) {
 	}
 	assertRepositoryCacheHit(t, cache, "b", "fp", "b")
 	assertRepositoryCacheHit(t, cache, "c", "fp", "c")
+}
+
+func TestRepositoryBuildTagsIncludesBuildFlagTags(t *testing.T) {
+	got := repositoryBuildTags(LoadOptions{
+		BuildTags:  []string{"enterprise"},
+		BuildFlags: []string{"-race", "-tags=integration,debug", "-tags", "canary nightly"},
+	})
+	want := []string{"canary", "debug", "enterprise", "integration", "nightly"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("repositoryBuildTags() = %#v, want %#v", got, want)
+	}
 }
 
 func assertRepositoryCacheHit(t *testing.T, cache *repositoryCache, key string, fingerprint string, root string) {
@@ -154,6 +166,9 @@ func NewValue` + value + `(field string, count int) Value` + value + ` {
 
 func repositoryInputContentFingerprintForBenchmark(root string) (string, error) {
 	hash := sha256.New()
+	options := LoadOptions{IncludeTests: true}
+	buildContext := repositoryBuildContext(options)
+	buildContextKey := repositoryBuildContextKey(buildContext)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -167,7 +182,18 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 			}
 			return nil
 		}
-		if !repositoryInputFile(entry.Name(), true) {
+		if !repositoryInputCandidate(entry.Name()) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		input, err := repositoryInputFile(path, entry.Name(), info, options, buildContext, buildContextKey)
+		if err != nil {
+			return err
+		}
+		if !input {
 			return nil
 		}
 
