@@ -93,7 +93,7 @@ func repositoryCacheKey(root string, options LoadOptions, patterns []string) str
 	return strings.Join(parts, "\x00")
 }
 
-func repositoryInputFingerprint(root string) (string, error) {
+func repositoryInputFingerprint(root string, options LoadOptions) (string, error) {
 	hash := sha256.New()
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -108,7 +108,7 @@ func repositoryInputFingerprint(root string) (string, error) {
 			}
 			return nil
 		}
-		if !repositoryInputFile(entry.Name()) {
+		if !repositoryInputFile(entry.Name(), options.IncludeTests) {
 			return nil
 		}
 
@@ -133,8 +133,11 @@ func repositoryInputFingerprint(root string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func repositoryInputFile(name string) bool {
+func repositoryInputFile(name string, includeTests bool) bool {
 	if strings.HasSuffix(name, ".go") {
+		if !includeTests && strings.HasSuffix(name, "_test.go") {
+			return false
+		}
 		return true
 	}
 

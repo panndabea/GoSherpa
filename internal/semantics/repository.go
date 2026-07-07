@@ -53,7 +53,7 @@ func LoadRepository(root string, options LoadOptions) (Repository, error) {
 
 	patterns := packageLoadPatterns(rootPath, options)
 	cacheKey := repositoryCacheKey(rootPath, options, patterns)
-	fingerprint, fingerprintErr := repositoryInputFingerprint(rootPath)
+	fingerprint, fingerprintErr := repositoryInputFingerprint(rootPath, options)
 	if fingerprintErr == nil {
 		if repo, ok := repositoryLoadCache.Get(cacheKey, fingerprint); ok {
 			return repo, nil

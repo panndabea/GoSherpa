@@ -96,7 +96,7 @@ func BenchmarkRepositoryInputFingerprint(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := repositoryInputFingerprint(root); err != nil {
+		if _, err := repositoryInputFingerprint(root, LoadOptions{}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -167,7 +167,7 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 			}
 			return nil
 		}
-		if !repositoryInputFile(entry.Name()) {
+		if !repositoryInputFile(entry.Name(), true) {
 			return nil
 		}
 
