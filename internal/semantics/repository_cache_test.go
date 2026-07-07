@@ -1,8 +1,6 @@
 package semantics
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -177,7 +175,7 @@ func NewValue` + value + `(field string, count int) Value` + value + ` {
 }
 
 func repositoryInputContentFingerprintForBenchmark(root string) (string, error) {
-	hash := sha256.New()
+	hash := newRepositoryFingerprintHash()
 	rootPrefix := filepath.Clean(root) + string(filepath.Separator)
 	options := LoadOptions{IncludeTests: true}
 	buildContext := repositoryBuildContext(options)
@@ -218,9 +216,8 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 		if err != nil {
 			return err
 		}
-		writeRepositoryHashLine(hash, relative)
-		_, _ = hash.Write(contents)
-		_, _ = hash.Write([]byte{0})
+		hash.WriteString(relative)
+		hash.WriteBytes(contents)
 
 		return nil
 	})
@@ -228,5 +225,5 @@ func repositoryInputContentFingerprintForBenchmark(root string) (string, error) 
 		return "", err
 	}
 
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return hash.SumHex(), nil
 }

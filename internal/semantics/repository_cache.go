@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
+	"hash"
 	"io/fs"
 	"path/filepath"
 	"strconv"
@@ -30,6 +31,11 @@ type repositoryInputFileMatchCache struct {
 	max     int
 	entries map[string]bool
 	order   []string
+}
+
+type repositoryFingerprintHash struct {
+	hash   hash.Hash
+	buffer []byte
 }
 
 var repositoryInputMatches = newRepositoryInputFileMatchCache(4096)
@@ -159,7 +165,7 @@ func repositoryCacheKey(root string, options LoadOptions, patterns []string) str
 }
 
 func repositoryInputFingerprint(root string, options LoadOptions) (string, error) {
-	hash := sha256.New()
+	hash := newRepositoryFingerprintHash()
 	rootPrefix := filepath.Clean(root) + string(filepath.Separator)
 	buildContext := repositoryBuildContext(options)
 	buildContextKey := repositoryBuildContextKey(buildContext)
@@ -195,9 +201,9 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 		if err != nil {
 			return err
 		}
-		writeRepositoryHashLine(hash, relative)
-		writeRepositoryHashInt64(hash, info.Size())
-		writeRepositoryHashInt64(hash, info.ModTime().UnixNano())
+		hash.WriteString(relative)
+		hash.WriteInt64(info.Size())
+		hash.WriteInt64(info.ModTime().UnixNano())
 
 		return nil
 	})
@@ -205,7 +211,7 @@ func repositoryInputFingerprint(root string, options LoadOptions) (string, error
 		return "", err
 	}
 
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return hash.SumHex(), nil
 }
 
 func repositoryInputRelativePath(root string, rootPrefix string, path string) (string, error) {
@@ -345,15 +351,32 @@ func repositoryInputFile(path string, name string, info fs.FileInfo, options Loa
 	}
 }
 
-func writeRepositoryHashLine(hash interface{ Write([]byte) (int, error) }, value string) {
-	_, _ = hash.Write([]byte(value))
-	_, _ = hash.Write([]byte{0})
+func newRepositoryFingerprintHash() repositoryFingerprintHash {
+	return repositoryFingerprintHash{
+		hash:   sha256.New(),
+		buffer: make([]byte, 0, 512),
+	}
 }
 
-func writeRepositoryHashInt64(hash interface{ Write([]byte) (int, error) }, value int64) {
+func (writer *repositoryFingerprintHash) WriteString(value string) {
+	writer.buffer = append(writer.buffer[:0], value...)
+	writer.buffer = append(writer.buffer, 0)
+	_, _ = writer.hash.Write(writer.buffer)
+}
+
+func (writer *repositoryFingerprintHash) WriteInt64(value int64) {
 	var buffer [20]byte
-	_, _ = hash.Write(strconv.AppendInt(buffer[:0], value, 10))
-	_, _ = hash.Write([]byte{0})
+	_, _ = writer.hash.Write(strconv.AppendInt(buffer[:0], value, 10))
+	_, _ = writer.hash.Write([]byte{0})
+}
+
+func (writer *repositoryFingerprintHash) WriteBytes(value []byte) {
+	_, _ = writer.hash.Write(value)
+	_, _ = writer.hash.Write([]byte{0})
+}
+
+func (writer *repositoryFingerprintHash) SumHex() string {
+	return hex.EncodeToString(writer.hash.Sum(nil))
 }
 
 func writeRepositoryBuilderInt64(builder *strings.Builder, value int64) {
