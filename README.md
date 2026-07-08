@@ -39,25 +39,34 @@ It is built for developers and coding agents who want focused, repeatable answer
 ```bash
 git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
-go test ./...
-go run ./cmd/gosherpa analyze .
 go run ./cmd/gosherpa version
-go run ./cmd/gosherpa doctor
-go run ./cmd/gosherpa snapshot
-go run ./cmd/gosherpa symbols --kind function
-go run ./cmd/gosherpa explain ParseFile
+go run ./cmd/gosherpa search parse file
+go run ./cmd/gosherpa symbol ParseFile
+go run ./cmd/gosherpa refs ParseFile --kind call
 ```
 
-Build a local binary when you are ready:
+For a broader repository overview, run:
+
+```bash
+go run ./cmd/gosherpa analyze .
+go run ./cmd/gosherpa doctor
+```
+
+Build a local binary when you are ready for repeated use:
 
 ```bash
 go build -o gosherpa ./cmd/gosherpa
-./gosherpa search parse file
+./gosherpa snapshot
 ./gosherpa analyze --use-snapshot
 ./gosherpa symbols --use-snapshot
-./gosherpa refs ParseFile --kind call
 ./gosherpa entrypoints ParseFile
 ./gosherpa impact diff --base HEAD
+```
+
+When contributing to GoSherpa itself, run the full test suite:
+
+```bash
+go test ./...
 ```
 
 Use `--root` to run GoSherpa from another working directory:
