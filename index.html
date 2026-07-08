@@ -92,7 +92,7 @@
         <div>
           <p class="section-kicker" data-i18n="agentic.kicker">Agentische Workflows</p>
           <h2 class="section-title" data-i18n="agentic.title">Gebaut für agentische Workflows.</h2>
-          <p class="section-lead" data-i18n="agentic.copy">GoSherpa liefert deterministischen, strukturierten Kontext für Go-Repositories. AI Coding Agents können damit Symbole, Referenzen, Caller, Callees, Abhängigkeiten und Diff-Impact prüfen, bevor sie Code ändern.</p>
+          <p class="section-lead" data-i18n="agentic.copy">GoSherpa liefert deterministischen, begrenzbaren Kontext für Go-Repositories. AI Coding Agents können mit JSON, Kontextlimits und Diff-Impact prüfen, bevor sie Code ändern.</p>
         </div>
         <a class="text-link" href="AGENT_NOTES.md" data-i18n="agentic.link">Agent Guide lesen</a>
       </div>
@@ -132,7 +132,7 @@
             <div class="comic-body">
               <h3 data-i18n="comics.agents.title">Kontext weitergeben</h3>
               <p data-i18n="comics.agents.copy">Für Menschen lesbar, für Tools stabil: Kontextbefehle exportieren Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.</p>
-              <code class="command-pill">gosherpa context symbol ParseFile --json</code>
+              <code class="command-pill">gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --json</code>
             </div>
           </article>
         </div>
@@ -173,8 +173,8 @@
           </div>
           <div class="capability-row" role="row">
             <strong role="cell" data-i18n="features.context.title">Agent-Kontext</strong>
-            <span role="cell" data-i18n="features.context.copy">Exportiert begrenzte, deterministische Kontextpakete für Codex, Claude Code, Cursor und CI.</span>
-            <code role="cell">gosherpa context diff --json</code>
+            <span role="cell" data-i18n="features.context.copy">Exportiert deterministische Kontextpakete mit Limits für Codex, Claude Code, Cursor und CI.</span>
+            <code role="cell">gosherpa context diff --base HEAD --max-files 20 --json</code>
           </div>
         </div>
       </div>
@@ -197,7 +197,7 @@
             </article>
             <article class="audience">
               <h3 data-i18n="agents.automation.title">Automation</h3>
-              <p data-i18n="agents.automation.copy">Stabile JSON-Umschläge für Scripts, CI und Coding Agents, die keinen Projektroman brauchen.</p>
+              <p data-i18n="agents.automation.copy">Stabile JSON-Umschläge und begrenzte Kontextbefehle für Scripts, CI und Coding Agents.</p>
             </article>
           </div>
         </div>
@@ -208,14 +208,15 @@
             <span class="terminal-dot"></span>
             <span class="terminal-dot"></span>
           </div>
-          <pre><span class="comment" data-i18n="terminal.symbol"># Ein Symbol verstehen</span>
-<span class="accent">gosherpa explain ParseFile</span>
+          <pre><span class="comment" data-i18n="terminal.symbol"># Analyse-Vertrauen prüfen</span>
+<span class="accent">gosherpa doctor --json</span>
 
-<span class="comment" data-i18n="terminal.tests"># Betroffene Tests für ein Diff</span>
-<span class="accent">gosherpa tests affected --base HEAD</span>
+<span class="comment" data-i18n="terminal.tests"># Begrenzter Diff-Kontext</span>
+<span class="accent">gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json</span>
 
-<span class="comment" data-i18n="terminal.context"># Kompakter Agent-Kontext</span>
-<span class="accent">gosherpa context package ./internal/sherpa --json</span></pre>
+<span class="comment" data-i18n="terminal.context"># Impact und Testplanung</span>
+<span class="accent">gosherpa impact diff --base HEAD --json</span>
+<span class="accent">gosherpa tests affected --base HEAD --json</span></pre>
         </div>
       </div>
     </section>
@@ -225,7 +226,7 @@
         <div>
           <p class="section-kicker" data-i18n="cta.kicker">Ausprobieren</p>
           <h2 data-i18n="cta.title">Starte lokal in wenigen Befehlen.</h2>
-          <p data-i18n="cta.copy">GoSherpa ist ein frühes MVP, aber die Grundroute steht: bauen, testen, fragen, verstehen. Für GitHub Pages ist diese Seite als statische Root-Page vorbereitet.</p>
+          <p data-i18n="cta.copy">GoSherpa ist ein frühes MVP, aber die Grundroute steht: fragen, finden, Kontext holen und verstehen. Für größere Workflows führt dich das README weiter.</p>
           <div class="mini-actions">
             <a class="button primary" href="https://github.com/panndabea/GoSherpa" data-i18n="cta.repo">Repository öffnen</a>
             <a class="button secondary" href="README.md" data-i18n="cta.readme">README ansehen</a>
@@ -234,12 +235,10 @@
         <div class="install-box" aria-label="Installationsbefehle" data-i18n-label="cta.install.aria">
           <pre>git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
-go test ./...
-go build -o gosherpa ./cmd/gosherpa
-
-./gosherpa doctor
-./gosherpa symbols
-./gosherpa impact diff --base HEAD</pre>
+go run ./cmd/gosherpa version
+go run ./cmd/gosherpa search parse file
+go run ./cmd/gosherpa symbol ParseFile
+go run ./cmd/gosherpa refs ParseFile --kind call</pre>
         </div>
       </div>
     </section>
