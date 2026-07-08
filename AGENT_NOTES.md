@@ -40,11 +40,11 @@ Do not use GoSherpa when:
 ## Agent Workflow
 
 For review, repair, or edit tasks in a Go repository, start with readiness and
-diff context:
+bounded diff context:
 
 ```bash
 gosherpa doctor --json
-gosherpa context diff --base HEAD --json
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa impact diff --base HEAD --json
 gosherpa tests affected --base HEAD --json
 ```
@@ -55,10 +55,18 @@ For a PR-style summary, use:
 gosherpa pr --base HEAD --json
 ```
 
-For focused symbol work, use package-qualified targets when possible:
+When the target is unclear, start with a limited search:
 
 ```bash
-gosherpa context symbol ./internal/sherpa.ParseFile --json
+gosherpa search parse file --limit 10 --json
+gosherpa symbol ./internal/sherpa.ParseFile --json
+```
+
+For focused symbol work, use package-qualified targets when possible and cap
+context output:
+
+```bash
+gosherpa context symbol ./internal/sherpa.ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa explain ./internal/sherpa.ParseFile --json
 gosherpa refs ./internal/sherpa.ParseFile --json
 gosherpa callers ./internal/sherpa.ParseFile --json
@@ -70,6 +78,9 @@ If an unqualified target is ambiguous, use the candidates in GoSherpa's
 diagnostic and retry with a package-qualified target, for example
 `./internal/sherpa.ParseFile`.
 
+Keep agent output bounded. Prefer `context ... --max-*` and `search --limit <n>`
+before broad inventory commands like unfiltered `symbols`.
+
 ## Common Tasks
 
 | Task | Start with |
@@ -78,27 +89,27 @@ diagnostic and retry with a package-qualified target, for example
 | Get a repository overview | `gosherpa analyze . --json` |
 | Inspect architecture and coupling | `gosherpa architecture --json` |
 | Inspect structural risk | `gosherpa risk --json` |
-| Find symbols by name or kind | `gosherpa search <terms> --json` and `gosherpa symbols --json` |
+| Find symbols by name or kind | `gosherpa search <terms> --limit <n> --json`; use `gosherpa symbols --json` only for broad inventory |
 | Inspect one symbol | `gosherpa symbol <target> --json` |
-| Get bounded pre-edit context | `gosherpa context symbol|file|package|diff ... --json` |
+| Get bounded pre-edit context | `gosherpa context symbol|file|package|diff ... --max-* ... --json` |
 | Find references | `gosherpa refs <target> --json` |
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` |
-| Analyze changed files | `gosherpa context diff --base HEAD --json` and `gosherpa impact diff --base HEAD --json` |
+| Analyze changed files | `gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
 
 ## Context Commands
 
 Use `gosherpa context` when an agent needs a compact reading bundle before
-editing:
+editing. Add size controls whenever the repository or target may be large:
 
 ```bash
-gosherpa context symbol ParseFile --json
-gosherpa context file internal/sherpa/impact.go --json
-gosherpa context package ./internal/sherpa --json
-gosherpa context diff --base HEAD --json
+gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
+gosherpa context file internal/sherpa/impact.go --max-symbols 20 --max-tests 10 --max-bytes 12000 --source-radius 1 --json
+gosherpa context package ./internal/sherpa --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ```
 
 Context output can include source excerpts, symbols, references, callers,
@@ -110,7 +121,7 @@ Use size controls for large repositories or limited context windows:
 ```bash
 gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --source-radius 1 --json
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --json
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ```
 
 ## JSON Output
@@ -150,6 +161,8 @@ and package-qualified examples.
   runtime behavior.
 - Inspect the source files named in `readingOrder`, references, callers,
   callees, tests, and impact output before editing.
+- Limit broad outputs with `--max-*` or `--limit` flags before feeding them into
+  an agent context window.
 - Prefer package-qualified targets for symbols that may appear in multiple
   packages.
 - Use reported confidence, warnings, analysis modes, and limitations in your

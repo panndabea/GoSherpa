@@ -108,6 +108,35 @@ gosherpa context package ./internal/sherpa --json
 gosherpa context diff --base HEAD --json
 ```
 
+### Agent Quickstart
+
+Agents should start with bounded, task-specific context instead of broad inventory dumps.
+
+```bash
+# 1. Check whether analysis is trustworthy
+gosherpa doctor --json
+
+# 2. For a change, start with bounded diff context
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+
+# 3. For a symbol task, fetch focused context
+gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
+
+# 4. For impact and test planning
+gosherpa impact diff --base HEAD --json
+gosherpa tests affected --base HEAD --json
+```
+
+Agent workflow rules:
+
+- Use `--json` for automation and agent workflows.
+- Prefer `context ...` commands before editing files.
+- Always bound large context commands with `--max-*` flags.
+- Avoid broad inventory dumps like unfiltered `symbols` unless you really need them.
+- Use `search --limit <n>` to discover targets, then switch to `symbol`, `context symbol`, `refs`, `callers`, or `callees`.
+- If a target is ambiguous, rerun with the package-qualified target GoSherpa suggests.
+- Add `--tests` only when test code matters.
+
 Start with [GoSherpa for AI Agents](AGENT_NOTES.md) when deciding whether the tool is useful for a repository or task.
 
 See the [Agent JSON Schema](docs/product/JSON_SCHEMA_V1.md) and [Context JSON Schema](docs/product/CONTEXT_SCHEMA_V1.md) for the detailed contracts.
