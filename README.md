@@ -41,6 +41,7 @@ git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go test ./...
 go run ./cmd/gosherpa analyze .
+go run ./cmd/gosherpa version
 go run ./cmd/gosherpa doctor
 go run ./cmd/gosherpa snapshot
 go run ./cmd/gosherpa symbols --kind function
@@ -69,6 +70,7 @@ Use `--root` to run GoSherpa from another working directory:
 
 | Command | What it shows |
 | --- | --- |
+| `gosherpa version` | GoSherpa and Go runtime version information |
 | `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
 | `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot |

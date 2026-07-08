@@ -46,6 +46,7 @@ type cliInvocation struct {
 	HasTagsOption      bool
 	UseSnapshot        bool
 	HasSnapshotOption  bool
+	HasVersionOption   bool
 	KindFilter         string
 	SearchKind         sherpa.SymbolKind
 	ReferenceKind      sherpa.ReferenceKind
@@ -385,6 +386,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --tags <list>    build tags for semantic package loading")
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
+	fmt.Fprintln(writer, "  --version        print GoSherpa version information")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	for _, spec := range commandSpecs {

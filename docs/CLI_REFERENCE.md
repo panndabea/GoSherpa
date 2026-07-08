@@ -15,6 +15,7 @@ Prefer not to build a binary yet?
 
 ```bash
 go run ./cmd/gosherpa analyze .
+go run ./cmd/gosherpa version
 go run ./cmd/gosherpa architecture
 go run ./cmd/gosherpa risk
 go run ./cmd/gosherpa symbols --kind function
@@ -59,6 +60,7 @@ repository analysis and report a warning.
 
 | Capability | Command | Result |
 | --- | --- | --- |
+| Version | `gosherpa version` | Prints GoSherpa and Go runtime version information |
 | Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, entrypoint candidates, structural risk, hotspots, tests, readiness, limitations, and suggested next commands |
 | Architecture overview | `gosherpa architecture` | Reports dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, and leaf packages |
 | Risk overview | `gosherpa risk` | Summarizes structural repository risk from cycles, fan-in/fan-out, public API surface, interfaces, and tests |
@@ -111,6 +113,7 @@ Found 4 references
 
 ```bash
 ./gosherpa analyze .
+./gosherpa version
 ./gosherpa analyze . --tests
 ./gosherpa analyze --use-snapshot
 ./gosherpa analyze . --json

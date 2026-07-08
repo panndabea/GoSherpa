@@ -692,6 +692,17 @@ func TestPrintUsageIncludesSnapshot(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesVersion(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	for _, want := range []string{"--version        print GoSherpa version information", "\n  version\n"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
+		}
+	}
+}
+
 func TestPrintUsageIncludesTests(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -818,6 +829,91 @@ func TestRunReturnsUsageExitWhenCommandIsMissing(t *testing.T) {
 
 	if result.Stdout != "" {
 		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRunsVersionCommand(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "version"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"GoSherpa dev\n", "go: go"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+}
+
+func TestMainRunsVersionFlag(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "--version"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	if !strings.Contains(result.Stdout, "GoSherpa dev\n") {
+		t.Fatalf("expected stdout to contain version, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsVersionCommandJSON(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "version", "--json"})
+	assertMainTestVersionJSON(t, result)
+}
+
+func TestMainRunsVersionFlagJSON(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "--json", "--version"})
+	assertMainTestVersionJSON(t, result)
+}
+
+func assertMainTestVersionJSON(t *testing.T, result mainTestRunResult) {
+	t.Helper()
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["schemaVersion"] != float64(jsonSchemaVersion) {
+		t.Fatalf("expected schemaVersion %d, got %v", jsonSchemaVersion, payload["schemaVersion"])
+	}
+	if payload["command"] != "version" {
+		t.Fatalf("expected command version, got %v", payload["command"])
+	}
+	if payload["target"] != "" {
+		t.Fatalf("expected empty target, got %v", payload["target"])
+	}
+	if payload["root"] != "" {
+		t.Fatalf("expected empty root, got %v", payload["root"])
+	}
+	if payload["modulePath"] != "" {
+		t.Fatalf("expected empty modulePath, got %v", payload["modulePath"])
+	}
+	if warnings := assertMainTestJSONArray(t, payload, "warnings"); len(warnings) != 0 {
+		t.Fatalf("expected warnings length 0, got %d: %#v", len(warnings), warnings)
+	}
+
+	data := assertMainTestJSONObject(t, payload, "data")
+	if data["version"] != "dev" {
+		t.Fatalf("expected version dev, got %v", data["version"])
+	}
+	goVersion, ok := data["goVersion"].(string)
+	if !ok || !strings.HasPrefix(goVersion, "go") {
+		t.Fatalf("expected goVersion to start with go, got %v", data["goVersion"])
 	}
 }
 

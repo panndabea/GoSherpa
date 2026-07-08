@@ -57,6 +57,13 @@ var cliFlagSpecs = []cliFlagSpec{
 		},
 	},
 	{
+		Name: "--version",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			invocation.HasVersionOption = true
+			return nil
+		},
+	},
+	{
 		Name:       "--tags",
 		TakesValue: true,
 		Apply:      applyBuildTagsFlag,
@@ -208,6 +215,13 @@ func parseCLIArgsWithFlagSpecs(args []string) (cliInvocation, error) {
 
 	if len(positionals) > 1 {
 		invocation.CommandArgs = positionals[1:]
+	}
+
+	if invocation.HasVersionOption {
+		if len(positionals) > 0 {
+			return cliInvocation{}, fmt.Errorf("--version does not accept command arguments")
+		}
+		invocation.Command = "version"
 	}
 
 	if invocation.HasKindOption {
