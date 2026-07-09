@@ -1216,6 +1216,141 @@ func Run(client *service.Client) {
 	}
 }
 
+func TestFindCalleesResolvesLocalFunctionValues(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	run := Target
+	run()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Entry")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(names, []string{"Target"}) {
+		t.Fatalf("expected resolved function value callee, got %v", names)
+	}
+
+	if len(result.Limitations) != 0 {
+		t.Fatalf("expected resolved function value to avoid limitations, got %v", result.Limitations)
+	}
+}
+
+func TestFindCallersResolvesImportedFunctionValues(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func Run() {
+	run := service.Target
+	run()
+}
+`)
+
+	result, err := FindCallers(tmp, "./internal/service.Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected imported function value caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", files)
+	}
+}
+
+func TestFindCallersResolvesConcreteMethodValues(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/service"
+
+func Run(client *service.Client) {
+	start := client.Start
+	start()
+}
+`)
+
+	result, err := FindCallers(tmp, "./internal/service.Client.Start")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected method value caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", files)
+	}
+}
+
+func TestFindCallsKeepReassignedFunctionValuesConservative(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	run := Target
+	run = Other
+	run()
+}
+
+func Target() {}
+
+func Other() {}
+`)
+
+	callers, err := FindCallers(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(callers.Callers) != 0 {
+		t.Fatalf("expected reassigned function value not to resolve to Target, got %v", callers.Callers)
+	}
+
+	callees, err := FindCallees(tmp, "Entry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := callTestCalleeNames(callees.Callees)
+	if !reflect.DeepEqual(names, []string{"run"}) {
+		t.Fatalf("expected unresolved function value callee name, got %v", names)
+	}
+	assertContainsCallLimitation(t, callees.Limitations, "Function value calls", "service.go:6")
+}
+
 func TestFindCallsFallBackToASTWhenSemanticLoaderFails(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1484,6 +1619,40 @@ func Target() {}
 
 	got := callTestPathCallees(result.Paths[0])
 	want := []string{"Fast", "Target"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindCallPathsResolvesFunctionValues(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	next := Middle
+	next()
+}
+
+func Middle() {
+	Target()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallPaths(tmp, "Entry", "Target", CallPathOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %v", result.Paths)
+	}
+
+	got := callTestPathCallees(result.Paths[0])
+	want := []string{"Middle", "Target"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}

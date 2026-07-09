@@ -119,8 +119,8 @@ Current analysis is intentionally conservative:
 - Reference analysis uses typechecked package loading when available and falls
   back to AST or per-package analysis when needed.
 - Caller, callee, path, entrypoint, and interface impact analysis may miss
-  dynamic dispatch, reflection, function values, build-tag edge cases, aliases,
-  and some generic cases.
+  dynamic dispatch, reflection, reassigned or escaping function values,
+  build-tag edge cases, aliases, and some generic cases.
 - Diff impact is hunk-based and does not infer every semantic consequence of
   changed statements.
 - Test discovery is useful but incomplete for dynamic table-driven test names

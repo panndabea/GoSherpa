@@ -180,8 +180,9 @@ Current analysis is intentionally conservative:
 - Reference search uses `go/packages` typechecked loading when available and
   falls back to AST/per-package analysis when needed.
 - Caller, callee, path, entrypoint, and interface impact analysis may miss
-  dynamic dispatch, reflection, function values, goroutine starts, function
-  literals, build-tag edge cases, aliases, and some generic cases.
+  dynamic dispatch, reflection, reassigned or escaping function values,
+  goroutine starts, function literals, build-tag edge cases, aliases, and some
+  generic cases.
 - Test files are excluded from several analyses by default; use command flags
   such as `--tests` where available.
 - Diff impact is hunk-based and does not infer every semantic consequence of

@@ -39,6 +39,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, exported functions, and functions with no local callers
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
+- Simple locally assigned function values and concrete method values resolved as caller, callee, and call-path edges when type information proves a single static target
 - Standalone interface navigation with `implementers` and `interfaces`
 - Opt-in test callers for `gosherpa callers --tests` and `gosherpa explain --tests`
 - Ambiguity errors for duplicate unqualified symbols include candidate packages, files, lines, and package-qualified examples
@@ -74,7 +75,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
 - Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
-- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
+- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, and `packages --tests`; deeper semantic, context, impact, and call-graph queries still analyze repository data directly.

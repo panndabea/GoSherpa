@@ -109,6 +109,11 @@ type callReference struct {
 	Range    *SourceRange
 }
 
+type staticCallValueAssignments struct {
+	values map[types.Object]ast.Expr
+	counts map[types.Object]int
+}
+
 type callGraphNode struct {
 	Key      string
 	Target   string
@@ -1443,6 +1448,7 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 		return nil
 	}
 
+	staticValues := collectStaticCallValueAssignments(function)
 	var references []callReference
 	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
 		if node == nil {
@@ -1458,7 +1464,8 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 			return true
 		}
 
-		name, ok := callReferenceName(function, call.Fun)
+		expr := resolveStaticCallValue(function, staticValues, call.Fun)
+		name, ok := callReferenceName(function, expr)
 		if !ok {
 			return true
 		}
@@ -1472,7 +1479,7 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 
 		references = append(references, callReference{
 			Name:     name,
-			Expr:     call.Fun,
+			Expr:     expr,
 			Position: position,
 			Range:    sourceRangeRelativeToRoot(function.Root, function.FileSet, call.Fun.Pos(), call.Fun.End()),
 		})
@@ -1483,6 +1490,142 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	sortCallReferences(references)
 
 	return references
+}
+
+func collectStaticCallValueAssignments(function functionInfo) staticCallValueAssignments {
+	assignments := staticCallValueAssignments{
+		values: make(map[types.Object]ast.Expr),
+		counts: make(map[types.Object]int),
+	}
+
+	if function.TypeInfo == nil || function.Decl.Body == nil {
+		return assignments
+	}
+
+	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		if _, ok := node.(*ast.FuncLit); ok {
+			return false
+		}
+
+		switch typed := node.(type) {
+		case *ast.AssignStmt:
+			collectAssignStmtStaticCallValues(function, assignments, typed)
+		case *ast.ValueSpec:
+			collectValueSpecStaticCallValues(function, assignments, typed)
+		}
+
+		return true
+	})
+
+	return assignments
+}
+
+func collectAssignStmtStaticCallValues(function functionInfo, assignments staticCallValueAssignments, stmt *ast.AssignStmt) {
+	if stmt.Tok != token.DEFINE {
+		invalidateAssignedCallValues(function, assignments, stmt.Lhs)
+		return
+	}
+
+	if len(stmt.Lhs) != len(stmt.Rhs) {
+		invalidateAssignedCallValues(function, assignments, stmt.Lhs)
+		return
+	}
+
+	for i, lhs := range stmt.Lhs {
+		ident, ok := lhs.(*ast.Ident)
+		if !ok || ident.Name == "_" {
+			continue
+		}
+
+		if object := function.TypeInfo.Uses[ident]; object != nil {
+			invalidateStaticCallValue(assignments, object)
+			continue
+		}
+
+		object := function.TypeInfo.Defs[ident]
+		if object == nil {
+			continue
+		}
+
+		recordStaticCallValue(function, assignments, object, stmt.Rhs[i])
+	}
+}
+
+func collectValueSpecStaticCallValues(function functionInfo, assignments staticCallValueAssignments, spec *ast.ValueSpec) {
+	if len(spec.Names) != len(spec.Values) {
+		for _, name := range spec.Names {
+			if name == nil || name.Name == "_" {
+				continue
+			}
+			invalidateStaticCallValue(assignments, function.TypeInfo.Defs[name])
+		}
+		return
+	}
+
+	for i, name := range spec.Names {
+		if name == nil || name.Name == "_" {
+			continue
+		}
+
+		recordStaticCallValue(function, assignments, function.TypeInfo.Defs[name], spec.Values[i])
+	}
+}
+
+func invalidateAssignedCallValues(function functionInfo, assignments staticCallValueAssignments, lhs []ast.Expr) {
+	for _, expr := range lhs {
+		ident, ok := expr.(*ast.Ident)
+		if !ok || ident.Name == "_" {
+			continue
+		}
+
+		invalidateStaticCallValue(assignments, function.TypeInfo.Uses[ident])
+	}
+}
+
+func recordStaticCallValue(function functionInfo, assignments staticCallValueAssignments, object types.Object, expr ast.Expr) {
+	if object == nil {
+		return
+	}
+
+	if !callStaticFunctionValueExpr(function, expr) {
+		invalidateStaticCallValue(assignments, object)
+		return
+	}
+
+	assignments.counts[object]++
+	if assignments.counts[object] != 1 {
+		delete(assignments.values, object)
+		return
+	}
+
+	assignments.values[object] = expr
+}
+
+func invalidateStaticCallValue(assignments staticCallValueAssignments, object types.Object) {
+	if object == nil {
+		return
+	}
+
+	assignments.counts[object]++
+	delete(assignments.values, object)
+}
+
+func resolveStaticCallValue(function functionInfo, assignments staticCallValueAssignments, expr ast.Expr) ast.Expr {
+	object := callValueObject(function, expr)
+	if object == nil {
+		return expr
+	}
+
+	resolved, ok := assignments.values[object]
+	if !ok {
+		return expr
+	}
+
+	return resolved
 }
 
 func collectDynamicCallLimitations(functions []functionInfo) []string {
@@ -1519,6 +1662,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 		return nil
 	}
 
+	staticValues := collectStaticCallValueAssignments(function)
 	var signals []callUncertaintySignal
 	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
 		if node == nil {
@@ -1543,19 +1687,20 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 					Position: callExpressionPosition(function, typed.Fun),
 				})
 			}
-			if callUsesInterfaceDispatch(function, typed.Fun) {
+			expr := resolveStaticCallValue(function, staticValues, typed.Fun)
+			if callUsesInterfaceDispatch(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyInterfaceDispatch,
 					Position: callExpressionPosition(function, typed.Fun),
 				})
 			}
-			if callUsesFunctionValue(function, typed.Fun) {
+			if callUsesFunctionValue(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionValue,
 					Position: callExpressionPosition(function, typed.Fun),
 				})
 			}
-			if callUsesReflection(function, typed.Fun) {
+			if callUsesReflection(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyReflection,
 					Position: callExpressionPosition(function, typed.Fun),
@@ -1599,6 +1744,10 @@ func callUsesFunctionValue(function functionInfo, expr ast.Expr) bool {
 }
 
 func functionValueCallObjectIsStaticFunction(function functionInfo, expr ast.Expr) bool {
+	if function.TypeInfo == nil {
+		return false
+	}
+
 	selection := callSelection(function, expr)
 	if selection != nil {
 		if _, ok := selection.Obj().(*types.Func); ok {
@@ -1622,6 +1771,46 @@ func functionValueCallObjectIsStaticFunction(function functionInfo, expr ast.Exp
 	}
 
 	return false
+}
+
+func callStaticFunctionValueExpr(function functionInfo, expr ast.Expr) bool {
+	if function.TypeInfo == nil {
+		return false
+	}
+
+	selection := callSelection(function, expr)
+	if selection != nil {
+		if _, ok := selection.Obj().(*types.Func); ok {
+			return !callTypeIsInterface(selection.Recv())
+		}
+	}
+
+	object := callObject(function, expr)
+	if object == nil {
+		return false
+	}
+
+	_, ok := object.(*types.Func)
+	return ok
+}
+
+func callValueObject(function functionInfo, expr ast.Expr) types.Object {
+	if function.TypeInfo == nil {
+		return nil
+	}
+
+	switch node := expr.(type) {
+	case *ast.Ident:
+		return function.TypeInfo.Uses[node]
+	case *ast.IndexExpr:
+		return callValueObject(function, node.X)
+	case *ast.IndexListExpr:
+		return callValueObject(function, node.X)
+	case *ast.ParenExpr:
+		return callValueObject(function, node.X)
+	default:
+		return nil
+	}
 }
 
 func callUsesReflection(function functionInfo, expr ast.Expr) bool {
