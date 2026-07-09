@@ -518,6 +518,79 @@ section {
   outline: none;
 }
 
+.guide-layout {
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+.guide-layout .section-title {
+  margin-bottom: 1rem;
+}
+
+.guide-layout .text-link {
+  margin-top: 0.5rem;
+}
+
+.guide-steps {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: guide;
+}
+
+.guide-steps li {
+  position: relative;
+  display: grid;
+  gap: 0.38rem;
+  min-width: 0;
+  padding: 1rem 1rem 1rem 3.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 25px rgba(16, 36, 44, 0.06);
+}
+
+.guide-steps li::before {
+  content: counter(guide);
+  counter-increment: guide;
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--sea);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.guide-steps strong {
+  font-size: 1.02rem;
+}
+
+.guide-steps span {
+  color: var(--muted);
+}
+
+.guide-steps code {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d7e8e4;
+  border-radius: 8px;
+  background: #f5fbfa;
+  color: #18404a;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .comic-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -597,6 +670,48 @@ section {
   background: #edf8f6;
   color: #16414a;
   font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.community-card {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  min-height: 100%;
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 10px 25px rgba(16, 36, 44, 0.06);
+}
+
+.community-card strong {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.community-card p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.community-card code {
+  max-width: 100%;
+  overflow-x: auto;
+  align-self: end;
+  padding: 0.48rem 0.55rem;
+  border: 1px solid #d7e8e4;
+  border-radius: 8px;
+  background: #f5fbfa;
+  color: #18404a;
+  font-size: 0.78rem;
   white-space: nowrap;
 }
 
@@ -774,6 +889,7 @@ footer {
 
   .intro-grid,
   .command-demo,
+  .guide-layout,
   .split,
   .cta .wrap {
     grid-template-columns: 1fr;
@@ -788,6 +904,7 @@ footer {
   }
 
   .comic-grid,
+  .community-grid,
   .audience-grid {
     grid-template-columns: 1fr;
   }
