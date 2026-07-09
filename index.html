@@ -25,6 +25,7 @@
     <div class="header-actions">
       <nav class="nav-links" aria-label="Seitenbereiche" data-i18n-label="nav.aria">
         <a href="#comics" data-i18n="nav.comics">Comics</a>
+        <a href="#demo" data-i18n="nav.demo">Demo</a>
         <a href="#features" data-i18n="nav.features">Funktionen</a>
         <a href="#agents" data-i18n="nav.agents">Agents</a>
         <a href="AGENT_NOTES.md" data-i18n="nav.agentGuide">Agent Guide</a>
@@ -84,6 +85,60 @@
             <span data-i18n="ask.diff.a">Betroffene Packages, Risiko und sinnvolle Testbefehle.</span>
           </li>
         </ul>
+      </div>
+    </section>
+
+    <section class="demo-section band" id="demo" aria-label="Interaktive GoSherpa CLI-Demo" data-i18n-label="demo.aria">
+      <div class="wrap">
+        <div class="section-head demo-head">
+          <div>
+            <p class="section-kicker" data-i18n="demo.kicker">Frag GoSherpa</p>
+            <h2 class="section-title" data-i18n="demo.title">Klicke auf eine Frage. Sieh die Antwort im Terminal.</h2>
+          </div>
+          <p class="section-lead" data-i18n="demo.lead">Die Demo zeigt typische Workflows als kompakte CLI-Ausgaben: verstehen, Kontext holen, Impact prüfen und Tests planen.</p>
+        </div>
+
+        <div class="command-demo" data-command-demo>
+          <div class="demo-tabs" role="tablist" aria-label="Demo-Befehle" data-i18n-label="demo.tabs.aria">
+            <button class="demo-tab is-active" id="demo-tab-explain" type="button" role="tab" aria-selected="true" aria-controls="demo-panel" data-demo-command="explain">
+              <strong data-i18n="demo.explain.title">Symbol verstehen</strong>
+              <span data-i18n="demo.explain.copy">Was macht diese Funktion, wer nutzt sie und wie riskant ist eine Änderung?</span>
+              <code>gosherpa explain ParseFile</code>
+            </button>
+            <button class="demo-tab" id="demo-tab-context" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="context" tabindex="-1">
+              <strong data-i18n="demo.context.title">Agent-Kontext holen</strong>
+              <span data-i18n="demo.context.copy">Welches kleine, begrenzte Paket sollte ein Coding Agent zuerst lesen?</span>
+              <code>gosherpa context symbol ParseFile --json</code>
+            </button>
+            <button class="demo-tab" id="demo-tab-impact" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="impact" tabindex="-1">
+              <strong data-i18n="demo.impact.title">Diff-Impact prüfen</strong>
+              <span data-i18n="demo.impact.copy">Welche Packages, Symbole und Tests kann mein aktueller Change berühren?</span>
+              <code>gosherpa impact diff --base HEAD</code>
+            </button>
+            <button class="demo-tab" id="demo-tab-tests" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="tests" tabindex="-1">
+              <strong data-i18n="demo.tests.title">Tests planen</strong>
+              <span data-i18n="demo.tests.copy">Welche Testbefehle sind nach diesem Diff sinnvoll statt einfach alles zu starten?</span>
+              <code>gosherpa tests affected --base HEAD</code>
+            </button>
+          </div>
+
+          <div class="demo-terminal" id="demo-panel" role="tabpanel" aria-labelledby="demo-tab-explain">
+            <div class="demo-terminal-top">
+              <div class="terminal-bar demo-terminal-bar" aria-hidden="true">
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+              </div>
+              <div class="demo-command-row">
+                <code data-demo-command-line>gosherpa explain ParseFile</code>
+                <button class="copy-command" type="button" data-copy-command aria-label="Befehl kopieren" data-i18n-label="demo.copy.aria">
+                  <span data-copy-label data-i18n="demo.copy">Kopieren</span>
+                </button>
+              </div>
+            </div>
+            <pre><code data-demo-output></code></pre>
+          </div>
+        </div>
       </div>
     </section>
 

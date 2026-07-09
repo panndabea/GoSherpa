@@ -1,5 +1,124 @@
 (() => {
   const translations = window.GoSherpaTranslations || {};
+  const commandDemos = {
+    explain: {
+      command: "gosherpa explain ParseFile",
+      output: `$ gosherpa explain ParseFile
+
+EXPLAIN
+
+TARGET
+  ParseFile (function)
+
+DEFINITION
+  internal/sherpa/parse.go:15
+
+RISK
+  medium
+  - References found: 7.
+  - Related tests found: 4.
+
+READING ORDER
+  1. Definition - internal/sherpa/parse.go:15
+     Start with the symbol declaration and nearby implementation.
+  2. Caller: LoadRepository - internal/sherpa/repository.go:28
+     See how repository loading depends on parsing.
+  3. Test: TestParseFile - internal/sherpa/parse_test.go:11
+     Check expected behavior and regression coverage.
+
+SUGGESTED TESTS
+  TestParseFile                       internal/sherpa/parse_test.go:11 (direct)
+
+TEST PLAN
+  go test ./internal/sherpa`
+    },
+    context: {
+      command: "gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --json",
+      output: `$ gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --json
+
+{
+  "schemaVersion": 1,
+  "command": "context symbol",
+  "target": "ParseFile",
+  "data": {
+    "identity": {
+      "package": "./internal/sherpa",
+      "symbol": "ParseFile",
+      "kind": "function",
+      "definition": {
+        "file": "internal/sherpa/parse.go",
+        "line": 15
+      }
+    },
+    "confidence": "medium",
+    "sourceContext": {
+      "startLine": 12,
+      "endLine": 35
+    },
+    "references": [
+      {
+        "file": "internal/sherpa/repository.go",
+        "line": 28
+      }
+    ],
+    "relatedTests": [
+      {
+        "name": "TestParseFile",
+        "file": "internal/sherpa/parse_test.go",
+        "line": 11
+      }
+    ]
+  }
+}`
+    },
+    impact: {
+      command: "gosherpa impact diff --base HEAD",
+      output: `$ gosherpa impact diff --base HEAD
+
+IMPACT DIFF
+
+CHANGED FILES
+  internal/sherpa/parse.go
+
+CHANGED PACKAGES
+  ./internal/sherpa
+
+AFFECTED PACKAGES
+  ./internal/sherpa
+  ./cmd/gosherpa
+
+AFFECTED SYMBOLS
+  ./internal/sherpa.ParseFile
+
+TEST PLAN
+  go test ./internal/sherpa
+  go test ./cmd/gosherpa`
+    },
+    tests: {
+      command: "gosherpa tests affected --base HEAD",
+      output: `$ gosherpa tests affected --base HEAD
+
+AFFECTED TESTS
+
+  TestParseFile                       internal/sherpa/parse_test.go:11 (direct)
+  TestRepositoryLoad                  internal/sherpa/repository_test.go:19
+  TestMainRunsSymbolCommand           cmd/gosherpa/main_test.go:2445
+
+TEST PLAN
+  Direct:
+    go test ./internal/sherpa
+      Direct tests reference changed symbol ParseFile.
+
+  Fallback:
+    go test ./cmd/gosherpa
+      Compile impacted CLI package and cover command behavior.`
+    }
+  };
+  const copiedLabels = {
+    de: "Kopiert",
+    en: "Copied",
+    fr: "Copié"
+  };
 
   const supportedLanguages = Object.keys(translations);
   const defaultLanguage = "de";
@@ -21,6 +140,116 @@
     } catch {
       // Local storage can be unavailable in strict browser contexts.
     }
+  };
+
+  const getCurrentLanguage = () => document.documentElement.lang || defaultLanguage;
+
+  const restoreCopyLabel = (label) => {
+    const language = getCurrentLanguage();
+    const dictionary = translations[language] || translations[defaultLanguage];
+    label.textContent = dictionary["demo.copy"] || "Copy";
+  };
+
+  const copyText = async (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.inset = "-9999px auto auto -9999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    textArea.remove();
+  };
+
+  const setupCommandDemo = () => {
+    const demo = document.querySelector("[data-command-demo]");
+    if (!demo) {
+      return;
+    }
+
+    const tabs = Array.from(demo.querySelectorAll("[data-demo-command]"));
+    const output = demo.querySelector("[data-demo-output]");
+    const commandLine = demo.querySelector("[data-demo-command-line]");
+    const copyButton = demo.querySelector("[data-copy-command]");
+    const copyLabel = demo.querySelector("[data-copy-label]");
+    const panel = demo.querySelector('[role="tabpanel"]');
+    let activeKey = tabs[0]?.dataset.demoCommand || "";
+    let restoreTimer;
+
+    const activate = (key) => {
+      const item = commandDemos[key];
+      if (!item) {
+        return;
+      }
+
+      activeKey = key;
+      if (output) {
+        output.textContent = item.output;
+      }
+      if (commandLine) {
+        commandLine.textContent = item.command;
+      }
+
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.demoCommand === key;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+        tab.setAttribute("tabindex", isActive ? "0" : "-1");
+        if (isActive && panel) {
+          panel.setAttribute("aria-labelledby", tab.id);
+        }
+      });
+    };
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => {
+        activate(tab.dataset.demoCommand);
+      });
+
+      tab.addEventListener("keydown", (event) => {
+        const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
+        if (!keys.includes(event.key)) {
+          return;
+        }
+
+        event.preventDefault();
+        let nextIndex = index;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          nextIndex = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          nextIndex = 0;
+        } else if (event.key === "End") {
+          nextIndex = tabs.length - 1;
+        }
+
+        tabs[nextIndex].focus();
+        activate(tabs[nextIndex].dataset.demoCommand);
+      });
+    });
+
+    if (copyButton && copyLabel) {
+      copyButton.addEventListener("click", async () => {
+        const item = commandDemos[activeKey];
+        if (!item) {
+          return;
+        }
+
+        await copyText(item.command);
+        window.clearTimeout(restoreTimer);
+        copyLabel.textContent = copiedLabels[getCurrentLanguage()] || copiedLabels.en;
+        restoreTimer = window.setTimeout(() => restoreCopyLabel(copyLabel), 1400);
+      });
+    }
+
+    activate(activeKey);
   };
 
   const getInitialLanguage = () => {
@@ -90,5 +319,6 @@
     });
   });
 
+  setupCommandDemo();
   translateElements(getInitialLanguage());
 })();
