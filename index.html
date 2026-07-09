@@ -24,12 +24,12 @@
     </a>
     <div class="header-actions">
       <nav class="nav-links" aria-label="Seitenbereiche" data-i18n-label="nav.aria">
-        <a href="#comics" data-i18n="nav.comics">Comics</a>
+        <a href="#quickstart" data-i18n="nav.quickstart">Start</a>
         <a href="#demo" data-i18n="nav.demo">Demo</a>
-        <a href="#features" data-i18n="nav.features">Funktionen</a>
-        <a href="#community" data-i18n="nav.community">Community</a>
+        <a href="#use-cases" data-i18n="nav.useCases">Use Cases</a>
         <a href="#agents" data-i18n="nav.agents">Agents</a>
-        <a href="#agent-guide" data-i18n="nav.agentGuide">Agent Guide</a>
+        <a href="#trust" data-i18n="nav.trust">Trust</a>
+        <a href="#community" data-i18n="nav.community">Community</a>
         <a href="#try" data-i18n="nav.try">Ausprobieren</a>
       </nav>
       <div class="lang-switcher" role="group" aria-label="Sprache auswählen" data-i18n-label="language.aria">
@@ -47,7 +47,8 @@
         <h1>GoSherpa</h1>
         <p class="hero-copy" data-i18n="hero.copy">Frag eine Code-Struktur-Frage. Bekomme eine kleine, verlässliche Antwort: Symbole, Referenzen, Call-Pfade, Impact, Tests und Agent-Kontext direkt aus deinem Go-Repository.</p>
         <div class="hero-actions" aria-label="Primäre Aktionen" data-i18n-label="hero.actions.aria">
-          <a class="button primary" href="https://github.com/panndabea/GoSherpa" data-i18n="hero.github">Auf GitHub ansehen</a>
+          <a class="button primary" href="#quickstart" data-i18n="hero.start">In zwei Minuten starten</a>
+          <a class="button secondary" href="https://github.com/panndabea/GoSherpa" data-i18n="hero.github">Auf GitHub ansehen</a>
           <a class="button secondary" href="https://github.com/panndabea/GoSherpa/blob/main/docs/CLI_REFERENCE.md" data-i18n="hero.cli">CLI-Referenz lesen</a>
         </div>
         <ul class="hero-points" aria-label="Kurzüberblick" data-i18n-label="hero.points.aria">
@@ -86,6 +87,86 @@
             <span data-i18n="ask.diff.a">Betroffene Packages, Risiko und sinnvolle Testbefehle.</span>
           </li>
         </ul>
+      </div>
+    </section>
+
+    <section class="band quickstart-section" id="quickstart">
+      <div class="wrap quickstart-layout">
+        <div>
+          <p class="section-kicker" data-i18n="quickstart.kicker">Sofort ausprobieren</p>
+          <h2 class="section-title" data-i18n="quickstart.title">Ein kleiner Install-Flow, dann echte Repository-Antworten.</h2>
+          <p class="section-lead" data-i18n="quickstart.lead">GoSherpa soll sich wie ein normales Go-Tool anfühlen: lokal installieren, Readiness prüfen, Projekt verstehen und den nächsten Review- oder Agent-Schritt mit Kontext füttern.</p>
+          <div class="quickstart-links">
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/README.md" data-i18n="quickstart.readme">README öffnen</a>
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/docs/CLI_REFERENCE.md" data-i18n="quickstart.reference">CLI-Referenz</a>
+          </div>
+        </div>
+
+        <div class="quickstart-panel" aria-label="Quickstart Befehle" data-i18n-label="quickstart.commands.aria">
+          <div class="terminal-bar" aria-hidden="true">
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+          </div>
+          <pre>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+gosherpa doctor
+gosherpa analyze .
+gosherpa impact diff --base HEAD</pre>
+        </div>
+      </div>
+
+      <div class="wrap trust-strip" aria-label="GoSherpa Vertrauenssignale" data-i18n-label="quickstart.trust.aria">
+        <span data-i18n="quickstart.signal.local">Lokal, kein Code-Upload</span>
+        <span data-i18n="quickstart.signal.mit">MIT-Lizenz</span>
+        <span data-i18n="quickstart.signal.go">Go 1.24.4</span>
+        <span data-i18n="quickstart.signal.json">Stabile JSON-Umschläge</span>
+        <span data-i18n="quickstart.signal.tests">Go-Tests + Golden Fixtures</span>
+      </div>
+    </section>
+
+    <section id="use-cases">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" data-i18n="useCases.kicker">Wofür du es nutzt</p>
+            <h2 class="section-title" data-i18n="useCases.title">GoSherpa beantwortet Arbeitsfragen, nicht nur Feature-Listen.</h2>
+          </div>
+          <p class="section-lead" data-i18n="useCases.lead">Die besten Einstiege sind konkrete Situationen: Review, Onboarding, Symbolarbeit und Agent-Kontext.</p>
+        </div>
+
+        <div class="usecase-grid">
+          <article class="usecase-card">
+            <strong data-i18n="useCases.review.title">Einen PR reviewen</strong>
+            <p data-i18n="useCases.review.copy">Fasse den Diff zusammen, lies Risiko und leite Verifikation direkt aus betroffenen Packages ab.</p>
+            <pre>gosherpa pr --base main
+
+RISK medium
+AFFECTED ./internal/sherpa
+VERIFY go test ./internal/sherpa</pre>
+          </article>
+          <article class="usecase-card">
+            <strong data-i18n="useCases.onboard.title">In ein Go-Repo einsteigen</strong>
+            <p data-i18n="useCases.onboard.copy">Starte mit Architektur, Hotspots und Symbolinventar, ohne dich erst durch alle Ordner zu klicken.</p>
+            <pre>gosherpa analyze .
+gosherpa architecture
+gosherpa risk</pre>
+          </article>
+          <article class="usecase-card">
+            <strong data-i18n="useCases.symbol.title">Ein Symbol ändern</strong>
+            <p data-i18n="useCases.symbol.copy">Finde Definition, Referenzen, Caller, Callees, relevante Tests und eine sinnvolle Lesereihenfolge.</p>
+            <pre>gosherpa explain ParseFile
+gosherpa refs ParseFile --kind call
+gosherpa tests ParseFile</pre>
+          </article>
+          <article class="usecase-card">
+            <strong data-i18n="useCases.agent.title">Einem Agent Kontext geben</strong>
+            <p data-i18n="useCases.agent.copy">Gib Codex, Claude Code oder Cursor begrenzten JSON-Kontext statt ein ganzes Repository in den Prompt zu kippen.</p>
+            <pre>gosherpa context diff --base HEAD \
+  --max-files 20 --max-symbols 40 \
+  --max-tests 20 --max-bytes 12000 \
+  --json</pre>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -185,6 +266,23 @@
             <code>gosherpa tests affected --base HEAD --json</code>
           </li>
         </ol>
+
+        <div class="agent-kit">
+          <div>
+            <h3 data-i18n="agentGuide.kit.title">Copy-Paste-Startpaket für Agents</h3>
+            <p data-i18n="agentGuide.kit.copy">Diese Sequenz reicht für viele Review-, Repair- und Edit-Aufgaben: erst Vertrauen prüfen, dann nur begrenzten Diff-Kontext laden.</p>
+          </div>
+          <pre>gosherpa doctor --json
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa impact diff --base HEAD --json
+gosherpa tests affected --base HEAD --json</pre>
+          <div class="schema-links" aria-label="Agent Schema Links" data-i18n-label="agentGuide.schema.aria">
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/AGENT_NOTES.md" data-i18n="agentGuide.schema.notes">AGENT_NOTES.md</a>
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/llms.txt">llms.txt</a>
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/docs/product/JSON_SCHEMA_V1.md" data-i18n="agentGuide.schema.json">JSON Schema</a>
+            <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/docs/product/CONTEXT_SCHEMA_V1.md" data-i18n="agentGuide.schema.context">Context Schema</a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -270,6 +368,65 @@
       </div>
     </section>
 
+    <section class="band trust-section" id="trust">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" data-i18n="trust.kicker">Warum man GoSherpa vertrauen kann</p>
+            <h2 class="section-title" data-i18n="trust.title">GoSherpa bleibt nah an Go und ehrlich über Grenzen.</h2>
+          </div>
+          <p class="section-lead" data-i18n="trust.lead">Das Projekt soll nachvollziehbar sein: lokale Analyse, dokumentierte JSON-Verträge, Tests, Roadmap und explizite Confidence statt stiller Vermutungen.</p>
+        </div>
+
+        <div class="trust-grid">
+          <article class="trust-card">
+            <strong data-i18n="trust.local.title">Lokal zuerst</strong>
+            <p data-i18n="trust.local.copy">GoSherpa liest dein Repository auf deiner Maschine und braucht keinen SaaS-Upload.</p>
+          </article>
+          <article class="trust-card">
+            <strong data-i18n="trust.go.title">Go-native Basis</strong>
+            <p data-i18n="trust.go.copy">Analyse über Go-AST, Module, Packages, Imports und typisierte Daten, wo verfügbar.</p>
+          </article>
+          <article class="trust-card">
+            <strong data-i18n="trust.contracts.title">Agent-Verträge</strong>
+            <p data-i18n="trust.contracts.copy">JSON-Schema, Context-Schema und stabile Response-Envelopes machen Automatisierung greifbar.</p>
+          </article>
+          <article class="trust-card">
+            <strong data-i18n="trust.limits.title">Sichtbare Grenzen</strong>
+            <p data-i18n="trust.limits.copy">Outputs nennen Warnings, Analyse-Modi, Confidence und bekannte MVP-Limitationen.</p>
+          </article>
+        </div>
+
+        <div class="fit-table" role="table" aria-label="GoSherpa im Tool-Kontext" data-i18n-label="trust.fit.aria">
+          <div class="fit-row fit-head" role="row">
+            <strong role="cell" data-i18n="trust.fit.tool">Tool</strong>
+            <strong role="cell" data-i18n="trust.fit.good">Gut für</strong>
+            <strong role="cell" data-i18n="trust.fit.gosherpa">GoSherpa ergänzt durch</strong>
+          </div>
+          <div class="fit-row" role="row">
+            <span role="cell">rg / grep</span>
+            <span role="cell" data-i18n="trust.fit.grep.good">schnelle Textsuche</span>
+            <span role="cell" data-i18n="trust.fit.grep.gosherpa">Go-bewusste Symbole, Referenzen und Packages</span>
+          </div>
+          <div class="fit-row" role="row">
+            <span role="cell">gopls / IDE</span>
+            <span role="cell" data-i18n="trust.fit.ide.good">interaktive Navigation</span>
+            <span role="cell" data-i18n="trust.fit.ide.gosherpa">terminalfähige Reports und JSON für Agents</span>
+          </div>
+          <div class="fit-row" role="row">
+            <span role="cell">CI</span>
+            <span role="cell" data-i18n="trust.fit.ci.good">Tests ausführen</span>
+            <span role="cell" data-i18n="trust.fit.ci.gosherpa">betroffene Tests und Verifikationsbefehle vorschlagen</span>
+          </div>
+          <div class="fit-row" role="row">
+            <span role="cell" data-i18n="trust.fit.agent.tool">Coding Agent</span>
+            <span role="cell" data-i18n="trust.fit.agent.good">Code lesen und ändern</span>
+            <span role="cell" data-i18n="trust.fit.agent.gosherpa">begrenzten, repository-geerdeten Kontext liefern</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="band community-section" id="community">
       <div class="wrap">
         <div class="section-head">
@@ -306,6 +463,18 @@
             <p data-i18n="community.open.copy">MIT-Lizenz, Roadmap, Status-Dokumente, Go-Tests und Golden-JSON-Fixtures machen Beiträge nachvollziehbar.</p>
             <code>go test ./...</code>
           </article>
+        </div>
+
+        <div class="contribute-panel">
+          <div>
+            <p class="section-kicker" data-i18n="contribute.kicker">Mitbauen</p>
+            <h3 data-i18n="contribute.title">Ein guter Einstieg für Contributors.</h3>
+            <p data-i18n="contribute.copy">Hilfreich sind gerade Beispiel-Repositories, bessere semantische Analyse, CI-Workflows, Dokumentation und kleine UX-Verbesserungen an CLI-Ausgaben.</p>
+          </div>
+          <div class="contribute-actions">
+            <a class="button primary" href="https://github.com/panndabea/GoSherpa/blob/main/docs/product/FEATURE_ROADMAP.md" data-i18n="contribute.roadmap">Roadmap lesen</a>
+            <a class="button secondary" href="https://github.com/panndabea/GoSherpa/blob/main/docs/STATUS.md" data-i18n="contribute.status">Status ansehen</a>
+          </div>
         </div>
       </div>
     </section>
@@ -363,12 +532,11 @@
           </div>
         </div>
         <div class="install-box" aria-label="Installationsbefehle" data-i18n-label="cta.install.aria">
-          <pre>git clone https://github.com/panndabea/GoSherpa.git
-cd GoSherpa
-go run ./cmd/gosherpa version
-go run ./cmd/gosherpa search parse file
-go run ./cmd/gosherpa symbol ParseFile
-go run ./cmd/gosherpa refs ParseFile --kind call</pre>
+          <pre>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+gosherpa doctor
+gosherpa search parse file
+gosherpa symbol ParseFile
+gosherpa refs ParseFile --kind call</pre>
         </div>
       </div>
     </section>
