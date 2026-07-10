@@ -23,6 +23,7 @@ go run ./cmd/gosherpa context symbol ParseFile
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa doctor
 go run ./cmd/gosherpa snapshot
+go run ./cmd/gosherpa completion zsh
 go run ./cmd/gosherpa explain ParseFile
 go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
@@ -56,6 +57,16 @@ repository analysis and report a warning.
 ./gosherpa packages --tests --use-snapshot
 ```
 
+Enable shell completion by evaluating the script for your shell. The generated
+scripts complete command names, subcommands, and supported flags; package and
+symbol completion can come later.
+
+```bash
+./gosherpa completion zsh
+./gosherpa completion bash
+./gosherpa completion fish
+```
+
 ## Command Overview
 
 | Capability | Command | Result |
@@ -74,6 +85,7 @@ repository analysis and report a warning.
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
+| Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
 | Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory where available, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
@@ -152,6 +164,9 @@ Found 4 references
 ./gosherpa doctor --json
 ./gosherpa snapshot
 ./gosherpa snapshot --json
+./gosherpa completion zsh
+./gosherpa completion bash
+./gosherpa completion fish
 ./gosherpa explain ParseFile
 ./gosherpa explain ParseFile --tests
 ./gosherpa explain ParseFile --json

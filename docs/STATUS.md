@@ -29,6 +29,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot, confidence, limitations, warnings, and JSON output
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, and git state
+- Static shell completion script generation with `gosherpa completion zsh|bash|fish`
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
 - Related test discovery with suggested `go test` commands
@@ -79,6 +80,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, and `packages --tests`; deeper semantic, context, impact, and call-graph queries still analyze repository data directly.
+- Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
 

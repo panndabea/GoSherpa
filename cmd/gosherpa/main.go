@@ -161,6 +161,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		printUsage(stderr)
 		return exitUsage
 	}
+	if invocation.Command == "completion" {
+		return runCompletionCommand(invocation, stdout, stderr)
+	}
 
 	return spec.Handler(invocation, stdout, stderr)
 }

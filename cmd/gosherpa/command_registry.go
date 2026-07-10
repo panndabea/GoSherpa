@@ -72,6 +72,10 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
+		Name:  "completion",
+		Usage: []string{completionUsageLine},
+	},
+	{
 		Name:    "version",
 		Usage:   []string{versionUsageLine},
 		Handler: runVersionCommand,
@@ -231,6 +235,7 @@ const (
 	contextDiffUsageLine    = "context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
 	doctorUsageLine         = "doctor"
 	snapshotUsageLine       = "snapshot"
+	completionUsageLine     = "completion zsh|bash|fish"
 	versionUsageLine        = "version"
 	explainUsageLine        = "explain <symbol> [--tests]"
 	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests] [--use-snapshot]"

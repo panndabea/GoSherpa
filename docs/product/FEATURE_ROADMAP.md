@@ -1205,6 +1205,10 @@ Done when:
 
 ### 7.2 Shell Completion
 
+Status: implemented as static `gosherpa completion zsh|bash|fish` script
+generation for command names, subcommands, and flags. Package and symbol
+completion remain future enhancements.
+
 Human question:
 
 ```text
@@ -1221,8 +1225,10 @@ gosherpa completion fish
 
 MVP behavior:
 
-- Complete command names and flags.
-- Optionally complete package paths.
+- Complete command names and flags. Implemented.
+- Complete major static subcommands such as `context symbol`, `impact diff`,
+  and `tests affected`. Implemented.
+- Optionally complete package paths. Future work.
 - Symbol completion can come later if indexing is fast enough.
 
 Done when:
@@ -1511,8 +1517,8 @@ Needed docs:
 
 This milestone section is a historical planning sketch. Several early and
 mid-stage items now have first slices implemented, including explicit snapshot
-creation and opt-in inventory reuse. Later integration work such as broader
-snapshot reuse, MCP, shell completion, and TUI remains future work.
+creation, opt-in inventory reuse, and shell completion. Later integration work
+such as broader snapshot reuse, MCP, and TUI remains future work.
 
 ### v0.1: Historical MVP Baseline
 

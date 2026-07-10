@@ -5706,6 +5706,115 @@ func TestMainPrintsErrorForUnknownFlag(t *testing.T) {
 	}
 }
 
+func TestMainPrintsZshCompletion(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "completion", "zsh"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	for _, want := range []string{
+		"#compdef gosherpa",
+		"'completion:completion zsh|bash|fish'",
+		"_describe -t context-subcommands 'context target' context_subcommands",
+		"'--use-snapshot[reuse a valid repository snapshot]'",
+		"'--scope[filter test scope]:scope:(direct related all)'",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected zsh completion to contain %q, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+}
+
+func TestMainPrintsBashCompletion(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "completion", "bash"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	for _, want := range []string{
+		"_gosherpa()",
+		"complete -F _gosherpa gosherpa",
+		"completion)",
+		"COMPREPLY=( $(compgen -W \"zsh bash fish\" -- \"$cur\") )",
+		"printf '%s\\n' '--root --json --tests --use-snapshot --tags'",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected bash completion to contain %q, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+}
+
+func TestMainPrintsFishCompletion(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "completion", "fish"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	for _, want := range []string{
+		"function __fish_gosherpa_seen_command",
+		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'completion' -d 'completion zsh|bash|fish'",
+		"complete -c gosherpa -f -n '__fish_seen_subcommand_from completion' -a 'zsh' -d 'zsh completion script'",
+		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface function method definition call type_usage field_access usage'",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected fish completion to contain %q, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+}
+
+func TestMainPrintsCompletionUsageWhenShellIsMissing(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "completion"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	want := "usage: gosherpa [--root <path>] completion zsh|bash|fish\n"
+	if result.Stderr != want {
+		t.Fatalf("expected completion usage %q, got %q", want, result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainPrintsCompletionUsageWhenShellIsUnsupported(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "completion", "powershell"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	for _, want := range []string{
+		"error: unsupported completion shell: powershell",
+		"usage: gosherpa [--root <path>] completion zsh|bash|fish",
+	} {
+		if !strings.Contains(result.Stderr, want) {
+			t.Fatalf("expected completion error to contain %q, got:\n%s", want, result.Stderr)
+		}
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
 type mainTestRunResult struct {
 	ExitCode int
 	Stdout   string

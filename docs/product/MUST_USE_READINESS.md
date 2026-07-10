@@ -264,7 +264,6 @@ These features turn GoSherpa into infrastructure for other tools, but they
 should follow the trust work above.
 
 - MCP or long-running server mode
-- shell completion
 - editor integration hooks
 - optional TUI
 - graph export
