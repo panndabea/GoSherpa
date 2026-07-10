@@ -59,7 +59,9 @@ signals include typechecked package loading, and `git-diff+ast` otherwise.
 Location-bearing context entries reuse the shared position and range shapes from
 `JSON_SCHEMA_V1.md`. References, callers, callees, affected tests, and related
 tests keep `position` and may include `range` when Go parser positions identify
-the exact source span.
+the exact source span. Related and affected tests may include `reasons` with
+stable relationship labels such as `direct-reference`, `same-package`,
+`target-package`, `external-package`, `changed-symbol`, and `caller-package`.
 
 When size controls are used, context results may also include:
 
@@ -126,5 +128,7 @@ symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
 interface signals, `interfaceAnalysisMode`, affected tests, `testAnalysisMode`,
 and test planning. Related or affected tests and test-plan items may include
 `targets` naming the symbol target or changed symbols that explain why the test
-or package command is recommended; test-plan items may include structured
-`tests` when concrete test names are known.
+or package command is recommended; related or affected tests may include
+`reasons` explaining direct symbol, changed-symbol, target-package,
+caller-package, same-package, or external-package relationships. Test-plan
+items may include structured `tests` when concrete test names are known.

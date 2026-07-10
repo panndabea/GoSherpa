@@ -39,6 +39,10 @@
         },
         "directReference": true,
         "externalPackage": false,
+        "reasons": [
+          "direct-reference",
+          "same-package"
+        ],
         "targets": [
           "Target"
         ]

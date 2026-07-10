@@ -333,6 +333,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 	modulePath := impactModulePath(root)
 	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
 	changedTargetsByPackage := changedSymbolPlanTargetsByPackage(changedSymbols, modulePath)
+	changedPackageSet := impactStringSet(changedPackages)
 	testAnalysisMode := ""
 
 	directTests, directTestAnalysisMode := directTestsForChangedSymbols(root, changedSymbols, &warnings)
@@ -356,6 +357,11 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 		for _, test := range tests.Tests {
 			if targets := changedTargetsByPackage[pkg]; len(targets) > 0 {
 				test.Targets = uniqueSortedStrings(append(test.Targets, targets...))
+				test = addRelatedTestReason(test, sherpa.RelatedTestReasonChangedSymbol)
+			}
+			if _, ok := changedPackageSet[pkg]; !ok {
+				test = removeRelatedTestReason(test, sherpa.RelatedTestReasonTargetPackage)
+				test = addRelatedTestReason(test, sherpa.RelatedTestReasonCallerPackage)
 			}
 			mergeRelatedTest(seen, test)
 		}
@@ -449,6 +455,7 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 
 		for _, test := range tests.Tests {
 			test.Targets = uniqueSortedStrings(append(test.Targets, target))
+			test = addRelatedTestReason(test, sherpa.RelatedTestReasonChangedSymbol)
 			mergeRelatedTest(seen, test)
 		}
 	}
@@ -513,6 +520,7 @@ func mergeRelatedTest(seen map[string]sherpa.RelatedTest, test sherpa.RelatedTes
 	test.DirectReference = test.DirectReference || existing.DirectReference
 	test.ExternalPackage = test.ExternalPackage || existing.ExternalPackage
 	test.Targets = uniqueSortedStrings(append(test.Targets, existing.Targets...))
+	test.Reasons = mergeRelatedTestReasons(test.Reasons, existing.Reasons)
 	if test.Range == nil {
 		test.Range = existing.Range
 	}
@@ -546,6 +554,74 @@ func relatedTestKey(test sherpa.RelatedTest) string {
 	}
 
 	return strings.Join(parts, "\x00")
+}
+
+func addRelatedTestReason(test sherpa.RelatedTest, reason string) sherpa.RelatedTest {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return test
+	}
+	for _, existing := range test.Reasons {
+		if existing == reason {
+			return test
+		}
+	}
+
+	test.Reasons = append(test.Reasons, reason)
+	return test
+}
+
+func removeRelatedTestReason(test sherpa.RelatedTest, reason string) sherpa.RelatedTest {
+	reason = strings.TrimSpace(reason)
+	if reason == "" || len(test.Reasons) == 0 {
+		return test
+	}
+
+	reasons := test.Reasons[:0]
+	for _, existing := range test.Reasons {
+		if existing == reason {
+			continue
+		}
+		reasons = append(reasons, existing)
+	}
+	test.Reasons = reasons
+
+	return test
+}
+
+func mergeRelatedTestReasons(first []string, second []string) []string {
+	result := append([]string{}, first...)
+	for _, reason := range second {
+		reason = strings.TrimSpace(reason)
+		if reason == "" {
+			continue
+		}
+		seen := false
+		for _, existing := range result {
+			if existing == reason {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			result = append(result, reason)
+		}
+	}
+
+	return result
+}
+
+func impactStringSet(values []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		set[value] = struct{}{}
+	}
+
+	return set
 }
 
 func sortRelatedTests(tests []sherpa.RelatedTest) {

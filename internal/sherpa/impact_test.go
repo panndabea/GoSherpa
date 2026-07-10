@@ -181,6 +181,8 @@ func TestApp(t *testing.T) {}
 	assertContainsString(t, tests, "TestCore")
 	assertContainsString(t, tests, "TestWorker")
 	assertContainsString(t, tests, "TestApp")
+	assertRelatedTestReasons(t, findRelatedTest(result.RelatedTests, "TestWorker"), []string{RelatedTestReasonCallerPackage})
+	assertRelatedTestReasons(t, findRelatedTest(result.RelatedTests, "TestApp"), []string{RelatedTestReasonCallerPackage})
 
 	wantCommands := []string{"go test ./cmd/app", "go test ./internal/core", "go test ./internal/worker"}
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {

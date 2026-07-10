@@ -60,6 +60,10 @@
         },
         "directReference": false,
         "externalPackage": false,
+        "reasons": [
+          "target-package",
+          "changed-symbol"
+        ],
         "targets": [
           "example.com/golden.Added"
         ]

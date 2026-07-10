@@ -53,7 +53,10 @@
           }
         },
         "directReference": false,
-        "externalPackage": false
+        "externalPackage": false,
+        "reasons": [
+          "target-package"
+        ]
       }
     ],
     "testAnalysisMode": "ast",

@@ -49,6 +49,7 @@ func TestExternalPackage(t *testing.T) {}
 	if external == nil || !external.ExternalPackage {
 		t.Fatalf("expected external package marker, got %v", external)
 	}
+	assertRelatedTestReasons(t, external, []string{RelatedTestReasonTargetPackage, RelatedTestReasonExternalPackage})
 	if len(external.Targets) != 0 {
 		t.Fatalf("expected package test to omit symbol targets, got %#v", external.Targets)
 	}
@@ -107,6 +108,7 @@ func TestUsesParser(t *testing.T) {
 	if direct == nil || !direct.DirectReference {
 		t.Fatalf("expected direct reference marker, got %v", direct)
 	}
+	assertRelatedTestReasons(t, direct, []string{RelatedTestReasonDirectReference})
 	if !reflect.DeepEqual(direct.Targets, []string{"ParseFile"}) {
 		t.Fatalf("expected direct related test target, got %#v", direct.Targets)
 	}
@@ -114,6 +116,7 @@ func TestUsesParser(t *testing.T) {
 	if samePackage == nil {
 		t.Fatalf("expected same-package related test, got %v", result.Tests)
 	}
+	assertRelatedTestReasons(t, samePackage, []string{RelatedTestReasonSamePackage})
 	if !reflect.DeepEqual(samePackage.Targets, []string{"ParseFile"}) {
 		t.Fatalf("expected same-package related test target, got %#v", samePackage.Targets)
 	}
@@ -470,6 +473,7 @@ func testName() string {
 	if subtest == nil || !subtest.DirectReference {
 		t.Fatalf("expected direct literal subtest marker, got %v", subtest)
 	}
+	assertRelatedTestReasons(t, subtest, []string{RelatedTestReasonDirectReference})
 }
 
 func TestFindTestsIncludesNestedLiteralSubtests(t *testing.T) {
@@ -627,4 +631,15 @@ func findRelatedTest(tests []RelatedTest, name string) *RelatedTest {
 	}
 
 	return nil
+}
+
+func assertRelatedTestReasons(t *testing.T, test *RelatedTest, want []string) {
+	t.Helper()
+
+	if test == nil {
+		t.Fatalf("expected related test with reasons %v, got nil", want)
+	}
+	if !reflect.DeepEqual(test.Reasons, want) {
+		t.Fatalf("expected reasons %v for %s, got %#v", want, test.Name, test.Reasons)
+	}
 }

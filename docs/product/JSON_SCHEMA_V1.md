@@ -147,10 +147,14 @@ Related tests:
   },
   "directReference": true,
   "externalPackage": false,
+  "reasons": ["direct-reference", "changed-symbol"],
   "targets": ["./internal/service.Target"]
 }
 ```
 
+`reasons` is optional and uses stable strings that explain why the test was
+included. Current values are `direct-reference`, `same-package`,
+`target-package`, `external-package`, `changed-symbol`, and `caller-package`.
 `targets` is optional. Symbol test queries use it to name the requested symbol;
 diff-oriented reports use it to name the changed symbol or symbols that made a
 test relevant when that relationship is known.
@@ -675,7 +679,10 @@ Impact data keeps its existing arrays such as `references`, `callers`,
 `affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
 keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
 includes `scope` with one of `direct`, `related`, or `all`; the default
-`related` scope focuses direct references when they exist.
+`related` scope focuses direct references when they exist. Related or affected
+test entries may include `reasons` with stable relationship labels such as
+`direct-reference`, `same-package`, `target-package`, `external-package`,
+`changed-symbol`, and `caller-package`.
 
 Composite impact, context, explain, tests-affected, and PR data that includes
 test recommendations may also include `testAnalysisMode`. It is `typechecked+ast`
@@ -691,8 +698,8 @@ the corresponding subanalysis path.
 Test plans group commands into `direct`, `related`, `callerPackages`, and
 `fallback`, preserve a flat `testCommands`/`commands` list for compatibility,
 include structured `tests` on plan items when concrete test names are known,
-and attach symbol or changed-symbol `targets` to related tests and plan items
-when known.
+and attach symbol or changed-symbol `targets` plus relationship `reasons` to
+related tests when known.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

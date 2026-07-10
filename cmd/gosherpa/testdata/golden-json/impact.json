@@ -200,6 +200,11 @@
         },
         "directReference": true,
         "externalPackage": false,
+        "reasons": [
+          "direct-reference",
+          "same-package",
+          "target-package"
+        ],
         "targets": [
           "Target"
         ]

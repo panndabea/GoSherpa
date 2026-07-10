@@ -62,9 +62,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-qualified symbol impact for references and affected tests
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
-- Related test entries and structured test plan items expose concrete `targets`
-  where the symbol or changed-symbol relationship is known; test plan items also
-  expose concrete `tests` arrays.
+- Related test entries expose stable relationship `reasons` and concrete
+  `targets` where the symbol or changed-symbol relationship is known; structured
+  test plan items also expose concrete `tests` arrays and `targets`.
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.

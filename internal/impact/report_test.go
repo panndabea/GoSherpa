@@ -48,6 +48,13 @@ func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
 		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
 	}
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler", "./internal/auth:TestSession"})
+	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/auth", "TestSession"), []string{
+		sherpa.RelatedTestReasonTargetPackage,
+		sherpa.RelatedTestReasonChangedSymbol,
+	})
+	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/api", "TestHandler"), []string{
+		sherpa.RelatedTestReasonCallerPackage,
+	})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 	assertStrings(t, report.Warnings, []string{})
 }
@@ -718,6 +725,16 @@ func directRelatedTestNames(tests []RelatedTest) []string {
 	}
 
 	return names
+}
+
+func relatedTestReasons(tests []RelatedTest, pkg string, name string) []string {
+	for _, test := range tests {
+		if test.Package == pkg && test.Name == name {
+			return test.Reasons
+		}
+	}
+
+	return nil
 }
 
 func testPlanItemPackages(items []sherpa.TestPlanItem) []string {

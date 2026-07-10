@@ -156,6 +156,7 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 
 	packages := uniqueSorted(append([]string{deps.Package}, deps.UsedBy...))
 	tests, warnings := impactTestsForPackages(root, packages)
+	tests = annotateCallerPackageTestReasons(tests, []string{deps.Package})
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           deps.Package,
 		Kind:             TestTargetKindPackage,
@@ -281,12 +282,13 @@ func impactSymbolTests(root string, target string, packages []string, targetPack
 
 	packageTests, packageWarnings := impactTestsForPackages(root, packages)
 	warnings = append(warnings, packageWarnings...)
-	mergedTests = mergeRelatedTests(mergedTests, packageTests)
-
-	sortRelatedTests(mergedTests)
 	if len(targetPackages) == 0 {
 		targetPackages = sortedTestPackages(symbolTests.Tests)
 	}
+	packageTests = annotateCallerPackageTestReasons(packageTests, targetPackages)
+	mergedTests = mergeRelatedTests(mergedTests, packageTests)
+
+	sortRelatedTests(mergedTests)
 	fallbackPackages := uniqueSorted(append(append([]string{}, targetPackages...), packages...))
 	plan := PlanTests(mergedTests, TestPlanOptions{
 		Target:           firstNonEmptyString(symbolTests.Target, target),
@@ -335,6 +337,24 @@ func impactTests(root string, target string) (TestsResult, []string) {
 	return tests, nil
 }
 
+func annotateCallerPackageTestReasons(tests []RelatedTest, targetPackages []string) []RelatedTest {
+	targetPackageSet := stringSet(targetPackages)
+	if len(targetPackageSet) == 0 {
+		return tests
+	}
+
+	result := make([]RelatedTest, 0, len(tests))
+	for _, test := range tests {
+		if _, ok := targetPackageSet[test.Package]; !ok {
+			test.Reasons = removeRelatedTestReason(test.Reasons, RelatedTestReasonTargetPackage)
+			test = annotateRelatedTestReason(test, RelatedTestReasonCallerPackage)
+		}
+		result = append(result, test)
+	}
+
+	return result
+}
+
 func mergeRelatedTests(existing []RelatedTest, incoming []RelatedTest) []RelatedTest {
 	merged := make(map[string]RelatedTest)
 
@@ -349,6 +369,7 @@ func mergeRelatedTests(existing []RelatedTest, incoming []RelatedTest) []Related
 			current.DirectReference = current.DirectReference || test.DirectReference
 			current.ExternalPackage = current.ExternalPackage || test.ExternalPackage
 			current.Targets = uniqueSorted(append(current.Targets, test.Targets...))
+			current.Reasons = mergeRelatedTestReasons(current.Reasons, test.Reasons)
 			merged[key] = current
 			continue
 		}
@@ -376,6 +397,32 @@ func relatedTestImpactKey(test RelatedTest) string {
 	}
 
 	return strings.Join(parts, "\x00")
+}
+
+func mergeRelatedTestReasons(first []string, second []string) []string {
+	result := append([]string{}, first...)
+	for _, reason := range second {
+		result = appendRelatedTestReason(result, reason)
+	}
+
+	return result
+}
+
+func removeRelatedTestReason(reasons []string, reason string) []string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" || len(reasons) == 0 {
+		return reasons
+	}
+
+	result := reasons[:0]
+	for _, existing := range reasons {
+		if existing == reason {
+			continue
+		}
+		result = append(result, existing)
+	}
+
+	return result
 }
 
 func isImpactNonFunctionTargetError(err error) bool {

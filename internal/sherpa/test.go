@@ -38,6 +38,15 @@ const (
 	TestAnalysisModeTypecheckedAST = "typechecked+ast"
 )
 
+const (
+	RelatedTestReasonDirectReference = "direct-reference"
+	RelatedTestReasonSamePackage     = "same-package"
+	RelatedTestReasonTargetPackage   = "target-package"
+	RelatedTestReasonExternalPackage = "external-package"
+	RelatedTestReasonChangedSymbol   = "changed-symbol"
+	RelatedTestReasonCallerPackage   = "caller-package"
+)
+
 type RelatedTest struct {
 	Name            string       `json:"name"`
 	Package         string       `json:"package"`
@@ -46,6 +55,7 @@ type RelatedTest struct {
 	Range           *SourceRange `json:"range,omitempty"`
 	DirectReference bool         `json:"directReference"`
 	ExternalPackage bool         `json:"externalPackage"`
+	Reasons         []string     `json:"reasons,omitempty"`
 	Targets         []string     `json:"targets,omitempty"`
 }
 
@@ -238,6 +248,44 @@ func annotateRelatedTestTargets(tests []RelatedTest, target string) []RelatedTes
 	return result
 }
 
+func annotateRelatedTestReason(test RelatedTest, reason string) RelatedTest {
+	test.Reasons = appendRelatedTestReason(test.Reasons, reason)
+	return test
+}
+
+func appendRelatedTestReason(reasons []string, reason string) []string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return reasons
+	}
+	for _, existing := range reasons {
+		if existing == reason {
+			return reasons
+		}
+	}
+
+	return append(reasons, reason)
+}
+
+func relatedTestReasons(packageMatches bool, directReference bool, externalPackage bool, target referenceTarget) []string {
+	var reasons []string
+	if directReference {
+		reasons = appendRelatedTestReason(reasons, RelatedTestReasonDirectReference)
+	}
+	if packageMatches {
+		if target.Name == "" {
+			reasons = appendRelatedTestReason(reasons, RelatedTestReasonTargetPackage)
+		} else {
+			reasons = appendRelatedTestReason(reasons, RelatedTestReasonSamePackage)
+		}
+	}
+	if externalPackage {
+		reasons = appendRelatedTestReason(reasons, RelatedTestReasonExternalPackage)
+	}
+
+	return reasons
+}
+
 func collectTestFiles(root string) ([]testFileInfo, error) {
 	files, err := FindGoFiles(root)
 	if err != nil {
@@ -348,6 +396,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 			}
 
 			pos := testFile.FileSet.Position(funcDecl.Pos())
+			externalPackage := isExternalTestPackage(testFile.PackageName)
 			tests = append(tests, RelatedTest{
 				Name:            funcDecl.Name.Name,
 				Package:         testFile.Package,
@@ -355,7 +404,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
 				Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, funcDecl.Pos(), funcDecl.End()),
 				DirectReference: directReference,
-				ExternalPackage: isExternalTestPackage(testFile.PackageName),
+				ExternalPackage: externalPackage,
+				Reasons:         relatedTestReasons(packageMatches, directReference, externalPackage, target),
 			})
 
 			for _, subtest := range literalSubtests(funcDecl) {
@@ -371,6 +421,7 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				}
 
 				pos := testFile.FileSet.Position(subtest.Pos)
+				externalPackage := isExternalTestPackage(testFile.PackageName)
 				tests = append(tests, RelatedTest{
 					Name:            funcDecl.Name.Name + "/" + subtest.Name,
 					Package:         testFile.Package,
@@ -378,7 +429,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 					Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
 					Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, subtest.Pos, subtest.End),
 					DirectReference: subtestDirectReference,
-					ExternalPackage: isExternalTestPackage(testFile.PackageName),
+					ExternalPackage: externalPackage,
+					Reasons:         relatedTestReasons(packageMatches, subtestDirectReference, externalPackage, target),
 				})
 			}
 		}
