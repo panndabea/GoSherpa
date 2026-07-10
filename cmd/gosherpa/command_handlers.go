@@ -819,6 +819,41 @@ func runImplementersCommand(invocation cliInvocation, stdout io.Writer, stderr i
 	return exitSuccess
 }
 
+func runInterfaceCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	if len(invocation.CommandArgs) < 1 {
+		printCommandUsage(stderr, interfaceUsageLine)
+		return exitUsage
+	}
+
+	root, ok := resolveRootPath(invocation.Root, stderr)
+	if !ok {
+		return exitFailure
+	}
+
+	target := invocation.CommandArgs[0]
+
+	result, err := impactengine.InspectInterfaceWithOptions(root, target, impactengine.InterfaceOptions{
+		BuildTags: invocation.BuildTags,
+	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "interface", target, stderr, err)
+	}
+
+	if invocation.JSON {
+		normalizedResult := interfaceJSONResult(result)
+		return writeJSON(stdout, stderr, newJSONResponse(
+			root,
+			"interface",
+			normalizedResult.Target,
+			normalizedResult.Warnings,
+			interfaceJSONDataFromResult(normalizedResult),
+		))
+	}
+
+	fmt.Fprint(stdout, impactengine.FormatInterface(result))
+	return exitSuccess
+}
+
 func runInterfacesCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
 	if len(invocation.CommandArgs) < 1 {
 		printCommandUsage(stderr, interfacesUsageLine)

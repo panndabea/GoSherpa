@@ -141,7 +141,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
-		fmt.Fprintln(stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interfaces, pr, doctor, and snapshot")
+		fmt.Fprintln(stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, and snapshot")
 		return exitUsage
 	}
 

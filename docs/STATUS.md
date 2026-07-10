@@ -41,7 +41,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-aware standalone call graph commands for package-qualified targets
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
 - Simple locally assigned function values and concrete method values resolved as caller, callee, and call-path edges when type information proves a single static target
-- Standalone interface navigation with `implementers` and `interfaces`
+- Standalone interface navigation with `implementers`, `interfaces`, and `interface` profiles for methods, implementers, type references, and visible method usage
 - Opt-in test callers for `gosherpa callers --tests` and `gosherpa explain --tests`
 - Ambiguity errors for duplicate unqualified symbols include candidate packages, files, lines, and package-qualified examples
 - Machine-readable JSON output for all commands with a stable response envelope
@@ -75,6 +75,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Diff impact is hunk-based; it reports directly changed or deleted top-level Go functions and struct/interface types, enriches current changed symbols with typechecked reference/call impact when available, but it does not infer every semantic consequence of changed statements.
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but it does not yet use full module-level typechecked analysis for aliases, build tags, or generic edge cases.
+- Interface method usage reports statically visible selector usage for interface-typed values when typechecked package loading succeeds; dynamic dispatch, reflection, and runtime wiring can hide additional usage.
 - Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.

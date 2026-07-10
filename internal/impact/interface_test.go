@@ -60,6 +60,86 @@ func TestFindInterfacesReturnsSatisfiedInterfaces(t *testing.T) {
 	}
 }
 
+func TestInspectInterfaceReturnsMethodsImplementersReferencesAndUsage(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	result, err := InspectInterface(root, "./internal/auth.Authenticator")
+	if err != nil {
+		t.Fatalf("InspectInterface returned error: %v", err)
+	}
+
+	if result.Target != "./internal/auth.Authenticator" {
+		t.Fatalf("expected target ./internal/auth.Authenticator, got %s", result.Target)
+	}
+	if result.Position.File != "internal/auth/auth.go" {
+		t.Fatalf("expected root-relative interface position, got %#v", result.Position)
+	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q", result.AnalysisMode)
+	}
+	if result.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked reference analysis mode, got %q", result.ReferenceAnalysisMode)
+	}
+	if result.MethodUsageAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked method usage mode, got %q", result.MethodUsageAnalysisMode)
+	}
+	if len(result.Methods) != 1 {
+		t.Fatalf("expected 1 method, got %#v", result.Methods)
+	}
+	method := result.Methods[0]
+	if method.Name != "Authenticate" || method.Signature != "func() error" {
+		t.Fatalf("expected Authenticate signature, got %#v", method)
+	}
+	if len(method.Usages) != 1 {
+		t.Fatalf("expected 1 method usage, got %#v", method.Usages)
+	}
+	if method.Usages[0].Kind != sherpa.ReferenceKindCall {
+		t.Fatalf("expected call usage, got %#v", method.Usages[0])
+	}
+	if method.Usages[0].Position.File != "internal/session/session.go" {
+		t.Fatalf("expected session usage, got %#v", method.Usages[0].Position)
+	}
+	if len(result.Implementers) != 1 || result.Implementers[0].Name != "./internal/jwt.JWTAuthenticator" {
+		t.Fatalf("expected JWTAuthenticator implementer, got %#v", result.Implementers)
+	}
+	if !interfaceReferencesContain(result.References, "internal/session/session.go", sherpa.ReferenceKindTypeUsage) {
+		t.Fatalf("expected session type usage reference, got %#v", result.References)
+	}
+	if len(result.Limitations) == 0 {
+		t.Fatal("expected limitations")
+	}
+}
+
+func TestInspectInterfaceFallsBackWhenMethodUsageTypecheckedLoadingFails(t *testing.T) {
+	oldLoader := loadSemanticInterfaceRepository
+	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		loadSemanticInterfaceRepository = oldLoader
+	}()
+
+	root := writeInterfaceImpactProject(t)
+
+	result, err := InspectInterface(root, "./internal/auth.Authenticator")
+	if err != nil {
+		t.Fatalf("InspectInterface returned error: %v", err)
+	}
+
+	if result.AnalysisMode != InterfaceAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback graph mode, got %q", result.AnalysisMode)
+	}
+	if result.MethodUsageAnalysisMode != InterfaceAnalysisModeASTFallback {
+		t.Fatalf("expected AST fallback method usage mode, got %q", result.MethodUsageAnalysisMode)
+	}
+	if len(result.Methods) != 1 || len(result.Methods[0].Usages) != 0 {
+		t.Fatalf("expected method without typechecked usages, got %#v", result.Methods)
+	}
+	if len(result.Warnings) == 0 || !strings.Contains(strings.Join(result.Warnings, "\n"), "loader failed") {
+		t.Fatalf("expected loader warning, got %#v", result.Warnings)
+	}
+}
+
 func TestFindImplementersUsesTypecheckedAliases(t *testing.T) {
 	root := writeInterfaceAliasProject(t)
 
@@ -77,6 +157,16 @@ func TestFindImplementersUsesTypecheckedAliases(t *testing.T) {
 	if result.Implementers[0].Name != "./internal/jwt.JWTAuthenticator" {
 		t.Fatalf("expected JWTAuthenticator implementer, got %#v", result.Implementers[0])
 	}
+}
+
+func interfaceReferencesContain(references []sherpa.Reference, file string, kind sherpa.ReferenceKind) bool {
+	for _, reference := range references {
+		if reference.Position.File == file && reference.Kind == kind {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TestFindImplementersUsesGenericPointerReceiver(t *testing.T) {

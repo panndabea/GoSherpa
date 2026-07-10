@@ -100,6 +100,7 @@ symbol completion can come later.
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
 | Dependency overview | `gosherpa deps --all` | Shows local and external imports plus reverse dependencies for every package |
 | Interface implementers | `gosherpa implementers ./internal/auth.Authenticator` | Lists concrete local types satisfying an interface |
+| Interface profile | `gosherpa interface ./internal/auth.Authenticator` | Shows methods, implementers, type references, and visible interface method usage |
 | Satisfied interfaces | `gosherpa interfaces ./internal/jwt.JWTAuthenticator` | Lists local interfaces satisfied by a type |
 | Callees | `gosherpa callees ./internal/sherpa.ParseFile` | Lists direct calls made by a function or method |
 | Callers | `gosherpa callers ./internal/sherpa.ParseFile` | Lists direct callers of a function or method |
@@ -200,6 +201,8 @@ Found 4 references
 ./gosherpa deps --all --json
 ./gosherpa implementers ./internal/auth.Authenticator
 ./gosherpa implementers ./internal/auth.Authenticator --json
+./gosherpa interface ./internal/auth.Authenticator
+./gosherpa interface ./internal/auth.Authenticator --json
 ./gosherpa interfaces ./internal/jwt.JWTAuthenticator
 ./gosherpa interfaces ./internal/jwt.JWTAuthenticator --json
 ./gosherpa callees ParseFile

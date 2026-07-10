@@ -174,6 +174,13 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
+		Name:    "interface",
+		Usage:   []string{interfaceUsageLine},
+		Handler: runInterfaceCommand,
+		JSON:    true,
+		Tags:    true,
+	},
+	{
 		Name:    "interfaces",
 		Usage:   []string{interfacesUsageLine},
 		Handler: runInterfacesCommand,
@@ -254,6 +261,7 @@ const (
 	depsAllUsageLine        = "deps --all"
 	packagesUsageLine       = "packages [--tests] [--use-snapshot]"
 	implementersUsageLine   = "implementers <interface>"
+	interfaceUsageLine      = "interface <interface>"
 	interfacesUsageLine     = "interfaces <type>"
 	pathUsageLine           = "path <from> <to>"
 	pathDetailedUsageLine   = "path <from> <to> [--limit <n>] [--max-depth <n>]"

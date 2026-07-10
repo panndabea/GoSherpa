@@ -240,6 +240,39 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 	}
 }
 
+func TestMainInterfaceJSONSchemaContract(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interface", "./internal/auth.Authenticator", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "interface", "./internal/auth.Authenticator", "example.com/app")
+
+	for field, want := range map[string]string{
+		"analysisMode":            impactengine.InterfaceAnalysisModeTypechecked,
+		"referenceAnalysisMode":   sherpa.ReferenceAnalysisModeTypechecked,
+		"methodUsageAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+		"confidence":              agentcontext.ConfidenceMedium,
+	} {
+		if data[field] != want {
+			t.Fatalf("expected %s %q, got %v", field, want, data[field])
+		}
+	}
+
+	for _, key := range []string{"methods", "implementers", "references", "limitations"} {
+		value, ok := data[key].([]any)
+		if !ok {
+			t.Fatalf("expected %s array, got %T", key, data[key])
+		}
+		if len(value) == 0 {
+			t.Fatalf("expected non-empty %s array", key)
+		}
+	}
+}
+
 func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 

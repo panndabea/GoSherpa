@@ -55,6 +55,31 @@ type InterfacesResult struct {
 	Warnings     []string             `json:"-"`
 }
 
+type InterfaceMethodUsage struct {
+	Kind     sherpa.ReferenceKind `json:"kind,omitempty"`
+	Position sherpa.Position      `json:"position"`
+	Range    *sherpa.SourceRange  `json:"range,omitempty"`
+}
+
+type InterfaceMethod struct {
+	Name      string                 `json:"name"`
+	Signature string                 `json:"signature,omitempty"`
+	Usages    []InterfaceMethodUsage `json:"usages"`
+}
+
+type InterfaceResult struct {
+	Target                  string             `json:"target"`
+	Position                sherpa.Position    `json:"position"`
+	Methods                 []InterfaceMethod  `json:"methods"`
+	Implementers            []Implementer      `json:"implementers"`
+	References              []sherpa.Reference `json:"references"`
+	AnalysisMode            string             `json:"-"`
+	ReferenceAnalysisMode   string             `json:"-"`
+	MethodUsageAnalysisMode string             `json:"-"`
+	Warnings                []string           `json:"-"`
+	Limitations             []string           `json:"-"`
+}
+
 type interfaceGraph struct {
 	Interfaces             []interfaceInfo
 	Types                  []typeInfo
@@ -146,6 +171,46 @@ func FindInterfacesWithOptions(root string, target string, options InterfaceOpti
 		Interfaces:   interfacesForType(graph, typ.Qualified),
 		AnalysisMode: graph.AnalysisMode,
 		Warnings:     graph.Warnings,
+	}, nil
+}
+
+func InspectInterface(root string, target string) (InterfaceResult, error) {
+	return InspectInterfaceWithOptions(root, target, InterfaceOptions{})
+}
+
+func InspectInterfaceWithOptions(root string, target string, options InterfaceOptions) (InterfaceResult, error) {
+	graph, err := buildInterfaceGraph(root, options)
+	if err != nil {
+		return InterfaceResult{}, err
+	}
+
+	iface, err := findInterfaceTarget(root, graph, target)
+	if err != nil {
+		return InterfaceResult{}, err
+	}
+
+	methods := interfaceMethodsForResult(graph, iface)
+	methodUsageAnalysisMode := InterfaceAnalysisModeASTFallback
+	methodUsages, methodWarnings, methodUsageTypechecked := findInterfaceMethodUsages(root, iface, options)
+	if methodUsageTypechecked {
+		methodUsageAnalysisMode = InterfaceAnalysisModeTypechecked
+		methods = attachInterfaceMethodUsages(methods, methodUsages)
+	}
+
+	references, referenceAnalysisMode, referenceWarnings := interfaceReferences(root, iface.Qualified, options)
+	limitations := interfaceResultLimitations(graph.AnalysisMode, methodUsageAnalysisMode)
+
+	return InterfaceResult{
+		Target:                  iface.Qualified,
+		Position:                iface.Position,
+		Methods:                 methods,
+		Implementers:            implementersForInterface(graph, iface.Qualified),
+		References:              references,
+		AnalysisMode:            graph.AnalysisMode,
+		ReferenceAnalysisMode:   referenceAnalysisMode,
+		MethodUsageAnalysisMode: methodUsageAnalysisMode,
+		Warnings:                uniqueSortedStrings(append(append([]string{}, graph.Warnings...), append(referenceWarnings, methodWarnings...)...)),
+		Limitations:             limitations,
 	}, nil
 }
 
@@ -708,6 +773,266 @@ func interfacesForType(graph interfaceGraph, qualified string) []SatisfiedInterf
 	sortSatisfiedInterfaces(interfaces)
 
 	return interfaces
+}
+
+func interfaceMethodsForResult(graph interfaceGraph, iface interfaceInfo) []InterfaceMethod {
+	methods := resolvedInterfaceMethodsForResult(graph, iface.Qualified, make(map[string]struct{}))
+	names := make([]string, 0, len(methods))
+	for name := range methods {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	result := make([]InterfaceMethod, 0, len(names))
+	for _, name := range names {
+		result = append(result, InterfaceMethod{
+			Name:      name,
+			Signature: formatInterfaceMethodSignature(methods[name]),
+			Usages:    []InterfaceMethodUsage{},
+		})
+	}
+
+	return result
+}
+
+func resolvedInterfaceMethodsForResult(graph interfaceGraph, qualified string, seen map[string]struct{}) methodSet {
+	if _, ok := seen[qualified]; ok {
+		return methodSet{}
+	}
+	seen[qualified] = struct{}{}
+
+	interfacesByQualified := interfacesByQualifiedName(graph.Interfaces)
+	iface, ok := interfacesByQualified[qualified]
+	if !ok {
+		return methodSet{}
+	}
+
+	methods := cloneMethodSet(iface.Methods)
+	for _, embedded := range iface.Embedded {
+		embeddedQualified := qualifiedSignalName(embedded.Package, embedded.Name)
+		mergeMethodSets(methods, resolvedInterfaceMethodsForResult(graph, embeddedQualified, seen))
+	}
+
+	return methods
+}
+
+func formatInterfaceMethodSignature(signature string) string {
+	signature = strings.TrimSpace(signature)
+	if signature == "" || strings.HasPrefix(signature, "func(") {
+		return signature
+	}
+
+	params, results, ok := strings.Cut(signature, "->")
+	if !ok {
+		return signature
+	}
+
+	params = strings.TrimSpace(params)
+	results = strings.TrimSpace(results)
+	if results == "" {
+		return "func(" + params + ")"
+	}
+	if strings.Contains(results, ",") {
+		return "func(" + params + ") (" + results + ")"
+	}
+
+	return "func(" + params + ") " + results
+}
+
+func attachInterfaceMethodUsages(methods []InterfaceMethod, usages map[string][]InterfaceMethodUsage) []InterfaceMethod {
+	for i := range methods {
+		methods[i].Usages = nonNilInterfaceMethodUsages(usages[methods[i].Name])
+	}
+
+	return methods
+}
+
+func interfaceReferences(root string, target string, options InterfaceOptions) ([]sherpa.Reference, string, []string) {
+	report, err := sherpa.FindReferenceReportWithOptions(root, target, sherpa.ReferenceOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return []sherpa.Reference{}, sherpa.ReferenceAnalysisModeASTFallback, []string{fmt.Sprintf("interface references unavailable: %v", err)}
+	}
+
+	analysisMode := strings.TrimSpace(report.AnalysisMode)
+	if analysisMode == "" {
+		analysisMode = sherpa.ReferenceAnalysisModeASTFallback
+	}
+
+	return nonNilInterfaceReferences(report.References), analysisMode, nonNilStrings(report.Warnings)
+}
+
+func findInterfaceMethodUsages(root string, iface interfaceInfo, options InterfaceOptions) (map[string][]InterfaceMethodUsage, []string, bool) {
+	usages := make(map[string][]InterfaceMethodUsage)
+	if !interfaceShouldAttemptTypechecked(root) {
+		return usages, nil, false
+	}
+
+	repo, err := loadSemanticInterfaceRepository(root, semantics.LoadOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return usages, []string{fmt.Sprintf("typechecked interface method usage unavailable: %v", err)}, false
+	}
+
+	methodObjects, ok := semanticInterfaceMethodObjects(repo, iface)
+	if !ok {
+		warnings := append([]string{"typechecked interface method usage unavailable: target interface was not loaded"}, repo.Warnings...)
+		return usages, nonNilStrings(warnings), false
+	}
+	if len(methodObjects) == 0 {
+		return usages, nonNilStrings(repo.Warnings), true
+	}
+
+	for _, pkg := range repo.Packages {
+		if pkg.FileSet == nil || pkg.TypesInfo == nil {
+			continue
+		}
+
+		for _, file := range pkg.Files {
+			var stack []ast.Node
+			ast.Inspect(file, func(node ast.Node) bool {
+				if node == nil {
+					stack = stack[:len(stack)-1]
+					return false
+				}
+
+				parent := ast.Node(nil)
+				if len(stack) > 0 {
+					parent = stack[len(stack)-1]
+				}
+				stack = append(stack, node)
+
+				selector, ok := node.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+
+				selection := pkg.TypesInfo.Selections[selector]
+				if selection == nil {
+					return true
+				}
+
+				methodName, ok := methodObjects[selection.Obj()]
+				if !ok {
+					return true
+				}
+
+				usages[methodName] = append(usages[methodName], InterfaceMethodUsage{
+					Kind:     interfaceMethodUsageKind(parent, selector),
+					Position: interfacePosition(repo.Root, pkg.FileSet, selector.Sel.Pos()),
+					Range:    interfaceSourceRange(repo.Root, pkg.FileSet, selector.Sel.Pos(), selector.Sel.End()),
+				})
+
+				return true
+			})
+		}
+	}
+
+	for method := range usages {
+		sortInterfaceMethodUsages(usages[method])
+	}
+
+	return usages, nonNilStrings(repo.Warnings), true
+}
+
+func semanticInterfaceMethodObjects(repo semantics.Repository, iface interfaceInfo) (map[types.Object]string, bool) {
+	for _, pkg := range repo.Packages {
+		if pkg.PackagePath != iface.Package || pkg.Types == nil {
+			continue
+		}
+
+		object, ok := pkg.Types.Scope().Lookup(iface.Name).(*types.TypeName)
+		if !ok {
+			continue
+		}
+
+		named, ok := object.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+
+		interfaceType, ok := named.Underlying().(*types.Interface)
+		if !ok {
+			continue
+		}
+
+		interfaceType.Complete()
+		methods := make(map[types.Object]string)
+		for i := 0; i < interfaceType.NumMethods(); i++ {
+			method := interfaceType.Method(i)
+			methods[method] = method.Name()
+		}
+
+		return methods, true
+	}
+
+	return nil, false
+}
+
+func interfaceMethodUsageKind(parent ast.Node, selector *ast.SelectorExpr) sherpa.ReferenceKind {
+	call, ok := parent.(*ast.CallExpr)
+	if ok && call.Fun == selector {
+		return sherpa.ReferenceKindCall
+	}
+
+	return sherpa.ReferenceKindUsage
+}
+
+func interfaceSourceRange(root string, fileSet *token.FileSet, start token.Pos, end token.Pos) *sherpa.SourceRange {
+	if !start.IsValid() || !end.IsValid() {
+		return nil
+	}
+
+	return &sherpa.SourceRange{
+		Start: interfacePosition(root, fileSet, start),
+		End:   interfacePosition(root, fileSet, end),
+	}
+}
+
+func sortInterfaceMethodUsages(usages []InterfaceMethodUsage) {
+	sort.Slice(usages, func(i int, j int) bool {
+		if usages[i].Position.File != usages[j].Position.File {
+			return usages[i].Position.File < usages[j].Position.File
+		}
+		if usages[i].Position.Line != usages[j].Position.Line {
+			return usages[i].Position.Line < usages[j].Position.Line
+		}
+		if usages[i].Position.Column != usages[j].Position.Column {
+			return usages[i].Position.Column < usages[j].Position.Column
+		}
+
+		return usages[i].Kind < usages[j].Kind
+	})
+}
+
+func interfaceResultLimitations(analysisMode string, methodUsageAnalysisMode string) []string {
+	limitations := []string{
+		"Interface method usage reports statically visible selector usages only.",
+		"Dynamic dispatch, reflection, and generated runtime wiring may hide additional usage.",
+	}
+	if analysisMode != InterfaceAnalysisModeTypechecked || methodUsageAnalysisMode != InterfaceAnalysisModeTypechecked {
+		limitations = append(limitations, "Interface method usage requires typechecked package loading; AST fallback keeps methods, implementers, and type references conservative.")
+	}
+
+	return limitations
+}
+
+func nonNilInterfaceReferences(references []sherpa.Reference) []sherpa.Reference {
+	if references == nil {
+		return []sherpa.Reference{}
+	}
+
+	return references
+}
+
+func nonNilInterfaceMethodUsages(usages []InterfaceMethodUsage) []InterfaceMethodUsage {
+	if usages == nil {
+		return []InterfaceMethodUsage{}
+	}
+
+	return usages
 }
 
 func typesByQualifiedName(types []typeInfo) map[string]typeInfo {

@@ -698,16 +698,20 @@ available.
 
 ## Interface And Path Data
 
-`implementers`, `interfaces`, `path`, and `paths` data objects include the
-common metadata fields:
+`implementers`, `interface`, `interfaces`, `path`, and `paths` data objects
+include the common metadata fields:
 
-- `analysisMode`: `typechecked` or `ast-fallback` for `implementers` and
-  `interfaces`; currently `ast` for path commands.
+- `analysisMode`: `typechecked` or `ast-fallback` for interface commands;
+  currently `ast` for path commands.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific interface or path-analysis blind spots.
 
-Interface data keeps `implementers` or `interfaces`. Path data keeps `from`,
-`to`, and `paths`.
+`interface` additionally includes `referenceAnalysisMode`,
+`methodUsageAnalysisMode`, `position`, `methods`, `implementers`, and
+`references`. Each method includes `name`, `signature`, and `usages`; usages
+include `kind`, `position`, and optional `range`. `implementers` keeps
+`implementers`; `interfaces` keeps `interfaces`. Path data keeps `from`, `to`,
+and `paths`.
 
 ## Package Inventory Data
 

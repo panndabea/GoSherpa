@@ -155,6 +155,10 @@ func TestMainInterfaceJSONGoldenFiles(t *testing.T) {
 			args: []string{"implementers", "./internal/auth.Authenticator", "--json"},
 		},
 		{
+			name: "interface",
+			args: []string{"interface", "./internal/auth.Authenticator", "--json"},
+		},
+		{
 			name: "interfaces",
 			args: []string{"interfaces", "./internal/jwt.JWTAuthenticator", "--json"},
 		},

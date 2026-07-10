@@ -134,8 +134,8 @@ Implemented:
 - Report-based impact and context bundles expose `interfaceAnalysisMode` so
   agents can distinguish bundle-level AST analysis from typechecked interface
   subanalysis.
-- Standalone `implementers <interface>` and `interfaces <type>` navigation
-  commands backed by the local interface graph.
+- Standalone `implementers <interface>`, `interface <interface>`, and
+  `interfaces <type>` navigation commands backed by the local interface graph.
 - Changed-symbol extraction from git diff hunks, including deleted symbols from
   base files.
 - Package-qualified symbol impact for references and affected tests.
@@ -659,6 +659,11 @@ Done when:
 
 ### 3.3 Interface Method Usage
 
+Status: first slice implemented as `gosherpa interface <interface>` with human
+and JSON output. The report shows interface methods, implementers, references
+to the interface type, and statically visible method usage when typechecked
+package loading can resolve selector calls.
+
 Human question:
 
 ```text
@@ -674,14 +679,15 @@ gosherpa interface UserRepository
 MVP behavior:
 
 - Show interface methods.
-- Show implementers.
-- Show references to the interface type.
+- Show implementers. Implemented.
+- Show references to the interface type. Implemented.
 - Show call sites for each interface method when type information can resolve
-  them.
+  them. Implemented for visible selector calls on interface-typed values.
 
 Done when:
 
-- GoSherpa can help identify overly broad or unused interfaces.
+- GoSherpa can help identify overly broad or unused interfaces. First slice
+  implemented.
 
 ## Phase 4: Call Graph and Paths
 
@@ -1358,6 +1364,8 @@ Potential tools:
 - `path`
 - `deps`
 - `implementers`
+- `interface`
+- `interfaces`
 - `tests`
 - `impact`
 
@@ -1441,7 +1449,7 @@ Current status:
 
 - `--tags` is implemented for semantic/loading-aware commands: `refs`,
   `callers`, `callees`, `explain`, `context`, `impact`, `implementers`,
-  `interfaces`, `pr`, `doctor`, and `tests affected`.
+  `interface`, `interfaces`, `pr`, `doctor`, and `tests affected`.
 - `--tests` is implemented for `search`, `entrypoints`, `callers`, `explain`,
   and `context`.
 
@@ -1566,6 +1574,7 @@ Theme: answer core Go architecture questions.
 Included:
 
 - `implementers`
+- `interface`
 - `interfaces`
 - richer interface details
 - interface method usage where practical
@@ -1646,7 +1655,7 @@ Included:
 | `search` | High | Low | Immediate |
 | Rich `symbol` details | High | Medium | Near-term |
 | Type-aware `refs` | Very high | High | Near-term |
-| `implementers` | Very high | Medium | Implemented first slice |
+| `implementers` / `interface` / `interfaces` | Very high | Medium | Implemented first slice |
 | Type-aware callers/callees | Very high | High | Implemented first slice |
 | `path` | High | High | Implemented first slice |
 | `tests` | Very high | Medium | Implemented first slice |
@@ -1696,7 +1705,7 @@ sequence was:
    - Preserve a simple human output shape.
    - Add reference kinds incrementally.
 
-7. Add `implementers`.
+7. Add interface navigation.
    - Reuse type information from the semantic loader.
    - Keep output compact and concrete.
 

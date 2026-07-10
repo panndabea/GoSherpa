@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "command": "interface",
+  "target": "./internal/auth.Authenticator",
+  "root": "<ROOT>",
+  "modulePath": "example.com/interfaces",
+  "warnings": [],
+  "data": {
+    "analysisMode": "typechecked",
+    "referenceAnalysisMode": "typechecked",
+    "methodUsageAnalysisMode": "typechecked",
+    "confidence": "medium",
+    "limitations": [
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "External implementations outside the repository are not reported.",
+      "Build tags follow the default Go package loading environment.",
+      "Interface method usage reports statically visible selector usages only.",
+      "Dynamic dispatch, reflection, and generated runtime wiring may hide additional usage."
+    ],
+    "position": {
+      "file": "internal/auth/auth.go",
+      "line": 3,
+      "column": 6
+    },
+    "methods": [
+      {
+        "name": "Authenticate",
+        "signature": "func() error",
+        "usages": [
+          {
+            "kind": "call",
+            "position": {
+              "file": "internal/session/session.go",
+              "line": 6,
+              "column": 23
+            },
+            "range": {
+              "start": {
+                "file": "internal/session/session.go",
+                "line": 6,
+                "column": 23
+              },
+              "end": {
+                "file": "internal/session/session.go",
+                "line": 6,
+                "column": 35
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "implementers": [
+      {
+        "name": "./internal/jwt.JWTAuthenticator",
+        "position": {
+          "file": "internal/jwt/jwt.go",
+          "line": 3,
+          "column": 6
+        }
+      }
+    ],
+    "references": [
+      {
+        "name": "./internal/auth.Authenticator",
+        "kind": "definition",
+        "position": {
+          "file": "internal/auth/auth.go",
+          "line": 3,
+          "column": 6
+        },
+        "range": {
+          "start": {
+            "file": "internal/auth/auth.go",
+            "line": 3,
+            "column": 6
+          },
+          "end": {
+            "file": "internal/auth/auth.go",
+            "line": 3,
+            "column": 19
+          }
+        }
+      },
+      {
+        "name": "./internal/auth.Authenticator",
+        "kind": "type_usage",
+        "position": {
+          "file": "internal/session/session.go",
+          "line": 5,
+          "column": 29
+        },
+        "range": {
+          "start": {
+            "file": "internal/session/session.go",
+            "line": 5,
+            "column": 29
+          },
+          "end": {
+            "file": "internal/session/session.go",
+            "line": 5,
+            "column": 42
+          }
+        }
+      }
+    ]
+  }
+}

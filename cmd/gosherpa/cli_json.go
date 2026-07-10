@@ -146,6 +146,18 @@ type implementersJSONData struct {
 	Implementers []impactengine.Implementer `json:"implementers"`
 }
 
+type interfaceJSONData struct {
+	AnalysisMode            string                         `json:"analysisMode"`
+	ReferenceAnalysisMode   string                         `json:"referenceAnalysisMode"`
+	MethodUsageAnalysisMode string                         `json:"methodUsageAnalysisMode"`
+	Confidence              string                         `json:"confidence"`
+	Limitations             []string                       `json:"limitations"`
+	Position                sherpa.Position                `json:"position"`
+	Methods                 []impactengine.InterfaceMethod `json:"methods"`
+	Implementers            []impactengine.Implementer     `json:"implementers"`
+	References              []sherpa.Reference             `json:"references"`
+}
+
 type interfacesJSONData struct {
 	AnalysisMode string                            `json:"analysisMode"`
 	Confidence   string                            `json:"confidence"`
@@ -558,6 +570,42 @@ func implementersJSONDataFromResult(result impactengine.ImplementersResult) impl
 		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
 		Limitations:  interfaceLimitations(result.AnalysisMode),
 		Implementers: result.Implementers,
+	}
+}
+
+func interfaceJSONResult(result impactengine.InterfaceResult) impactengine.InterfaceResult {
+	result.Methods = nonNilSlice(result.Methods)
+	for i := range result.Methods {
+		result.Methods[i].Usages = nonNilSlice(result.Methods[i].Usages)
+	}
+	result.Implementers = nonNilSlice(result.Implementers)
+	result.References = nonNilSlice(result.References)
+	result.Warnings = nonNilSlice(result.Warnings)
+	result.Limitations = nonNilSlice(result.Limitations)
+	if strings.TrimSpace(result.AnalysisMode) == "" {
+		result.AnalysisMode = impactengine.InterfaceAnalysisModeASTFallback
+	}
+	if strings.TrimSpace(result.ReferenceAnalysisMode) == "" {
+		result.ReferenceAnalysisMode = sherpa.ReferenceAnalysisModeASTFallback
+	}
+	if strings.TrimSpace(result.MethodUsageAnalysisMode) == "" {
+		result.MethodUsageAnalysisMode = impactengine.InterfaceAnalysisModeASTFallback
+	}
+
+	return result
+}
+
+func interfaceJSONDataFromResult(result impactengine.InterfaceResult) interfaceJSONData {
+	return interfaceJSONData{
+		AnalysisMode:            result.AnalysisMode,
+		ReferenceAnalysisMode:   result.ReferenceAnalysisMode,
+		MethodUsageAnalysisMode: result.MethodUsageAnalysisMode,
+		Confidence:              jsonConfidence(result.Warnings, result.AnalysisMode, result.ReferenceAnalysisMode, result.MethodUsageAnalysisMode),
+		Limitations:             appendLimitations(interfaceLimitations(result.AnalysisMode), result.Limitations),
+		Position:                result.Position,
+		Methods:                 result.Methods,
+		Implementers:            result.Implementers,
+		References:              result.References,
 	}
 }
 

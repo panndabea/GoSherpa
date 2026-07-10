@@ -431,7 +431,13 @@ func (JWTAuthenticator) Authenticate() error {
 `)
 	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
 
+import "example.com/app/internal/auth"
+
 type SessionStore struct{}
+
+func Run(authenticator auth.Authenticator) error {
+	return authenticator.Authenticate()
+}
 `)
 
 	return root

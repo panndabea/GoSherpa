@@ -96,7 +96,7 @@ before broad inventory commands like unfiltered `symbols`.
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
-| Inspect interface relationships | `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` |
+| Inspect interface relationships | `gosherpa interface <interface> --json`; use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
 | Analyze changed files | `gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
 
