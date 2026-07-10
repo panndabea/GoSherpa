@@ -38,7 +38,10 @@
           }
         },
         "directReference": true,
-        "externalPackage": false
+        "externalPackage": false,
+        "targets": [
+          "Target"
+        ]
       }
     ],
     "commands": [

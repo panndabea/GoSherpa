@@ -55,7 +55,10 @@
           }
         },
         "directReference": true,
-        "externalPackage": false
+        "externalPackage": false,
+        "targets": [
+          "Target"
+        ]
       }
     ],
     "testAnalysisMode": "typechecked+ast",

@@ -124,7 +124,7 @@ contexts, package-level impact, `interfaceAnalysisMode`, affected tests,
 `context diff` adds base ref, changed files, changed packages, affected
 symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
 interface signals, `interfaceAnalysisMode`, affected tests, `testAnalysisMode`,
-and test planning. Affected tests and test-plan items may include `targets`
-naming changed symbols that explain why the test or package command is
-recommended; test-plan items may include structured `tests` when concrete test
-names are known.
+and test planning. Related or affected tests and test-plan items may include
+`targets` naming the symbol target or changed symbols that explain why the test
+or package command is recommended; test-plan items may include structured
+`tests` when concrete test names are known.

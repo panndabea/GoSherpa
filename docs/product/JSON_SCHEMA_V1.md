@@ -151,8 +151,9 @@ Related tests:
 }
 ```
 
-`targets` is optional. Diff-oriented reports use it to name the changed symbol
-or symbols that made a test relevant when that relationship is known.
+`targets` is optional. Symbol test queries use it to name the requested symbol;
+diff-oriented reports use it to name the changed symbol or symbols that made a
+test relevant when that relationship is known.
 
 Entrypoints:
 
@@ -687,11 +688,11 @@ When composed reports expose subanalysis fields such as
 `testAnalysisMode`, their `limitations` array also includes a concise note about
 the corresponding subanalysis path.
 
-Diff-oriented test plans group commands into `direct`, `related`,
-`callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
-list for compatibility, include structured `tests` on plan items when concrete
-test names are known, and attach changed-symbol `targets` to affected tests and
-plan items when known.
+Test plans group commands into `direct`, `related`, `callerPackages`, and
+`fallback`, preserve a flat `testCommands`/`commands` list for compatibility,
+include structured `tests` on plan items when concrete test names are known,
+and attach symbol or changed-symbol `targets` to related tests and plan items
+when known.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

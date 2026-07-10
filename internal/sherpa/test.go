@@ -202,6 +202,7 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 
 	relatedTests, analysisMode, warnings := collectRelatedTests(root, testFiles, packages, normalizedTarget)
 	tests := filterTestsForScope(relatedTests, TestTargetKindSymbol, options.Scope)
+	tests = annotateRelatedTestTargets(tests, normalizedTarget.String())
 	targetPackages := sortedMapKeys(packages)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget.String(),
@@ -220,6 +221,21 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 		Commands:     TestPlanCommands(plan),
 		TestPlan:     plan,
 	}, nil
+}
+
+func annotateRelatedTestTargets(tests []RelatedTest, target string) []RelatedTest {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return tests
+	}
+
+	result := make([]RelatedTest, 0, len(tests))
+	for _, test := range tests {
+		test.Targets = uniqueSorted(append(test.Targets, target))
+		result = append(result, test)
+	}
+
+	return result
 }
 
 func collectTestFiles(root string) ([]testFileInfo, error) {

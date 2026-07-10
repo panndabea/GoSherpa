@@ -49,6 +49,9 @@ func TestExternalPackage(t *testing.T) {}
 	if external == nil || !external.ExternalPackage {
 		t.Fatalf("expected external package marker, got %v", external)
 	}
+	if len(external.Targets) != 0 {
+		t.Fatalf("expected package test to omit symbol targets, got %#v", external.Targets)
+	}
 
 	wantCommands := []string{"go test ./internal/service"}
 	if !reflect.DeepEqual(result.Commands, wantCommands) {
@@ -103,6 +106,16 @@ func TestUsesParser(t *testing.T) {
 	direct := findRelatedTest(result.Tests, "TestUsesParser")
 	if direct == nil || !direct.DirectReference {
 		t.Fatalf("expected direct reference marker, got %v", direct)
+	}
+	if !reflect.DeepEqual(direct.Targets, []string{"ParseFile"}) {
+		t.Fatalf("expected direct related test target, got %#v", direct.Targets)
+	}
+	samePackage := findRelatedTest(result.Tests, "TestParserPackage")
+	if samePackage == nil {
+		t.Fatalf("expected same-package related test, got %v", result.Tests)
+	}
+	if !reflect.DeepEqual(samePackage.Targets, []string{"ParseFile"}) {
+		t.Fatalf("expected same-package related test target, got %#v", samePackage.Targets)
 	}
 
 	wantCommands := []string{"go test ./cmd/app", "go test ./internal/parser"}
