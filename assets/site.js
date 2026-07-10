@@ -114,12 +114,6 @@ TEST PLAN
       Compile impacted CLI package and cover command behavior.`
     }
   };
-  const copiedLabels = {
-    de: "Kopiert",
-    en: "Copied",
-    fr: "Copié"
-  };
-
   const supportedLanguages = Object.keys(translations);
   const defaultLanguage = "de";
   if (!translations[defaultLanguage]) {
@@ -144,10 +138,14 @@ TEST PLAN
 
   const getCurrentLanguage = () => document.documentElement.lang || defaultLanguage;
 
-  const restoreCopyLabel = (label) => {
+  const getTranslation = (key, fallback) => {
     const language = getCurrentLanguage();
     const dictionary = translations[language] || translations[defaultLanguage];
-    label.textContent = dictionary["demo.copy"] || "Copy";
+    return dictionary[key] || fallback;
+  };
+
+  const restoreCopyLabel = (label, key = "demo.copy", fallback = "Copy") => {
+    label.textContent = getTranslation(key, fallback);
   };
 
   const copyText = async (text) => {
@@ -244,12 +242,80 @@ TEST PLAN
 
         await copyText(item.command);
         window.clearTimeout(restoreTimer);
-        copyLabel.textContent = copiedLabels[getCurrentLanguage()] || copiedLabels.en;
+        copyLabel.textContent = getTranslation("code.copied", "Copied");
         restoreTimer = window.setTimeout(() => restoreCopyLabel(copyLabel), 1400);
       });
     }
 
     activate(activeKey);
+  };
+
+  const setupCopyableCodeBlocks = () => {
+    document.querySelectorAll("[data-copy-block-button]").forEach((button) => {
+      const block = button.closest("[data-copyable-code]");
+      const source = block?.querySelector("[data-copy-content]");
+      const label = button.querySelector("[data-copy-block-label]");
+      let restoreTimer;
+
+      if (!source || !label) {
+        return;
+      }
+
+      button.addEventListener("click", async () => {
+        const text = source.textContent.trim();
+        if (!text) {
+          return;
+        }
+
+        await copyText(text);
+        window.clearTimeout(restoreTimer);
+        label.textContent = getTranslation("code.copied", "Copied");
+        restoreTimer = window.setTimeout(() => restoreCopyLabel(label, "code.copy", "Copy"), 1400);
+      });
+    });
+  };
+
+  const setupMobileMenu = () => {
+    const toggle = document.querySelector("[data-menu-toggle]");
+    const menu = document.querySelector("[data-mobile-menu]");
+    if (!toggle || !menu) {
+      return;
+    }
+
+    const setOpen = (isOpen) => {
+      toggle.classList.toggle("is-open", isOpen);
+      toggle.setAttribute("aria-expanded", String(isOpen));
+      toggle.setAttribute("aria-label", getTranslation(isOpen ? "menu.close" : "menu.open", isOpen ? "Close menu" : "Open menu"));
+      menu.hidden = !isOpen;
+    };
+
+    toggle.addEventListener("click", () => {
+      setOpen(toggle.getAttribute("aria-expanded") !== "true");
+    });
+
+    menu.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        setOpen(false);
+      });
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+
+    const desktopQuery = window.matchMedia("(min-width: 921px)");
+    const closeOnDesktop = (event) => {
+      if (event.matches) {
+        setOpen(false);
+      }
+    };
+
+    if (desktopQuery.addEventListener) {
+      desktopQuery.addEventListener("change", closeOnDesktop);
+    }
   };
 
   const getInitialLanguage = () => {
@@ -310,6 +376,14 @@ TEST PLAN
       button.setAttribute("aria-pressed", String(isActive));
     });
 
+    document.querySelectorAll("[data-menu-toggle]").forEach((button) => {
+      const key = button.getAttribute("aria-expanded") === "true" ? "menu.close" : "menu.open";
+      const value = dictionary[key];
+      if (value !== undefined) {
+        button.setAttribute("aria-label", value);
+      }
+    });
+
     saveLanguage(language);
   };
 
@@ -319,6 +393,8 @@ TEST PLAN
     });
   });
 
+  setupMobileMenu();
   setupCommandDemo();
+  setupCopyableCodeBlocks();
   translateElements(getInitialLanguage());
 })();

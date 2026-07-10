@@ -23,6 +23,11 @@
       <span>GoSherpa</span>
     </a>
     <div class="header-actions">
+      <button class="menu-button" type="button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="mobile-menu" data-menu-toggle>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <nav class="nav-links" aria-label="Seitenbereiche" data-i18n-label="nav.aria">
         <a href="#quickstart" data-i18n="nav.quickstart">Start</a>
         <a href="#demo" data-i18n="nav.demo">Demo</a>
@@ -38,6 +43,15 @@
         <button class="lang-button" type="button" data-lang-option="fr" aria-label="Français" aria-pressed="false">FR</button>
       </div>
     </div>
+    <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile Navigation" data-i18n-label="mobileNav.aria" data-mobile-menu hidden>
+      <a href="#quickstart" data-i18n="nav.quickstart">Start</a>
+      <a href="#demo" data-i18n="nav.demo">Demo</a>
+      <a href="#use-cases" data-i18n="nav.useCases">Use Cases</a>
+      <a href="#agents" data-i18n="nav.agents">Agents</a>
+      <a href="#trust" data-i18n="nav.trust">Trust</a>
+      <a href="#community" data-i18n="nav.community">Community</a>
+      <a href="#try" data-i18n="nav.try">Ausprobieren</a>
+    </nav>
   </header>
 
   <main id="top">
@@ -102,13 +116,18 @@
           </div>
         </div>
 
-        <div class="quickstart-panel" aria-label="Quickstart Befehle" data-i18n-label="quickstart.commands.aria">
-          <div class="terminal-bar" aria-hidden="true">
-            <span class="terminal-dot"></span>
-            <span class="terminal-dot"></span>
-            <span class="terminal-dot"></span>
+        <div class="quickstart-panel" aria-label="Quickstart Befehle" data-i18n-label="quickstart.commands.aria" data-copyable-code>
+          <div class="terminal-bar code-block-bar">
+            <div class="terminal-dots" aria-hidden="true">
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+            </div>
+            <button class="copy-block-button" type="button" data-copy-block-button aria-label="Befehle kopieren" data-i18n-label="code.copy.aria">
+              <span data-copy-block-label data-i18n="code.copy">Kopieren</span>
+            </button>
           </div>
-          <pre>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+          <pre data-copy-content>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
 gosherpa doctor
 gosherpa analyze .
 gosherpa impact diff --base HEAD</pre>
@@ -531,8 +550,18 @@ gosherpa tests affected --base HEAD --json</pre>
             <a class="button secondary" href="https://github.com/panndabea/GoSherpa/blob/main/README.md" data-i18n="cta.readme">README ansehen</a>
           </div>
         </div>
-        <div class="install-box" aria-label="Installationsbefehle" data-i18n-label="cta.install.aria">
-          <pre>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+        <div class="install-box" aria-label="Installationsbefehle" data-i18n-label="cta.install.aria" data-copyable-code>
+          <div class="terminal-bar code-block-bar">
+            <div class="terminal-dots" aria-hidden="true">
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+            </div>
+            <button class="copy-block-button" type="button" data-copy-block-button aria-label="Befehle kopieren" data-i18n-label="code.copy.aria">
+              <span data-copy-block-label data-i18n="code.copy">Kopieren</span>
+            </button>
+          </div>
+          <pre data-copy-content>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
 gosherpa doctor
 gosherpa search parse file
 gosherpa symbol ParseFile

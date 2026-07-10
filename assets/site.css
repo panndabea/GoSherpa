@@ -90,6 +90,51 @@ pre {
   gap: 0.8rem;
 }
 
+.menu-button {
+  display: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.45rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(3, 31, 40, 0.22);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.menu-button span {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.menu-button span + span {
+  margin-top: 0.24rem;
+}
+
+.menu-button:hover,
+.menu-button:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+
+.menu-button.is-open span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.menu-button.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.menu-button.is-open span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
 .nav-links a {
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
@@ -136,6 +181,10 @@ pre {
   color: #0a2630;
   background: #ffffff;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.mobile-menu {
+  display: none;
 }
 
 .hero {
@@ -567,7 +616,8 @@ section {
   white-space: nowrap;
 }
 
-.copy-command {
+.copy-command,
+.copy-block-button {
   flex: 0 0 auto;
   min-height: 34px;
   padding: 0.45rem 0.7rem;
@@ -583,7 +633,9 @@ section {
 }
 
 .copy-command:hover,
-.copy-command:focus-visible {
+.copy-command:focus-visible,
+.copy-block-button:hover,
+.copy-block-button:focus-visible {
   background: rgba(255, 255, 255, 0.18);
   outline: none;
 }
@@ -991,6 +1043,17 @@ section {
   background: #17333d;
 }
 
+.terminal-dots {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.code-block-bar {
+  align-items: center;
+  justify-content: space-between;
+}
+
 .terminal-dot {
   width: 0.72rem;
   height: 0.72rem;
@@ -1083,6 +1146,10 @@ section {
   backdrop-filter: blur(8px);
 }
 
+.install-box .terminal-bar {
+  background: rgba(23, 51, 61, 0.72);
+}
+
 .install-box pre {
   margin: 0;
   overflow-x: auto;
@@ -1129,6 +1196,43 @@ footer {
 
   .nav-links {
     display: none;
+  }
+
+  .menu-button {
+    display: grid;
+  }
+
+  .mobile-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    display: grid;
+    width: min(21rem, calc(100vw - 2rem));
+    gap: 0.22rem;
+    padding: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: 8px;
+    background: rgba(3, 31, 40, 0.9);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.26);
+    backdrop-filter: blur(12px);
+  }
+
+  .mobile-menu[hidden] {
+    display: none;
+  }
+
+  .mobile-menu a {
+    padding: 0.78rem 0.85rem;
+    border-radius: 8px;
+    color: #ffffff;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .mobile-menu a:hover,
+  .mobile-menu a:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+    outline: none;
   }
 
   h1 {
@@ -1231,6 +1335,34 @@ footer {
     width: 100%;
   }
 
+  .brand span {
+    display: none;
+  }
+
+  .brand img {
+    width: 46px;
+    height: 46px;
+  }
+
+  .header-actions {
+    gap: 0.5rem;
+  }
+
+  .menu-button {
+    width: 2.45rem;
+    height: 2.25rem;
+  }
+
+  .lang-button {
+    width: 2rem;
+    min-height: 2rem;
+  }
+
+  .mobile-menu {
+    left: 0;
+    width: 100%;
+  }
+
   .demo-tabs {
     grid-template-columns: 1fr;
   }
@@ -1248,7 +1380,8 @@ footer {
     flex-direction: column;
   }
 
-  .copy-command {
+  .copy-command,
+  .copy-block-button {
     width: 100%;
   }
 
