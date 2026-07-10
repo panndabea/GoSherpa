@@ -26,8 +26,9 @@ Every context result includes:
 - `risk`: deterministic risk level and reasons.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan with `direct`, `related`, `callerPackages`,
-  and `fallback` items. Plan items may include `targets` when diff context can
-  connect a recommendation to changed symbols.
+  and `fallback` items. Plan items may include `test`, `tests`, and `targets`.
+  Diff context uses `targets` when it can connect a recommendation to changed
+  symbols.
 - `readingOrder`: ordered source locations to inspect next. Entries include
   `position` and may include `range` when backed by a symbol, call, or test
   source range.
@@ -41,6 +42,8 @@ Every context result includes:
 - `interfaceAnalysisMode`: optional trust label for affected interface and
   implementation signals when interface subanalysis ran (`typechecked` or
   `ast-fallback`).
+- `testAnalysisMode`: optional trust label for related-test and test-plan
+  signals (`typechecked+ast` or `ast`).
 - `confidence`: deterministic confidence label.
 - `limitations`: known blind spots and conservative boundaries.
 
@@ -107,19 +110,21 @@ If the requested byte budget is smaller than the minimum report shell, the
 
 `context symbol` adds symbol identity, definition, source context, references,
 `referenceAnalysisMode`, callers, callees, `callAnalysisMode`, affected
-packages, interface signals, `interfaceAnalysisMode`, related tests, and test
-planning.
+packages, interface signals, `interfaceAnalysisMode`, related tests,
+`testAnalysisMode`, and test planning.
 
 `context file` adds file identity, package identity, file symbols, source
-contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
-test planning.
+contexts, package-level impact, `interfaceAnalysisMode`, affected tests,
+`testAnalysisMode`, and test planning.
 
 `context package` adds package identity, package files, package symbols, source
-contexts, package-level impact, `interfaceAnalysisMode`, affected tests, and
-test planning.
+contexts, package-level impact, `interfaceAnalysisMode`, affected tests,
+`testAnalysisMode`, and test planning.
 
 `context diff` adds base ref, changed files, changed packages, affected
 symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
-interface signals, `interfaceAnalysisMode`, affected tests, and test planning.
-Affected tests and test-plan items may include `targets` naming changed symbols
-that explain why the test or package command is recommended.
+interface signals, `interfaceAnalysisMode`, affected tests, `testAnalysisMode`,
+and test planning. Affected tests and test-plan items may include `targets`
+naming changed symbols that explain why the test or package command is
+recommended; test-plan items may include structured `tests` when concrete test
+names are known.

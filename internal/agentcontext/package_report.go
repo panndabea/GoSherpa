@@ -125,7 +125,7 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 	report.Purpose = packagePurpose(report)
 	report.Risk = packageRiskSummary(report)
 	report.ReadingOrder = packageReadingOrder(report)
-	report.Limitations = packageLimitations(options.IncludeTests, report.AnalysisMode)
+	report.Limitations = packageLimitations(options.IncludeTests, report.AnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Confidence = packageConfidence(report)
 	report = applyPackageLimits(report, limits)
 
@@ -362,11 +362,13 @@ func packageReadingOrder(report PackageReport) []explainengine.ReadingStep {
 	return steps
 }
 
-func packageLimitations(includeTests bool, analysisMode string) []string {
+func packageLimitations(includeTests bool, analysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
 	values := []string{
 		"Package context uses package-level impact for affected packages and tests.",
 		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, interfaces, and type aliases.",
 		packageContextAnalysisLimitation(analysisMode),
+		interfaceAnalysisLimitation(interfaceAnalysisMode),
+		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 	}

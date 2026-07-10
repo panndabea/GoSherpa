@@ -357,7 +357,10 @@
           "command": "go test .",
           "reason": "Tests in target package .: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ]
         }
       ],
       "callerPackages": [],
@@ -516,6 +519,8 @@
       "File context uses package-level impact for affected packages and tests.",
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, interfaces, and type aliases.",
       "File context used typechecked package loading for package files and symbols, with syntax/local impact signals.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used AST/package fallback.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Test discovery uses direct references, same-package tests, and literal t.Run subtest names."
     ]

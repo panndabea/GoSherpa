@@ -11,7 +11,11 @@
     "limitations": [
       "Affected test planning includes typechecked changed-symbol impact where available, then falls back to package-level commands.",
       "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
-      "Fallback commands are package-level when direct test functions are not known."
+      "Fallback commands are package-level when direct test functions are not known.",
+      "Reference analysis used typechecked package loading where available.",
+      "Call analysis used typechecked package loading where available.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
     ],
     "referenceAnalysisMode": "typechecked",
     "callAnalysisMode": "typechecked",
@@ -58,6 +62,9 @@
           "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
           "package": ".",
           "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ],
           "targets": [
             "example.com/golden.Added"
           ]

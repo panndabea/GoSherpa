@@ -242,7 +242,10 @@
           "command": "go test .",
           "reason": "Direct tests in . reference Target: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ]
         }
       ],
       "related": [],
@@ -352,6 +355,8 @@
       "Symbol context used typechecked package loading for symbol identity, with syntax/local impact and test signals.",
       "Reference analysis used typechecked package loading where available.",
       "Call analysis used typechecked package loading where available.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Call graph results are repository-local and may miss some imported-package receiver calls.",
       "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",

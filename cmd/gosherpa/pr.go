@@ -66,7 +66,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 		Warnings:                impactReport.Warnings,
 	}
 	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
-	report.Limitations = impactBundleLimitations(report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode)
+	report.Limitations = impactBundleLimitations(report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Risk = prRiskSummary(report)
 	report.VerificationCommands = prVerificationCommands(report.TestCommands)
 

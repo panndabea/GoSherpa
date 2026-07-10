@@ -2596,7 +2596,13 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
 	assertMainTestJSONArrayHasLength(t, data, "relatedTests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 7)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
+	}
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used typechecked") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -2621,7 +2627,10 @@ func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 	assertMainTestContextJSONContract(t, payload, data)
 
 	assertMainTestJSONArrayHasLength(t, data, "callers", 2)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used typechecked") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 }
 
 func TestMainRunsContextSymbolCommandWithLimits(t *testing.T) {
@@ -2883,7 +2892,13 @@ func TestMainRunsContextFileCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 4)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
+	}
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used AST") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -3003,7 +3018,13 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 6)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 5)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
+	}
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used AST") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -3152,7 +3173,13 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "verificationCommands", 3)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
+	}
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used typechecked") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 	assertMainTestJSONArrayHasLength(t, repositoryRisk, "limitations", 3)
 	assertMainTestJSONArrayHasLength(t, repositoryRisk, "factors", 4)
 	assertMainTestJSONArrayHasLength(t, repositoryRisk, "packages", 2)
@@ -3336,7 +3363,13 @@ func NewSession() Session {
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
 	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
-	assertMainTestJSONArrayHasLength(t, data, "limitations", 6)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
+	}
+	if !mainTestJSONArrayContainsSubstring(limitations, "Test analysis used typechecked") {
+		t.Fatalf("expected test analysis limitation, got %#v", limitations)
+	}
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])

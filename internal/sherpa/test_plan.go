@@ -17,6 +17,7 @@ type TestPlanItem struct {
 	Reason  string   `json:"reason"`
 	Package string   `json:"package,omitempty"`
 	Test    string   `json:"test,omitempty"`
+	Tests   []string `json:"tests,omitempty"`
 	Targets []string `json:"targets,omitempty"`
 }
 
@@ -175,6 +176,9 @@ func testPlanItemsFromGroups(groups map[string][]string, targetsByPackage map[st
 		}
 		if len(names) == 1 {
 			item.Test = names[0]
+		}
+		if len(names) > 0 {
+			item.Tests = names
 		}
 
 		items = append(items, item)

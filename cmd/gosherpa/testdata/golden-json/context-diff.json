@@ -78,6 +78,9 @@
           "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
           "package": ".",
           "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ],
           "targets": [
             "example.com/golden.Added"
           ]
@@ -140,7 +143,9 @@
       "Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
       "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
       "Reference analysis mode: typechecked.",
-      "Call analysis mode: typechecked."
+      "Call analysis mode: typechecked.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
     ]
   }
 }

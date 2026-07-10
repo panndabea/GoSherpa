@@ -196,8 +196,10 @@ Test plans:
 ```
 
 Each test plan item has `command` and `reason`, with optional `package`, `test`,
-and `targets`. Diff-oriented reports use `targets` to connect a recommended
-test command to changed symbols when known.
+`tests`, and `targets`. `test` is present for a single focused test name;
+`tests` is the structured list of all test functions or literal subtests that
+made the plan item relevant. Diff-oriented reports use `targets` to connect a
+recommended test command to changed symbols when known.
 
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
@@ -504,7 +506,8 @@ Data:
 - `analysisMode`: broader explain-bundle mode, `typechecked+ast` when one or
   more composed subanalyses use typechecked package loading and `ast` otherwise.
 - `confidence`: deterministic trust label.
-- `limitations`: explain, call, and test-planning blind spots.
+- `limitations`: explain, reference, call, interface, and test-planning blind
+  spots.
 - `symbol`: symbol profile object.
 - `symbolAnalysisMode`: symbol identity mode, currently `typechecked+ast`
   when the target was resolved from typechecked package loading and `ast` when
@@ -526,6 +529,8 @@ Data:
 - `relatedTests`: tests related to the symbol.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan.
+- `testAnalysisMode`: trust mode for related-test and test-plan signals when
+  present, either `typechecked+ast` or `ast`.
 - `readingOrder`: ordered source locations to inspect next. Entries include
   `position` and may include `range` when backed by a symbol, call, or test
   source range.
@@ -677,10 +682,16 @@ when direct symbol test-reference analysis loaded repository packages and `ast`
 when test planning stayed package/syntax based. Related test-analysis warnings
 are reported through the top-level `warnings` array.
 
+When composed reports expose subanalysis fields such as
+`referenceAnalysisMode`, `callAnalysisMode`, `interfaceAnalysisMode`, or
+`testAnalysisMode`, their `limitations` array also includes a concise note about
+the corresponding subanalysis path.
+
 Diff-oriented test plans group commands into `direct`, `related`,
 `callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
-list for compatibility, and attach changed-symbol `targets` to affected tests
-and plan items when known.
+list for compatibility, include structured `tests` on plan items when concrete
+test names are known, and attach changed-symbol `targets` to affected tests and
+plan items when known.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,
@@ -771,6 +782,8 @@ trust metadata:
   `ast-fallback`.
 - `interfaceAnalysisMode`: trust mode for interface and implementation impact
   fields when present, either `typechecked` or `ast-fallback`.
+- `testAnalysisMode`: trust mode for related-test and test-plan fields when
+  present, either `typechecked+ast` or `ast`.
 - `callers`: repository-local callers.
 - `callees`: repository-local callees.
 

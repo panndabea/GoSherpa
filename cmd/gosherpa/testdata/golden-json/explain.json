@@ -17,8 +17,10 @@
       "Call graph results are repository-local.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Imported-package receiver calls may be incomplete.",
-      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
-      "Dynamic table-test names may be incomplete.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
+      "Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
+      "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],
     "symbol": {
@@ -219,7 +221,10 @@
           "command": "go test .",
           "reason": "Direct tests in . reference Target: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ]
         }
       ],
       "related": [],

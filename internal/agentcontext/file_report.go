@@ -118,7 +118,7 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 	report.Purpose = filePurpose(report)
 	report.Risk = fileRiskSummary(report)
 	report.ReadingOrder = fileReadingOrder(report)
-	report.Limitations = fileLimitations(options.IncludeTests, report.AnalysisMode)
+	report.Limitations = fileLimitations(options.IncludeTests, report.AnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Confidence = fileConfidence(report)
 	report = applyFileLimits(report, limits)
 
@@ -338,11 +338,13 @@ func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
 	return steps
 }
 
-func fileLimitations(includeTests bool, analysisMode string) []string {
+func fileLimitations(includeTests bool, analysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
 	values := []string{
 		"File context uses package-level impact for affected packages and tests.",
 		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, interfaces, and type aliases.",
 		fileContextAnalysisLimitation(analysisMode),
+		interfaceAnalysisLimitation(interfaceAnalysisMode),
+		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 	}

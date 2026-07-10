@@ -222,6 +222,12 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 	if strings.TrimSpace(report.CallAnalysisMode) != "" {
 		values = append(values, "Call analysis mode: "+report.CallAnalysisMode+".")
 	}
+	if strings.TrimSpace(report.InterfaceAnalysisMode) != "" {
+		values = append(values, interfaceAnalysisLimitation(report.InterfaceAnalysisMode))
+	}
+	if strings.TrimSpace(report.TestAnalysisMode) != "" {
+		values = append(values, testAnalysisLimitation(report.TestAnalysisMode))
+	}
 
 	if includeTests {
 		values = append(values, "--tests is accepted for workflow symmetry; diff context always includes affected tests from impact analysis.")

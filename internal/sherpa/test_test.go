@@ -112,8 +112,14 @@ func TestUsesParser(t *testing.T) {
 	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./cmd/app" {
 		t.Fatalf("expected direct test plan item for ./cmd/app, got %#v", result.TestPlan)
 	}
+	if !reflect.DeepEqual(result.TestPlan.Direct[0].Tests, []string{"TestUsesParser"}) {
+		t.Fatalf("expected structured direct tests, got %#v", result.TestPlan.Direct[0].Tests)
+	}
 	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/parser" {
 		t.Fatalf("expected related test plan item for ./internal/parser, got %#v", result.TestPlan)
+	}
+	if !reflect.DeepEqual(result.TestPlan.Related[0].Tests, []string{"TestParserPackage"}) {
+		t.Fatalf("expected structured related tests, got %#v", result.TestPlan.Related[0].Tests)
 	}
 }
 

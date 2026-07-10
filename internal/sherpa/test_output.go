@@ -116,6 +116,11 @@ func writeTestPlanSection(builder *strings.Builder, title string, items []TestPl
 			builder.WriteString(item.Reason)
 			builder.WriteString("\n")
 		}
+		if len(item.Tests) > 0 {
+			builder.WriteString("      tests: ")
+			builder.WriteString(strings.Join(item.Tests, ", "))
+			builder.WriteString("\n")
+		}
 		if len(item.Targets) > 0 {
 			builder.WriteString("      targets: ")
 			builder.WriteString(strings.Join(item.Targets, ", "))

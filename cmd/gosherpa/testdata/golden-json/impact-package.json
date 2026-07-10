@@ -12,7 +12,9 @@
       "Impact analysis uses syntax plus local package dependency and interface signals.",
       "Symbol impact includes references and conservative caller-package propagation.",
       "Interface impact uses typechecked method sets when package loading succeeds and AST fallback otherwise.",
-      "Dynamic dispatch, reflection, and function values are not resolved."
+      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used AST/package fallback."
     ],
     "changedFiles": [],
     "changedPackages": [
@@ -64,7 +66,10 @@
           "command": "go test .",
           "reason": "Tests in target package .: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ]
         }
       ],
       "callerPackages": [],

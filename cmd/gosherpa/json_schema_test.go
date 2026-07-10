@@ -294,6 +294,7 @@ func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 		"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 		"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 		"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+		"testAnalysisMode":      sherpa.TestAnalysisModeTypecheckedAST,
 		"confidence":            agentcontext.ConfidenceMedium,
 	}
 	for field, want := range wantFields {
@@ -328,6 +329,58 @@ func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 	}
 }
 
+func TestMainTestsAffectedJSONSchemaContract(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/app")
+
+	wantFields := map[string]string{
+		"analysisMode":          agentcontext.AnalysisModeDiffTypechecked,
+		"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
+		"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
+		"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+		"testAnalysisMode":      sherpa.TestAnalysisModeTypecheckedAST,
+		"confidence":            agentcontext.ConfidenceMedium,
+	}
+	for field, want := range wantFields {
+		if data[field] != want {
+			t.Fatalf("expected data.%s %q, got %v", field, want, data[field])
+		}
+	}
+
+	for _, field := range []string{"affectedTests", "commands", "limitations"} {
+		if _, ok := data[field].([]any); !ok {
+			t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
+		}
+	}
+
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	for _, field := range []string{"direct", "related", "callerPackages", "fallback"} {
+		if _, ok := testPlan[field].([]any); !ok {
+			t.Fatalf("expected data.testPlan.%s to be a JSON array, got %T", field, testPlan[field])
+		}
+	}
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	if strings.Contains(result.Stdout, "AFFECTED TESTS") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainPRJSONSchemaContract(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 
@@ -349,6 +402,7 @@ func TestMainPRJSONSchemaContract(t *testing.T) {
 		"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 		"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 		"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
+		"testAnalysisMode":      sherpa.TestAnalysisModeTypecheckedAST,
 		"confidence":            agentcontext.ConfidenceMedium,
 	}
 	for field, want := range wantFields {

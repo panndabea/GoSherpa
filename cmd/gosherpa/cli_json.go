@@ -344,7 +344,7 @@ func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
 	return impactJSONData{
 		AnalysisMode:          analysisMode,
 		Confidence:            jsonConfidence(result.Warnings, analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode),
-		Limitations:           impactBundleLimitations(analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode),
+		Limitations:           impactBundleLimitations(analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode, "", result.TestAnalysisMode),
 		Kind:                  result.Kind,
 		References:            result.References,
 		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
@@ -388,7 +388,7 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 	return impactDiffJSONData{
 		AnalysisMode:            analysisMode,
 		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
-		Limitations:             impactBundleLimitations(analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode),
+		Limitations:             impactBundleLimitations(analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode),
 		ChangedFiles:            report.ChangedFiles,
 		ChangedPackages:         report.ChangedPackages,
 		AffectedPackages:        report.AffectedPackages,
@@ -450,7 +450,7 @@ func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffe
 	return testsAffectedJSONData{
 		AnalysisMode:          analysisMode,
 		Confidence:            jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
-		Limitations:           testLimitations(analysisMode),
+		Limitations:           testBundleLimitations(analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode),
 		ReferenceAnalysisMode: report.ReferenceAnalysisMode,
 		CallAnalysisMode:      report.CallAnalysisMode,
 		InterfaceAnalysisMode: report.InterfaceAnalysisMode,
@@ -826,7 +826,7 @@ func explainJSONDataFromReport(report explainengine.Report) explainJSONData {
 		Target:                  report.Target,
 		AnalysisMode:            analysisMode,
 		Confidence:              jsonConfidence(report.Warnings, analysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode),
-		Limitations:             explainLimitations(report.ReferenceAnalysisMode, report.CallAnalysisMode),
+		Limitations:             explainLimitations(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode),
 		Symbol:                  report.Symbol,
 		SymbolAnalysisMode:      report.SymbolAnalysisMode,
 		Purpose:                 report.Purpose,
@@ -942,7 +942,7 @@ func entrypointLimitations(analysisMode string) []string {
 	return limitations
 }
 
-func explainLimitations(referenceAnalysisMode string, callAnalysisMode string) []string {
+func explainLimitations(referenceAnalysisMode string, callAnalysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
 	limitations := []string{
 		"Explain analysis combines symbol, reference, impact, test, and call signals from local repository analysis.",
 		"Purpose, risk, architecture role, and reading order are deterministic heuristics.",
@@ -951,12 +951,18 @@ func explainLimitations(referenceAnalysisMode string, callAnalysisMode string) [
 		limitations = append(limitations, referenceAnalysisLimitation(referenceAnalysisMode))
 	}
 	limitations = append(limitations, callLimitations(callAnalysisMode)...)
-	limitations = append(limitations, testLimitations(analysisModeAST)...)
+	if strings.TrimSpace(interfaceAnalysisMode) != "" {
+		limitations = append(limitations, interfaceAnalysisLimitation(interfaceAnalysisMode))
+	}
+	if strings.TrimSpace(testAnalysisMode) != "" {
+		limitations = append(limitations, testAnalysisLimitation(testAnalysisMode))
+	}
+	limitations = append(limitations, testLimitations(testAnalysisMode)...)
 
-	return limitations
+	return appendLimitations(nil, limitations)
 }
 
-func impactBundleLimitations(analysisMode string, referenceAnalysisMode string, callAnalysisMode string) []string {
+func impactBundleLimitations(analysisMode string, referenceAnalysisMode string, callAnalysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
 	limitations := impactLimitations(analysisMode)
 	if strings.TrimSpace(referenceAnalysisMode) != "" {
 		limitations = append(limitations, referenceAnalysisLimitation(referenceAnalysisMode))
@@ -964,8 +970,32 @@ func impactBundleLimitations(analysisMode string, referenceAnalysisMode string, 
 	if strings.TrimSpace(callAnalysisMode) != "" {
 		limitations = append(limitations, callAnalysisLimitation(callAnalysisMode))
 	}
+	if strings.TrimSpace(interfaceAnalysisMode) != "" {
+		limitations = append(limitations, interfaceAnalysisLimitation(interfaceAnalysisMode))
+	}
+	if strings.TrimSpace(testAnalysisMode) != "" {
+		limitations = append(limitations, testAnalysisLimitation(testAnalysisMode))
+	}
 
-	return limitations
+	return appendLimitations(nil, limitations)
+}
+
+func testBundleLimitations(analysisMode string, referenceAnalysisMode string, callAnalysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
+	limitations := testLimitations(analysisMode)
+	if strings.TrimSpace(referenceAnalysisMode) != "" {
+		limitations = append(limitations, referenceAnalysisLimitation(referenceAnalysisMode))
+	}
+	if strings.TrimSpace(callAnalysisMode) != "" {
+		limitations = append(limitations, callAnalysisLimitation(callAnalysisMode))
+	}
+	if strings.TrimSpace(interfaceAnalysisMode) != "" {
+		limitations = append(limitations, interfaceAnalysisLimitation(interfaceAnalysisMode))
+	}
+	if strings.TrimSpace(testAnalysisMode) != "" {
+		limitations = append(limitations, testAnalysisLimitation(testAnalysisMode))
+	}
+
+	return appendLimitations(nil, limitations)
 }
 
 func impactLimitations(analysisMode string) []string {
@@ -1017,6 +1047,28 @@ func testLimitations(analysisMode string) []string {
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
 		"Dynamic table-test names may be incomplete.",
 		"Fallback commands are package-level when direct test functions are not known.",
+	}
+}
+
+func testAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case sherpa.TestAnalysisModeTypecheckedAST:
+		return "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
+	case sherpa.TestAnalysisModeAST:
+		return "Test analysis used AST/package fallback."
+	default:
+		return "Test analysis mode: " + analysisMode + "."
+	}
+}
+
+func interfaceAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case impactengine.InterfaceAnalysisModeTypechecked:
+		return "Interface analysis used typechecked method sets from repository-local packages."
+	case impactengine.InterfaceAnalysisModeASTFallback:
+		return "Interface analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Interface analysis mode: " + analysisMode + "."
 	}
 }
 

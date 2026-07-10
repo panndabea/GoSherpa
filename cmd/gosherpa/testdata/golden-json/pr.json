@@ -15,7 +15,9 @@
       "Statement-level semantic consequences are not fully inferred.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Reference analysis used typechecked package loading where available.",
-      "Call analysis used typechecked package loading where available."
+      "Call analysis used typechecked package loading where available.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
     ],
     "changedFiles": [
       "service.go"
@@ -166,6 +168,9 @@
           "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
           "package": ".",
           "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ],
           "targets": [
             "example.com/golden.Added"
           ]

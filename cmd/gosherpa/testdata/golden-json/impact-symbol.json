@@ -14,7 +14,9 @@
       "Interface impact uses typechecked method sets when package loading succeeds and AST fallback otherwise.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
       "Reference analysis used typechecked package loading where available.",
-      "Call analysis used typechecked package loading where available."
+      "Call analysis used typechecked package loading where available.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
     ],
     "changedFiles": [],
     "changedPackages": [],
@@ -67,7 +69,10 @@
           "command": "go test .",
           "reason": "Direct tests in . reference Target: TestTarget.",
           "package": ".",
-          "test": "TestTarget"
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ]
         }
       ],
       "related": [],

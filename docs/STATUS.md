@@ -62,6 +62,11 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-qualified symbol impact for references and affected tests
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
+- Structured test plan items expose concrete `tests` arrays in addition to
+  grouped commands, reasons, packages, and changed-symbol targets.
+- Agent-facing context, impact, PR, and affected-test JSON limitations include
+  subanalysis notes for reference, call, interface, and test analysis modes
+  where those modes are present.
 - Package inventory with `gosherpa packages`, including file, symbol, import, reverse-dependency, and test indicators
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering

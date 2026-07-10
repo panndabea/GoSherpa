@@ -574,8 +574,11 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	}
 	assertAgentContextReadingStepRange(t, report.ReadingOrder[1], "service.go", 3, 1, 5, 2)
 	assertAgentContextReadingStepRange(t, report.ReadingOrder[4], "service_test.go", 5, 1, 7, 2)
-	if len(report.Limitations) != 5 {
-		t.Fatalf("expected 5 limitations, got %#v", report.Limitations)
+	if !agentContextLimitationsContain(report.Limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", report.Limitations)
+	}
+	if !agentContextLimitationsContain(report.Limitations, "Test analysis used AST") {
+		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
 }
 
@@ -587,10 +590,7 @@ func TestAnalyzeFileNotesTestsOptionInLimitations(t *testing.T) {
 		t.Fatalf("AnalyzeFile returned error: %v", err)
 	}
 
-	if len(report.Limitations) != 6 {
-		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
-	}
-	if !strings.Contains(report.Limitations[5], "--tests") {
+	if !agentContextLimitationsContain(report.Limitations, "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
 	}
 }
@@ -693,8 +693,11 @@ func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	if len(report.ReadingOrder) != 7 {
 		t.Fatalf("expected 7 reading order steps, got %#v", report.ReadingOrder)
 	}
-	if len(report.Limitations) != 5 {
-		t.Fatalf("expected 5 limitations, got %#v", report.Limitations)
+	if !agentContextLimitationsContain(report.Limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", report.Limitations)
+	}
+	if !agentContextLimitationsContain(report.Limitations, "Test analysis used AST") {
+		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
 }
 
@@ -706,10 +709,7 @@ func TestAnalyzePackageNotesTestsOptionInLimitations(t *testing.T) {
 		t.Fatalf("AnalyzePackage returned error: %v", err)
 	}
 
-	if len(report.Limitations) != 6 {
-		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
-	}
-	if !strings.Contains(report.Limitations[5], "--tests") {
+	if !agentContextLimitationsContain(report.Limitations, "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
 	}
 }
@@ -879,8 +879,11 @@ func NewSession() Session {
 	if len(report.ReadingOrder) != 3 {
 		t.Fatalf("expected 3 reading order steps, got %#v", report.ReadingOrder)
 	}
-	if len(report.Limitations) != 6 {
-		t.Fatalf("expected 6 limitations, got %#v", report.Limitations)
+	if !agentContextLimitationsContain(report.Limitations, "Interface analysis used typechecked") {
+		t.Fatalf("expected interface analysis limitation, got %#v", report.Limitations)
+	}
+	if !agentContextLimitationsContain(report.Limitations, "Test analysis used typechecked") {
+		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
 }
 
@@ -898,7 +901,7 @@ func TestAnalyzeDiffNotesTestsOptionInLimitations(t *testing.T) {
 		t.Fatalf("AnalyzeDiff returned error: %v", err)
 	}
 
-	if !strings.Contains(report.Limitations[len(report.Limitations)-1], "--tests") {
+	if !agentContextLimitationsContain(report.Limitations, "--tests") {
 		t.Fatalf("expected --tests limitation note, got %#v", report.Limitations)
 	}
 }
@@ -1010,6 +1013,16 @@ func agentContextReportHasSymbol(symbols []sherpa.Symbol, name string) bool {
 func agentContextStringSliceContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+
+	return false
+}
+
+func agentContextLimitationsContain(values []string, want string) bool {
+	for _, value := range values {
+		if strings.Contains(value, want) {
 			return true
 		}
 	}

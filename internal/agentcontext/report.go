@@ -113,7 +113,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
-	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode)
+	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Confidence = confidence(report)
 	report = applySymbolLimits(report, limits)
 
@@ -226,11 +226,13 @@ func identityFromSymbol(target string, symbol sherpa.Symbol) Identity {
 	}
 }
 
-func limitations(includeTestCallers bool, analysisMode string, referenceAnalysisMode string, callAnalysisMode string) []string {
+func limitations(includeTestCallers bool, analysisMode string, referenceAnalysisMode string, callAnalysisMode string, interfaceAnalysisMode string, testAnalysisMode string) []string {
 	values := []string{
 		symbolContextAnalysisLimitation(analysisMode),
 		referenceAnalysisLimitation(referenceAnalysisMode),
 		callAnalysisLimitation(callAnalysisMode),
+		interfaceAnalysisLimitation(interfaceAnalysisMode),
+		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
@@ -271,6 +273,28 @@ func callAnalysisLimitation(callAnalysisMode string) string {
 		return "Call analysis used AST fallback because typechecked loading was unavailable."
 	default:
 		return "Analysis uses syntax plus local type information, not full module loading."
+	}
+}
+
+func interfaceAnalysisLimitation(interfaceAnalysisMode string) string {
+	switch interfaceAnalysisMode {
+	case impactengine.InterfaceAnalysisModeTypechecked:
+		return "Interface analysis used typechecked method sets from repository-local packages."
+	case impactengine.InterfaceAnalysisModeASTFallback:
+		return "Interface analysis used AST fallback because typechecked loading was unavailable."
+	default:
+		return "Interface analysis used local method-set matching when interface signals were available."
+	}
+}
+
+func testAnalysisLimitation(testAnalysisMode string) string {
+	switch testAnalysisMode {
+	case sherpa.TestAnalysisModeTypecheckedAST:
+		return "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
+	case sherpa.TestAnalysisModeAST:
+		return "Test analysis used AST/package fallback."
+	default:
+		return "Test analysis mode was not reported for this result."
 	}
 }
 
