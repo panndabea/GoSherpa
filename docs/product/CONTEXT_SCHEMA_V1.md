@@ -27,8 +27,8 @@ Every context result includes:
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan with `direct`, `related`, `callerPackages`,
   and `fallback` items. Plan items may include `test`, `tests`, and `targets`.
-  Diff context uses `targets` when it can connect a recommendation to changed
-  symbols.
+  `targets` connects a recommendation to the symbol target or changed symbols
+  when known.
 - `readingOrder`: ordered source locations to inspect next. Entries include
   `position` and may include `range` when backed by a symbol, call, or test
   source range.

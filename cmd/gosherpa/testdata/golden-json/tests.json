@@ -53,6 +53,9 @@
           "test": "TestTarget",
           "tests": [
             "TestTarget"
+          ],
+          "targets": [
+            "Target"
           ]
         }
       ],

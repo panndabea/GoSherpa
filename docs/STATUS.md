@@ -63,7 +63,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Transitive caller impact for symbol changes
 - Affected-test planning for transitive caller packages
 - Structured test plan items expose concrete `tests` arrays in addition to
-  grouped commands, reasons, packages, and changed-symbol targets.
+  grouped commands, reasons, packages, symbol targets, and changed-symbol
+  targets.
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.

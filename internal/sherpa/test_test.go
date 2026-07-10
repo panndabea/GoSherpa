@@ -115,11 +115,17 @@ func TestUsesParser(t *testing.T) {
 	if !reflect.DeepEqual(result.TestPlan.Direct[0].Tests, []string{"TestUsesParser"}) {
 		t.Fatalf("expected structured direct tests, got %#v", result.TestPlan.Direct[0].Tests)
 	}
+	if !reflect.DeepEqual(result.TestPlan.Direct[0].Targets, []string{"ParseFile"}) {
+		t.Fatalf("expected direct test plan target, got %#v", result.TestPlan.Direct[0].Targets)
+	}
 	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/parser" {
 		t.Fatalf("expected related test plan item for ./internal/parser, got %#v", result.TestPlan)
 	}
 	if !reflect.DeepEqual(result.TestPlan.Related[0].Tests, []string{"TestParserPackage"}) {
 		t.Fatalf("expected structured related tests, got %#v", result.TestPlan.Related[0].Tests)
+	}
+	if !reflect.DeepEqual(result.TestPlan.Related[0].Targets, []string{"ParseFile"}) {
+		t.Fatalf("expected related test plan target, got %#v", result.TestPlan.Related[0].Targets)
 	}
 }
 
@@ -173,6 +179,9 @@ func TestUsesParser(t *testing.T) {
 	}
 	if len(result.TestPlan.Fallback) != 1 || result.TestPlan.Fallback[0].Package != "./internal/parser" {
 		t.Fatalf("expected fallback package test for ./internal/parser, got %#v", result.TestPlan)
+	}
+	if !reflect.DeepEqual(result.TestPlan.Fallback[0].Targets, []string{"ParseFile"}) {
+		t.Fatalf("expected fallback test plan target, got %#v", result.TestPlan.Fallback[0].Targets)
 	}
 }
 

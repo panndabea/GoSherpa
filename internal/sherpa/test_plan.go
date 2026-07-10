@@ -39,7 +39,7 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 	targetPackages := uniqueSorted(options.TargetPackages)
 	callerPackages := uniqueSorted(options.CallerPackages)
 	fallbackPackages := uniqueSorted(options.FallbackPackages)
-	defaultTargets := uniqueSorted(options.Targets)
+	defaultTargets := defaultTestPlanTargets(options, target)
 	targetPackageSet := stringSet(targetPackages)
 	callerPackageSet := stringSet(callerPackages)
 
@@ -94,7 +94,7 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 
 		plan.Fallback = append(plan.Fallback, TestPlanItem{
 			Command: command,
-			Reason:  fallbackTestPlanReason(pkg, defaultTargets),
+			Reason:  fallbackTestPlanReason(target, pkg, defaultTargets),
 			Package: pkg,
 			Targets: defaultTargets,
 		})
@@ -102,6 +102,24 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 	}
 
 	return NormalizeTestPlan(plan)
+}
+
+func defaultTestPlanTargets(options TestPlanOptions, target string) []string {
+	targets := uniqueSorted(options.Targets)
+	if len(targets) > 0 {
+		return targets
+	}
+
+	if options.Kind != TestTargetKindSymbol {
+		return nil
+	}
+
+	target = strings.TrimSpace(target)
+	if target == "" || target == "target" {
+		return nil
+	}
+
+	return []string{target}
 }
 
 func NormalizeTestPlan(plan TestPlan) TestPlan {
@@ -213,9 +231,14 @@ func callerPackageTestPlanReason(pkg string, names []string, targets []string) s
 	return "Tests in caller package " + pkg + " cover impacted code paths" + testPlanNamesSuffix(names)
 }
 
-func fallbackTestPlanReason(pkg string, targets []string) string {
+func fallbackTestPlanReason(target string, pkg string, targets []string) string {
 	if len(targets) > 0 {
-		return "Run package tests for " + pkg + " to compile impacted code from " + testPlanTargetPhrase("changed symbols", targets) + " and cover tests not matched directly."
+		target = strings.TrimSpace(target)
+		if target == "changed symbols" {
+			return "Run package tests for " + pkg + " to compile impacted code from " + testPlanTargetPhrase(target, targets) + " and cover tests not matched directly."
+		}
+
+		return "Run package tests for " + pkg + " to compile code related to " + testPlanTargetPhrase(target, targets) + " and cover tests not matched directly."
 	}
 
 	return "Run package tests for " + pkg + " to compile impacted code and cover tests not matched directly."
@@ -225,6 +248,9 @@ func testPlanTargetPhrase(target string, targets []string) string {
 	target = strings.TrimSpace(target)
 	targets = uniqueSorted(targets)
 	if len(targets) == 0 {
+		return target
+	}
+	if len(targets) == 1 && targets[0] == target {
 		return target
 	}
 	if target == "" || target == "target" {

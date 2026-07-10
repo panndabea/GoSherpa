@@ -198,8 +198,8 @@ Test plans:
 Each test plan item has `command` and `reason`, with optional `package`, `test`,
 `tests`, and `targets`. `test` is present for a single focused test name;
 `tests` is the structured list of all test functions or literal subtests that
-made the plan item relevant. Diff-oriented reports use `targets` to connect a
-recommended test command to changed symbols when known.
+made the plan item relevant. `targets` connects a recommended test command to
+the symbol target or changed symbols when known.
 
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use

@@ -72,6 +72,9 @@
           "test": "TestTarget",
           "tests": [
             "TestTarget"
+          ],
+          "targets": [
+            "Target"
           ]
         }
       ],
@@ -80,8 +83,11 @@
       "fallback": [
         {
           "command": "go test ./cmd/app",
-          "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
-          "package": "./cmd/app"
+          "reason": "Run package tests for ./cmd/app to compile code related to Target and cover tests not matched directly.",
+          "package": "./cmd/app",
+          "targets": [
+            "Target"
+          ]
         }
       ]
     }
