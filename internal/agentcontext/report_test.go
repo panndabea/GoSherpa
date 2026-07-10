@@ -236,6 +236,86 @@ func Target() {}
 	}
 }
 
+func TestAnalyzeSymbolBuildsTypecheckedContextForTypeAlias(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "model", "user.go"), `package model
+
+type UserID string
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/model"
+
+// UserID is the auth-facing user identifier.
+type UserID = model.UserID
+
+func Normalize(id UserID) UserID {
+	return id
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "auth", "auth_test.go"), `package auth
+
+import "testing"
+
+func TestNormalizeUserID(t *testing.T) {
+	var id UserID
+	_ = Normalize(id)
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Load(id auth.UserID) auth.UserID {
+	return id
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "session", "session_test.go"), `package session
+
+import (
+	"testing"
+
+	"example.com/app/internal/auth"
+)
+
+func TestLoadUserID(t *testing.T) {
+	var id auth.UserID
+	_ = Load(id)
+}
+`)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.UserID", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.Identity.Kind != sherpa.SymbolKindAlias {
+		t.Fatalf("identity kind = %q, want %s", report.Identity.Kind, sherpa.SymbolKindAlias)
+	}
+	if report.Identity.Signature != "type UserID = model.UserID" {
+		t.Fatalf("identity signature = %q, want alias signature", report.Identity.Signature)
+	}
+	if report.SourceContext.Position.File != "internal/auth/auth.go" {
+		t.Fatalf("source context file = %q, want internal/auth/auth.go", report.SourceContext.Position.File)
+	}
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if !agentContextStringSliceContains(report.AffectedPackages, "./internal/auth") || !agentContextStringSliceContains(report.AffectedPackages, "./internal/session") {
+		t.Fatalf("expected auth and session affected packages, got %#v", report.AffectedPackages)
+	}
+	if len(report.RelatedTests) < 2 {
+		t.Fatalf("expected alias-related tests, got %#v", report.RelatedTests)
+	}
+	if report.Confidence != ConfidenceMedium {
+		t.Fatalf("confidence = %q, want %s with warnings %#v", report.Confidence, ConfidenceMedium, report.Warnings)
+	}
+}
+
 func TestAnalyzeSymbolIncludesTestCallersWithOption(t *testing.T) {
 	root := writeAgentContextProject(t)
 

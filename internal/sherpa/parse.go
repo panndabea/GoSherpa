@@ -82,6 +82,10 @@ func ParseFile(path string) ([]Symbol, error) {
 				kind = SymbolKindInterface
 			}
 
+			if kind == "" && typeSpec.Assign.IsValid() {
+				kind = SymbolKindAlias
+			}
+
 			if kind == "" {
 				continue
 			}
@@ -96,6 +100,9 @@ func ParseFile(path string) ([]Symbol, error) {
 				Position:      position,
 				Range:         symbolRange(fileSet, typeSpec.Pos(), typeSpec.End()),
 			}
+			if kind == SymbolKindAlias {
+				symbol.Signature = typeAliasSignature(typeSpec)
+			}
 			if structType, ok := typeSpec.Type.(*ast.StructType); ok {
 				symbol.Fields = structFields(structType)
 			}
@@ -108,6 +115,14 @@ func ParseFile(path string) ([]Symbol, error) {
 	}
 
 	return symbols, nil
+}
+
+func typeAliasSignature(typeSpec *ast.TypeSpec) string {
+	if typeSpec == nil {
+		return ""
+	}
+
+	return "type " + typeSpec.Name.Name + " = " + nodeString(typeSpec.Type)
 }
 
 func receiverName(funcDecl *ast.FuncDecl) string {

@@ -328,6 +328,41 @@ type UserRepository interface {
 	}
 }
 
+func TestParseFileFindsTypeAlias(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "auth.go")
+
+	err := os.WriteFile(path, []byte(`package auth
+
+import "example.com/app/internal/model"
+
+// UserID is the auth-facing user identifier.
+type UserID = model.UserID
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	symbols, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	symbol := findParseTestSymbol(t, symbols, "UserID")
+	if symbol.Kind != SymbolKindAlias {
+		t.Fatalf("expected alias kind, got %s", symbol.Kind)
+	}
+	if symbol.Signature != "type UserID = model.UserID" {
+		t.Fatalf("expected alias signature, got %s", symbol.Signature)
+	}
+	if symbol.Documentation != "UserID is the auth-facing user identifier." {
+		t.Fatalf("expected alias doc comment, got %q", symbol.Documentation)
+	}
+	if symbol.Range == nil || symbol.Range.End.Line != 6 {
+		t.Fatalf("expected alias range ending at line 6, got %#v", symbol.Range)
+	}
+}
+
 func TestParseRepositoryAddsPackageAndQualifiedName(t *testing.T) {
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")

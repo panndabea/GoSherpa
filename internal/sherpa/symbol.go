@@ -5,6 +5,7 @@ type SymbolKind string
 const (
 	SymbolKindStruct    SymbolKind = "struct"
 	SymbolKindInterface SymbolKind = "interface"
+	SymbolKindAlias     SymbolKind = "alias"
 	SymbolKindFunction  SymbolKind = "function"
 	SymbolKindMethod    SymbolKind = "method"
 )

@@ -10,6 +10,7 @@ func FormatSymbols(symbols []Symbol) string {
 
 	writeSymbolGroup(&builder, "📦 STRUCTS", symbols, SymbolKindStruct)
 	writeSymbolGroup(&builder, "🔌 INTERFACES", symbols, SymbolKindInterface)
+	writeSymbolGroup(&builder, "🏷️ ALIASES", symbols, SymbolKindAlias)
 	writeSymbolGroup(&builder, "⚙️ FUNCTIONS", symbols, SymbolKindFunction)
 	writeSymbolGroup(&builder, "🔧 METHODS", symbols, SymbolKindMethod)
 	writeSymbolTests(&builder, symbols)

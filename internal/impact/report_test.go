@@ -244,6 +244,26 @@ func TestAnalyzeSymbolHonorsPackageQualifiedTargets(t *testing.T) {
 	assertStrings(t, report.TestCommands, []string{"go test ./cmd/app", "go test ./internal/auth"})
 }
 
+func TestAnalyzeSymbolReportsTypeAliasImpact(t *testing.T) {
+	root := writeTypeAliasImpactProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.UserID")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.UserID"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/auth", "./internal/session"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestNormalizeUserID", "./internal/session:TestLoadUserID"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth", "go test ./internal/session"})
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, InterfaceAnalysisModeTypechecked)
+	}
+}
+
 func TestAnalyzeFileRejectsNonGoFiles(t *testing.T) {
 	root := writeImpactAnalysisProject(t)
 
@@ -571,6 +591,59 @@ import (
 func Run() {
 	_ = auth.Session{}
 	_ = billing.Session{}
+}
+`)
+
+	return root
+}
+
+func writeTypeAliasImpactProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "model", "user.go"), `package model
+
+type UserID string
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/model"
+
+type UserID = model.UserID
+
+func Normalize(id UserID) UserID {
+	return id
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth_test.go"), `package auth
+
+import "testing"
+
+func TestNormalizeUserID(t *testing.T) {
+	var id UserID
+	_ = Normalize(id)
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Load(id auth.UserID) auth.UserID {
+	return id
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session_test.go"), `package session
+
+import (
+	"testing"
+
+	"example.com/app/internal/auth"
+)
+
+func TestLoadUserID(t *testing.T) {
+	var id auth.UserID
+	_ = Load(id)
 }
 `)
 

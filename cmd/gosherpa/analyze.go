@@ -632,12 +632,14 @@ func analyzeSymbolKindPriority(kind sherpa.SymbolKind) int {
 		return 0
 	case sherpa.SymbolKindStruct:
 		return 1
-	case sherpa.SymbolKindFunction:
+	case sherpa.SymbolKindAlias:
 		return 2
-	case sherpa.SymbolKindMethod:
+	case sherpa.SymbolKindFunction:
 		return 3
-	default:
+	case sherpa.SymbolKindMethod:
 		return 4
+	default:
+		return 5
 	}
 }
 

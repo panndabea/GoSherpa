@@ -360,7 +360,8 @@ gosherpa search target --tests --limit 5
 MVP behavior:
 
 - Search symbols by partial, case-insensitive name matching. Implemented for
-  currently indexed structs, interfaces, functions, methods, and tests.
+  currently indexed structs, interfaces, type aliases, functions, methods, and
+  tests.
 - Match multiple query terms. Implemented.
 - Return ranked human and JSON output. Implemented.
 - Support filters. Implemented:
@@ -384,8 +385,9 @@ Done when:
 ### 1.2 Rich Symbol Details
 
 Status: first slice implemented with package paths, package-qualified symbol
-targets, signatures, doc comments, struct fields, interface methods, columns,
-source ranges, and source context through `--context`.
+targets, signatures, type alias signatures, doc comments, struct fields,
+interface methods, columns, source ranges, and source context through
+`--context`.
 
 Human question:
 
@@ -408,6 +410,7 @@ MVP behavior:
 - Show file, line, and column.
 - Show receiver for methods.
 - Show signature for functions and methods.
+- Show signature for type aliases.
 - Show fields for structs.
 - Show method set for interfaces.
 - Show doc comment when present.

@@ -341,7 +341,7 @@ func fileReadingOrder(report FileReport) []explainengine.ReadingStep {
 func fileLimitations(includeTests bool, analysisMode string) []string {
 	values := []string{
 		"File context uses package-level impact for affected packages and tests.",
-		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, and interfaces.",
+		"Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, interfaces, and type aliases.",
 		fileContextAnalysisLimitation(analysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",

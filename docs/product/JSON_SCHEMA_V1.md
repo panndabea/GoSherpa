@@ -78,7 +78,7 @@ source span. `position` remains the primary compact location field.
 Symbols use this profile shape. Some fields are omitted when empty:
 
 - `name`
-- `kind`: `struct`, `interface`, `function`, or `method`
+- `kind`: `struct`, `interface`, `alias`, `function`, or `method`
 - `package`
 - `packageName`
 - `qualifiedName`

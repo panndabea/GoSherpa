@@ -525,6 +525,17 @@ func TestParseCLIArgsAcceptsSymbolsFilters(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsAliasSymbolKind(t *testing.T) {
+	got, err := parseCLIArgs([]string{"symbols", "--kind", "alias"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.SearchKind != sherpa.SymbolKindAlias {
+		t.Fatalf("expected alias kind, got %s", got.SearchKind)
+	}
+}
+
 func TestParseCLIArgsAcceptsRefsKindFilter(t *testing.T) {
 	got, err := parseCLIArgs([]string{"refs", "ParseFile", "--kind", "call"})
 	if err != nil {
@@ -5856,7 +5867,7 @@ func TestMainPrintsFishCompletion(t *testing.T) {
 		"function __fish_gosherpa_seen_command",
 		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'completion' -d 'completion zsh|bash|fish'",
 		"complete -c gosherpa -f -n '__fish_seen_subcommand_from completion' -a 'zsh' -d 'zsh completion script'",
-		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface function method definition call type_usage field_access usage'",
+		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface alias function method definition call type_usage field_access usage'",
 	} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected fish completion to contain %q, got:\n%s", want, result.Stdout)

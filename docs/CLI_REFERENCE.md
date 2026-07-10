@@ -75,7 +75,7 @@ symbol completion can come later.
 | Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, entrypoint candidates, structural risk, hotspots, tests, readiness, limitations, and suggested next commands |
 | Architecture overview | `gosherpa architecture` | Reports dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, and leaf packages |
 | Risk overview | `gosherpa risk` | Summarizes structural repository risk from cycles, fan-in/fan-out, public API surface, interfaces, and tests |
-| Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, functions, and methods with optional kind, package, and test filters |
+| Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, type aliases, functions, and methods with optional kind, package, and test filters |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
@@ -138,6 +138,7 @@ Found 4 references
 ./gosherpa risk --json
 ./gosherpa symbols
 ./gosherpa symbols --kind struct
+./gosherpa symbols --kind alias
 ./gosherpa symbols --kind method --package ./internal/sherpa
 ./gosherpa symbols --tests
 ./gosherpa symbols --use-snapshot

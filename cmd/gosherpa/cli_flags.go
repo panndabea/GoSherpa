@@ -314,7 +314,7 @@ func parseSymbolKindFlag(flag string, value string) (sherpa.SymbolKind, error) {
 
 func isSupportedSearchKind(kind sherpa.SymbolKind) bool {
 	switch kind {
-	case sherpa.SymbolKindStruct, sherpa.SymbolKindInterface, sherpa.SymbolKindFunction, sherpa.SymbolKindMethod:
+	case sherpa.SymbolKindStruct, sherpa.SymbolKindInterface, sherpa.SymbolKindAlias, sherpa.SymbolKindFunction, sherpa.SymbolKindMethod:
 		return true
 	default:
 		return false

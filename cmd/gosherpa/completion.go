@@ -68,7 +68,7 @@ var completionFlagDefinitions = map[string]completionFlag{
 		Description: "filter by symbol or reference kind",
 		TakesValue:  true,
 		ValueName:   "kind",
-		Values:      []string{"struct", "interface", "function", "method", "definition", "call", "type_usage", "field_access", "usage"},
+		Values:      []string{"struct", "interface", "alias", "function", "method", "definition", "call", "type_usage", "field_access", "usage"},
 	},
 	"--scope": {
 		Name:        "--scope",
@@ -292,7 +292,7 @@ func formatBashCompletion() string {
 	builder.WriteString("    --kind)\n")
 	builder.WriteString("      command=$(__gosherpa_command)\n")
 	builder.WriteString("      case \"$command\" in\n")
-	builder.WriteString("        search|symbols) COMPREPLY=( $(compgen -W \"struct interface function method\" -- \"$cur\") ) ;;\n")
+	builder.WriteString("        search|symbols) COMPREPLY=( $(compgen -W \"struct interface alias function method\" -- \"$cur\") ) ;;\n")
 	builder.WriteString("        refs) COMPREPLY=( $(compgen -W \"definition call type_usage field_access usage\" -- \"$cur\") ) ;;\n")
 	builder.WriteString("      esac\n")
 	builder.WriteString("      return\n")
