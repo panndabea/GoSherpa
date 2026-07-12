@@ -182,6 +182,28 @@ func FindCalleesWithOptions(root string, target string, options CallOptions) (Ca
 	return findCalleesInFunctions(functions, normalizedTarget, analysisMode, warnings)
 }
 
+func FindCalleesWithContext(context *SemanticContext, target string, options CallOptions) (CalleesResult, error) {
+	if context == nil {
+		return CalleesResult{}, fmt.Errorf("semantic context is nil")
+	}
+
+	normalizedTarget, err := normalizeCallTarget(context.root, target)
+	if err != nil {
+		return CalleesResult{}, err
+	}
+
+	functions, analysisMode, warnings, err := collectCallFunctionInfosWithContext(context, options)
+	if err != nil {
+		return CalleesResult{
+			Target:       normalizedTarget.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
+	}
+
+	return findCalleesInFunctions(functions, normalizedTarget, analysisMode, warnings)
+}
+
 func findCalleesInFunctions(functions []functionInfo, target callTarget, analysisMode string, warnings []string) (CalleesResult, error) {
 	function, err := findFunctionInfo(functions, target)
 	if err != nil {
@@ -231,11 +253,37 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 	return findCallersInFunctionsWithOptions(rootPath, functions, normalizedTarget, options, analysisMode, warnings)
 }
 
+func FindCallersWithContext(context *SemanticContext, target string, options CallOptions) (CallersResult, error) {
+	if context == nil {
+		return CallersResult{}, fmt.Errorf("semantic context is nil")
+	}
+
+	normalizedTarget, err := normalizeCallTarget(context.root, target)
+	if err != nil {
+		return CallersResult{}, err
+	}
+
+	functions, analysisMode, warnings, err := collectCallFunctionInfosWithContext(context, options)
+	if err != nil {
+		return CallersResult{
+			Target:       normalizedTarget.String(),
+			AnalysisMode: analysisMode,
+			Warnings:     nonNilStrings(warnings),
+		}, err
+	}
+
+	return findCallersInFunctionsWithContext(context, context.root, functions, normalizedTarget, options, analysisMode, warnings)
+}
+
 func findCallersInFunctions(functions []functionInfo, target callTarget) (CallersResult, error) {
 	return findCallersInFunctionsWithOptions("", functions, target, CallOptions{}, "", nil)
 }
 
 func findCallersInFunctionsWithOptions(root string, functions []functionInfo, target callTarget, options CallOptions, analysisMode string, warnings []string) (CallersResult, error) {
+	return findCallersInFunctionsWithContext(nil, root, functions, target, options, analysisMode, warnings)
+}
+
+func findCallersInFunctionsWithContext(context *SemanticContext, root string, functions []functionInfo, target callTarget, options CallOptions, analysisMode string, warnings []string) (CallersResult, error) {
 	function, err := findFunctionInfo(functions, target)
 	if err != nil {
 		return CallersResult{
@@ -247,7 +295,7 @@ func findCallersInFunctionsWithOptions(root string, functions []functionInfo, ta
 
 	callerFunctions := functions
 	if options.IncludeTests {
-		testFunctions, testWarnings, err := collectTestCallerFunctionInfos(root, options)
+		testFunctions, testWarnings, err := collectTestCallerFunctionInfosWithContext(context, root, options)
 		warnings = uniqueSorted(append(warnings, testWarnings...))
 		if err != nil {
 			return CallersResult{
@@ -558,6 +606,27 @@ func collectCallFunctionInfos(root string, options CallOptions) ([]functionInfo,
 	return functions, CallAnalysisModeASTFallback, warnings, nil
 }
 
+func collectCallFunctionInfosWithContext(context *SemanticContext, options CallOptions) ([]functionInfo, string, []string, error) {
+	if context == nil {
+		return nil, "", nil, fmt.Errorf("semantic context is nil")
+	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return collectCallFunctionInfos(context.root, options)
+	}
+
+	functions, warnings, ok := context.typecheckedCallFunctionInfos(options)
+	if ok {
+		return functions, CallAnalysisModeTypechecked, warnings, nil
+	}
+
+	functions, err := collectFunctionInfos(context.root)
+	if err != nil {
+		return nil, CallAnalysisModeASTFallback, warnings, err
+	}
+
+	return functions, CallAnalysisModeASTFallback, warnings, nil
+}
+
 func collectTypecheckedCallFunctionInfos(root string, options CallOptions) ([]functionInfo, []string, bool) {
 	if !referenceShouldAttemptTypechecked(root) {
 		return nil, nil, false
@@ -641,6 +710,23 @@ func collectTestCallerFunctionInfos(root string, options CallOptions) ([]functio
 	}
 
 	functions, err := collectASTTestCallerFunctionInfos(root)
+	return functions, warnings, err
+}
+
+func collectTestCallerFunctionInfosWithContext(context *SemanticContext, root string, options CallOptions) ([]functionInfo, []string, error) {
+	if context == nil {
+		return collectTestCallerFunctionInfos(root, options)
+	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return collectTestCallerFunctionInfos(context.root, options)
+	}
+
+	functions, warnings, ok := context.typecheckedTestCallFunctionInfos(options)
+	if ok {
+		return functions, warnings, nil
+	}
+
+	functions, err := collectASTTestCallerFunctionInfos(context.root)
 	return functions, warnings, err
 }
 

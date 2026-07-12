@@ -77,7 +77,14 @@ func Analyze(root string, target string) (Report, error) {
 }
 
 func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Report, error) {
-	impactResult, err := sherpa.FindImpactWithOptions(root, target, sherpa.ImpactOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return Report{}, err
+	}
+
+	impactResult, err := sherpa.FindImpactWithContext(semanticContext, target, sherpa.ImpactOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
@@ -87,7 +94,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		return Report{}, fmt.Errorf("explain target must be a symbol: %s", target)
 	}
 
-	symbol, symbolAnalysisMode, symbolWarnings, err := findSymbolIdentity(root, impactResult.Target, options)
+	symbol, symbolAnalysisMode, symbolWarnings, err := findSymbolIdentityWithContext(semanticContext, impactResult.Target, options)
 	if err != nil {
 		return Report{}, err
 	}
@@ -113,7 +120,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		report.Purpose = purpose
 	}
 
-	impactReport, err := impactengine.AnalyzeSymbolWithOptions(root, target, impactengine.AnalyzerOptions{
+	impactReport, err := impactengine.AnalyzeSymbolWithContext(semanticContext, target, impactengine.AnalyzerOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
@@ -125,7 +132,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		report.Warnings = append(report.Warnings, impactReport.Warnings...)
 	}
 
-	callSignals := callSignalsForSymbol(root, impactResult.Target, symbol, options)
+	callSignals := callSignalsForSymbolWithContext(semanticContext, root, impactResult.Target, symbol, options)
 	report.Callers = callSignals.Callers
 	report.Callees = callSignals.Callees
 	report.CallAnalysisMode = callSignals.AnalysisMode
@@ -136,6 +143,45 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 	report.ReadingOrder = readingOrder(report)
 
 	return normalizeReport(report), nil
+}
+
+func findSymbolIdentityWithContext(context *sherpa.SemanticContext, target string, options AnalyzeOptions) (sherpa.Symbol, string, []string, error) {
+	if context == nil {
+		return findSymbolIdentity("", target, options)
+	}
+
+	var warnings []string
+	repo, attempted, err := context.TypecheckedRepository()
+	if attempted && err == nil {
+		index, err := symbolindex.FromRepository(repo)
+		if err == nil {
+			symbol, found, err := index.FindSymbol(target)
+			if err != nil {
+				return sherpa.Symbol{}, "", nil, err
+			}
+			if found {
+				return symbol, SymbolAnalysisModeTypecheckedAST, index.Warnings, nil
+			}
+
+			warnings = append(warnings, index.Warnings...)
+		} else {
+			warnings = append(warnings, fmt.Sprintf("typechecked symbol identity unavailable: %v", err))
+		}
+	} else if err != nil {
+		warnings = append(warnings, fmt.Sprintf("typechecked symbol identity unavailable: %v", err))
+	}
+
+	symbols, err := sherpa.ParseRepository(context.Root())
+	if err != nil {
+		return sherpa.Symbol{}, "", warnings, err
+	}
+
+	symbol, err := findSymbol(context.Root(), symbols, target)
+	if err != nil {
+		return sherpa.Symbol{}, "", warnings, err
+	}
+
+	return symbol, SymbolAnalysisModeAST, warnings, nil
 }
 
 func findSymbolIdentity(root string, target string, options AnalyzeOptions) (sherpa.Symbol, string, []string, error) {

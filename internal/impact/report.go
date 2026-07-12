@@ -94,6 +94,14 @@ func AnalyzeSymbolWithOptions(root string, target string, options AnalyzerOption
 	return NewAnalyzerWithOptions(root, options).AnalyzeSymbol(target)
 }
 
+func AnalyzeSymbolWithContext(context *sherpa.SemanticContext, target string, options AnalyzerOptions) (ImpactReport, error) {
+	if context == nil {
+		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	return NewAnalyzerWithOptions(context.Root(), options).AnalyzeSymbolWithContext(context, target)
+}
+
 func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	changedFiles, err := gitdiff.ChangedFiles(a.Root, base, head)
 	if err != nil {
@@ -113,7 +121,13 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 		return ImpactReport{}, err
 	}
 	report.AffectedSymbols = changedSymbolNames(changedSymbols)
-	symbolImpact := a.analyzeChangedSymbolImpacts(changedSymbols)
+	semanticContext, err := sherpa.NewSemanticContext(a.Root, sherpa.SemanticContextOptions{
+		BuildTags: a.BuildTags,
+	})
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	symbolImpact := a.analyzeChangedSymbolImpactsWithContext(changedSymbols, semanticContext)
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, symbolImpact.Packages...))
 	report.ReferenceAnalysisMode = symbolImpact.ReferenceAnalysisMode
@@ -181,9 +195,31 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
-	result, err := sherpa.FindImpactWithOptions(a.Root, target, sherpa.ImpactOptions{
+	semanticContext, err := sherpa.NewSemanticContext(a.Root, sherpa.SemanticContextOptions{
 		BuildTags: a.BuildTags,
 	})
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
+	return a.analyzeSymbol(target, semanticContext)
+}
+
+func (a Analyzer) AnalyzeSymbolWithContext(context *sherpa.SemanticContext, target string) (ImpactReport, error) {
+	return a.analyzeSymbol(target, context)
+}
+
+func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) (ImpactReport, error) {
+	impactOptions := sherpa.ImpactOptions{
+		BuildTags: a.BuildTags,
+	}
+	var result sherpa.ImpactResult
+	var err error
+	if context != nil {
+		result, err = sherpa.FindImpactWithContext(context, target, impactOptions)
+	} else {
+		result, err = sherpa.FindImpactWithOptions(a.Root, target, impactOptions)
+	}
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -282,6 +318,10 @@ func changedSymbolsForDiff(root string, base string, head string) ([]changedSymb
 }
 
 func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSymbolImpact {
+	return a.analyzeChangedSymbolImpactsWithContext(symbols, nil)
+}
+
+func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol, context *sherpa.SemanticContext) changedSymbolImpact {
 	symbols = normalizeChangedSymbols(symbols)
 	if len(symbols) == 0 {
 		return changedSymbolImpact{}
@@ -299,9 +339,14 @@ func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSy
 	}
 
 	var impact changedSymbolImpact
-	for _, batch := range sherpa.FindSymbolImpactSignalsWithOptions(a.Root, targets, sherpa.ImpactOptions{
-		BuildTags: a.BuildTags,
-	}) {
+	impactOptions := sherpa.ImpactOptions{BuildTags: a.BuildTags}
+	var batches []sherpa.ImpactBatchResult
+	if context != nil {
+		batches = sherpa.FindSymbolImpactSignalsWithContext(context, targets, impactOptions)
+	} else {
+		batches = sherpa.FindSymbolImpactSignalsWithOptions(a.Root, targets, impactOptions)
+	}
+	for _, batch := range batches {
 		if batch.Err != nil {
 			impact.Warnings = append(impact.Warnings, fmt.Sprintf("symbol impact unavailable for %s: %v", batch.Target, batch.Err))
 			continue

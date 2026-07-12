@@ -105,6 +105,19 @@ func FindReferenceReportWithOptions(root string, name string, options ReferenceO
 	return findReferenceReportForTarget(rootPath, target, options, nil)
 }
 
+func FindReferenceReportWithContext(context *SemanticContext, name string, options ReferenceOptions) (ReferenceReport, error) {
+	if context == nil {
+		return ReferenceReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	target, err := normalizeReferenceTarget(context.root, name)
+	if err != nil {
+		return ReferenceReport{}, err
+	}
+
+	return findReferenceReportForTarget(context.root, target, options, context.referenceAnalysisCache(options))
+}
+
 func findReferenceReportForTarget(rootPath string, target referenceTarget, options ReferenceOptions, cache *referenceAnalysisCache) (ReferenceReport, error) {
 	var report ReferenceReport
 	if referenceShouldAttemptTypechecked(rootPath) {
@@ -301,12 +314,25 @@ func newReferenceAnalysisCache(root string, options ReferenceOptions) *reference
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
-		cache.Warnings = []string{fmt.Sprintf("typechecked reference analysis unavailable: %v", err)}
-		return cache
+		return unavailableReferenceAnalysisCache(fmt.Sprintf("typechecked reference analysis unavailable: %v", err))
 	}
 
-	cache.Packages = semanticReferencePackages(repo)
-	cache.Warnings = nonNilStrings(repo.Warnings)
+	return newReferenceAnalysisCacheFromRepository(repo)
+}
+
+func unavailableReferenceAnalysisCache(warning string) *referenceAnalysisCache {
+	return &referenceAnalysisCache{
+		Attempted: true,
+		Warnings:  []string{warning},
+	}
+}
+
+func newReferenceAnalysisCacheFromRepository(repo semantics.Repository) *referenceAnalysisCache {
+	cache := &referenceAnalysisCache{
+		Attempted: true,
+		Packages:  semanticReferencePackages(repo),
+		Warnings:  nonNilStrings(repo.Warnings),
+	}
 	if len(cache.Packages) == 0 {
 		cache.Warnings = append([]string{"typechecked reference analysis unavailable: no typechecked packages loaded"}, repo.Warnings...)
 	}

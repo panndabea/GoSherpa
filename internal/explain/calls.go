@@ -41,19 +41,32 @@ type callSignalsResult struct {
 }
 
 func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) callSignalsResult {
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err == nil {
+		return callSignalsForSymbolWithContext(context, root, target, symbol, options)
+	}
+
+	return callSignalsForSymbolWithContext(nil, root, target, symbol, options)
+}
+
+func callSignalsForSymbolWithContext(context *sherpa.SemanticContext, root string, target string, symbol sherpa.Symbol, options AnalyzeOptions) callSignalsResult {
 	callTarget := callSignalTargetForSymbol(root, target, symbol)
 	if callTarget.Name == "" {
 		return callSignalsResult{}
 	}
 
 	targetName := callTarget.Display()
-	callers, callersErr := sherpa.FindCallersWithOptions(root, targetName, sherpa.CallOptions{
+	callOptions := sherpa.CallOptions{
 		IncludeTests: options.IncludeTests,
 		BuildTags:    options.BuildTags,
-	})
-	callees, calleesErr := sherpa.FindCalleesWithOptions(root, targetName, sherpa.CallOptions{
+	}
+	calleeOptions := sherpa.CallOptions{
 		BuildTags: options.BuildTags,
-	})
+	}
+	callers, callersErr := findCallersForSignal(context, root, targetName, callOptions)
+	callees, calleesErr := findCalleesForSignal(context, root, targetName, calleeOptions)
 
 	result := callSignalsResult{
 		AnalysisMode: mergeCallAnalysisModes(callers.AnalysisMode, callees.AnalysisMode),
@@ -86,6 +99,22 @@ func callSignalsForSymbol(root string, target string, symbol sherpa.Symbol, opti
 	}
 
 	return result
+}
+
+func findCallersForSignal(context *sherpa.SemanticContext, root string, target string, options sherpa.CallOptions) (sherpa.CallersResult, error) {
+	if context != nil {
+		return sherpa.FindCallersWithContext(context, target, options)
+	}
+
+	return sherpa.FindCallersWithOptions(root, target, options)
+}
+
+func findCalleesForSignal(context *sherpa.SemanticContext, root string, target string, options sherpa.CallOptions) (sherpa.CalleesResult, error) {
+	if context != nil {
+		return sherpa.FindCalleesWithContext(context, target, options)
+	}
+
+	return sherpa.FindCalleesWithOptions(root, target, options)
 }
 
 func mergeCallAnalysisModes(first string, second string) string {

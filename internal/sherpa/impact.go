@@ -1,6 +1,7 @@
 package sherpa
 
 import (
+	"fmt"
 	"go/token"
 	"path/filepath"
 	"strconv"
@@ -42,6 +43,7 @@ type ImpactOptions struct {
 
 type impactAnalysisCache struct {
 	References         *referenceAnalysisCache
+	Context            *SemanticContext
 	SkipTests          bool
 	CallFunctions      []functionInfo
 	CallAnalysisMode   string
@@ -67,6 +69,18 @@ func FindImpactWithOptions(root string, target string, options ImpactOptions) (I
 	return findSymbolImpact(rootPath, target, options)
 }
 
+func FindImpactWithContext(context *SemanticContext, target string, options ImpactOptions) (ImpactResult, error) {
+	if context == nil {
+		return ImpactResult{}, fmt.Errorf("semantic context is nil")
+	}
+
+	if isImpactPackageTarget(target) {
+		return findPackageImpact(context.root, target)
+	}
+
+	return findSymbolImpactWithCache(context.root, target, options, newImpactAnalysisCacheWithContext(context, options))
+}
+
 func FindSymbolImpactSignalsWithOptions(root string, targets []string, options ImpactOptions) []ImpactBatchResult {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
@@ -78,6 +92,26 @@ func FindSymbolImpactSignalsWithOptions(root string, targets []string, options I
 	results := make([]ImpactBatchResult, 0, len(targets))
 	for _, target := range targets {
 		result, err := findSymbolImpactWithCache(rootPath, target, options, cache)
+		results = append(results, ImpactBatchResult{
+			Target: target,
+			Result: result,
+			Err:    err,
+		})
+	}
+
+	return results
+}
+
+func FindSymbolImpactSignalsWithContext(context *SemanticContext, targets []string, options ImpactOptions) []ImpactBatchResult {
+	if context == nil {
+		return impactBatchErrorResults(targets, fmt.Errorf("semantic context is nil"))
+	}
+
+	cache := newImpactAnalysisCacheWithContext(context, options)
+	cache.SkipTests = true
+	results := make([]ImpactBatchResult, 0, len(targets))
+	for _, target := range targets {
+		result, err := findSymbolImpactWithCache(context.root, target, options, cache)
 		results = append(results, ImpactBatchResult{
 			Target: target,
 			Result: result,
@@ -103,6 +137,19 @@ func impactBatchErrorResults(targets []string, err error) []ImpactBatchResult {
 func newImpactAnalysisCache(root string, options ImpactOptions) *impactAnalysisCache {
 	return &impactAnalysisCache{
 		References: newReferenceAnalysisCache(root, ReferenceOptions{
+			BuildTags: options.BuildTags,
+		}),
+	}
+}
+
+func newImpactAnalysisCacheWithContext(context *SemanticContext, options ImpactOptions) *impactAnalysisCache {
+	if context == nil {
+		return &impactAnalysisCache{}
+	}
+
+	return &impactAnalysisCache{
+		Context: context,
+		References: context.referenceAnalysisCache(ReferenceOptions{
 			BuildTags: options.BuildTags,
 		}),
 	}
@@ -268,9 +315,14 @@ func collectImpactCallFunctionInfos(root string, options ImpactOptions, cache *i
 
 	if !cache.CallFunctionsReady {
 		cache.CallFunctionsReady = true
-		cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr = collectCallFunctionInfos(root, CallOptions{
+		callOptions := CallOptions{
 			BuildTags: options.BuildTags,
-		})
+		}
+		if cache.Context != nil {
+			cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr = collectCallFunctionInfosWithContext(cache.Context, callOptions)
+		} else {
+			cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr = collectCallFunctionInfos(root, callOptions)
+		}
 	}
 
 	return cache.CallFunctions, cache.CallAnalysisMode, cache.CallWarnings, cache.CallErr
