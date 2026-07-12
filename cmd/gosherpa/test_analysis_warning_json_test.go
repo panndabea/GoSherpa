@@ -12,18 +12,18 @@ import (
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
-//go:linkname mainTestLoadSemanticTestRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticTestRepository
-var mainTestLoadSemanticTestRepository func(string, semantics.LoadOptions) (semantics.Repository, error)
+//go:linkname mainTestLoadSemanticContextRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticContextRepository
+var mainTestLoadSemanticContextRepository func(string, semantics.LoadOptions) (semantics.Repository, error)
 
 func TestMainContextSymbolJSONPropagatesTestAnalysisWarnings(t *testing.T) {
 	tmp := writeMainImpactReportProject(t)
 
-	original := mainTestLoadSemanticTestRepository
-	mainTestLoadSemanticTestRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+	original := mainTestLoadSemanticContextRepository
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
 		return semantics.Repository{}, errors.New("loader failed")
 	}
 	defer func() {
-		mainTestLoadSemanticTestRepository = original
+		mainTestLoadSemanticContextRepository = original
 	}()
 
 	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target", "--json"})

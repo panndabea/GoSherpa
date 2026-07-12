@@ -275,7 +275,7 @@ func findSymbolImpactWithCache(root string, target string, options ImpactOptions
 	}
 
 	if cache == nil || !cache.SkipTests {
-		tests, warnings := impactSymbolTests(root, target, result.Packages, targetPackages)
+		tests, warnings := impactSymbolTestsWithCache(root, target, result.Packages, targetPackages, cache)
 		result.RelatedTests = tests.Tests
 		result.TestAnalysisMode = tests.AnalysisMode
 		result.TestCommands = tests.Commands
@@ -329,7 +329,11 @@ func collectImpactCallFunctionInfos(root string, options ImpactOptions, cache *i
 }
 
 func impactSymbolTests(root string, target string, packages []string, targetPackages []string) (TestsResult, []string) {
-	symbolTests, warnings := impactTests(root, target)
+	return impactSymbolTestsWithCache(root, target, packages, targetPackages, nil)
+}
+
+func impactSymbolTestsWithCache(root string, target string, packages []string, targetPackages []string, cache *impactAnalysisCache) (TestsResult, []string) {
+	symbolTests, warnings := impactTestsWithCache(root, target, cache)
 	mergedTests := symbolTests.Tests
 
 	packageTests, packageWarnings := impactTestsForPackages(root, packages)
@@ -381,6 +385,19 @@ func impactTestsForPackages(root string, packages []string) ([]RelatedTest, []st
 }
 
 func impactTests(root string, target string) (TestsResult, []string) {
+	return impactTestsWithCache(root, target, nil)
+}
+
+func impactTestsWithCache(root string, target string, cache *impactAnalysisCache) (TestsResult, []string) {
+	if cache != nil && cache.Context != nil {
+		tests, err := FindTestsWithContext(cache.Context, target, TestOptions{Scope: TestScopeAll})
+		if err != nil {
+			return TestsResult{}, []string{err.Error()}
+		}
+
+		return tests, nil
+	}
+
 	tests, err := FindTests(root, target)
 	if err != nil {
 		return TestsResult{}, []string{err.Error()}

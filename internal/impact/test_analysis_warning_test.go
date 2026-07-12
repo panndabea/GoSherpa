@@ -11,8 +11,8 @@ import (
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
-//go:linkname impactTestLoadSemanticTestRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticTestRepository
-var impactTestLoadSemanticTestRepository func(string, semantics.LoadOptions) (semantics.Repository, error)
+//go:linkname impactTestLoadSemanticContextRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticContextRepository
+var impactTestLoadSemanticContextRepository func(string, semantics.LoadOptions) (semantics.Repository, error)
 
 func TestAnalyzeSymbolPropagatesTestAnalysisWarnings(t *testing.T) {
 	root := t.TempDir()
@@ -30,12 +30,12 @@ func TestTarget(t *testing.T) {
 }
 `)
 
-	original := impactTestLoadSemanticTestRepository
-	impactTestLoadSemanticTestRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+	original := impactTestLoadSemanticContextRepository
+	impactTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
 		return semantics.Repository{}, errors.New("loader failed")
 	}
 	defer func() {
-		impactTestLoadSemanticTestRepository = original
+		impactTestLoadSemanticContextRepository = original
 	}()
 
 	report, err := AnalyzeSymbolWithOptions(root, "Target", AnalyzerOptions{})

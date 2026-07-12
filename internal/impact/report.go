@@ -137,7 +137,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.CallAnalysisMode = symbolImpact.CallAnalysisMode
 	report.TestAnalysisMode = symbolImpact.TestAnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, symbolImpact.Warnings...))
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -377,6 +377,10 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 }
 
 func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
+	return affectedTestsForPackagesWithContext(nil, root, changedPackages, packages, changedSymbols, extraTests, warnings)
+}
+
+func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
 	modulePath := impactModulePath(root)
 	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
@@ -384,7 +388,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 	changedPackageSet := impactStringSet(changedPackages)
 	testAnalysisMode := ""
 
-	directTests, directTestAnalysisMode := directTestsForChangedSymbols(root, changedSymbols, &warnings)
+	directTests, directTestAnalysisMode := directTestsForChangedSymbolsWithContext(context, root, changedSymbols, &warnings)
 	testAnalysisMode = mergeTestAnalysisMode(testAnalysisMode, directTestAnalysisMode)
 	for _, test := range directTests {
 		mergeRelatedTest(seen, test)
@@ -394,7 +398,7 @@ func affectedTestsForPackages(root string, changedPackages []string, packages []
 	}
 
 	for _, pkg := range packages {
-		tests, err := sherpa.FindTests(root, pkg)
+		tests, err := findTestsWithContext(context, root, pkg, sherpa.TestOptions{Scope: sherpa.TestScopeAll})
 		if err != nil {
 			warnings = append(warnings, err.Error())
 			continue
@@ -478,6 +482,10 @@ func mergeAnalysisMode(current string, next string, typechecked string, fallback
 }
 
 func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings *[]string) ([]sherpa.RelatedTest, string) {
+	return directTestsForChangedSymbolsWithContext(nil, root, symbols, warnings)
+}
+
+func directTestsForChangedSymbolsWithContext(context *sherpa.SemanticContext, root string, symbols []changedSymbol, warnings *[]string) ([]sherpa.RelatedTest, string) {
 	if len(symbols) == 0 {
 		return nil, ""
 	}
@@ -487,7 +495,7 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 	testAnalysisMode := ""
 	for _, symbol := range normalizeChangedSymbols(symbols) {
 		target := changedSymbolTestTarget(symbol, modulePath)
-		tests, err := sherpa.FindTestsWithOptions(root, target, sherpa.TestOptions{
+		tests, err := findTestsWithContext(context, root, target, sherpa.TestOptions{
 			Scope: sherpa.TestScopeDirect,
 		})
 		if err != nil {
@@ -515,6 +523,14 @@ func directTestsForChangedSymbols(root string, symbols []changedSymbol, warnings
 	sortRelatedTests(result)
 
 	return result, testAnalysisMode
+}
+
+func findTestsWithContext(context *sherpa.SemanticContext, root string, target string, options sherpa.TestOptions) (sherpa.TestsResult, error) {
+	if context != nil {
+		return sherpa.FindTestsWithContext(context, target, options)
+	}
+
+	return sherpa.FindTestsWithOptions(root, target, options)
 }
 
 func changedSymbolPlanTargets(symbols []changedSymbol, modulePath string) []string {

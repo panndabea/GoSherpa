@@ -107,15 +107,27 @@ func FindTestsWithOptions(root string, target string, options TestOptions) (Test
 		return TestsResult{}, err
 	}
 
+	return findTestsWithContext(nil, rootPath, target, options)
+}
+
+func FindTestsWithContext(context *SemanticContext, target string, options TestOptions) (TestsResult, error) {
+	if context == nil {
+		return TestsResult{}, fmt.Errorf("semantic context is nil")
+	}
+
+	return findTestsWithContext(context, context.Root(), target, options)
+}
+
+func findTestsWithContext(context *SemanticContext, rootPath string, target string, options TestOptions) (TestsResult, error) {
 	options = normalizeTestOptions(options)
 	if isTestFileTarget(target) {
-		return findFileTestsWithOptions(rootPath, target, options)
+		return findFileTestsWithContext(context, rootPath, target, options)
 	}
 	if isImpactPackageTarget(target) {
 		return findPackageTestsWithOptions(rootPath, target, options)
 	}
 
-	return findSymbolTestsWithOptions(rootPath, target, options)
+	return findSymbolTestsWithContext(context, rootPath, target, options)
 }
 
 func ParseTestScope(value string) (TestScope, bool) {
@@ -197,6 +209,10 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 }
 
 func findFileTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
+	return findFileTestsWithContext(nil, root, target, options)
+}
+
+func findFileTestsWithContext(context *SemanticContext, root string, target string, options TestOptions) (TestsResult, error) {
 	relativeFile, absoluteFile, err := normalizeTestFileTarget(root, target)
 	if err != nil {
 		return TestsResult{}, err
@@ -227,7 +243,7 @@ func findFileTestsWithOptions(root string, target string, options TestOptions) (
 	}
 	targets := referenceTargetsForSymbols(fileSymbols, packagePath)
 	targetNames := referenceTargetNames(targets)
-	relatedTests, analysisMode, warnings := collectRelatedTestsForTargets(root, testFiles, packages, targets, TestTargetKindFile)
+	relatedTests, analysisMode, warnings := collectRelatedTestsForTargetsWithContext(context, root, testFiles, packages, targets, TestTargetKindFile)
 	tests := filterTestsForScope(relatedTests, TestTargetKindFile, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           relativeFile,
@@ -254,6 +270,10 @@ func findSymbolTests(root string, target string) (TestsResult, error) {
 }
 
 func findSymbolTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
+	return findSymbolTestsWithContext(nil, root, target, options)
+}
+
+func findSymbolTestsWithContext(context *SemanticContext, root string, target string, options TestOptions) (TestsResult, error) {
 	normalizedTarget, err := normalizeReferenceTarget(root, target)
 	if err != nil {
 		return TestsResult{}, err
@@ -269,7 +289,7 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 		return TestsResult{}, err
 	}
 
-	relatedTests, analysisMode, warnings := collectRelatedTests(root, testFiles, packages, normalizedTarget, TestTargetKindSymbol)
+	relatedTests, analysisMode, warnings := collectRelatedTestsWithContext(context, root, testFiles, packages, normalizedTarget, TestTargetKindSymbol)
 	tests := filterTestsForScope(relatedTests, TestTargetKindSymbol, options.Scope)
 	tests = annotateRelatedTestTargets(tests, normalizedTarget.String())
 	targetPackages := sortedMapKeys(packages)
@@ -509,18 +529,26 @@ func fileDefinesReferenceTarget(file *ast.File, target referenceTarget) bool {
 }
 
 func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
+	return collectRelatedTestsWithContext(nil, root, testFiles, packages, target, kind)
+}
+
+func collectRelatedTestsWithContext(context *SemanticContext, root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
 	var targets []referenceTarget
 	if target.Name != "" {
 		targets = append(targets, target)
 	}
 
-	return collectRelatedTestsForTargets(root, testFiles, packages, targets, kind)
+	return collectRelatedTestsForTargetsWithContext(context, root, testFiles, packages, targets, kind)
 }
 
 func collectRelatedTestsForTargets(root string, testFiles []testFileInfo, packages map[string]struct{}, targets []referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
+	return collectRelatedTestsForTargetsWithContext(nil, root, testFiles, packages, targets, kind)
+}
+
+func collectRelatedTestsForTargetsWithContext(context *SemanticContext, root string, testFiles []testFileInfo, packages map[string]struct{}, targets []referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
 	var tests []RelatedTest
 	modulePath := readModulePath(root)
-	typecheckedDirectReferences := analyzeTypecheckedDirectTestReferences(root, targets)
+	typecheckedDirectReferences := analyzeTypecheckedDirectTestReferencesWithContext(context, root, targets)
 
 	for _, testFile := range testFiles {
 		_, packageMatches := packages[testFile.Package]
@@ -623,9 +651,28 @@ func directRelatedTests(tests []RelatedTest) []RelatedTest {
 }
 
 func analyzeTypecheckedDirectTestReferences(root string, targets []referenceTarget) testReferenceAnalysis {
+	return analyzeTypecheckedDirectTestReferencesWithContext(nil, root, targets)
+}
+
+func analyzeTypecheckedDirectTestReferencesWithContext(context *SemanticContext, root string, targets []referenceTarget) testReferenceAnalysis {
 	targets = namedReferenceTargets(targets)
 	if len(targets) == 0 || !referenceShouldAttemptTypechecked(root) {
 		return testReferenceAnalysis{AnalysisMode: TestAnalysisModeAST}
+	}
+
+	if context != nil {
+		repo, attempted, err := context.TypecheckedTestRepository()
+		if !attempted {
+			return testReferenceAnalysis{AnalysisMode: TestAnalysisModeAST}
+		}
+		if err != nil {
+			return testReferenceAnalysis{
+				AnalysisMode: TestAnalysisModeAST,
+				Warnings:     []string{fmt.Sprintf("typechecked test reference analysis unavailable: %v", err)},
+			}
+		}
+
+		return analyzeTypecheckedDirectTestReferencesFromRepository(root, targets, repo)
 	}
 
 	repo, err := loadSemanticTestRepository(root, semantics.LoadOptions{IncludeTests: true})
@@ -636,6 +683,10 @@ func analyzeTypecheckedDirectTestReferences(root string, targets []referenceTarg
 		}
 	}
 
+	return analyzeTypecheckedDirectTestReferencesFromRepository(root, targets, repo)
+}
+
+func analyzeTypecheckedDirectTestReferencesFromRepository(root string, targets []referenceTarget, repo semantics.Repository) testReferenceAnalysis {
 	packages := semanticReferencePackages(repo)
 	if len(packages) == 0 {
 		return testReferenceAnalysis{

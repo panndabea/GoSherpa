@@ -1386,11 +1386,11 @@ Done when:
 The roadmap becomes much easier once GoSherpa has a shared repository index.
 
 Status: first internal v0 implemented for typechecked package, file, and symbol
-inventory. A first in-memory semantic context now shares one typechecked
-repository load across symbol identity, references, and call signals for
-`explain`, `context symbol`, symbol impact, and changed-symbol impact paths.
-Implementations, tests, and persisted relationship reuse remain future
-expansion.
+inventory. A first in-memory semantic context now shares typechecked repository
+loads across symbol identity, references, call signals, and direct
+test-reference analysis for `explain`, `context symbol`, symbol impact, and
+changed-symbol impact paths. Implementations and persisted relationship reuse
+remain future expansion.
 
 Candidate model:
 
