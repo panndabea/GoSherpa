@@ -79,12 +79,28 @@ func AnalyzeFileWithOptions(root string, file string, options AnalyzerOptions) (
 	return NewAnalyzerWithOptions(root, options).AnalyzeFile(file)
 }
 
+func AnalyzeFileWithContext(context *sherpa.SemanticContext, file string, options AnalyzerOptions) (ImpactReport, error) {
+	if context == nil {
+		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	return NewAnalyzerWithOptions(context.Root(), options).AnalyzeFileWithContext(context, file)
+}
+
 func AnalyzePackage(root string, targetPackage string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzePackage(targetPackage)
 }
 
 func AnalyzePackageWithOptions(root string, targetPackage string, options AnalyzerOptions) (ImpactReport, error) {
 	return NewAnalyzerWithOptions(root, options).AnalyzePackage(targetPackage)
+}
+
+func AnalyzePackageWithContext(context *sherpa.SemanticContext, targetPackage string, options AnalyzerOptions) (ImpactReport, error) {
+	if context == nil {
+		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	return NewAnalyzerWithOptions(context.Root(), options).AnalyzePackageWithContext(context, targetPackage)
 }
 
 func AnalyzeSymbol(root string, target string) (ImpactReport, error) {
@@ -153,12 +169,25 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {
+	return a.analyzeFile(file, nil)
+}
+
+func (a Analyzer) AnalyzeFileWithContext(context *sherpa.SemanticContext, file string) (ImpactReport, error) {
+	return a.analyzeFile(file, context)
+}
+
+func (a Analyzer) analyzeFile(file string, context *sherpa.SemanticContext) (ImpactReport, error) {
 	changedFile, changedPackage, err := fileTarget(file)
 	if err != nil {
 		return ImpactReport{}, err
 	}
 
-	report, err := a.AnalyzePackage(changedPackage)
+	var report ImpactReport
+	if context != nil {
+		report, err = a.AnalyzePackageWithContext(context, changedPackage)
+	} else {
+		report, err = a.AnalyzePackage(changedPackage)
+	}
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -170,9 +199,24 @@ func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
-	result, err := sherpa.FindImpactWithOptions(a.Root, targetPackage, sherpa.ImpactOptions{
+	return a.analyzePackage(targetPackage, nil)
+}
+
+func (a Analyzer) AnalyzePackageWithContext(context *sherpa.SemanticContext, targetPackage string) (ImpactReport, error) {
+	return a.analyzePackage(targetPackage, context)
+}
+
+func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticContext) (ImpactReport, error) {
+	impactOptions := sherpa.ImpactOptions{
 		BuildTags: a.BuildTags,
-	})
+	}
+	var result sherpa.ImpactResult
+	var err error
+	if context != nil {
+		result, err = sherpa.FindImpactWithContext(context, targetPackage, impactOptions)
+	} else {
+		result, err = sherpa.FindImpactWithOptions(a.Root, targetPackage, impactOptions)
+	}
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -182,8 +226,8 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackages(a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, report.Warnings)
-	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, report.Warnings)
+	signals, err := interfaceSignalsForPackagesWithContext(context, a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {

@@ -16,10 +16,24 @@ type contextSemanticSnapshot struct {
 	warnings []string
 }
 
-func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemanticSnapshot, bool) {
-	index, err := symbolindex.LoadRepositoryIndex(root, symbolindex.LoadOptions{
-		BuildTags: buildTags,
-	})
+func loadContextSemanticSnapshotWithContext(context *sherpa.SemanticContext) (contextSemanticSnapshot, bool) {
+	if context == nil {
+		return contextSemanticSnapshot{
+			warnings: []string{"typechecked context analysis unavailable: semantic context is nil"},
+		}, false
+	}
+
+	repo, attempted, err := context.TypecheckedRepository()
+	if !attempted {
+		return contextSemanticSnapshot{}, false
+	}
+	if err != nil {
+		return contextSemanticSnapshot{
+			warnings: []string{fmt.Sprintf("typechecked context analysis unavailable: %v", err)},
+		}, false
+	}
+
+	index, err := symbolindex.FromRepository(repo)
 	if err != nil {
 		return contextSemanticSnapshot{
 			warnings: []string{fmt.Sprintf("typechecked context analysis unavailable: %v", err)},
@@ -30,7 +44,6 @@ func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemant
 		index:    index,
 		warnings: append([]string{}, index.Warnings...),
 	}
-
 	snapshot.warnings = uniqueStrings(snapshot.warnings)
 
 	return snapshot, true

@@ -215,12 +215,16 @@ func InspectInterfaceWithOptions(root string, target string, options InterfaceOp
 }
 
 func interfaceSignalsForPackages(root string, packages []string, options InterfaceOptions) (interfaceImpactSignals, error) {
+	return interfaceSignalsForPackagesWithContext(nil, root, packages, options)
+}
+
+func interfaceSignalsForPackagesWithContext(context *sherpa.SemanticContext, root string, packages []string, options InterfaceOptions) (interfaceImpactSignals, error) {
 	packages = uniqueSortedStrings(packages)
 	if len(packages) == 0 {
 		return interfaceImpactSignals{}, nil
 	}
 
-	graph, err := buildInterfaceGraph(root, options)
+	graph, err := buildInterfaceGraphWithContext(context, root, options)
 	if err != nil {
 		return interfaceImpactSignals{}, err
 	}
@@ -264,12 +268,16 @@ func interfaceSignalsForPackages(root string, packages []string, options Interfa
 }
 
 func interfaceSignalsForSymbol(root string, target string, options InterfaceOptions) (interfaceImpactSignals, error) {
+	return interfaceSignalsForSymbolWithContext(nil, root, target, options)
+}
+
+func interfaceSignalsForSymbolWithContext(context *sherpa.SemanticContext, root string, target string, options InterfaceOptions) (interfaceImpactSignals, error) {
 	targetParts := parseInterfaceSymbolTarget(root, target)
 	if targetParts.Name == "" {
 		return interfaceImpactSignals{}, nil
 	}
 
-	graph, err := buildInterfaceGraph(root, options)
+	graph, err := buildInterfaceGraphWithContext(context, root, options)
 	if err != nil {
 		return interfaceImpactSignals{}, err
 	}
@@ -351,6 +359,27 @@ func buildInterfaceGraph(root string, options InterfaceOptions) (interfaceGraph,
 	return graph, nil
 }
 
+func buildInterfaceGraphWithContext(context *sherpa.SemanticContext, root string, options InterfaceOptions) (interfaceGraph, error) {
+	if context == nil || !interfaceContextSupportsBuildTags(context, options) {
+		return buildInterfaceGraph(root, options)
+	}
+
+	graph, warnings, ok := buildTypecheckedInterfaceGraphWithContext(context)
+	if ok {
+		return graph, nil
+	}
+
+	graph, err := buildASTInterfaceGraph(root)
+	if err != nil {
+		return interfaceGraph{}, err
+	}
+
+	graph.AnalysisMode = InterfaceAnalysisModeASTFallback
+	graph.Warnings = nonNilStrings(warnings)
+
+	return graph, nil
+}
+
 func buildTypecheckedInterfaceGraph(root string, options InterfaceOptions) (interfaceGraph, []string, bool) {
 	if !interfaceShouldAttemptTypechecked(root) {
 		return interfaceGraph{}, nil, false
@@ -369,6 +398,35 @@ func buildTypecheckedInterfaceGraph(root string, options InterfaceOptions) (inte
 	}
 
 	return graph, nonNilStrings(repo.Warnings), true
+}
+
+func buildTypecheckedInterfaceGraphWithContext(context *sherpa.SemanticContext) (interfaceGraph, []string, bool) {
+	if context == nil {
+		return interfaceGraph{}, nil, false
+	}
+
+	repo, attempted, err := context.TypecheckedRepository()
+	if !attempted {
+		return interfaceGraph{}, nil, false
+	}
+	if err != nil {
+		return interfaceGraph{}, []string{fmt.Sprintf("typechecked interface analysis unavailable: %v", err)}, false
+	}
+
+	graph := semanticInterfaceGraph(repo)
+	if graph.AnalysisMode == "" {
+		return interfaceGraph{}, append([]string{"typechecked interface analysis unavailable: no typechecked packages loaded"}, repo.Warnings...), false
+	}
+
+	return graph, nonNilStrings(repo.Warnings), true
+}
+
+func interfaceContextSupportsBuildTags(context *sherpa.SemanticContext, options InterfaceOptions) bool {
+	if context == nil {
+		return false
+	}
+
+	return strings.Join(context.BuildTags(), "\x00") == strings.Join(semantics.NormalizeBuildTags(options.BuildTags), "\x00")
 }
 
 func interfaceShouldAttemptTypechecked(root string) bool {

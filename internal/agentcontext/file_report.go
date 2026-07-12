@@ -54,7 +54,14 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		return FileReport{}, err
 	}
 
-	impactReport, err := impactengine.AnalyzeFileWithOptions(root, file, impactengine.AnalyzerOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return FileReport{}, err
+	}
+
+	impactReport, err := impactengine.AnalyzeFileWithContext(semanticContext, file, impactengine.AnalyzerOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
@@ -66,7 +73,7 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		return FileReport{}, err
 	}
 
-	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
+	semanticSnapshot, semanticOK := loadContextSemanticSnapshotWithContext(semanticContext)
 	warnings := append([]string{}, impactReport.Warnings...)
 	warnings = append(warnings, semanticSnapshot.warnings...)
 
@@ -359,7 +366,7 @@ func fileLimitations(includeTests bool, analysisMode string, interfaceAnalysisMo
 func fileContextAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
 	case AnalysisModeTypecheckedAST:
-		return "File context used typechecked package loading for package files and symbols, with syntax/local impact signals."
+		return "File context used shared typechecked package loading for package files, symbols, and interface impact where available."
 	default:
 		return "File context used AST fallback for package files and symbols because typechecked loading was unavailable."
 	}

@@ -615,7 +615,7 @@
     "limitations": [
       "Package context uses package-level impact for affected packages and tests.",
       "Source excerpts are limited to supported top-level Go symbols: functions, methods, structs, interfaces, and type aliases.",
-      "Package context used typechecked package loading for package files and symbols, with syntax/local impact signals.",
+      "Package context used shared typechecked package loading for package files, symbols, and interface impact where available.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used AST/package fallback.",
       "Dynamic dispatch, reflection, and function values are not resolved.",

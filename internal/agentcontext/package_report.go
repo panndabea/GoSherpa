@@ -47,7 +47,14 @@ type PackageReport struct {
 }
 
 func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOptions) (PackageReport, error) {
-	impactReport, err := impactengine.AnalyzePackageWithOptions(root, targetPackage, impactengine.AnalyzerOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return PackageReport{}, err
+	}
+
+	impactReport, err := impactengine.AnalyzePackageWithContext(semanticContext, targetPackage, impactengine.AnalyzerOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
@@ -55,7 +62,7 @@ func AnalyzePackage(root string, targetPackage string, options PackageAnalyzeOpt
 	}
 
 	packagePath := firstString(impactReport.ChangedPackages)
-	semanticSnapshot, semanticOK := loadContextSemanticSnapshot(root, options.BuildTags)
+	semanticSnapshot, semanticOK := loadContextSemanticSnapshotWithContext(semanticContext)
 	warnings := append([]string{}, impactReport.Warnings...)
 	warnings = append(warnings, semanticSnapshot.warnings...)
 
@@ -383,7 +390,7 @@ func packageLimitations(includeTests bool, analysisMode string, interfaceAnalysi
 func packageContextAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
 	case AnalysisModeTypecheckedAST:
-		return "Package context used typechecked package loading for package files and symbols, with syntax/local impact signals."
+		return "Package context used shared typechecked package loading for package files, symbols, and interface impact where available."
 	default:
 		return "Package context used AST fallback for package files and symbols because typechecked loading was unavailable."
 	}

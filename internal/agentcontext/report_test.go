@@ -6,11 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	_ "unsafe"
 
 	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
+
+//go:linkname agentContextTestLoadSemanticContextRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticContextRepository
+var agentContextTestLoadSemanticContextRepository func(string, semantics.LoadOptions) (semantics.Repository, error)
 
 func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	root := writeAgentContextProject(t)
@@ -582,6 +587,37 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	}
 }
 
+func TestAnalyzeFileSharesSemanticContextForImpactAndSymbols(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	original := agentContextTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	agentContextTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if !options.IncludeTests {
+			repositoryLoads++
+		}
+		return original(root, options)
+	}
+	defer func() {
+		agentContextTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+}
+
 func TestAnalyzeFileNotesTestsOptionInLimitations(t *testing.T) {
 	root := writeAgentContextProject(t)
 
@@ -721,6 +757,37 @@ func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	}
 	if !agentContextLimitationsContain(report.Limitations, "Test analysis used AST") {
 		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzePackageSharesSemanticContextForImpactAndSymbols(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	original := agentContextTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	agentContextTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if !options.IncludeTests {
+			repositoryLoads++
+		}
+		return original(root, options)
+	}
+	defer func() {
+		agentContextTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
 	}
 }
 

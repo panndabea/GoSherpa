@@ -115,10 +115,12 @@ Move the highest-risk analysis paths from AST-only heuristics toward Go
 semantics using `go/packages` and the Go type checker.
 
 Current status: `gosherpa refs`, call graph commands, and standalone interface
-navigation have `go/packages`-backed typechecked paths with AST fallback.
-Context and report-based impact bundles now expose `interfaceAnalysisMode` for
-the interface subanalysis, but still need broader shared semantic loading across
-every analysis field.
+navigation have `go/packages`-backed typechecked paths with AST fallback. A
+first in-memory semantic context shares typechecked repository loads for symbol
+identity, references, calls, file/package context symbol inventory, and context
+interface-impact signals. Context and report-based impact bundles now expose
+`interfaceAnalysisMode` for the interface subanalysis, but still need broader
+shared semantic loading across every analysis field.
 
 Focus areas:
 

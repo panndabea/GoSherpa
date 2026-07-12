@@ -15,7 +15,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Repository scanning and Go file discovery
 - Struct, interface, type alias, function, and method discovery
 - Initial shared repository index v0 for typechecked package, file, and symbol inventory used by symbol identity and context exports
-- First in-memory semantic context slice reuses typechecked repository loads across symbol identity, references, call signals, and direct test-reference analysis for `explain`, `context symbol`, symbol impact, and changed-symbol impact paths
+- First in-memory semantic context slice reuses typechecked repository loads across symbol identity, references, call signals, direct test-reference analysis, file/package context symbol inventory, and context interface-impact signals for `explain`, `context symbol`, `context file`, `context package`, symbol impact, and changed-symbol impact paths
 - Symbol listing filters by kind, package, and test symbols
 - Rich symbol lookup with package paths, signatures, doc comments, struct fields, interface methods, and Go-aware reference lookup
 - Typechecked reference analysis via `go/packages`, with an AST/per-package fallback when semantic loading is unavailable
@@ -90,7 +90,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, and `packages --tests`; deeper semantic, context, impact, and call-graph queries still analyze repository data directly.
-- The shared repository index v0 currently covers package, file, and symbol inventory. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, and direct test-reference analysis in symbol-oriented workflows; implementations and persisted relationship reuse remain separate follow-up work.
+- The shared repository index v0 currently covers package, file, and symbol inventory. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship reuse remains separate follow-up work.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
