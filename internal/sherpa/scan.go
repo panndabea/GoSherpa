@@ -2,18 +2,25 @@ package sherpa
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 )
 
 func FindGoFiles(root string) ([]string, error) {
 	var files []string
+	rootPath := filepath.Clean(root)
+	skipNestedModules := regularFileExists(filepath.Join(rootPath, "go.mod"))
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		if d.IsDir() {
+			if skipNestedModules && filepath.Clean(path) != rootPath && regularFileExists(filepath.Join(path, "go.mod")) {
+				return fs.SkipDir
+			}
+
 			return nil
 		}
 
@@ -29,4 +36,9 @@ func FindGoFiles(root string) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+func regularFileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
