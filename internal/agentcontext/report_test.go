@@ -643,6 +643,29 @@ func TestAnalyzeFileAppliesByteLimit(t *testing.T) {
 	}
 }
 
+func TestAnalyzeFileByteLimitPreservesCoreSignals(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: 1200,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+
+	if len(report.Symbols) == 0 {
+		t.Fatalf("expected byte-limited file context to keep at least one symbol, got %#v", report.Truncated)
+	}
+	if len(report.AffectedPackages) == 0 {
+		t.Fatalf("expected byte-limited file context to keep affected package signal, got %#v", report.Truncated)
+	}
+	if len(report.TestCommands) == 0 {
+		t.Fatalf("expected byte-limited file context to keep a compact test command, got %#v", report.Truncated)
+	}
+}
+
 func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	root := writeAgentContextProject(t)
 
@@ -794,6 +817,32 @@ func TestAnalyzePackageAppliesByteLimit(t *testing.T) {
 	}
 	if size := encodedJSONLen(normalizePackageReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
 		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
+	}
+}
+
+func TestAnalyzePackageByteLimitPreservesCoreSignals(t *testing.T) {
+	root := writeAgentContextProject(t)
+
+	report, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: 1400,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+
+	if len(report.Files) == 0 {
+		t.Fatalf("expected byte-limited package context to keep at least one file, got %#v", report.Truncated)
+	}
+	if len(report.Symbols) == 0 {
+		t.Fatalf("expected byte-limited package context to keep at least one symbol, got %#v", report.Truncated)
+	}
+	if len(report.AffectedPackages) == 0 {
+		t.Fatalf("expected byte-limited package context to keep affected package signal, got %#v", report.Truncated)
+	}
+	if len(report.TestCommands) == 0 {
+		t.Fatalf("expected byte-limited package context to keep a compact test command, got %#v", report.Truncated)
 	}
 }
 
@@ -976,6 +1025,37 @@ func TestAnalyzeDiffAppliesByteLimit(t *testing.T) {
 	}
 	if size := encodedJSONLen(normalizeDiffReport(report)); size > maxBytes && report.Truncated.ByteBudgetOverage == 0 {
 		t.Fatalf("expected report to fit budget or report overage, size=%d budget=%d truncation=%#v", size, maxBytes, report.Truncated)
+	}
+}
+
+func TestAnalyzeDiffByteLimitPreservesCoreSignals(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n")
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+	writeAgentContextTestFile(t, filepath.Join(root, "first.go"), "package app\n\nfunc First() {}\n\nfunc AddedFirst() {}\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "second.go"), "package app\n\nfunc Second() {}\n\nfunc AddedSecond() {}\n")
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{
+		Limits: LimitOptions{
+			MaxBytes: 1000,
+		},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if len(report.ChangedFiles) == 0 {
+		t.Fatalf("expected byte-limited diff context to keep at least one changed file, got %#v", report.Truncated)
+	}
+	if len(report.ChangedPackages) == 0 {
+		t.Fatalf("expected byte-limited diff context to keep changed package signal, got %#v", report.Truncated)
+	}
+	if len(report.ChangedSymbolDetails) == 0 {
+		t.Fatalf("expected byte-limited diff context to keep at least one changed symbol detail, got %#v", report.Truncated)
 	}
 }
 

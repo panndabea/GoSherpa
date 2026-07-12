@@ -32,9 +32,6 @@ func applySymbolByteLimit(report Report, maxBytes int) Report {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
 		},
 		func() bool {
-			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
-		},
-		func() bool {
 			return trimLast(&report.References, &truncation.References)
 		},
 		func() bool {
@@ -52,7 +49,10 @@ func applySymbolByteLimit(report Report, maxBytes int) Report {
 			return true
 		},
 		func() bool {
-			return trimLast(&report.TestCommands, &truncation.TestCommands)
+			return trimLastPreserving(&report.TestCommands, 1, &truncation.TestCommands)
+		},
+		func() bool {
+			return trimLastPreserving(&report.AffectedPackages, 1, &truncation.AffectedPackages)
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -76,13 +76,6 @@ func applyFileByteLimit(report FileReport, maxBytes int) FileReport {
 			return trimLast(&report.SourceContexts, &truncation.SourceContexts)
 		},
 		func() bool {
-			if !trimLast(&report.Symbols, &truncation.Symbols) {
-				return false
-			}
-			report.ReadingOrder = fileReadingOrder(report)
-			return true
-		},
-		func() bool {
 			if !trimLast(&report.AffectedTests, &truncation.AffectedTests) {
 				return false
 			}
@@ -96,10 +89,17 @@ func applyFileByteLimit(report FileReport, maxBytes int) FileReport {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
 		},
 		func() bool {
-			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
+			return trimLastPreserving(&report.TestCommands, 1, &truncation.TestCommands)
 		},
 		func() bool {
-			return trimLast(&report.TestCommands, &truncation.TestCommands)
+			return trimLastPreserving(&report.AffectedPackages, 1, &truncation.AffectedPackages)
+		},
+		func() bool {
+			if !trimLastPreserving(&report.Symbols, 1, &truncation.Symbols) {
+				return false
+			}
+			report.ReadingOrder = fileReadingOrder(report)
+			return true
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -123,20 +123,6 @@ func applyPackageByteLimit(report PackageReport, maxBytes int) PackageReport {
 			return trimLast(&report.SourceContexts, &truncation.SourceContexts)
 		},
 		func() bool {
-			if !trimLast(&report.Symbols, &truncation.Symbols) {
-				return false
-			}
-			report.ReadingOrder = packageReadingOrder(report)
-			return true
-		},
-		func() bool {
-			if !trimLast(&report.Files, &truncation.Files) {
-				return false
-			}
-			report.ReadingOrder = packageReadingOrder(report)
-			return true
-		},
-		func() bool {
 			if !trimLast(&report.AffectedTests, &truncation.AffectedTests) {
 				return false
 			}
@@ -150,10 +136,24 @@ func applyPackageByteLimit(report PackageReport, maxBytes int) PackageReport {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
 		},
 		func() bool {
-			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
+			return trimLastPreserving(&report.TestCommands, 1, &truncation.TestCommands)
 		},
 		func() bool {
-			return trimLast(&report.TestCommands, &truncation.TestCommands)
+			return trimLastPreserving(&report.AffectedPackages, 1, &truncation.AffectedPackages)
+		},
+		func() bool {
+			if !trimLastPreserving(&report.Symbols, 1, &truncation.Symbols) {
+				return false
+			}
+			report.ReadingOrder = packageReadingOrder(report)
+			return true
+		},
+		func() bool {
+			if !trimLastPreserving(&report.Files, 1, &truncation.Files) {
+				return false
+			}
+			report.ReadingOrder = packageReadingOrder(report)
+			return true
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -174,7 +174,7 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
 		},
 		func() bool {
-			if !trimLast(&report.ChangedSymbolDetails, &truncation.ChangedSymbolDetails) {
+			if !trimLast(&report.AffectedTests, &truncation.AffectedTests) {
 				return false
 			}
 			report.ReadingOrder = diffReadingOrder(report)
@@ -184,33 +184,33 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 			return trimLast(&report.AffectedSymbols, &truncation.AffectedSymbols)
 		},
 		func() bool {
-			if !trimLast(&report.AffectedTests, &truncation.AffectedTests) {
-				return false
-			}
-			report.ReadingOrder = diffReadingOrder(report)
-			return true
-		},
-		func() bool {
 			return trimLast(&report.AffectedImplementations, &truncation.AffectedImplementations)
 		},
 		func() bool {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
 		},
 		func() bool {
-			return trimLast(&report.AffectedPackages, &truncation.AffectedPackages)
+			return trimLastPreserving(&report.TestCommands, 1, &truncation.TestCommands)
 		},
 		func() bool {
-			if !trimLast(&report.ChangedFiles, &truncation.ChangedFiles) {
+			return trimLastPreserving(&report.AffectedPackages, 1, &truncation.AffectedPackages)
+		},
+		func() bool {
+			if !trimLastPreserving(&report.ChangedSymbolDetails, 1, &truncation.ChangedSymbolDetails) {
 				return false
 			}
 			report.ReadingOrder = diffReadingOrder(report)
 			return true
 		},
 		func() bool {
-			return trimLast(&report.ChangedPackages, &truncation.ChangedPackages)
+			if !trimLastPreserving(&report.ChangedFiles, 1, &truncation.ChangedFiles) {
+				return false
+			}
+			report.ReadingOrder = diffReadingOrder(report)
+			return true
 		},
 		func() bool {
-			return trimLast(&report.TestCommands, &truncation.TestCommands)
+			return trimLastPreserving(&report.ChangedPackages, 1, &truncation.ChangedPackages)
 		},
 		func() bool {
 			return trimLast(&report.ReadingOrder, &truncation.ReadingOrder)
@@ -274,6 +274,19 @@ func encodedJSONLen(value any) int {
 
 func trimLast[T any](values *[]T, omitted *int) bool {
 	if len(*values) == 0 {
+		return false
+	}
+
+	*values = append([]T{}, (*values)[:len(*values)-1]...)
+	*omitted++
+	return true
+}
+
+func trimLastPreserving[T any](values *[]T, min int, omitted *int) bool {
+	if min < 0 {
+		min = 0
+	}
+	if len(*values) <= min {
 		return false
 	}
 
