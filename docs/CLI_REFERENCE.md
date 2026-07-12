@@ -252,7 +252,9 @@ keeps JSON valid; any omissions are reported in `data.truncated`.
 Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `context diff` can report `git-diff+typechecked+ast` plus
 `referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
-typechecked package loading.
+typechecked package loading. `context diff` and `pr` include
+`changedSymbolDetails` and put changed-symbol locations first in
+`readingOrder` when positions are known.
 
 `pr --json` keeps the diff-oriented `risk` summary and also includes
 `repositoryRisk`, the full structural `RiskReport` from `gosherpa risk`.

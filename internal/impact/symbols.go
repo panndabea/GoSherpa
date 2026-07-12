@@ -11,18 +11,27 @@ import (
 	"strings"
 
 	gitdiff "github.com/panndabea/GoSherpa/internal/git"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type changedSymbolRange struct {
-	Name  string
-	Start int
-	End   int
+	Name     string
+	Position sherpa.Position
+	Range    *sherpa.SourceRange
+	Start    int
+	End      int
 }
 
-type changedSymbol struct {
-	Package string
-	Name    string
+type ChangedSymbol struct {
+	Package  string              `json:"package"`
+	Name     string              `json:"name"`
+	Target   string              `json:"target,omitempty"`
+	Position sherpa.Position     `json:"position"`
+	Range    *sherpa.SourceRange `json:"range,omitempty"`
+	Deleted  bool                `json:"deleted,omitempty"`
 }
+
+type changedSymbol = ChangedSymbol
 
 func ChangedSymbols(root string, base string, head string) ([]string, error) {
 	changedLines, err := gitdiff.ChangedLineRanges(root, base, head)
@@ -103,7 +112,7 @@ func changedSymbolsForCurrentFile(root string, head string, changedFile gitdiff.
 		return nil, err
 	}
 
-	return changedSymbolRecords(packagePath, changedSymbolsForRanges(symbols, changedFile.Ranges)), nil
+	return changedSymbolRecords(root, packagePath, changedSymbolsForRanges(symbols, changedFile.Ranges), false), nil
 }
 
 func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.ChangedFileLineRanges) ([]changedSymbol, error) {
@@ -131,18 +140,18 @@ func changedSymbolsForBaseFile(root string, base string, changedFile gitdiff.Cha
 		return nil, err
 	}
 
-	return changedSymbolRecords(packagePath, changedSymbolsForRanges(symbols, changedFile.OldRanges)), nil
+	return changedSymbolRecords(root, packagePath, changedSymbolsForRanges(symbols, changedFile.OldRanges), true), nil
 }
 
-func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.ChangedLineRange) []string {
-	var changedSymbols []string
+func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.ChangedLineRange) []changedSymbolRange {
+	var changedSymbols []changedSymbolRange
 	for _, symbol := range symbols {
 		for _, lineRange := range ranges {
 			if !lineRangesOverlap(symbol.Start, symbol.End, lineRange.Start, lineRange.End) {
 				continue
 			}
 
-			changedSymbols = append(changedSymbols, symbol.Name)
+			changedSymbols = append(changedSymbols, symbol)
 			break
 		}
 	}
@@ -150,17 +159,20 @@ func changedSymbolsForRanges(symbols []changedSymbolRange, ranges []gitdiff.Chan
 	return changedSymbols
 }
 
-func changedSymbolRecords(packagePath string, names []string) []changedSymbol {
-	records := make([]changedSymbol, 0, len(names))
-	for _, name := range names {
-		name = strings.TrimSpace(name)
+func changedSymbolRecords(root string, packagePath string, symbols []changedSymbolRange, deleted bool) []changedSymbol {
+	records := make([]changedSymbol, 0, len(symbols))
+	for _, symbol := range symbols {
+		name := strings.TrimSpace(symbol.Name)
 		if name == "" {
 			continue
 		}
 
 		records = append(records, changedSymbol{
-			Package: packagePath,
-			Name:    name,
+			Package:  packagePath,
+			Name:     name,
+			Position: changedSymbolPositionRelativeToRoot(root, symbol.Position),
+			Range:    changedSymbolRangeRelativeToRoot(root, symbol.Range),
+			Deleted:  deleted,
 		})
 	}
 
@@ -181,11 +193,19 @@ func normalizeChangedSymbols(symbols []changedSymbol) []changedSymbol {
 	for _, symbol := range symbols {
 		symbol.Package = strings.TrimSpace(symbol.Package)
 		symbol.Name = strings.TrimSpace(symbol.Name)
+		symbol.Target = strings.TrimSpace(symbol.Target)
 		if symbol.Package == "" || symbol.Name == "" {
 			continue
 		}
 
-		seen[symbol.Package+"\x00"+symbol.Name] = symbol
+		key := symbol.Package + "\x00" + symbol.Name
+		existing, ok := seen[key]
+		if !ok || preferChangedSymbol(symbol, existing) {
+			seen[key] = symbol
+			continue
+		}
+
+		seen[key] = mergeChangedSymbol(existing, symbol)
 	}
 
 	normalized := make([]changedSymbol, 0, len(seen))
@@ -202,6 +222,46 @@ func normalizeChangedSymbols(symbols []changedSymbol) []changedSymbol {
 	})
 
 	return normalized
+}
+
+func preferChangedSymbol(candidate changedSymbol, existing changedSymbol) bool {
+	if existing.Deleted && !candidate.Deleted {
+		return true
+	}
+	if existing.Position.File == "" && candidate.Position.File != "" {
+		return true
+	}
+	if existing.Range == nil && candidate.Range != nil {
+		return true
+	}
+
+	return false
+}
+
+func mergeChangedSymbol(existing changedSymbol, candidate changedSymbol) changedSymbol {
+	if existing.Target == "" {
+		existing.Target = candidate.Target
+	}
+	if existing.Position.File == "" {
+		existing.Position = candidate.Position
+	}
+	if existing.Range == nil {
+		existing.Range = candidate.Range
+	}
+	existing.Deleted = existing.Deleted && candidate.Deleted
+
+	return existing
+}
+
+func changedSymbolsWithTargets(symbols []changedSymbol, modulePath string) []ChangedSymbol {
+	normalized := normalizeChangedSymbols(symbols)
+	result := make([]ChangedSymbol, 0, len(normalized))
+	for _, symbol := range normalized {
+		symbol.Target = changedSymbolTestTarget(symbol, modulePath)
+		result = append(result, symbol)
+	}
+
+	return result
 }
 
 func parseChangedSymbolRanges(filePath string) ([]changedSymbolRange, error) {
@@ -227,11 +287,7 @@ func parseChangedSymbolRangesFromSource(filePath string, source any) ([]changedS
 				}
 			}
 
-			symbols = append(symbols, changedSymbolRange{
-				Name:  name,
-				Start: fileSet.Position(decl.Pos()).Line,
-				End:   fileSet.Position(decl.End()).Line,
-			})
+			symbols = append(symbols, newChangedSymbolRange(fileSet, decl.Pos(), decl.End(), name))
 		case *ast.GenDecl:
 			if decl.Tok != token.TYPE {
 				continue
@@ -246,16 +302,84 @@ func parseChangedSymbolRangesFromSource(filePath string, source any) ([]changedS
 					continue
 				}
 
-				symbols = append(symbols, changedSymbolRange{
-					Name:  typeSpec.Name.Name,
-					Start: fileSet.Position(typeSpec.Pos()).Line,
-					End:   fileSet.Position(typeSpec.End()).Line,
-				})
+				symbols = append(symbols, newChangedSymbolRange(fileSet, typeSpec.Pos(), typeSpec.End(), typeSpec.Name.Name))
 			}
 		}
 	}
 
 	return symbols, nil
+}
+
+func newChangedSymbolRange(fileSet *token.FileSet, start token.Pos, end token.Pos, name string) changedSymbolRange {
+	startPosition := fileSet.Position(start)
+	endPosition := fileSet.Position(end)
+
+	return changedSymbolRange{
+		Name: strings.TrimSpace(name),
+		Position: sherpa.Position{
+			File:   startPosition.Filename,
+			Line:   startPosition.Line,
+			Column: startPosition.Column,
+		},
+		Range: &sherpa.SourceRange{
+			Start: sherpa.Position{
+				File:   startPosition.Filename,
+				Line:   startPosition.Line,
+				Column: startPosition.Column,
+			},
+			End: sherpa.Position{
+				File:   endPosition.Filename,
+				Line:   endPosition.Line,
+				Column: endPosition.Column,
+			},
+		},
+		Start: startPosition.Line,
+		End:   endPosition.Line,
+	}
+}
+
+func changedSymbolRangeRelativeToRoot(root string, sourceRange *sherpa.SourceRange) *sherpa.SourceRange {
+	if sourceRange == nil {
+		return nil
+	}
+
+	return &sherpa.SourceRange{
+		Start: changedSymbolPositionRelativeToRoot(root, sourceRange.Start),
+		End:   changedSymbolPositionRelativeToRoot(root, sourceRange.End),
+	}
+}
+
+func changedSymbolPositionRelativeToRoot(root string, position sherpa.Position) sherpa.Position {
+	if position.File == "" {
+		return position
+	}
+
+	position.File = filepath.ToSlash(position.File)
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return position
+	}
+
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		return position
+	}
+	rootPath = filepath.Clean(rootPath)
+
+	filePath := filepath.FromSlash(position.File)
+	if !filepath.IsAbs(filePath) {
+		filePath = filepath.Join(rootPath, filePath)
+	}
+	filePath = filepath.Clean(filePath)
+
+	relative, err := filepath.Rel(rootPath, filePath)
+	if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
+		position.File = filepath.ToSlash(filePath)
+		return position
+	}
+
+	position.File = filepath.ToSlash(relative)
+	return position
 }
 
 func isChangedSymbolType(expr ast.Expr) bool {

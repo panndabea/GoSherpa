@@ -16,30 +16,31 @@ type DiffAnalyzeOptions struct {
 }
 
 type DiffReport struct {
-	Target                  string                      `json:"target"`
-	Base                    string                      `json:"base"`
-	Purpose                 string                      `json:"purpose"`
-	Risk                    explainengine.RiskSummary   `json:"risk"`
-	ChangedFiles            []string                    `json:"changedFiles"`
-	ChangedPackages         []string                    `json:"changedPackages"`
-	AffectedPackages        []string                    `json:"affectedPackages"`
-	AffectedSymbols         []string                    `json:"affectedSymbols"`
-	ReferenceAnalysisMode   string                      `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string                      `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
-	AffectedImplementations []string                    `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string                      `json:"interfaceAnalysisMode,omitempty"`
-	AffectedTests           []impactengine.RelatedTest  `json:"affectedTests"`
-	TestAnalysisMode        string                      `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string                    `json:"testCommands"`
-	TestPlan                sherpa.TestPlan             `json:"testPlan"`
-	ReadingOrder            []explainengine.ReadingStep `json:"readingOrder"`
-	AnalysisMode            string                      `json:"analysisMode"`
-	Confidence              string                      `json:"confidence"`
-	Limits                  *LimitOptions               `json:"limits,omitempty"`
-	Truncated               *Truncation                 `json:"truncated,omitempty"`
-	Limitations             []string                    `json:"limitations"`
-	Warnings                []string                    `json:"-"`
+	Target                  string                       `json:"target"`
+	Base                    string                       `json:"base"`
+	Purpose                 string                       `json:"purpose"`
+	Risk                    explainengine.RiskSummary    `json:"risk"`
+	ChangedFiles            []string                     `json:"changedFiles"`
+	ChangedPackages         []string                     `json:"changedPackages"`
+	AffectedPackages        []string                     `json:"affectedPackages"`
+	AffectedSymbols         []string                     `json:"affectedSymbols"`
+	ChangedSymbolDetails    []impactengine.ChangedSymbol `json:"changedSymbolDetails"`
+	ReferenceAnalysisMode   string                       `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                       `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string                     `json:"affectedInterfaces"`
+	AffectedImplementations []string                     `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                       `json:"interfaceAnalysisMode,omitempty"`
+	AffectedTests           []impactengine.RelatedTest   `json:"affectedTests"`
+	TestAnalysisMode        string                       `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                     `json:"testCommands"`
+	TestPlan                sherpa.TestPlan              `json:"testPlan"`
+	ReadingOrder            []explainengine.ReadingStep  `json:"readingOrder"`
+	AnalysisMode            string                       `json:"analysisMode"`
+	Confidence              string                       `json:"confidence"`
+	Limits                  *LimitOptions                `json:"limits,omitempty"`
+	Truncated               *Truncation                  `json:"truncated,omitempty"`
+	Limitations             []string                     `json:"limitations"`
+	Warnings                []string                     `json:"-"`
 }
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
@@ -59,6 +60,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		ChangedPackages:         impactReport.ChangedPackages,
 		AffectedPackages:        impactReport.AffectedPackages,
 		AffectedSymbols:         impactReport.AffectedSymbols,
+		ChangedSymbolDetails:    impactReport.ChangedSymbolDetails,
 		ReferenceAnalysisMode:   impactReport.ReferenceAnalysisMode,
 		CallAnalysisMode:        impactReport.CallAnalysisMode,
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
@@ -89,6 +91,7 @@ func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
 	report.AffectedTests = prioritizeContextTests(report.AffectedTests)
 	report.ChangedFiles, truncation.ChangedFiles = limitSlice(report.ChangedFiles, limits.MaxFiles)
 	report.AffectedSymbols, truncation.AffectedSymbols = limitSlice(report.AffectedSymbols, limits.MaxSymbols)
+	report.ChangedSymbolDetails, truncation.ChangedSymbolDetails = limitSlice(report.ChangedSymbolDetails, limits.MaxSymbols)
 	report.AffectedTests, truncation.AffectedTests = limitSlice(report.AffectedTests, limits.MaxTests)
 	report.ReadingOrder = diffReadingOrder(report)
 	if originalReadingOrderCount > len(report.ReadingOrder) {
@@ -171,8 +174,21 @@ func diffRiskSummary(report DiffReport) explainengine.RiskSummary {
 }
 
 func diffReadingOrder(report DiffReport) []explainengine.ReadingStep {
-	steps := make([]explainengine.ReadingStep, 0, len(report.ChangedFiles)+len(report.AffectedTests))
-	for _, file := range report.ChangedFiles {
+	return BuildDiffReadingOrder(report.ChangedFiles, report.ChangedSymbolDetails, report.AffectedTests)
+}
+
+func BuildDiffReadingOrder(changedFiles []string, changedSymbols []impactengine.ChangedSymbol, affectedTests []sherpa.RelatedTest) []explainengine.ReadingStep {
+	steps := make([]explainengine.ReadingStep, 0, len(changedSymbols)+len(changedFiles)+len(affectedTests))
+	for _, symbol := range changedSymbols {
+		steps = append(steps, explainengine.ReadingStep{
+			Title:    "Changed symbol: " + changedSymbolReadingTitle(symbol),
+			Reason:   "Inspect the changed top-level symbol before broader package impact.",
+			Position: symbol.Position,
+			Range:    symbol.Range,
+		})
+	}
+
+	for _, file := range changedFiles {
 		steps = append(steps, explainengine.ReadingStep{
 			Title:  "Changed file: " + file,
 			Reason: "Start with the files changed by the diff.",
@@ -183,7 +199,7 @@ func diffReadingOrder(report DiffReport) []explainengine.ReadingStep {
 		})
 	}
 
-	for _, test := range report.AffectedTests {
+	for _, test := range affectedTests {
 		steps = append(steps, explainengine.ReadingStep{
 			Title:    "Test: " + test.Name,
 			Reason:   "Check expected behavior and regression coverage.",
@@ -193,6 +209,21 @@ func diffReadingOrder(report DiffReport) []explainengine.ReadingStep {
 	}
 
 	return steps
+}
+
+func changedSymbolReadingTitle(symbol impactengine.ChangedSymbol) string {
+	title := strings.TrimSpace(symbol.Target)
+	if title == "" {
+		title = strings.TrimSpace(symbol.Name)
+	}
+	if title == "" {
+		title = "(unknown)"
+	}
+	if symbol.Deleted {
+		title += " (deleted)"
+	}
+
+	return title
 }
 
 func diffAnalysisMode(report impactengine.ImpactReport) string {
@@ -258,6 +289,7 @@ func normalizeDiffReport(report DiffReport) DiffReport {
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.AffectedSymbols = nonNilSlice(report.AffectedSymbols)
+	report.ChangedSymbolDetails = nonNilSlice(report.ChangedSymbolDetails)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)

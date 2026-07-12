@@ -711,11 +711,14 @@ when those subanalyses ran. Diff-oriented report data (`impact diff`,
 includes `affectedInterfaces`, `affectedImplementations`, and
 `interfaceAnalysisMode` when interface subanalysis ran; `tests affected` and
 `pr` expose `interfaceAnalysisMode` for the same underlying diff report when
-available.
+available. `context diff` and `pr` expose `changedSymbolDetails` with package,
+normalized target, position, optional range, and optional deleted status so
+agents can open changed symbols directly.
 
 `pr` keeps the diff-oriented `risk` object and additionally includes
 `repositoryRisk`, a full structural risk report in the same shape emitted by
-`risk --json`.
+`risk --json`, plus the same changed-symbol-first reading order used by
+`context diff`.
 
 ## Interface And Path Data
 

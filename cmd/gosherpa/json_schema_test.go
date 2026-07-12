@@ -416,11 +416,13 @@ func TestMainPRJSONSchemaContract(t *testing.T) {
 		"changedFiles",
 		"changedPackages",
 		"changedSymbols",
+		"changedSymbolDetails",
 		"affectedPackages",
 		"affectedInterfaces",
 		"affectedImplementations",
 		"affectedTests",
 		"testCommands",
+		"readingOrder",
 		"verificationCommands",
 	} {
 		if _, ok := data[field].([]any); !ok {
@@ -487,7 +489,7 @@ func TestMainContextDiffJSONLimitContract(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected truncated object, got %T", data["truncated"])
 	}
-	for _, field := range []string{"changedFiles", "affectedSymbols", "affectedTests", "readingOrder"} {
+	for _, field := range []string{"changedFiles", "affectedSymbols", "changedSymbolDetails", "affectedTests", "readingOrder"} {
 		if truncated[field] == nil {
 			t.Fatalf("expected %s truncation, got %#v", field, truncated)
 		}
@@ -496,7 +498,7 @@ func TestMainContextDiffJSONLimitContract(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 2)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])

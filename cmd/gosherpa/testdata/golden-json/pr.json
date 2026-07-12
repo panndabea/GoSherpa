@@ -28,6 +28,30 @@
     "changedSymbols": [
       "Added"
     ],
+    "changedSymbolDetails": [
+      {
+        "package": ".",
+        "name": "Added",
+        "target": "example.com/golden.Added",
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      }
+    ],
     "affectedPackages": [
       ".",
       "./cmd/app"
@@ -192,6 +216,58 @@
         }
       ]
     },
+    "readingOrder": [
+      {
+        "title": "Changed symbol: example.com/golden.Added",
+        "reason": "Inspect the changed top-level symbol before broader package impact.",
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      },
+      {
+        "title": "Changed file: service.go",
+        "reason": "Start with the files changed by the diff.",
+        "position": {
+          "file": "service.go",
+          "line": 1
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
+        }
+      }
+    ],
     "verificationCommands": [
       "go test .",
       "go test ./cmd/app",

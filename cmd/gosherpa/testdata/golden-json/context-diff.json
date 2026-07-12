@@ -31,6 +31,30 @@
     "affectedSymbols": [
       "Added"
     ],
+    "changedSymbolDetails": [
+      {
+        "package": ".",
+        "name": "Added",
+        "target": "example.com/golden.Added",
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      }
+    ],
     "referenceAnalysisMode": "typechecked",
     "callAnalysisMode": "typechecked",
     "affectedInterfaces": [],
@@ -103,6 +127,27 @@
       ]
     },
     "readingOrder": [
+      {
+        "title": "Changed symbol: example.com/golden.Added",
+        "reason": "Inspect the changed top-level symbol before broader package impact.",
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      },
       {
         "title": "Changed file: service.go",
         "reason": "Start with the files changed by the diff.",

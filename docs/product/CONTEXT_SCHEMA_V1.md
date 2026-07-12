@@ -124,11 +124,14 @@ contexts, package-level impact, `interfaceAnalysisMode`, affected tests,
 `testAnalysisMode`, and test planning.
 
 `context diff` adds base ref, changed files, changed packages, affected
-symbols, affected packages, `referenceAnalysisMode`, `callAnalysisMode`,
-interface signals, `interfaceAnalysisMode`, affected tests, `testAnalysisMode`,
-and test planning. Related or affected tests and test-plan items may include
-`targets` naming the symbol target or changed symbols that explain why the test
-or package command is recommended; related or affected tests may include
-`reasons` explaining direct symbol, changed-symbol, target-package,
-caller-package, same-package, or external-package relationships. Test-plan
-items may include structured `tests` when concrete test names are known.
+symbols, `changedSymbolDetails` with package, target, position, optional range,
+and optional deleted status, affected packages, `referenceAnalysisMode`,
+`callAnalysisMode`, interface signals, `interfaceAnalysisMode`, affected tests,
+`testAnalysisMode`, and test planning. Its `readingOrder` starts with changed
+symbol locations when they are known, then changed files, then affected tests.
+Related or affected tests and test-plan items may include `targets` naming the
+symbol target or changed symbols that explain why the test or package command is
+recommended; related or affected tests may include `reasons` explaining direct
+symbol, changed-symbol, target-package, caller-package, same-package, or
+external-package relationships. Test-plan items may include structured `tests`
+when concrete test names are known.

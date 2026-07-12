@@ -3194,6 +3194,8 @@ func TestMainRunsPRCommand(t *testing.T) {
 		"./internal/auth",
 		"CHANGED SYMBOLS",
 		"NewSession",
+		"READING ORDER",
+		"Changed symbol: ./internal/auth.NewSession",
 		"AFFECTED PACKAGES",
 		"./internal/api",
 		"AFFECTED TESTS",
@@ -3261,9 +3263,11 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
 	assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1)
 	assertMainTestJSONArrayHasLength(t, data, "changedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 4)
 	assertMainTestJSONArrayHasLength(t, data, "verificationCommands", 3)
 	limitations := assertMainTestJSONArray(t, data, "limitations")
 	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
@@ -3362,6 +3366,7 @@ func NewSession() Session {
 		"go test ./internal/api",
 		"go test ./internal/auth",
 		"READING ORDER",
+		"Changed symbol: ./internal/auth.NewSession",
 		"Changed file: internal/auth/session.go",
 		"LIMITATIONS",
 	} {
@@ -3452,9 +3457,10 @@ func NewSession() Session {
 	assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedPackages", 2)
 	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
 	assertMainTestJSONArrayHasLength(t, data, "testCommands", 2)
-	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 4)
 	limitations := assertMainTestJSONArray(t, data, "limitations")
 	if !mainTestJSONArrayContainsSubstring(limitations, "Interface analysis used typechecked") {
 		t.Fatalf("expected interface analysis limitation, got %#v", limitations)
@@ -3510,8 +3516,9 @@ func TestMainRunsContextDiffCommandWithLimitsAsJSON(t *testing.T) {
 
 	assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
 	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
-	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 2)
+	assertMainTestJSONArrayHasLength(t, data, "readingOrder", 3)
 }
 
 func TestMainRunsImpactDiffCommand(t *testing.T) {

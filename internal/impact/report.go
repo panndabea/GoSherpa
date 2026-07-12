@@ -26,20 +26,21 @@ type RelatedTest = sherpa.RelatedTest
 type TestPlan = sherpa.TestPlan
 
 type ImpactReport struct {
-	ChangedFiles            []string      `json:"changedFiles"`
-	ChangedPackages         []string      `json:"changedPackages"`
-	AffectedPackages        []string      `json:"affectedPackages"`
-	AffectedSymbols         []string      `json:"affectedSymbols"`
-	ReferenceAnalysisMode   string        `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string        `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string      `json:"affectedInterfaces"`
-	AffectedImplementations []string      `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string        `json:"interfaceAnalysisMode,omitempty"`
-	AffectedTests           []RelatedTest `json:"affectedTests"`
-	TestAnalysisMode        string        `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string      `json:"testCommands"`
-	TestPlan                TestPlan      `json:"testPlan"`
-	Warnings                []string      `json:"warnings"`
+	ChangedFiles            []string        `json:"changedFiles"`
+	ChangedPackages         []string        `json:"changedPackages"`
+	AffectedPackages        []string        `json:"affectedPackages"`
+	AffectedSymbols         []string        `json:"affectedSymbols"`
+	ChangedSymbolDetails    []ChangedSymbol `json:"changedSymbolDetails,omitempty"`
+	ReferenceAnalysisMode   string          `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string          `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string        `json:"affectedInterfaces"`
+	AffectedImplementations []string        `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string          `json:"interfaceAnalysisMode,omitempty"`
+	AffectedTests           []RelatedTest   `json:"affectedTests"`
+	TestAnalysisMode        string          `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string        `json:"testCommands"`
+	TestPlan                TestPlan        `json:"testPlan"`
+	Warnings                []string        `json:"warnings"`
 }
 
 type changedSymbolImpact struct {
@@ -120,7 +121,9 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	if err != nil {
 		return ImpactReport{}, err
 	}
+	modulePath := impactModulePath(a.Root)
 	report.AffectedSymbols = changedSymbolNames(changedSymbols)
+	report.ChangedSymbolDetails = changedSymbolsWithTargets(changedSymbols, modulePath)
 	semanticContext, err := sherpa.NewSemanticContext(a.Root, sherpa.SemanticContextOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -690,6 +693,7 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.ChangedPackages = nonNilStrings(report.ChangedPackages)
 	report.AffectedPackages = nonNilStrings(report.AffectedPackages)
 	report.AffectedSymbols = nonNilStrings(report.AffectedSymbols)
+	report.ChangedSymbolDetails = nonNilChangedSymbols(report.ChangedSymbolDetails)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
@@ -731,6 +735,14 @@ func uniqueSortedStrings(values []string) []string {
 func nonNilStrings(values []string) []string {
 	if values == nil {
 		return []string{}
+	}
+
+	return values
+}
+
+func nonNilChangedSymbols(values []ChangedSymbol) []ChangedSymbol {
+	if values == nil {
+		return []ChangedSymbol{}
 	}
 
 	return values

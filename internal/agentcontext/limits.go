@@ -38,6 +38,7 @@ type Truncation struct {
 	ChangedPackages         int `json:"changedPackages,omitempty"`
 	AffectedPackages        int `json:"affectedPackages,omitempty"`
 	AffectedSymbols         int `json:"affectedSymbols,omitempty"`
+	ChangedSymbolDetails    int `json:"changedSymbolDetails,omitempty"`
 	AffectedInterfaces      int `json:"affectedInterfaces,omitempty"`
 	AffectedImplementations int `json:"affectedImplementations,omitempty"`
 	ReadingOrder            int `json:"readingOrder,omitempty"`
@@ -134,6 +135,7 @@ func truncationActive(truncation Truncation) bool {
 		truncation.ChangedPackages > 0 ||
 		truncation.AffectedPackages > 0 ||
 		truncation.AffectedSymbols > 0 ||
+		truncation.ChangedSymbolDetails > 0 ||
 		truncation.AffectedInterfaces > 0 ||
 		truncation.AffectedImplementations > 0 ||
 		truncation.ReadingOrder > 0 ||
@@ -193,6 +195,7 @@ func truncationMessages(truncation *Truncation) []string {
 	appendMessage("changed packages", truncation.ChangedPackages)
 	appendMessage("affected packages", truncation.AffectedPackages)
 	appendMessage("affected symbols", truncation.AffectedSymbols)
+	appendMessage("changed symbol details", truncation.ChangedSymbolDetails)
 	appendMessage("affected interfaces", truncation.AffectedInterfaces)
 	appendMessage("affected implementations", truncation.AffectedImplementations)
 	appendMessage("reading order", truncation.ReadingOrder)

@@ -4,33 +4,36 @@ import (
 	"fmt"
 	"strings"
 
+	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
 	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 type prReport struct {
-	Base                    string                     `json:"base"`
-	AnalysisMode            string                     `json:"analysisMode"`
-	Confidence              string                     `json:"confidence"`
-	Limitations             []string                   `json:"limitations"`
-	ChangedFiles            []string                   `json:"changedFiles"`
-	ChangedPackages         []string                   `json:"changedPackages"`
-	ChangedSymbols          []string                   `json:"changedSymbols"`
-	AffectedPackages        []string                   `json:"affectedPackages"`
-	ReferenceAnalysisMode   string                     `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string                     `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
-	AffectedImplementations []string                   `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
-	Risk                    explainengine.RiskSummary  `json:"risk"`
-	RepositoryRisk          sherpa.RiskReport          `json:"repositoryRisk"`
-	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
-	TestAnalysisMode        string                     `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string                   `json:"testCommands"`
-	TestPlan                sherpa.TestPlan            `json:"testPlan"`
-	VerificationCommands    []string                   `json:"verificationCommands"`
-	Warnings                []string                   `json:"-"`
+	Base                    string                       `json:"base"`
+	AnalysisMode            string                       `json:"analysisMode"`
+	Confidence              string                       `json:"confidence"`
+	Limitations             []string                     `json:"limitations"`
+	ChangedFiles            []string                     `json:"changedFiles"`
+	ChangedPackages         []string                     `json:"changedPackages"`
+	ChangedSymbols          []string                     `json:"changedSymbols"`
+	ChangedSymbolDetails    []impactengine.ChangedSymbol `json:"changedSymbolDetails"`
+	AffectedPackages        []string                     `json:"affectedPackages"`
+	ReferenceAnalysisMode   string                       `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                       `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string                     `json:"affectedInterfaces"`
+	AffectedImplementations []string                     `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                       `json:"interfaceAnalysisMode,omitempty"`
+	Risk                    explainengine.RiskSummary    `json:"risk"`
+	RepositoryRisk          sherpa.RiskReport            `json:"repositoryRisk"`
+	AffectedTests           []impactengine.RelatedTest   `json:"affectedTests"`
+	TestAnalysisMode        string                       `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                     `json:"testCommands"`
+	TestPlan                sherpa.TestPlan              `json:"testPlan"`
+	ReadingOrder            []explainengine.ReadingStep  `json:"readingOrder"`
+	VerificationCommands    []string                     `json:"verificationCommands"`
+	Warnings                []string                     `json:"-"`
 }
 
 func analyzePR(root string, base string, buildTags []string) (prReport, error) {
@@ -52,6 +55,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 		ChangedFiles:            impactReport.ChangedFiles,
 		ChangedPackages:         impactReport.ChangedPackages,
 		ChangedSymbols:          impactReport.AffectedSymbols,
+		ChangedSymbolDetails:    impactReport.ChangedSymbolDetails,
 		AffectedPackages:        impactReport.AffectedPackages,
 		ReferenceAnalysisMode:   strings.TrimSpace(impactReport.ReferenceAnalysisMode),
 		CallAnalysisMode:        strings.TrimSpace(impactReport.CallAnalysisMode),
@@ -68,6 +72,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
 	report.Limitations = impactBundleLimitations(report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Risk = prRiskSummary(report)
+	report.ReadingOrder = agentcontext.BuildDiffReadingOrder(report.ChangedFiles, report.ChangedSymbolDetails, report.AffectedTests)
 	report.VerificationCommands = prVerificationCommands(report.TestCommands)
 
 	return normalizePRReport(report), nil
@@ -77,6 +82,7 @@ func normalizePRReport(report prReport) prReport {
 	report.ChangedFiles = nonNilSlice(report.ChangedFiles)
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.ChangedSymbols = nonNilSlice(report.ChangedSymbols)
+	report.ChangedSymbolDetails = nonNilSlice(report.ChangedSymbolDetails)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
@@ -89,6 +95,7 @@ func normalizePRReport(report prReport) prReport {
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
+	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.VerificationCommands = nonNilSlice(report.VerificationCommands)
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Warnings = nonNilSlice(report.Warnings)
@@ -198,6 +205,8 @@ func formatPRReport(report prReport) string {
 	builder.WriteString("\n")
 	writePRValues(&builder, "CHANGED SYMBOLS", report.ChangedSymbols)
 	builder.WriteString("\n")
+	writePRReadingOrder(&builder, report.ReadingOrder)
+	builder.WriteString("\n")
 	writePRValues(&builder, "AFFECTED PACKAGES", report.AffectedPackages)
 	builder.WriteString("\n")
 	writePRValues(&builder, "AFFECTED INTERFACES", report.AffectedInterfaces)
@@ -271,6 +280,23 @@ func writePRAffectedTests(builder *strings.Builder, tests []impactengine.Related
 
 	for _, test := range tests {
 		fmt.Fprintf(builder, "  %-36s %s:%d\n", test.Name, test.Position.File, test.Position.Line)
+	}
+}
+
+func writePRReadingOrder(builder *strings.Builder, steps []explainengine.ReadingStep) {
+	builder.WriteString("READING ORDER\n")
+	if len(steps) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	for _, step := range steps {
+		if step.Position.File == "" {
+			fmt.Fprintf(builder, "  %s\n", step.Title)
+			continue
+		}
+
+		fmt.Fprintf(builder, "  %-36s %s:%d\n", step.Title, step.Position.File, step.Position.Line)
 	}
 }
 

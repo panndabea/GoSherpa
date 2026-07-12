@@ -174,6 +174,13 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 			return trimTestPlanItem(&report.TestPlan, &truncation.TestPlanItems)
 		},
 		func() bool {
+			if !trimLast(&report.ChangedSymbolDetails, &truncation.ChangedSymbolDetails) {
+				return false
+			}
+			report.ReadingOrder = diffReadingOrder(report)
+			return true
+		},
+		func() bool {
 			return trimLast(&report.AffectedSymbols, &truncation.AffectedSymbols)
 		},
 		func() bool {

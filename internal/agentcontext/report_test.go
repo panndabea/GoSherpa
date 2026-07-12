@@ -870,14 +870,23 @@ func NewSession() Session {
 	if len(report.AffectedSymbols) != 1 || report.AffectedSymbols[0] != "NewSession" {
 		t.Fatalf("expected NewSession affected symbol, got %#v", report.AffectedSymbols)
 	}
+	if len(report.ChangedSymbolDetails) != 1 {
+		t.Fatalf("expected one changed symbol detail, got %#v", report.ChangedSymbolDetails)
+	}
+	if detail := report.ChangedSymbolDetails[0]; detail.Target != "./internal/auth.NewSession" || detail.Position.File != "internal/auth/session.go" || detail.Position.Line != 5 {
+		t.Fatalf("unexpected changed symbol detail: %#v", detail)
+	}
 	if len(report.AffectedTests) != 2 {
 		t.Fatalf("expected 2 affected tests, got %#v", report.AffectedTests)
 	}
 	if len(report.TestCommands) != 2 {
 		t.Fatalf("expected 2 test commands, got %#v", report.TestCommands)
 	}
-	if len(report.ReadingOrder) != 3 {
-		t.Fatalf("expected 3 reading order steps, got %#v", report.ReadingOrder)
+	if len(report.ReadingOrder) != 4 {
+		t.Fatalf("expected 4 reading order steps, got %#v", report.ReadingOrder)
+	}
+	if report.ReadingOrder[0].Title != "Changed symbol: ./internal/auth.NewSession" {
+		t.Fatalf("expected changed symbol to lead reading order, got %#v", report.ReadingOrder)
 	}
 	if !agentContextLimitationsContain(report.Limitations, "Interface analysis used typechecked") {
 		t.Fatalf("expected interface analysis limitation, got %#v", report.Limitations)
