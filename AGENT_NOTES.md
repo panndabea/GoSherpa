@@ -98,6 +98,7 @@ before broad inventory commands like unfiltered `symbols`.
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa interface <interface> --json`; use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
 | Analyze changed files | `gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
+| Plan tests for a symbol, package, or file | `gosherpa tests <target> --json`; for files use `gosherpa tests internal/service/service.go --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
 
 ## Context Commands

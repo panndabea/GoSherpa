@@ -324,7 +324,7 @@ func impactTestsForPackages(root string, packages []string) ([]RelatedTest, []st
 		packageSet[pkg] = struct{}{}
 	}
 
-	tests, _, _ := collectRelatedTests(root, testFiles, packageSet, referenceTarget{})
+	tests, _, _ := collectRelatedTests(root, testFiles, packageSet, referenceTarget{}, TestTargetKindPackage)
 	return tests, nil
 }
 

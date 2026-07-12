@@ -111,7 +111,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTestScopeOption && !isScopedTestsInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --scope is only supported by tests <symbol-or-package>")
+		fmt.Fprintln(stderr, "error: --scope is only supported by tests <symbol-or-package-or-file>")
 		return exitUsage
 	}
 

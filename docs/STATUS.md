@@ -32,7 +32,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Static shell completion script generation with `gosherpa completion zsh|bash|fish`
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
-- Related test discovery with suggested `go test` commands
+- Related test discovery for symbols, packages, and files with suggested `go test` commands
 - Package dependency analysis
 - Direct caller and callee analysis with package-aware targets and receiver-variable method calls
 - Shortest and limited repository-local call path analysis
@@ -83,7 +83,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package-qualified symbol impact disambiguates references and affected tests; unqualified symbol targets may require disambiguation across packages.
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but generated-file, build-tag, and generic edge cases may remain incomplete.
 - Interface method usage reports statically visible selector usage for interface-typed values when typechecked package loading succeeds; dynamic dispatch, reflection, and runtime wiring can hide additional usage.
-- Test discovery uses direct references, same-package tests, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
+- Test discovery uses direct references, same-package tests, file-contained symbols, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.

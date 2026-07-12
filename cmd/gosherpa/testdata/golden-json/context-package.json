@@ -619,7 +619,7 @@
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used AST/package fallback.",
       "Dynamic dispatch, reflection, and function values are not resolved.",
-      "Test discovery uses direct references, same-package tests, and literal t.Run subtest names."
+      "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names."
     ]
   }
 }

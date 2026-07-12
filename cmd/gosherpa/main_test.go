@@ -719,7 +719,7 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 	printUsage(&output)
 
 	for _, want := range []string{
-		"tests <symbol-or-package> [--scope direct|related|all]",
+		"tests <symbol-or-package-or-file> [--scope direct|related|all]",
 		"tests affected --base <ref>",
 	} {
 		if !strings.Contains(output.String(), want) {
@@ -798,7 +798,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"usage: gosherpa [--root <path>] tests <symbol-or-package> [--scope direct|related|all]",
+		"usage: gosherpa [--root <path>] tests <symbol-or-package-or-file> [--scope direct|related|all]",
 		"gosherpa [--root <path>] tests affected --base <ref>",
 	} {
 		if !strings.Contains(result.Stderr, want) {
@@ -1788,6 +1788,98 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestMainRunsTestsCommandForFile(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParserFile(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "internal/parser/parser.go"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"TESTS", "internal/parser/parser.go (file)", "TestUsesParserFile", "go test ./cmd/app", "go test ./internal/parser"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+	if strings.Contains(result.Stdout, "TestParserPackage") {
+		t.Fatalf("expected focused default output to omit same-package tests when direct file tests exist, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsTestsCommandForFileAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParserFile(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "internal/parser/parser.go", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests", "internal/parser/parser.go", "example.com/app")
+
+	if data["kind"] != "file" {
+		t.Fatalf("expected kind file, got %v", data["kind"])
+	}
+	if data["analysisMode"] != "typechecked+ast" {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "tests", 1)
+	assertMainTestJSONArrayHasLength(t, data, "commands", 2)
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	assertMainTestJSONArrayHasLength(t, testPlan, "direct", 1)
+	assertMainTestJSONArrayHasLength(t, testPlan, "fallback", 1)
+}
+
 func TestMainRunsTestsCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2144,7 +2236,7 @@ func TestMainRejectsScopeFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --scope is only supported by tests <symbol-or-package>") {
+	if !strings.Contains(result.Stderr, "error: --scope is only supported by tests <symbol-or-package-or-file>") {
 		t.Fatalf("expected scope flag error, got:\n%s", result.Stderr)
 	}
 

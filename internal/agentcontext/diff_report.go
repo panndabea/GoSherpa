@@ -209,7 +209,7 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 	values := []string{
 		"Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
 		"Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
-		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 	if report.AnalysisMode == AnalysisModeDiffTypechecked {
 		values = append([]string{"Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available."}, values...)

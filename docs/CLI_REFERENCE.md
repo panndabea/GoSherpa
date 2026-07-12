@@ -31,6 +31,7 @@ go run ./cmd/gosherpa impact file internal/sherpa/impact.go
 go run ./cmd/gosherpa impact diff --base HEAD
 go run ./cmd/gosherpa pr --base HEAD
 go run ./cmd/gosherpa tests ParseFile
+go run ./cmd/gosherpa tests internal/sherpa/impact.go
 go run ./cmd/gosherpa tests affected --base HEAD
 go run ./cmd/gosherpa packages
 go run ./cmd/gosherpa entrypoints ParseFile
@@ -93,7 +94,7 @@ symbol completion can come later.
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, changed-symbol impact, affected packages, and affected tests |
 | PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, diff risk, repository risk, affected tests, and verification commands |
-| Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests and suggested `go test` commands with optional direct/related/all scope |
+| Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests for a symbol, package, or file and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package inventory | `gosherpa packages --tests` | Lists local packages with file, symbol, import, reverse-dependency, and test indicators |
@@ -190,6 +191,7 @@ Found 4 references
 ./gosherpa tests ParseFile --scope all
 ./gosherpa tests ParseFile --json
 ./gosherpa tests ./internal/sherpa
+./gosherpa tests internal/sherpa/impact.go
 ./gosherpa tests affected --base HEAD
 ./gosherpa tests affected --base HEAD --json
 ./gosherpa packages

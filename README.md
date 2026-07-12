@@ -33,6 +33,7 @@ It is built for developers and coding agents who want focused, repeatable answer
 | "Which parts of this interface are used?" | Methods, implementers, type references, and visible interface method calls |
 | "What can reach this internal code?" | Runtime, test, exported, and no-local-caller entrypoints |
 | "What depends on this package?" | Local package imports and dependents |
+| "Which tests cover this file?" | Direct file-symbol references, same-package tests, and suggested commands |
 | "What might this change affect?" | Changed symbols, affected packages, and suggested tests |
 
 ## Try It
@@ -44,6 +45,7 @@ go run ./cmd/gosherpa version
 go run ./cmd/gosherpa search parse file
 go run ./cmd/gosherpa symbol ParseFile
 go run ./cmd/gosherpa refs ParseFile --kind call
+go run ./cmd/gosherpa tests internal/sherpa/parse.go
 ```
 
 For a broader repository overview, run:
@@ -96,6 +98,7 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa callers ParseFile` | Direct callers of a function or method |
 | `gosherpa interface ./internal/auth.Authenticator` | Interface methods, implementers, type references, and visible interface method usage |
 | `gosherpa entrypoints ParseFile` | Public, runtime, test, and no-local-caller functions that can reach a target |
+| `gosherpa tests internal/sherpa/parse.go` | Related tests and commands for a changed file |
 | `gosherpa impact diff --base HEAD` | Changed files, affected packages, and suggested tests |
 | `gosherpa pr --base HEAD` | PR-style change summary with risk and verification commands |
 

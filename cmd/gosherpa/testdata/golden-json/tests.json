@@ -9,7 +9,7 @@
     "analysisMode": "typechecked+ast",
     "confidence": "medium",
     "limitations": [
-      "Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
+      "Direct symbol and file test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
       "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],

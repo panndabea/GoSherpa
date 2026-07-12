@@ -47,7 +47,7 @@ gosherpa refs <symbol> --json
 gosherpa callers <symbol> --json
 gosherpa callees <symbol> --json
 gosherpa deps <package> --json
-gosherpa tests <symbol-or-package> --json
+gosherpa tests <symbol-or-package-or-file> --json
 gosherpa tests affected --base HEAD --json
 ```
 
@@ -91,7 +91,7 @@ files.
 - `gosherpa deps --all --json`
 - `gosherpa implementers <interface> --json`
 - `gosherpa interfaces <type> --json`
-- `gosherpa tests <symbol-or-package> --json`
+- `gosherpa tests <symbol-or-package-or-file> --json`
 - `gosherpa tests affected --base HEAD --json`
 
 ## Context Commands

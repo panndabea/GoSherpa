@@ -670,17 +670,19 @@ the snapshot is missing, valid, stale, or invalid.
   one or more composed subanalyses used typechecked package loading; diff-based
   queries use `git-diff+typechecked+ast` when changed-symbol, reference, call,
   or interface subanalysis used typechecked package loading and `git-diff+ast`
-  otherwise. Direct `tests` queries use `typechecked+ast` when direct symbol
-  test-reference analysis loaded repository packages and `ast` otherwise.
+  otherwise. Direct `tests` queries use `typechecked+ast` when direct symbol or
+  file-contained symbol test-reference analysis loaded repository packages and
+  `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific impact or test-planning blind spots.
 
 Impact data keeps its existing arrays such as `references`, `callers`,
 `affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
 keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
-includes `scope` with one of `direct`, `related`, or `all`; the default
-`related` scope focuses direct references when they exist. Related or affected
-test entries may include `reasons` with stable relationship labels such as
+includes `kind` with `symbol`, `package`, or `file`, and `scope` with one of
+`direct`, `related`, or `all`; the default `related` scope focuses direct
+references when they exist. Related or affected test entries may include
+`reasons` with stable relationship labels such as
 `direct-reference`, `same-package`, `target-package`, `external-package`,
 `changed-symbol`, and `caller-package`.
 

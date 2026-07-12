@@ -346,7 +346,7 @@ func fileLimitations(includeTests bool, analysisMode string, interfaceAnalysisMo
 		interfaceAnalysisLimitation(interfaceAnalysisMode),
 		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and function values are not resolved.",
-		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 
 	if includeTests {

@@ -1037,14 +1037,14 @@ func testLimitations(analysisMode string) []string {
 
 	if analysisMode == agentcontext.AnalysisModeTypecheckedAST {
 		return []string{
-			"Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
+			"Direct symbol and file test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
 			"Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
 			"Fallback commands are package-level when direct test functions are not known.",
 		}
 	}
 
 	return []string{
-		"Test discovery uses direct references, same-package tests, and literal t.Run subtest names.",
+		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 		"Dynamic table-test names may be incomplete.",
 		"Fallback commands are package-level when direct test functions are not known.",
 	}

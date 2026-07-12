@@ -255,7 +255,7 @@ const (
 	impactSymbolUsageLine   = "impact symbol <symbol>"
 	impactDiffUsageLine     = "impact diff --base <ref>"
 	prUsageLine             = "pr --base <ref>"
-	testsDefaultUsageLine   = "tests <symbol-or-package> [--scope direct|related|all]"
+	testsDefaultUsageLine   = "tests <symbol-or-package-or-file> [--scope direct|related|all]"
 	testsAffectedUsageLine  = "tests affected --base <ref>"
 	depsPackageUsageLine    = "deps <package>"
 	depsAllUsageLine        = "deps --all"

@@ -19,7 +19,7 @@
       "Imported-package receiver calls may be incomplete.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
-      "Direct symbol test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
+      "Direct symbol and file test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
       "Literal t.Run subtest names are extracted; dynamic table-test names may be incomplete.",
       "Fallback commands are package-level when direct test functions are not known."
     ],

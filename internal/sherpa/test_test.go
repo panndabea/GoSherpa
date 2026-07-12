@@ -145,6 +145,153 @@ func TestUsesParser(t *testing.T) {
 	}
 }
 
+func TestFindTestsForFileIncludesSamePackageAndDirectReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+type Parser struct{}
+
+func ParseFile() {}
+
+func (parser Parser) Decode() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParserFile(t *testing.T) {
+	parser.ParseFile()
+	client := parser.Parser{}
+	client.Decode()
+}
+`)
+
+	result, err := FindTests(tmp, "internal/parser/parser.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Target != "internal/parser/parser.go" {
+		t.Fatalf("expected internal/parser/parser.go target, got %s", result.Target)
+	}
+	if result.Kind != TestTargetKindFile {
+		t.Fatalf("expected file target, got %s", result.Kind)
+	}
+	if result.AnalysisMode != TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestParserPackage")
+	assertContainsString(t, names, "TestUsesParserFile")
+
+	direct := findRelatedTest(result.Tests, "TestUsesParserFile")
+	if direct == nil || !direct.DirectReference {
+		t.Fatalf("expected direct reference marker, got %#v", direct)
+	}
+	assertRelatedTestReasons(t, direct, []string{RelatedTestReasonDirectReference})
+	if !reflect.DeepEqual(direct.Targets, []string{"./internal/parser.ParseFile", "./internal/parser.Parser", "./internal/parser.Parser.Decode"}) {
+		t.Fatalf("expected direct file targets, got %#v", direct.Targets)
+	}
+
+	samePackage := findRelatedTest(result.Tests, "TestParserPackage")
+	if samePackage == nil {
+		t.Fatalf("expected same-package related test, got %#v", result.Tests)
+	}
+	assertRelatedTestReasons(t, samePackage, []string{RelatedTestReasonSamePackage})
+	if len(samePackage.Targets) != 0 {
+		t.Fatalf("expected same-package file test to omit concrete targets, got %#v", samePackage.Targets)
+	}
+
+	wantCommands := []string{"go test ./cmd/app", "go test ./internal/parser"}
+	if !reflect.DeepEqual(result.Commands, wantCommands) {
+		t.Fatalf("expected %v, got %v", wantCommands, result.Commands)
+	}
+	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./cmd/app" {
+		t.Fatalf("expected direct test plan item for ./cmd/app, got %#v", result.TestPlan)
+	}
+	if !reflect.DeepEqual(result.TestPlan.Direct[0].Targets, []string{"./internal/parser.ParseFile", "./internal/parser.Parser", "./internal/parser.Parser.Decode"}) {
+		t.Fatalf("expected direct test plan targets, got %#v", result.TestPlan.Direct[0].Targets)
+	}
+	if len(result.TestPlan.Related) != 1 || result.TestPlan.Related[0].Package != "./internal/parser" {
+		t.Fatalf("expected related test plan item for ./internal/parser, got %#v", result.TestPlan)
+	}
+	if !reflect.DeepEqual(result.TestPlan.Related[0].Targets, []string{"./internal/parser.ParseFile", "./internal/parser.Parser", "./internal/parser.Parser.Decode"}) {
+		t.Fatalf("expected related file targets, got %#v", result.TestPlan.Related[0].Targets)
+	}
+}
+
+func TestFindTestsForFileWithRelatedScopeFocusesDirectReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser.go"), `package parser
+
+func ParseFile() {}
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "parser", "parser_test.go"), `package parser
+
+import "testing"
+
+func TestParserPackage(t *testing.T) {}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main_test.go"), `package main
+
+import (
+	"testing"
+
+	"example.com/app/internal/parser"
+)
+
+func TestUsesParserFile(t *testing.T) {
+	parser.ParseFile()
+}
+`)
+
+	result, err := FindTestsWithOptions(tmp, "internal/parser/parser.go", TestOptions{Scope: TestScopeRelated})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := relatedTestNames(result.Tests)
+	assertContainsString(t, names, "TestUsesParserFile")
+	if containsString(names, "TestParserPackage") {
+		t.Fatalf("expected related scope to focus direct file tests, got %v", names)
+	}
+	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./cmd/app" {
+		t.Fatalf("expected direct plan item for ./cmd/app, got %#v", result.TestPlan)
+	}
+	if len(result.TestPlan.Fallback) != 1 || result.TestPlan.Fallback[0].Package != "./internal/parser" {
+		t.Fatalf("expected fallback package test for ./internal/parser, got %#v", result.TestPlan)
+	}
+}
+
+func TestFindTestsForFileReturnsErrorForMissingFile(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	_, err := FindTests(tmp, "internal/parser/missing.go")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "tests file target not found") {
+		t.Fatalf("expected missing file error, got %v", err)
+	}
+}
+
 func TestFindTestsWithRelatedScopeFocusesDirectReferences(t *testing.T) {
 	tmp := t.TempDir()
 

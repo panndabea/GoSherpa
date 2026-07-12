@@ -75,7 +75,7 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 
 	plan := TestPlan{
 		Direct: testPlanItemsFromGroups(directGroups, directTargets, defaultTargets, func(pkg string, names []string, targets []string) string {
-			return directTestPlanReason(target, pkg, names, targets)
+			return directTestPlanReason(options.Kind, target, pkg, names, targets)
 		}),
 		Related: testPlanItemsFromGroups(relatedGroups, relatedTargets, defaultTargets, func(pkg string, names []string, targets []string) string {
 			return relatedTestPlanReason(options.Kind, target, pkg, names, targets)
@@ -94,7 +94,7 @@ func PlanTests(tests []RelatedTest, options TestPlanOptions) TestPlan {
 
 		plan.Fallback = append(plan.Fallback, TestPlanItem{
 			Command: command,
-			Reason:  fallbackTestPlanReason(target, pkg, defaultTargets),
+			Reason:  fallbackTestPlanReason(options.Kind, target, pkg, defaultTargets),
 			Package: pkg,
 			Targets: defaultTargets,
 		})
@@ -205,7 +205,11 @@ func testPlanItemsFromGroups(groups map[string][]string, targetsByPackage map[st
 	return items
 }
 
-func directTestPlanReason(target string, pkg string, names []string, targets []string) string {
+func directTestPlanReason(kind TestTargetKind, target string, pkg string, names []string, targets []string) string {
+	if kind == TestTargetKindFile && len(targets) > 0 {
+		return "Direct tests in " + pkg + " reference symbols from " + target + ": " + strings.Join(targets, ", ") + testPlanNamesSuffix(names)
+	}
+
 	return "Direct tests in " + pkg + " reference " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
 }
 
@@ -215,6 +219,13 @@ func relatedTestPlanReason(kind TestTargetKind, target string, pkg string, names
 			return "Tests in target package " + pkg + " cover " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
 		}
 		return "Tests in target package " + pkg + testPlanNamesSuffix(names)
+	}
+	if kind == TestTargetKindFile {
+		if len(targets) > 0 {
+			return "Same-package tests in " + pkg + " cover symbols from " + target + ": " + strings.Join(targets, ", ") + testPlanNamesSuffix(names)
+		}
+
+		return "Same-package tests in " + pkg + " are related to " + target + testPlanNamesSuffix(names)
 	}
 	if len(targets) > 0 {
 		return "Same-package tests in " + pkg + " cover " + testPlanTargetPhrase(target, targets) + testPlanNamesSuffix(names)
@@ -231,11 +242,14 @@ func callerPackageTestPlanReason(pkg string, names []string, targets []string) s
 	return "Tests in caller package " + pkg + " cover impacted code paths" + testPlanNamesSuffix(names)
 }
 
-func fallbackTestPlanReason(target string, pkg string, targets []string) string {
+func fallbackTestPlanReason(kind TestTargetKind, target string, pkg string, targets []string) string {
 	if len(targets) > 0 {
 		target = strings.TrimSpace(target)
 		if target == "changed symbols" {
 			return "Run package tests for " + pkg + " to compile impacted code from " + testPlanTargetPhrase(target, targets) + " and cover tests not matched directly."
+		}
+		if kind == TestTargetKindFile {
+			return "Run package tests for " + pkg + " to compile code related to symbols from " + target + " and cover tests not matched directly."
 		}
 
 		return "Run package tests for " + pkg + " to compile code related to " + testPlanTargetPhrase(target, targets) + " and cover tests not matched directly."

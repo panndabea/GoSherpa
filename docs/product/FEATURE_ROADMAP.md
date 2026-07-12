@@ -85,7 +85,8 @@ Implemented:
 - Package-aware caller/callee signals for package-qualified `gosherpa explain`
   targets.
 - Direct symbol and package impact analysis.
-- Related test discovery with suggested `go test` commands.
+- Related test discovery for symbols, packages, and files with suggested
+  `go test` commands.
 - Package dependency analysis.
 - Package inventory with file, symbol, import, reverse-dependency, and test
   indicators via `gosherpa packages`.
@@ -165,8 +166,9 @@ Current limitations:
   succeeds and falls back to local AST method-set matching when it cannot load
   semantic package data; report-based impact and context JSON expose which path
   was used through `interfaceAnalysisMode`.
-- Test discovery uses direct references, same-package tests, and literal
-  `t.Run` subtest names; dynamic table-driven names may be incomplete.
+- Test discovery uses direct references, same-package tests, file-contained
+  symbols, and literal `t.Run` subtest names; dynamic table-driven names may be
+  incomplete.
 - Callers, callees, paths, and entrypoints still do not resolve dynamic
   dispatch, reflection, function values, or every imported-package receiver
   call. Caller, callee, and path outputs now surface detected dynamic-call
@@ -849,13 +851,13 @@ Goal: help developers make changes with confidence.
 ### 5.1 Test Discovery
 
 Status: MVP implemented with same-package tests, external `_test` packages,
-direct symbol references, literal `t.Run` subtest names, scoped output, and
-suggested `go test` commands.
+direct symbol and file-contained symbol references, literal `t.Run` subtest
+names, scoped output, file targets, and suggested `go test` commands.
 
 Human question:
 
 ```text
-Which tests are related to this symbol or package?
+Which tests are related to this symbol, package, or file?
 ```
 
 Command sketch:
@@ -873,15 +875,16 @@ MVP behavior:
 - Find tests in the same package.
 - Find tests in external `_test` packages.
 - Find tests that reference the target symbol.
+- Accept Go file targets and match direct references to symbols defined in the
+  file.
 - Extract literal `t.Run` subtest names.
-- Scope symbol test output with `--scope direct|related|all`; the default
-  `related` scope focuses direct references when they exist and keeps package
-  test commands as fallback.
+- Scope symbol and file test output with `--scope direct|related|all`; the
+  default `related` scope focuses direct references when they exist and keeps
+  package test commands as fallback.
 - Suggest exact `go test` commands.
 
 Later behavior:
 
-- Accept file targets.
 - Infer dynamic table-driven names when possible.
 - Use type-aware reference matching inside test files.
 
@@ -924,7 +927,7 @@ gosherpa impact internal/user/service.go
 
 MVP behavior:
 
-- Accept symbol and package targets.
+- Accept symbol, package, file, and diff targets.
 - Show direct references and caller-chain impact for symbols.
 - Show direct dependent packages for packages.
 - Show affected local packages.
@@ -932,7 +935,6 @@ MVP behavior:
 
 Later behavior:
 
-- Accept file targets.
 - Expose configurable caller-depth controls.
 - Show exported API impact when target is exported.
 

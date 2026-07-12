@@ -6,7 +6,9 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +21,7 @@ type TestTargetKind string
 const (
 	TestTargetKindSymbol  TestTargetKind = "symbol"
 	TestTargetKindPackage TestTargetKind = "package"
+	TestTargetKindFile    TestTargetKind = "file"
 )
 
 type TestScope string
@@ -84,7 +87,7 @@ type literalSubtest struct {
 	Func *ast.FuncLit
 }
 
-type testReferenceKeys map[string]struct{}
+type testReferenceKeys map[string]map[string]struct{}
 
 type testReferenceAnalysis struct {
 	Keys         testReferenceKeys
@@ -105,6 +108,9 @@ func FindTestsWithOptions(root string, target string, options TestOptions) (Test
 	}
 
 	options = normalizeTestOptions(options)
+	if isTestFileTarget(target) {
+		return findFileTestsWithOptions(rootPath, target, options)
+	}
 	if isImpactPackageTarget(target) {
 		return findPackageTestsWithOptions(rootPath, target, options)
 	}
@@ -170,7 +176,7 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 	packages := map[string]struct{}{
 		normalizedTarget: {},
 	}
-	relatedTests, _, _ := collectRelatedTests(root, testFiles, packages, referenceTarget{})
+	relatedTests, _, _ := collectRelatedTests(root, testFiles, packages, referenceTarget{}, TestTargetKindPackage)
 	tests := filterTestsForScope(relatedTests, TestTargetKindPackage, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
 		Target:           normalizedTarget,
@@ -184,6 +190,59 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 		Kind:         TestTargetKindPackage,
 		Scope:        options.Scope,
 		AnalysisMode: TestAnalysisModeAST,
+		Tests:        tests,
+		Commands:     TestPlanCommands(plan),
+		TestPlan:     plan,
+	}, nil
+}
+
+func findFileTestsWithOptions(root string, target string, options TestOptions) (TestsResult, error) {
+	relativeFile, absoluteFile, err := normalizeTestFileTarget(root, target)
+	if err != nil {
+		return TestsResult{}, err
+	}
+
+	packagePath, err := packagePathForFile(root, absoluteFile)
+	if err != nil {
+		return TestsResult{}, err
+	}
+
+	fileSymbols, err := ParseFile(absoluteFile)
+	if err != nil {
+		return TestsResult{}, fmt.Errorf("parse %s: %w", relativeFile, err)
+	}
+
+	modulePath := readModulePath(root)
+	for i := range fileSymbols {
+		fileSymbols[i] = symbolRelativeToRoot(root, packagePath, modulePath, fileSymbols[i])
+	}
+
+	testFiles, err := collectTestFiles(root)
+	if err != nil {
+		return TestsResult{}, err
+	}
+
+	packages := map[string]struct{}{
+		packagePath: {},
+	}
+	targets := referenceTargetsForSymbols(fileSymbols, packagePath)
+	targetNames := referenceTargetNames(targets)
+	relatedTests, analysisMode, warnings := collectRelatedTestsForTargets(root, testFiles, packages, targets, TestTargetKindFile)
+	tests := filterTestsForScope(relatedTests, TestTargetKindFile, options.Scope)
+	plan := PlanTests(tests, TestPlanOptions{
+		Target:           relativeFile,
+		Kind:             TestTargetKindFile,
+		TargetPackages:   []string{packagePath},
+		FallbackPackages: []string{packagePath},
+		Targets:          targetNames,
+	})
+
+	return TestsResult{
+		Target:       relativeFile,
+		Kind:         TestTargetKindFile,
+		Scope:        options.Scope,
+		AnalysisMode: analysisMode,
+		Warnings:     warnings,
 		Tests:        tests,
 		Commands:     TestPlanCommands(plan),
 		TestPlan:     plan,
@@ -210,7 +269,7 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 		return TestsResult{}, err
 	}
 
-	relatedTests, analysisMode, warnings := collectRelatedTests(root, testFiles, packages, normalizedTarget)
+	relatedTests, analysisMode, warnings := collectRelatedTests(root, testFiles, packages, normalizedTarget, TestTargetKindSymbol)
 	tests := filterTestsForScope(relatedTests, TestTargetKindSymbol, options.Scope)
 	tests = annotateRelatedTestTargets(tests, normalizedTarget.String())
 	targetPackages := sortedMapKeys(packages)
@@ -231,6 +290,85 @@ func findSymbolTestsWithOptions(root string, target string, options TestOptions)
 		Commands:     TestPlanCommands(plan),
 		TestPlan:     plan,
 	}, nil
+}
+
+func isTestFileTarget(target string) bool {
+	value := strings.TrimSpace(filepath.ToSlash(target))
+	if value == "" {
+		return false
+	}
+
+	return path.Ext(value) == ".go"
+}
+
+func normalizeTestFileTarget(root string, target string) (string, string, error) {
+	value := strings.TrimSpace(target)
+	if value == "" {
+		return "", "", fmt.Errorf("file path is empty")
+	}
+	if filepath.IsAbs(value) {
+		return "", "", fmt.Errorf("absolute file paths are not supported: %s", target)
+	}
+
+	value = path.Clean(filepath.ToSlash(value))
+	if value == "." || path.IsAbs(value) || value == ".." || strings.HasPrefix(value, "../") {
+		return "", "", fmt.Errorf("tests file target must be a repository-local Go file: %s", target)
+	}
+	if path.Ext(value) != ".go" {
+		return "", "", fmt.Errorf("tests file target must be a repository-local Go file: %s", target)
+	}
+
+	filePath := filepath.Join(root, filepath.FromSlash(value))
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "", fmt.Errorf("tests file target not found: %s", value)
+		}
+		return "", "", fmt.Errorf("stat tests file %s: %w", value, err)
+	}
+	if info.IsDir() {
+		return "", "", fmt.Errorf("tests file target is a directory: %s", value)
+	}
+
+	return value, filePath, nil
+}
+
+func referenceTargetsForSymbols(symbols []Symbol, packagePath string) []referenceTarget {
+	targets := make([]referenceTarget, 0, len(symbols))
+	seen := make(map[string]struct{})
+	for _, symbol := range symbols {
+		name := strings.TrimSpace(symbol.Name)
+		if name == "" {
+			continue
+		}
+
+		target := referenceTarget{
+			Package:  packagePath,
+			Receiver: symbol.Receiver,
+			Name:     name,
+		}
+		key := target.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		targets = append(targets, target)
+	}
+
+	sort.SliceStable(targets, func(i int, j int) bool {
+		return targets[i].String() < targets[j].String()
+	})
+
+	return targets
+}
+
+func referenceTargetNames(targets []referenceTarget) []string {
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.String())
+	}
+
+	return uniqueSorted(names)
 }
 
 func annotateRelatedTestTargets(tests []RelatedTest, target string) []RelatedTest {
@@ -267,13 +405,13 @@ func appendRelatedTestReason(reasons []string, reason string) []string {
 	return append(reasons, reason)
 }
 
-func relatedTestReasons(packageMatches bool, directReference bool, externalPackage bool, target referenceTarget) []string {
+func relatedTestReasons(packageMatches bool, directReference bool, externalPackage bool, kind TestTargetKind) []string {
 	var reasons []string
 	if directReference {
 		reasons = appendRelatedTestReason(reasons, RelatedTestReasonDirectReference)
 	}
 	if packageMatches {
-		if target.Name == "" {
+		if kind == TestTargetKindPackage {
 			reasons = appendRelatedTestReason(reasons, RelatedTestReasonTargetPackage)
 		} else {
 			reasons = appendRelatedTestReason(reasons, RelatedTestReasonSamePackage)
@@ -370,10 +508,19 @@ func fileDefinesReferenceTarget(file *ast.File, target referenceTarget) bool {
 	return false
 }
 
-func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget) ([]RelatedTest, string, []string) {
+func collectRelatedTests(root string, testFiles []testFileInfo, packages map[string]struct{}, target referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
+	var targets []referenceTarget
+	if target.Name != "" {
+		targets = append(targets, target)
+	}
+
+	return collectRelatedTestsForTargets(root, testFiles, packages, targets, kind)
+}
+
+func collectRelatedTestsForTargets(root string, testFiles []testFileInfo, packages map[string]struct{}, targets []referenceTarget, kind TestTargetKind) ([]RelatedTest, string, []string) {
 	var tests []RelatedTest
 	modulePath := readModulePath(root)
-	typecheckedDirectReferences := analyzeTypecheckedDirectTestReferences(root, target)
+	typecheckedDirectReferences := analyzeTypecheckedDirectTestReferences(root, targets)
 
 	for _, testFile := range testFiles {
 		_, packageMatches := packages[testFile.Package]
@@ -385,11 +532,10 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				continue
 			}
 
-			directReference := false
-			if target.Name != "" {
-				directReference = typecheckedDirectReferences.Keys.Contains(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name) ||
-					functionReferencesTarget(funcDecl, target, packageMatches, imports)
-			}
+			directTargets := typecheckedDirectReferences.Keys.Targets(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name)
+			directTargets = append(directTargets, functionReferenceTargets(funcDecl, targets, packageMatches, imports)...)
+			directTargets = uniqueSorted(directTargets)
+			directReference := len(directTargets) > 0
 
 			if !packageMatches && !directReference {
 				continue
@@ -405,16 +551,16 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 				Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, funcDecl.Pos(), funcDecl.End()),
 				DirectReference: directReference,
 				ExternalPackage: externalPackage,
-				Reasons:         relatedTestReasons(packageMatches, directReference, externalPackage, target),
+				Reasons:         relatedTestReasons(packageMatches, directReference, externalPackage, kind),
+				Targets:         directTargets,
 			})
 
 			for _, subtest := range literalSubtests(funcDecl) {
-				subtestDirectReference := false
-				if target.Name != "" {
-					subtestName := funcDecl.Name.Name + "/" + subtest.Name
-					subtestDirectReference = typecheckedDirectReferences.Keys.Contains(root, testFile.FileSet, subtest.Pos, subtestName) ||
-						nodeReferencesTarget(subtest.Func.Body, target, packageMatches, imports)
-				}
+				subtestName := funcDecl.Name.Name + "/" + subtest.Name
+				subtestDirectTargets := typecheckedDirectReferences.Keys.Targets(root, testFile.FileSet, subtest.Pos, subtestName)
+				subtestDirectTargets = append(subtestDirectTargets, nodeReferenceTargets(subtest.Func.Body, targets, packageMatches, imports)...)
+				subtestDirectTargets = uniqueSorted(subtestDirectTargets)
+				subtestDirectReference := len(subtestDirectTargets) > 0
 
 				if !packageMatches && !subtestDirectReference {
 					continue
@@ -430,7 +576,8 @@ func collectRelatedTests(root string, testFiles []testFileInfo, packages map[str
 					Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, subtest.Pos, subtest.End),
 					DirectReference: subtestDirectReference,
 					ExternalPackage: externalPackage,
-					Reasons:         relatedTestReasons(packageMatches, subtestDirectReference, externalPackage, target),
+					Reasons:         relatedTestReasons(packageMatches, subtestDirectReference, externalPackage, kind),
+					Targets:         subtestDirectTargets,
 				})
 			}
 		}
@@ -475,8 +622,9 @@ func directRelatedTests(tests []RelatedTest) []RelatedTest {
 	return direct
 }
 
-func analyzeTypecheckedDirectTestReferences(root string, target referenceTarget) testReferenceAnalysis {
-	if target.Name == "" || !referenceShouldAttemptTypechecked(root) {
+func analyzeTypecheckedDirectTestReferences(root string, targets []referenceTarget) testReferenceAnalysis {
+	targets = namedReferenceTargets(targets)
+	if len(targets) == 0 || !referenceShouldAttemptTypechecked(root) {
 		return testReferenceAnalysis{AnalysisMode: TestAnalysisModeAST}
 	}
 
@@ -496,7 +644,7 @@ func analyzeTypecheckedDirectTestReferences(root string, target referenceTarget)
 		}
 	}
 
-	targetObjects := semanticReferenceTargetObjects(packages, target)
+	targetObjects := semanticReferenceTargetObjectsByTarget(packages, targets)
 	if len(targetObjects) == 0 {
 		return testReferenceAnalysis{
 			AnalysisMode: TestAnalysisModeTypecheckedAST,
@@ -513,16 +661,17 @@ func analyzeTypecheckedDirectTestReferences(root string, target referenceTarget)
 					continue
 				}
 
-				if typecheckedNodeReferencesTarget(pkg.Info, funcDecl.Body, targetObjects) {
-					keys.Add(root, pkg.FileSet, funcDecl.Pos(), funcDecl.Name.Name)
+				if directTargets := typecheckedNodeReferenceTargets(pkg.Info, funcDecl.Body, targetObjects); len(directTargets) > 0 {
+					keys.Add(root, pkg.FileSet, funcDecl.Pos(), funcDecl.Name.Name, directTargets)
 				}
 
 				for _, subtest := range literalSubtests(funcDecl) {
-					if !typecheckedNodeReferencesTarget(pkg.Info, subtest.Func.Body, targetObjects) {
+					directTargets := typecheckedNodeReferenceTargets(pkg.Info, subtest.Func.Body, targetObjects)
+					if len(directTargets) == 0 {
 						continue
 					}
 
-					keys.Add(root, pkg.FileSet, subtest.Pos, funcDecl.Name.Name+"/"+subtest.Name)
+					keys.Add(root, pkg.FileSet, subtest.Pos, funcDecl.Name.Name+"/"+subtest.Name, directTargets)
 				}
 			}
 		}
@@ -535,40 +684,77 @@ func analyzeTypecheckedDirectTestReferences(root string, target referenceTarget)
 	}
 }
 
-func typecheckedNodeReferencesTarget(info types.Info, node ast.Node, targetObjects map[types.Object]struct{}) bool {
-	if node == nil {
-		return false
+func namedReferenceTargets(targets []referenceTarget) []referenceTarget {
+	result := make([]referenceTarget, 0, len(targets))
+	seen := make(map[string]struct{})
+	for _, target := range targets {
+		if target.Name == "" {
+			continue
+		}
+		key := target.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, target)
 	}
 
-	found := false
-	ast.Inspect(node, func(node ast.Node) bool {
-		if found {
-			return false
-		}
+	return result
+}
 
+func semanticReferenceTargetObjectsByTarget(packages []referencePackage, targets []referenceTarget) map[types.Object]map[string]struct{} {
+	objectsByTarget := make(map[types.Object]map[string]struct{})
+	for _, target := range targets {
+		targetObjects := semanticReferenceTargetObjects(packages, target)
+		targetName := target.String()
+		for object := range targetObjects {
+			if objectsByTarget[object] == nil {
+				objectsByTarget[object] = make(map[string]struct{})
+			}
+			objectsByTarget[object][targetName] = struct{}{}
+		}
+	}
+
+	return objectsByTarget
+}
+
+func typecheckedNodeReferenceTargets(info types.Info, node ast.Node, targetObjects map[types.Object]map[string]struct{}) []string {
+	if node == nil {
+		return nil
+	}
+
+	targets := make(map[string]struct{})
+	ast.Inspect(node, func(node ast.Node) bool {
 		switch node := node.(type) {
 		case *ast.Ident:
 			object, _ := referenceIdentObject(info, node)
-			if referenceObjectMatchesTarget(object, targetObjects) {
-				found = true
-				return false
-			}
+			addTypecheckedReferenceTargets(targets, object, targetObjects)
 		case *ast.SelectorExpr:
 			object := info.Uses[node.Sel]
 			selection := info.Selections[node]
-			if referenceObjectMatchesTarget(object, targetObjects) || referenceSelectionMatchesTarget(selection, targetObjects) {
-				found = true
-				return false
+			addTypecheckedReferenceTargets(targets, object, targetObjects)
+			if selection != nil {
+				addTypecheckedReferenceTargets(targets, selection.Obj(), targetObjects)
 			}
 		}
 
 		return true
 	})
 
-	return found
+	return sortedMapKeys(targets)
 }
 
-func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token.Pos, name string) {
+func addTypecheckedReferenceTargets(targets map[string]struct{}, object types.Object, targetObjects map[types.Object]map[string]struct{}) {
+	if object == nil {
+		return
+	}
+
+	for target := range targetObjects[object] {
+		targets[target] = struct{}{}
+	}
+}
+
+func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token.Pos, name string, targets []string) {
 	if keys == nil {
 		return
 	}
@@ -578,16 +764,27 @@ func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token
 		return
 	}
 
-	keys[key] = struct{}{}
+	if keys[key] == nil {
+		keys[key] = make(map[string]struct{})
+	}
+	for _, target := range targets {
+		target = strings.TrimSpace(target)
+		if target != "" {
+			keys[key][target] = struct{}{}
+		}
+	}
 }
 
 func (keys testReferenceKeys) Contains(root string, fileSet *token.FileSet, pos token.Pos, name string) bool {
+	return len(keys.Targets(root, fileSet, pos, name)) > 0
+}
+
+func (keys testReferenceKeys) Targets(root string, fileSet *token.FileSet, pos token.Pos, name string) []string {
 	if keys == nil {
-		return false
+		return nil
 	}
 
-	_, ok := keys[testReferenceKey(root, fileSet, pos, name)]
-	return ok
+	return sortedMapKeys(keys[testReferenceKey(root, fileSet, pos, name)])
 }
 
 func testReferenceKey(root string, fileSet *token.FileSet, pos token.Pos, name string) string {
@@ -640,12 +837,35 @@ func isGoTestFunction(funcDecl *ast.FuncDecl) bool {
 	return funcDecl.Recv == nil && strings.HasPrefix(funcDecl.Name.Name, "Test")
 }
 
+func functionReferenceTargets(funcDecl *ast.FuncDecl, targets []referenceTarget, samePackage bool, imports map[string]string) []string {
+	if funcDecl.Body == nil {
+		return nil
+	}
+
+	return nodeReferenceTargets(funcDecl.Body, targets, samePackage, imports)
+}
+
 func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget, samePackage bool, imports map[string]string) bool {
 	if funcDecl.Body == nil {
 		return false
 	}
 
 	return nodeReferencesTarget(funcDecl.Body, target, samePackage, imports)
+}
+
+func nodeReferenceTargets(node ast.Node, targets []referenceTarget, samePackage bool, imports map[string]string) []string {
+	if node == nil || len(targets) == 0 {
+		return nil
+	}
+
+	var matches []string
+	for _, target := range targets {
+		if nodeReferencesTarget(node, target, samePackage, imports) {
+			matches = append(matches, target.String())
+		}
+	}
+
+	return uniqueSorted(matches)
 }
 
 func nodeReferencesTarget(node ast.Node, target referenceTarget, samePackage bool, imports map[string]string) bool {
