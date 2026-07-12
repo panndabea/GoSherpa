@@ -17,12 +17,30 @@ type LoadOptions struct {
 	BuildTags []string
 }
 
-type Index struct {
+type RepositoryIndex struct {
 	Root           string
 	ModulePath     string
+	Packages       []Package
+	Files          []File
 	Symbols        []sherpa.Symbol
 	FilesByPackage map[string][]string
 	Warnings       []string
+}
+
+type Index = RepositoryIndex
+
+type Package struct {
+	Path       string   `json:"path"`
+	Name       string   `json:"name"`
+	ImportPath string   `json:"importPath,omitempty"`
+	Dir        string   `json:"dir"`
+	Files      []string `json:"files"`
+}
+
+type File struct {
+	Path        string `json:"path"`
+	Package     string `json:"package"`
+	PackageName string `json:"packageName,omitempty"`
 }
 
 type symbolTarget struct {
@@ -32,18 +50,22 @@ type symbolTarget struct {
 }
 
 func Load(root string, options LoadOptions) (Index, error) {
+	return LoadRepositoryIndex(root, options)
+}
+
+func LoadRepositoryIndex(root string, options LoadOptions) (RepositoryIndex, error) {
 	repo, err := semantics.LoadRepository(root, semantics.LoadOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err != nil {
-		return Index{}, err
+		return RepositoryIndex{}, err
 	}
 
 	return FromRepository(repo)
 }
 
-func FromRepository(repo semantics.Repository) (Index, error) {
-	index := Index{
+func FromRepository(repo semantics.Repository) (RepositoryIndex, error) {
+	index := RepositoryIndex{
 		Root:           repo.Root,
 		ModulePath:     modulePath(repo.Root),
 		FilesByPackage: make(map[string][]string),
@@ -52,17 +74,25 @@ func FromRepository(repo semantics.Repository) (Index, error) {
 
 	for _, pkg := range repo.Packages {
 		files := semanticPackageFiles(repo.Root, pkg)
+		index.Packages = append(index.Packages, packageRecord(repo.Root, pkg, files))
 		if len(files) > 0 {
 			index.FilesByPackage[pkg.PackagePath] = uniqueSortedStrings(append(index.FilesByPackage[pkg.PackagePath], files...))
 		}
 
 		for _, file := range files {
+			index.Files = append(index.Files, File{
+				Path:        file,
+				Package:     pkg.PackagePath,
+				PackageName: pkg.Name,
+			})
 			symbols, warnings := symbolsFromFile(repo.Root, file, pkg.PackagePath, index.ModulePath)
 			index.Warnings = append(index.Warnings, warnings...)
 			index.Symbols = append(index.Symbols, symbols...)
 		}
 	}
 
+	sortPackages(index.Packages)
+	sortFiles(index.Files)
 	SortSymbols(index.Symbols)
 	index.Warnings = uniqueSortedStrings(index.Warnings)
 
@@ -76,6 +106,27 @@ func (index Index) HasPackage(packagePath string) bool {
 
 func (index Index) PackageFiles(packagePath string) []string {
 	return append([]string{}, index.FilesByPackage[packagePath]...)
+}
+
+func (index Index) FindPackage(packagePath string) (Package, bool) {
+	for _, pkg := range index.Packages {
+		if pkg.Path == packagePath {
+			return clonePackage(pkg), true
+		}
+	}
+
+	return Package{}, false
+}
+
+func (index Index) FindFile(file string) (File, bool) {
+	file = filepath.ToSlash(file)
+	for _, indexedFile := range index.Files {
+		if filepath.ToSlash(indexedFile.Path) == file {
+			return indexedFile, true
+		}
+	}
+
+	return File{}, false
 }
 
 func (index Index) SymbolsInFile(file string) []sherpa.Symbol {
@@ -126,6 +177,29 @@ func (index Index) FindSymbol(target string) (sherpa.Symbol, bool, error) {
 	}
 
 	return matches[0], true, nil
+}
+
+func packageRecord(root string, pkg semantics.Package, files []string) Package {
+	return Package{
+		Path:       pkg.PackagePath,
+		Name:       pkg.Name,
+		ImportPath: pkg.ImportPath,
+		Dir:        packageRelativeDir(root, pkg),
+		Files:      append([]string{}, files...),
+	}
+}
+
+func packageRelativeDir(root string, pkg semantics.Package) string {
+	relative, ok := relativeFile(root, pkg.Dir)
+	if ok {
+		return relative
+	}
+
+	if pkg.PackagePath == "." {
+		return "."
+	}
+
+	return strings.TrimPrefix(pkg.PackagePath, "./")
 }
 
 func semanticPackageFiles(root string, pkg semantics.Package) []string {
@@ -384,6 +458,29 @@ func SortSymbols(symbols []sherpa.Symbol) {
 
 		return symbols[i].DisplayName() < symbols[j].DisplayName()
 	})
+}
+
+func sortPackages(packages []Package) {
+	sort.SliceStable(packages, func(i int, j int) bool {
+		if packages[i].Path != packages[j].Path {
+			return packages[i].Path < packages[j].Path
+		}
+		return packages[i].Name < packages[j].Name
+	})
+}
+
+func sortFiles(files []File) {
+	sort.SliceStable(files, func(i int, j int) bool {
+		if files[i].Package != files[j].Package {
+			return files[i].Package < files[j].Package
+		}
+		return files[i].Path < files[j].Path
+	})
+}
+
+func clonePackage(pkg Package) Package {
+	pkg.Files = append([]string{}, pkg.Files...)
+	return pkg
 }
 
 func uniqueSortedStrings(values []string) []string {

@@ -12,14 +12,12 @@ import (
 )
 
 type contextSemanticSnapshot struct {
-	modulePath     string
-	symbols        []sherpa.Symbol
-	filesByPackage map[string][]string
-	warnings       []string
+	index    symbolindex.RepositoryIndex
+	warnings []string
 }
 
 func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemanticSnapshot, bool) {
-	index, err := symbolindex.Load(root, symbolindex.LoadOptions{
+	index, err := symbolindex.LoadRepositoryIndex(root, symbolindex.LoadOptions{
 		BuildTags: buildTags,
 	})
 	if err != nil {
@@ -29,25 +27,21 @@ func loadContextSemanticSnapshot(root string, buildTags []string) (contextSemant
 	}
 
 	snapshot := contextSemanticSnapshot{
-		modulePath:     index.ModulePath,
-		symbols:        append([]sherpa.Symbol{}, index.Symbols...),
-		filesByPackage: cloneFilesByPackage(index.FilesByPackage),
-		warnings:       append([]string{}, index.Warnings...),
+		index:    index,
+		warnings: append([]string{}, index.Warnings...),
 	}
 
-	sortSymbols(snapshot.symbols)
 	snapshot.warnings = uniqueStrings(snapshot.warnings)
 
 	return snapshot, true
 }
 
 func (snapshot contextSemanticSnapshot) hasPackage(packagePath string) bool {
-	_, ok := snapshot.filesByPackage[packagePath]
-	return ok
+	return snapshot.index.HasPackage(packagePath)
 }
 
 func (snapshot contextSemanticSnapshot) packageFiles(root string, packagePath string) ([]string, []string) {
-	files := append([]string{}, snapshot.filesByPackage[packagePath]...)
+	files := snapshot.index.PackageFiles(packagePath)
 	testFiles, warnings := contextTestFilesForPackage(root, packagePath)
 	files = append(files, testFiles...)
 
@@ -55,12 +49,12 @@ func (snapshot contextSemanticSnapshot) packageFiles(root string, packagePath st
 }
 
 func (snapshot contextSemanticSnapshot) symbolsInFile(root string, file string, packagePath string) ([]sherpa.Symbol, []string) {
-	symbols := symbolsInFile(snapshot.symbols, file)
+	symbols := snapshot.index.SymbolsInFile(file)
 	if !strings.HasSuffix(file, "_test.go") {
 		return symbols, nil
 	}
 
-	testSymbols, warnings := contextSymbolsFromFile(root, file, packagePath, snapshot.modulePath)
+	testSymbols, warnings := contextSymbolsFromFile(root, file, packagePath, snapshot.index.ModulePath)
 	symbols = append(symbols, testSymbols...)
 	sortSymbols(symbols)
 
@@ -68,10 +62,10 @@ func (snapshot contextSemanticSnapshot) symbolsInFile(root string, file string, 
 }
 
 func (snapshot contextSemanticSnapshot) symbolsInPackage(root string, packagePath string) ([]sherpa.Symbol, []string) {
-	symbols := symbolsInPackage(snapshot.symbols, packagePath)
+	symbols := snapshot.index.SymbolsInPackage(packagePath)
 	testFiles, warnings := contextTestFilesForPackage(root, packagePath)
 	for _, file := range testFiles {
-		fileSymbols, fileWarnings := contextSymbolsFromFile(root, file, packagePath, snapshot.modulePath)
+		fileSymbols, fileWarnings := contextSymbolsFromFile(root, file, packagePath, snapshot.index.ModulePath)
 		warnings = append(warnings, fileWarnings...)
 		symbols = append(symbols, fileSymbols...)
 	}
@@ -79,15 +73,6 @@ func (snapshot contextSemanticSnapshot) symbolsInPackage(root string, packagePat
 	sortSymbols(symbols)
 
 	return symbols, uniqueStrings(warnings)
-}
-
-func cloneFilesByPackage(values map[string][]string) map[string][]string {
-	clone := make(map[string][]string, len(values))
-	for key, files := range values {
-		clone[key] = append([]string{}, files...)
-	}
-
-	return clone
 }
 
 func contextTestFilesForPackage(root string, packagePath string) ([]string, []string) {

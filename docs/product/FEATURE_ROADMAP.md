@@ -1385,6 +1385,10 @@ Done when:
 
 The roadmap becomes much easier once GoSherpa has a shared repository index.
 
+Status: first internal v0 implemented for typechecked package, file, and symbol
+inventory. References, calls, implementations, tests, and persisted reuse remain
+future expansion.
+
 Candidate model:
 
 ```text

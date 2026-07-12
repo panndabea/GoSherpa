@@ -140,7 +140,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 
 func findSymbolIdentity(root string, target string, options AnalyzeOptions) (sherpa.Symbol, string, []string, error) {
 	var warnings []string
-	index, err := symbolindex.Load(root, symbolindex.LoadOptions{
+	index, err := symbolindex.LoadRepositoryIndex(root, symbolindex.LoadOptions{
 		BuildTags: options.BuildTags,
 	})
 	if err == nil {
