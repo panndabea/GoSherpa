@@ -8,6 +8,7 @@ import (
 	_ "unsafe"
 
 	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
@@ -189,6 +190,52 @@ func TestMainImpactCommandSharesSemanticSession(t *testing.T) {
 	}
 	if testRepositoryLoads != 1 {
 		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
+func TestMainInterfaceCommandSharesSemanticSession(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+
+	original := mainTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		mainTestLoadSemanticContextRepository = original
+	}()
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interface", "./internal/auth.Authenticator", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "interface", "./internal/auth.Authenticator", "example.com/app")
+	if data["analysisMode"] != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("analysis mode = %v, want %s", data["analysisMode"], impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %v, want %s", data["referenceAnalysisMode"], sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if data["methodUsageAnalysisMode"] != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("method usage analysis mode = %v, want %s", data["methodUsageAnalysisMode"], impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 0 {
+		t.Fatalf("expected no shared semantic test repository loads, got %d", testRepositoryLoads)
 	}
 }
 

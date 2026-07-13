@@ -805,9 +805,17 @@ func runImplementersCommand(invocation cliInvocation, stdout io.Writer, stderr i
 
 	target := invocation.CommandArgs[0]
 
-	result, err := impactengine.FindImplementersWithOptions(root, target, impactengine.InterfaceOptions{
+	options := impactengine.InterfaceOptions{
+		BuildTags: invocation.BuildTags,
+	}
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
 		BuildTags: invocation.BuildTags,
 	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
+	}
+
+	result, err := impactengine.FindImplementersWithContext(semanticContext, target, options)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
 	}
@@ -840,9 +848,17 @@ func runInterfaceCommand(invocation cliInvocation, stdout io.Writer, stderr io.W
 
 	target := invocation.CommandArgs[0]
 
-	result, err := impactengine.InspectInterfaceWithOptions(root, target, impactengine.InterfaceOptions{
+	options := impactengine.InterfaceOptions{
+		BuildTags: invocation.BuildTags,
+	}
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
 		BuildTags: invocation.BuildTags,
 	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "interface", target, stderr, err)
+	}
+
+	result, err := impactengine.InspectInterfaceWithContext(semanticContext, target, options)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "interface", target, stderr, err)
 	}
@@ -875,9 +891,17 @@ func runInterfacesCommand(invocation cliInvocation, stdout io.Writer, stderr io.
 
 	target := invocation.CommandArgs[0]
 
-	result, err := impactengine.FindInterfacesWithOptions(root, target, impactengine.InterfaceOptions{
+	options := impactengine.InterfaceOptions{
+		BuildTags: invocation.BuildTags,
+	}
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
 		BuildTags: invocation.BuildTags,
 	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
+	}
+
+	result, err := impactengine.FindInterfacesWithContext(semanticContext, target, options)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
 	}

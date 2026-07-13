@@ -231,6 +231,120 @@ func (EnterpriseRunner) Run() error {
 	}
 }
 
+func TestInterfaceWithContextReusesSemanticContext(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
+	originalContextLoader := impactTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	impactTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			t.Fatalf("interface commands should not load test repositories")
+		}
+
+		repositoryLoads++
+		return originalContextLoader(root, options)
+	}
+	defer func() {
+		impactTestLoadSemanticContextRepository = originalContextLoader
+	}()
+
+	oldInterfaceLoader := loadSemanticInterfaceRepository
+	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("separate interface loader should not be used")
+	}
+	defer func() {
+		loadSemanticInterfaceRepository = oldInterfaceLoader
+	}()
+
+	implementers, err := FindImplementersWithContext(context, "./internal/auth.Authenticator", InterfaceOptions{})
+	if err != nil {
+		t.Fatalf("FindImplementersWithContext returned error: %v", err)
+	}
+	if implementers.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked implementers mode, got %q with warnings %#v", implementers.AnalysisMode, implementers.Warnings)
+	}
+
+	interfaces, err := FindInterfacesWithContext(context, "./internal/jwt.JWTAuthenticator", InterfaceOptions{})
+	if err != nil {
+		t.Fatalf("FindInterfacesWithContext returned error: %v", err)
+	}
+	if interfaces.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked interfaces mode, got %q with warnings %#v", interfaces.AnalysisMode, interfaces.Warnings)
+	}
+
+	inspection, err := InspectInterfaceWithContext(context, "./internal/auth.Authenticator", InterfaceOptions{})
+	if err != nil {
+		t.Fatalf("InspectInterfaceWithContext returned error: %v", err)
+	}
+	if inspection.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked inspection mode, got %q with warnings %#v", inspection.AnalysisMode, inspection.Warnings)
+	}
+	if inspection.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked reference mode, got %q with warnings %#v", inspection.ReferenceAnalysisMode, inspection.Warnings)
+	}
+	if inspection.MethodUsageAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked method usage mode, got %q with warnings %#v", inspection.MethodUsageAnalysisMode, inspection.Warnings)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+}
+
+func TestInterfaceWithContextRejectsBuildTagMismatch(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "implementers",
+			run: func() error {
+				_, err := FindImplementersWithContext(context, "./internal/auth.Authenticator", InterfaceOptions{})
+				return err
+			},
+		},
+		{
+			name: "interface",
+			run: func() error {
+				_, err := InspectInterfaceWithContext(context, "./internal/auth.Authenticator", InterfaceOptions{})
+				return err
+			},
+		},
+		{
+			name: "interfaces",
+			run: func() error {
+				_, err := FindInterfacesWithContext(context, "./internal/jwt.JWTAuthenticator", InterfaceOptions{})
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.run()
+			if err == nil {
+				t.Fatal("expected build-tag mismatch error")
+			}
+			if !strings.Contains(err.Error(), "build tags") {
+				t.Fatalf("expected build-tag mismatch error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestFindImplementersUsesTypecheckedLoaderAcrossGoWorkModules(t *testing.T) {
 	root := t.TempDir()
 

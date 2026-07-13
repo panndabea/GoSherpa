@@ -133,7 +133,19 @@ func FindImplementers(root string, target string) (ImplementersResult, error) {
 }
 
 func FindImplementersWithOptions(root string, target string, options InterfaceOptions) (ImplementersResult, error) {
-	graph, err := buildInterfaceGraph(root, options)
+	return findImplementersWithContext(nil, root, target, options)
+}
+
+func FindImplementersWithContext(context *sherpa.SemanticContext, target string, options InterfaceOptions) (ImplementersResult, error) {
+	if err := requireInterfaceContext(context, options); err != nil {
+		return ImplementersResult{}, err
+	}
+
+	return findImplementersWithContext(context, context.Root(), target, options)
+}
+
+func findImplementersWithContext(context *sherpa.SemanticContext, root string, target string, options InterfaceOptions) (ImplementersResult, error) {
+	graph, err := buildInterfaceGraphWithContext(context, root, options)
 	if err != nil {
 		return ImplementersResult{}, err
 	}
@@ -156,7 +168,19 @@ func FindInterfaces(root string, target string) (InterfacesResult, error) {
 }
 
 func FindInterfacesWithOptions(root string, target string, options InterfaceOptions) (InterfacesResult, error) {
-	graph, err := buildInterfaceGraph(root, options)
+	return findInterfacesWithContext(nil, root, target, options)
+}
+
+func FindInterfacesWithContext(context *sherpa.SemanticContext, target string, options InterfaceOptions) (InterfacesResult, error) {
+	if err := requireInterfaceContext(context, options); err != nil {
+		return InterfacesResult{}, err
+	}
+
+	return findInterfacesWithContext(context, context.Root(), target, options)
+}
+
+func findInterfacesWithContext(context *sherpa.SemanticContext, root string, target string, options InterfaceOptions) (InterfacesResult, error) {
+	graph, err := buildInterfaceGraphWithContext(context, root, options)
 	if err != nil {
 		return InterfacesResult{}, err
 	}
@@ -179,7 +203,19 @@ func InspectInterface(root string, target string) (InterfaceResult, error) {
 }
 
 func InspectInterfaceWithOptions(root string, target string, options InterfaceOptions) (InterfaceResult, error) {
-	graph, err := buildInterfaceGraph(root, options)
+	return inspectInterfaceWithContext(nil, root, target, options)
+}
+
+func InspectInterfaceWithContext(context *sherpa.SemanticContext, target string, options InterfaceOptions) (InterfaceResult, error) {
+	if err := requireInterfaceContext(context, options); err != nil {
+		return InterfaceResult{}, err
+	}
+
+	return inspectInterfaceWithContext(context, context.Root(), target, options)
+}
+
+func inspectInterfaceWithContext(context *sherpa.SemanticContext, root string, target string, options InterfaceOptions) (InterfaceResult, error) {
+	graph, err := buildInterfaceGraphWithContext(context, root, options)
 	if err != nil {
 		return InterfaceResult{}, err
 	}
@@ -191,13 +227,13 @@ func InspectInterfaceWithOptions(root string, target string, options InterfaceOp
 
 	methods := interfaceMethodsForResult(graph, iface)
 	methodUsageAnalysisMode := InterfaceAnalysisModeASTFallback
-	methodUsages, methodWarnings, methodUsageTypechecked := findInterfaceMethodUsages(root, iface, options)
+	methodUsages, methodWarnings, methodUsageTypechecked := findInterfaceMethodUsagesWithContext(context, root, iface, options)
 	if methodUsageTypechecked {
 		methodUsageAnalysisMode = InterfaceAnalysisModeTypechecked
 		methods = attachInterfaceMethodUsages(methods, methodUsages)
 	}
 
-	references, referenceAnalysisMode, referenceWarnings := interfaceReferences(root, iface.Qualified, options)
+	references, referenceAnalysisMode, referenceWarnings := interfaceReferencesWithContext(context, root, iface.Qualified, options)
 	limitations := interfaceResultLimitations(graph.AnalysisMode, methodUsageAnalysisMode)
 
 	return InterfaceResult{
@@ -427,6 +463,17 @@ func interfaceContextSupportsBuildTags(context *sherpa.SemanticContext, options 
 	}
 
 	return strings.Join(context.BuildTags(), "\x00") == strings.Join(semantics.NormalizeBuildTags(options.BuildTags), "\x00")
+}
+
+func requireInterfaceContext(context *sherpa.SemanticContext, options InterfaceOptions) error {
+	if context == nil {
+		return fmt.Errorf("semantic context is nil")
+	}
+	if !interfaceContextSupportsBuildTags(context, options) {
+		return fmt.Errorf("semantic context build tags do not match interface options")
+	}
+
+	return nil
 }
 
 func interfaceShouldAttemptTypechecked(root string) bool {
@@ -906,9 +953,21 @@ func attachInterfaceMethodUsages(methods []InterfaceMethod, usages map[string][]
 }
 
 func interfaceReferences(root string, target string, options InterfaceOptions) ([]sherpa.Reference, string, []string) {
-	report, err := sherpa.FindReferenceReportWithOptions(root, target, sherpa.ReferenceOptions{
+	return interfaceReferencesWithContext(nil, root, target, options)
+}
+
+func interfaceReferencesWithContext(context *sherpa.SemanticContext, root string, target string, options InterfaceOptions) ([]sherpa.Reference, string, []string) {
+	referenceOptions := sherpa.ReferenceOptions{
 		BuildTags: options.BuildTags,
-	})
+	}
+
+	var report sherpa.ReferenceReport
+	var err error
+	if context != nil && interfaceContextSupportsBuildTags(context, options) {
+		report, err = sherpa.FindReferenceReportWithContext(context, target, referenceOptions)
+	} else {
+		report, err = sherpa.FindReferenceReportWithOptions(root, target, referenceOptions)
+	}
 	if err != nil {
 		return []sherpa.Reference{}, sherpa.ReferenceAnalysisModeASTFallback, []string{fmt.Sprintf("interface references unavailable: %v", err)}
 	}
@@ -922,14 +981,28 @@ func interfaceReferences(root string, target string, options InterfaceOptions) (
 }
 
 func findInterfaceMethodUsages(root string, iface interfaceInfo, options InterfaceOptions) (map[string][]InterfaceMethodUsage, []string, bool) {
+	return findInterfaceMethodUsagesWithContext(nil, root, iface, options)
+}
+
+func findInterfaceMethodUsagesWithContext(context *sherpa.SemanticContext, root string, iface interfaceInfo, options InterfaceOptions) (map[string][]InterfaceMethodUsage, []string, bool) {
 	usages := make(map[string][]InterfaceMethodUsage)
 	if !interfaceShouldAttemptTypechecked(root) {
 		return usages, nil, false
 	}
 
-	repo, err := loadSemanticInterfaceRepository(root, semantics.LoadOptions{
-		BuildTags: options.BuildTags,
-	})
+	var repo semantics.Repository
+	var err error
+	if context != nil && interfaceContextSupportsBuildTags(context, options) {
+		var attempted bool
+		repo, attempted, err = context.TypecheckedRepository()
+		if !attempted {
+			return usages, nil, false
+		}
+	} else {
+		repo, err = loadSemanticInterfaceRepository(root, semantics.LoadOptions{
+			BuildTags: options.BuildTags,
+		})
+	}
 	if err != nil {
 		return usages, []string{fmt.Sprintf("typechecked interface method usage unavailable: %v", err)}, false
 	}
