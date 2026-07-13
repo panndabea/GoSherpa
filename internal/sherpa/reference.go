@@ -109,6 +109,9 @@ func FindReferenceReportWithContext(context *SemanticContext, name string, optio
 	if context == nil {
 		return ReferenceReport{}, fmt.Errorf("semantic context is nil")
 	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return ReferenceReport{}, fmt.Errorf("semantic context build tags do not match reference options")
+	}
 
 	target, err := normalizeReferenceTarget(context.root, name)
 	if err != nil {

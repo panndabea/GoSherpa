@@ -186,6 +186,9 @@ func FindCalleesWithContext(context *SemanticContext, target string, options Cal
 	if context == nil {
 		return CalleesResult{}, fmt.Errorf("semantic context is nil")
 	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return CalleesResult{}, fmt.Errorf("semantic context build tags do not match call options")
+	}
 
 	normalizedTarget, err := normalizeCallTarget(context.root, target)
 	if err != nil {
@@ -256,6 +259,9 @@ func FindCallersWithOptions(root string, target string, options CallOptions) (Ca
 func FindCallersWithContext(context *SemanticContext, target string, options CallOptions) (CallersResult, error) {
 	if context == nil {
 		return CallersResult{}, fmt.Errorf("semantic context is nil")
+	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return CallersResult{}, fmt.Errorf("semantic context build tags do not match call options")
 	}
 
 	normalizedTarget, err := normalizeCallTarget(context.root, target)

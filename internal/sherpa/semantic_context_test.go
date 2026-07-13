@@ -253,3 +253,36 @@ func TestSemanticContextRejectsImpactBuildTagMismatch(t *testing.T) {
 		t.Fatalf("expected build tag mismatch batch error, got %#v", results)
 	}
 }
+
+func TestSemanticContextRejectsRelationshipBuildTagMismatch(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	context, err := NewSemanticContext(tmp, SemanticContextOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = FindReferenceReportWithContext(context, "Target", ReferenceOptions{
+		BuildTags: []string{"integration"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match reference options") {
+		t.Fatalf("expected reference build tag mismatch error, got %v", err)
+	}
+
+	_, err = FindCallersWithContext(context, "Target", CallOptions{
+		BuildTags: []string{"integration"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match call options") {
+		t.Fatalf("expected caller build tag mismatch error, got %v", err)
+	}
+
+	_, err = FindCalleesWithContext(context, "Target", CallOptions{
+		BuildTags: []string{"integration"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match call options") {
+		t.Fatalf("expected callee build tag mismatch error, got %v", err)
+	}
+}
