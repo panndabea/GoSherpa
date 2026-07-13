@@ -11,6 +11,7 @@ import (
 
 	gitdiff "github.com/panndabea/GoSherpa/internal/git"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/symbolindex"
 )
 
 type Analyzer struct {
@@ -267,6 +268,10 @@ func (a Analyzer) AnalyzeSymbolWithContext(context *sherpa.SemanticContext, targ
 }
 
 func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) (ImpactReport, error) {
+	if err := a.requireUniqueSymbolTarget(target, context); err != nil {
+		return ImpactReport{}, err
+	}
+
 	impactOptions := sherpa.ImpactOptions{
 		BuildTags: a.BuildTags,
 	}
@@ -301,6 +306,32 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 	report = a.enrichSymbolContractTestsWithContext(context, report, result, contractPackages, contractTargetsByPackage(signals))
 
 	return normalizeReport(report), nil
+}
+
+func (a Analyzer) requireUniqueSymbolTarget(target string, context *sherpa.SemanticContext) error {
+	root := a.Root
+	if context != nil {
+		root = context.Root()
+		repo, attempted, err := context.TypecheckedRepository()
+		if attempted && err == nil {
+			index, err := symbolindex.FromRepository(repo)
+			if err == nil {
+				if _, found, err := index.FindSymbol(target); err != nil {
+					return err
+				} else if found {
+					return nil
+				}
+			}
+		}
+	}
+
+	symbols, err := sherpa.ParseRepository(root)
+	if err != nil {
+		return err
+	}
+
+	_, err = sherpa.FindSymbolTarget(root, symbols, target)
+	return err
 }
 
 func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {

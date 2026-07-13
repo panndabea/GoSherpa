@@ -294,6 +294,29 @@ func TestAnalyzeSymbolReportsSymbolImpact(t *testing.T) {
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 }
 
+func TestAnalyzeSymbolReportsAmbiguousSymbolTargets(t *testing.T) {
+	root := writeAmbiguousSymbolImpactProject(t)
+
+	_, err := AnalyzeSymbol(root, "Target")
+	if err == nil {
+		t.Fatal("expected ambiguous symbol error")
+	}
+
+	var ambiguity *sherpa.AmbiguousTargetError
+	if !errors.As(err, &ambiguity) {
+		t.Fatalf("expected AmbiguousTargetError, got %T: %v", err, err)
+	}
+	if ambiguity.Kind != "symbol" {
+		t.Fatalf("expected symbol ambiguity, got %q", ambiguity.Kind)
+	}
+	if len(ambiguity.Candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %#v", ambiguity.Candidates)
+	}
+	if !strings.Contains(err.Error(), "./internal/auth.Target") || !strings.Contains(err.Error(), "./internal/billing.Target") {
+		t.Fatalf("expected package-qualified examples, got %v", err)
+	}
+}
+
 func TestAnalyzeSymbolHonorsPackageQualifiedTargets(t *testing.T) {
 	root := writePackageQualifiedSymbolImpactProject(t)
 
@@ -534,6 +557,23 @@ func writeImpactAnalysisProject(t *testing.T) string {
 	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), "package auth\n\nimport \"testing\"\n\nfunc TestSession(t *testing.T) { _ = Session{} }\n")
 	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler.go"), "package api\n\nimport \"example.com/app/internal/auth\"\n\nvar _ = auth.Session{}\n")
 	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler_test.go"), "package api\n\nimport \"testing\"\n\nfunc TestHandler(t *testing.T) {}\n")
+
+	return root
+}
+
+func writeAmbiguousSymbolImpactProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+func Target() {}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "billing", "billing.go"), `package billing
+
+func Target() {}
+`)
 
 	return root
 }
