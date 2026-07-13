@@ -96,9 +96,10 @@ Supported context flags:
 - `--max-references <n>` limits symbol references, callers, and callees.
 - `--max-symbols <n>` limits symbol lists and matching source excerpts.
 - `--max-tests <n>` limits related or affected test lists.
-- `--max-bytes <n>` applies a best-effort byte budget to the context data
-  payload by omitting large fields in a deterministic order while keeping JSON
-  valid.
+- `--max-bytes <n>` applies a best-effort byte budget to the context `data`
+  payload, not the shared JSON envelope. Large fields are omitted in a
+  deterministic order while keeping JSON valid and leaving envelope warnings
+  outside `data`.
 - `--source-radius <n>` limits source excerpt radius for symbol, file, and
   package context. `0` means target line only.
 
@@ -108,9 +109,9 @@ changed-symbol inventory; missing, stale, or invalid snapshots fall back to live
 diff context analysis with a warning.
 
 Purpose and risk are computed before output truncation. The `truncated` object
-explains what was omitted from the bounded context bundle.
-If the requested byte budget is smaller than the minimum report shell, the
-`truncated.byteBudgetOverage` field reports the remaining byte overage.
+explains what was omitted from the bounded context `data` bundle.
+If the requested byte budget is smaller than the minimum `data` report shell,
+the `truncated.byteBudgetOverage` field reports the remaining byte overage.
 
 ## Context Kinds
 
