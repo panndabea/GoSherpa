@@ -240,6 +240,108 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 	}
 }
 
+func TestMainAdditionalAgentJSONMetadataContracts(t *testing.T) {
+	tests := []struct {
+		name    string
+		root    func(t *testing.T) string
+		args    []string
+		command string
+		target  string
+	}{
+		{
+			name: "architecture",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"architecture", "--json"},
+			command: "architecture",
+			target:  ".",
+		},
+		{
+			name: "risk",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"risk", "--json"},
+			command: "risk",
+			target:  ".",
+		},
+		{
+			name: "refs",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"refs", "Target", "--json"},
+			command: "refs",
+			target:  "Target",
+		},
+		{
+			name: "path",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"path", "Entry", "Target", "--json"},
+			command: "path",
+			target:  "Entry -> Target",
+		},
+		{
+			name: "paths",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"paths", "Entry", "Target", "--limit", "2", "--json"},
+			command: "paths",
+			target:  "Entry -> Target",
+		},
+		{
+			name: "impact diff",
+			root: func(t *testing.T) string {
+				return writeMainPRDiffProject(t)
+			},
+			args:    []string{"impact", "diff", "--base", "HEAD", "--json"},
+			command: "impact diff",
+			target:  "HEAD",
+		},
+		{
+			name: "implementers",
+			root: func(t *testing.T) string {
+				return writeMainInterfaceProject(t)
+			},
+			args:    []string{"implementers", "./internal/auth.Authenticator", "--json"},
+			command: "implementers",
+			target:  "./internal/auth.Authenticator",
+		},
+		{
+			name: "interfaces",
+			root: func(t *testing.T) string {
+				return writeMainInterfaceProject(t)
+			},
+			args:    []string{"interfaces", "./internal/jwt.JWTAuthenticator", "--json"},
+			command: "interfaces",
+			target:  "./internal/jwt.JWTAuthenticator",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := test.root(t)
+			args := append([]string{"gosherpa", "--root", root}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+
+			payload := decodeMainTestJSON(t, result.Stdout)
+			data := assertMainTestJSONEnvelope(t, payload, root, test.command, test.target, "example.com/app")
+			assertMainTestAgentMetadataContract(t, payload, data)
+		})
+	}
+}
+
 func TestMainInterfaceJSONSchemaContract(t *testing.T) {
 	tmp := writeMainInterfaceProject(t)
 
@@ -319,6 +421,7 @@ func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 			t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
 		}
 	}
+	assertMainTestTestPlanContract(t, data, "testPlan")
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -365,12 +468,7 @@ func TestMainTestsAffectedJSONSchemaContract(t *testing.T) {
 		}
 	}
 
-	testPlan := assertMainTestJSONObject(t, data, "testPlan")
-	for _, field := range []string{"direct", "related", "callerPackages", "fallback"} {
-		if _, ok := testPlan[field].([]any); !ok {
-			t.Fatalf("expected data.testPlan.%s to be a JSON array, got %T", field, testPlan[field])
-		}
-	}
+	assertMainTestTestPlanContract(t, data, "testPlan")
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
@@ -435,6 +533,7 @@ func TestMainPRJSONSchemaContract(t *testing.T) {
 			t.Fatalf("expected data.%s to be a JSON object, got %T", field, data[field])
 		}
 	}
+	assertMainTestTestPlanContract(t, data, "testPlan")
 
 	repositoryRisk := assertMainTestJSONObject(t, data, "repositoryRisk")
 	for _, field := range []string{"limitations", "factors", "packages", "cycles"} {
@@ -553,4 +652,39 @@ func AddedSecond() {}
 `)
 
 	return tmp
+}
+
+func assertMainTestAgentMetadataContract(t *testing.T, payload map[string]any, data map[string]any) {
+	t.Helper()
+
+	assertMainTestJSONArray(t, payload, "warnings")
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+
+	analysisMode, ok := data["analysisMode"].(string)
+	if !ok || strings.TrimSpace(analysisMode) == "" {
+		t.Fatalf("expected non-empty analysisMode string, got %#v", data["analysisMode"])
+	}
+
+	confidence, ok := data["confidence"].(string)
+	if !ok || (confidence != agentcontext.ConfidenceMedium && confidence != agentcontext.ConfidenceLow) {
+		t.Fatalf("expected confidence %q or %q, got %#v", agentcontext.ConfidenceMedium, agentcontext.ConfidenceLow, data["confidence"])
+	}
+
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if len(limitations) == 0 {
+		t.Fatal("expected non-empty limitations array")
+	}
+}
+
+func assertMainTestTestPlanContract(t *testing.T, data map[string]any, key string) {
+	t.Helper()
+
+	testPlan := assertMainTestJSONObject(t, data, key)
+	for _, field := range []string{"direct", "related", "contracts", "callerPackages", "fallback"} {
+		if _, ok := testPlan[field].([]any); !ok {
+			t.Fatalf("expected data.%s.%s to be a JSON array, got %T", key, field, testPlan[field])
+		}
+	}
 }
