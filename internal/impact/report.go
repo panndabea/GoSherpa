@@ -153,7 +153,6 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.CallAnalysisMode = symbolImpact.CallAnalysisMode
 	report.TestAnalysisMode = symbolImpact.TestAnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, symbolImpact.Warnings...))
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, report.Warnings)
 	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -164,6 +163,9 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.AffectedImplementations = signals.Implementations
 	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
+	contractPackages := contractPackagesForSignals(signals)
+	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
 
 	return normalizeReport(report), nil
 }
@@ -226,7 +228,6 @@ func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticC
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, report.Warnings)
 	signals, err := interfaceSignalsForPackagesWithContext(context, a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
@@ -237,6 +238,9 @@ func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticC
 	report.AffectedImplementations = signals.Implementations
 	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
+	contractPackages := contractPackagesForSignals(signals)
+	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, contractPackages, report.Warnings)
 
 	return normalizeReport(report), nil
 }
@@ -286,6 +290,9 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 	report.AffectedImplementations = signals.Implementations
 	report.InterfaceAnalysisMode = signals.AnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
+	contractPackages := contractPackagesForSignals(signals)
+	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
+	report = a.enrichSymbolContractTestsWithContext(context, report, result, contractPackages, contractTargetsByPackage(signals))
 
 	return normalizeReport(report), nil
 }
@@ -301,6 +308,63 @@ func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 		TestPlan:              result.TestPlan,
 		Warnings:              result.Warnings,
 	}
+}
+
+func (a Analyzer) enrichSymbolContractTestsWithContext(context *sherpa.SemanticContext, report ImpactReport, result sherpa.ImpactResult, contractPackages []string, targetsByPackage map[string][]string) ImpactReport {
+	contractPackages = uniqueSortedStrings(contractPackages)
+	if len(contractPackages) == 0 {
+		return report
+	}
+
+	seen := make(map[string]sherpa.RelatedTest)
+	for _, test := range report.AffectedTests {
+		mergeRelatedTest(seen, test)
+	}
+
+	testAnalysisMode := report.TestAnalysisMode
+	warnings := append([]string{}, report.Warnings...)
+	for _, pkg := range contractPackages {
+		tests, err := findTestsWithContext(context, a.Root, pkg, sherpa.TestOptions{Scope: sherpa.TestScopeAll})
+		if err != nil {
+			warnings = append(warnings, err.Error())
+			continue
+		}
+		testAnalysisMode = mergeTestAnalysisMode(testAnalysisMode, tests.AnalysisMode)
+		warnings = append(warnings, tests.Warnings...)
+
+		for _, test := range tests.Tests {
+			if targets := targetsByPackage[pkg]; len(targets) > 0 {
+				test.Targets = uniqueSortedStrings(append(test.Targets, targets...))
+			}
+			test = addRelatedTestReason(test, sherpa.RelatedTestReasonContract)
+			mergeRelatedTest(seen, test)
+		}
+	}
+
+	report.AffectedTests = make([]sherpa.RelatedTest, 0, len(seen))
+	for _, test := range seen {
+		report.AffectedTests = append(report.AffectedTests, test)
+	}
+	sortRelatedTests(report.AffectedTests)
+
+	targetPackages := symbolTestPlanTargetPackages(result.Target, result.TestPlan)
+	callerPackages := packagesFromTestPlanItems(result.TestPlan.CallerPackages)
+	fallbackPackages := uniqueSortedStrings(append(append([]string{}, report.AffectedPackages...), targetPackages...))
+	targets := nonEmptyStrings(result.Target)
+	report.TestPlan = sherpa.PlanTests(report.AffectedTests, sherpa.TestPlanOptions{
+		Target:           firstNonEmptyImpactString(result.Target, "target"),
+		Kind:             sherpa.TestTargetKindSymbol,
+		TargetPackages:   targetPackages,
+		ContractPackages: contractPackages,
+		CallerPackages:   callerPackages,
+		FallbackPackages: fallbackPackages,
+		Targets:          targets,
+	})
+	report.TestCommands = sherpa.TestPlanCommands(report.TestPlan)
+	report.TestAnalysisMode = normalizeTestAnalysisMode(testAnalysisMode)
+	report.Warnings = uniqueSortedStrings(warnings)
+
+	return report
 }
 
 func fileTarget(file string) (string, string, error) {
@@ -420,16 +484,17 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 	return impact
 }
 
-func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
-	return affectedTestsForPackagesWithContext(nil, root, changedPackages, packages, changedSymbols, extraTests, warnings)
+func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
+	return affectedTestsForPackagesWithContext(nil, root, changedPackages, packages, changedSymbols, extraTests, contractPackages, warnings)
 }
 
-func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
+func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
 	modulePath := impactModulePath(root)
 	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
 	changedTargetsByPackage := changedSymbolPlanTargetsByPackage(changedSymbols, modulePath)
 	changedPackageSet := impactStringSet(changedPackages)
+	contractPackageSet := impactStringSet(contractPackages)
 	testAnalysisMode := ""
 
 	directTests, directTestAnalysisMode := directTestsForChangedSymbolsWithContext(context, root, changedSymbols, &warnings)
@@ -459,6 +524,9 @@ func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root s
 				test = removeRelatedTestReason(test, sherpa.RelatedTestReasonTargetPackage)
 				test = addRelatedTestReason(test, sherpa.RelatedTestReasonCallerPackage)
 			}
+			if _, ok := contractPackageSet[pkg]; ok {
+				test = addRelatedTestReason(test, sherpa.RelatedTestReasonContract)
+			}
 			mergeRelatedTest(seen, test)
 		}
 	}
@@ -477,6 +545,7 @@ func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root s
 		Target:           target,
 		Kind:             sherpa.TestTargetKindPackage,
 		TargetPackages:   changedPackages,
+		ContractPackages: contractPackages,
 		CallerPackages:   packageDifference(packages, changedPackages),
 		FallbackPackages: packages,
 		Targets:          changedTargets,
@@ -713,6 +782,106 @@ func mergeRelatedTestReasons(first []string, second []string) []string {
 		}
 		if !seen {
 			result = append(result, reason)
+		}
+	}
+
+	return result
+}
+
+func contractPackagesForSignals(signals interfaceImpactSignals) []string {
+	return uniqueSortedStrings(append(signalPackages(signals.Interfaces), signalPackages(signals.Implementations)...))
+}
+
+func contractTargetsByPackage(signals interfaceImpactSignals) map[string][]string {
+	result := make(map[string][]string)
+	for _, target := range append(append([]string{}, signals.Interfaces...), signals.Implementations...) {
+		pkg := packageForQualifiedSymbol(target)
+		if pkg == "" {
+			continue
+		}
+		result[pkg] = append(result[pkg], target)
+	}
+	for pkg, targets := range result {
+		result[pkg] = uniqueSortedStrings(targets)
+	}
+
+	return result
+}
+
+func signalPackages(targets []string) []string {
+	var packages []string
+	for _, target := range targets {
+		if pkg := packageForQualifiedSymbol(target); pkg != "" {
+			packages = append(packages, pkg)
+		}
+	}
+
+	return packages
+}
+
+func symbolTestPlanTargetPackages(target string, plan sherpa.TestPlan) []string {
+	packages := packagesFromTestPlanItems(plan.Related)
+	if len(packages) > 0 {
+		return packages
+	}
+
+	return nonEmptyStrings(packageForQualifiedSymbol(target))
+}
+
+func packagesFromTestPlanItems(items []sherpa.TestPlanItem) []string {
+	var packages []string
+	for _, item := range items {
+		packages = append(packages, item.Package)
+	}
+
+	return uniqueSortedStrings(packages)
+}
+
+func packageForQualifiedSymbol(target string) string {
+	value := strings.TrimSpace(filepath.ToSlash(target))
+	if value == "" {
+		return ""
+	}
+
+	lastSlash := strings.LastIndex(value, "/")
+	if lastSlash >= 0 {
+		firstDotAfterSlash := strings.Index(value[lastSlash+1:], ".")
+		if firstDotAfterSlash >= 0 {
+			return value[:lastSlash+1+firstDotAfterSlash]
+		}
+	}
+
+	if strings.HasPrefix(value, "./") {
+		lastDot := strings.LastIndex(value, ".")
+		if lastDot > 0 {
+			return value[:lastDot]
+		}
+	}
+
+	if !strings.Contains(value, "/") {
+		return "."
+	}
+
+	return ""
+}
+
+func firstNonEmptyImpactString(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
+func nonEmptyStrings(values ...string) []string {
+	var result []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			result = append(result, value)
 		}
 	}
 

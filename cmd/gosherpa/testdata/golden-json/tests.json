@@ -68,7 +68,8 @@
       ],
       "related": [],
       "callerPackages": [],
-      "fallback": []
+      "fallback": [],
+      "contracts": []
     }
   }
 }

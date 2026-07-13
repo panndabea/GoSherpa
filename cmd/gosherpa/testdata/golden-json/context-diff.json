@@ -124,7 +124,8 @@
             "example.com/golden.Added"
           ]
         }
-      ]
+      ],
+      "contracts": []
     },
     "readingOrder": [
       {

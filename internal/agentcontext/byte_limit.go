@@ -351,6 +351,9 @@ func trimTestPlanItem(plan *sherpa.TestPlan, omitted *int) bool {
 	if trimLast(&plan.CallerPackages, omitted) {
 		return true
 	}
+	if trimLast(&plan.Contracts, omitted) {
+		return true
+	}
 	if trimLast(&plan.Related, omitted) {
 		return true
 	}

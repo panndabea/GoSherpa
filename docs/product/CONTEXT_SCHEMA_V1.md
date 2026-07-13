@@ -25,10 +25,11 @@ Every context result includes:
 - `purpose`: concise summary of what the context covers.
 - `risk`: deterministic risk level and reasons.
 - `testCommands`: suggested `go test` commands.
-- `testPlan`: grouped test plan with `direct`, `related`, `callerPackages`,
-  and `fallback` items. Plan items may include `test`, `tests`, and `targets`.
-  `targets` connects a recommendation to the symbol target or changed symbols
-  when known.
+- `testPlan`: grouped test plan with `direct`, `related`, `contracts`,
+  `callerPackages`, and `fallback` items. Plan items may include `test`,
+  `tests`, and `targets`. `targets` connects a recommendation to the symbol
+  target, changed symbols, or interface/implementation contract signals when
+  known.
 - `readingOrder`: ordered source locations to inspect next. Entries include
   `position` and may include `range` when backed by a symbol, call, or test
   source range.
@@ -61,7 +62,8 @@ Location-bearing context entries reuse the shared position and range shapes from
 tests keep `position` and may include `range` when Go parser positions identify
 the exact source span. Related and affected tests may include `reasons` with
 stable relationship labels such as `direct-reference`, `same-package`,
-`target-package`, `external-package`, `changed-symbol`, and `caller-package`.
+`target-package`, `external-package`, `changed-symbol`, `caller-package`, and
+`contract`.
 
 When size controls are used, context results may also include:
 
@@ -132,6 +134,6 @@ symbol locations when they are known, then changed files, then affected tests.
 Related or affected tests and test-plan items may include `targets` naming the
 symbol target or changed symbols that explain why the test or package command is
 recommended; related or affected tests may include `reasons` explaining direct
-symbol, changed-symbol, target-package, caller-package, same-package, or
-external-package relationships. Test-plan items may include structured `tests`
-when concrete test names are known.
+symbol, changed-symbol, target-package, caller-package, same-package,
+interface/implementation contract, or external-package relationships. Test-plan
+items may include structured `tests` when concrete test names are known.

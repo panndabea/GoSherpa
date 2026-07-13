@@ -293,6 +293,18 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedInterfacePac
 
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/auth", "./internal/jwt", "./internal/session"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestAuthenticatorContract", "./internal/jwt:TestJWTAuthenticatorContract"})
+	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/auth", "TestAuthenticatorContract"), []string{
+		sherpa.RelatedTestReasonTargetPackage,
+		sherpa.RelatedTestReasonContract,
+	})
+	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/jwt", "TestJWTAuthenticatorContract"), []string{
+		sherpa.RelatedTestReasonCallerPackage,
+		sherpa.RelatedTestReasonContract,
+	})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Contracts), []string{"./internal/auth", "./internal/jwt"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth", "go test ./internal/jwt", "go test ./internal/session"})
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
 		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
 	}
@@ -379,6 +391,10 @@ func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	assertStrings(t, report.AffectedSymbols, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+	assertStrings(t, report.AffectedPackages, []string{"./internal/auth", "./internal/jwt", "./internal/session"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestAuthenticatorContract", "./internal/jwt:TestJWTAuthenticatorContract"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Contracts), []string{"./internal/auth", "./internal/jwt"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth", "go test ./internal/jwt", "go test ./internal/session"})
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
 		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
 	}
@@ -448,6 +464,12 @@ type Authenticator interface {
 	Authenticate() error
 }
 `)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth_test.go"), `package auth
+
+import "testing"
+
+func TestAuthenticatorContract(t *testing.T) {}
+`)
 	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt.go"), `package jwt
 
 type JWTAuthenticator struct{}
@@ -455,6 +477,12 @@ type JWTAuthenticator struct{}
 func (JWTAuthenticator) Authenticate() error {
 	return nil
 }
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt_test.go"), `package jwt
+
+import "testing"
+
+func TestJWTAuthenticatorContract(t *testing.T) {}
 `)
 	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
 

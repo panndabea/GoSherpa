@@ -100,7 +100,8 @@
             "example.com/golden.Added"
           ]
         }
-      ]
+      ],
+      "contracts": []
     }
   }
 }

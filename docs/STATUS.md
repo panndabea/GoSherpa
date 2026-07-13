@@ -67,6 +67,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Related test entries expose stable relationship `reasons` and concrete
   `targets` where the symbol or changed-symbol relationship is known; structured
   test plan items also expose concrete `tests` arrays and `targets`.
+- Structured test plans include a `contracts` group for interface or
+  implementation contract packages, keeping those recommendations separate from
+  direct, related, caller-package, and fallback test commands.
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.

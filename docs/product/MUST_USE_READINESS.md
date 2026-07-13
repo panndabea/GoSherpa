@@ -135,8 +135,9 @@ Make test recommendations explain the tradeoff between fast confidence and broad
 coverage.
 
 Current status: first structured slice implemented. Test plans expose direct,
-related, caller-package, and fallback groups with reasons, and diff-oriented
-reports attach changed-symbol targets when known.
+related, interface/implementation contract, caller-package, and fallback groups
+with reasons, and diff-oriented reports attach changed-symbol targets when
+known.
 
 Recommended groups:
 
@@ -148,7 +149,8 @@ Recommended groups:
 
 Done when:
 
-- JSON distinguishes `direct`, `related`, and `fallback` test commands
+- JSON distinguishes `direct`, `related`, `contracts`, and `fallback` test
+  commands
 - each suggested command includes a reason
 - diff-based recommendations include changed symbols when known
 - empty direct results still provide a practical package fallback

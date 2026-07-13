@@ -48,6 +48,7 @@ const (
 	RelatedTestReasonExternalPackage = "external-package"
 	RelatedTestReasonChangedSymbol   = "changed-symbol"
 	RelatedTestReasonCallerPackage   = "caller-package"
+	RelatedTestReasonContract        = "contract"
 )
 
 type RelatedTest struct {

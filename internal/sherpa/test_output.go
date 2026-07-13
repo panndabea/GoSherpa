@@ -93,6 +93,7 @@ func WriteTestPlan(builder *strings.Builder, plan TestPlan, fallbackCommands []s
 	builder.WriteString("TEST PLAN\n")
 	writeTestPlanSection(builder, "DIRECT", plan.Direct)
 	writeTestPlanSection(builder, "RELATED", plan.Related)
+	writeTestPlanSection(builder, "CONTRACTS", plan.Contracts)
 	writeTestPlanSection(builder, "CALLER PACKAGES", plan.CallerPackages)
 	writeTestPlanSection(builder, "FALLBACK", plan.Fallback)
 }

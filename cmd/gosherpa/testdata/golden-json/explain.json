@@ -249,7 +249,8 @@
             "Target"
           ]
         }
-      ]
+      ],
+      "contracts": []
     },
     "readingOrder": [
       {

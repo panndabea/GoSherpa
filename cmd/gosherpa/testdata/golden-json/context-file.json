@@ -373,7 +373,8 @@
           "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
           "package": "./cmd/app"
         }
-      ]
+      ],
+      "contracts": []
     },
     "readingOrder": [
       {

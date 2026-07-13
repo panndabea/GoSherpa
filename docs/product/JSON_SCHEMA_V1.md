@@ -154,10 +154,12 @@ Related tests:
 
 `reasons` is optional and uses stable strings that explain why the test was
 included. Current values are `direct-reference`, `same-package`,
-`target-package`, `external-package`, `changed-symbol`, and `caller-package`.
+`target-package`, `external-package`, `changed-symbol`, `caller-package`, and
+`contract`.
 `targets` is optional. Symbol test queries use it to name the requested symbol;
 diff-oriented reports use it to name the changed symbol or symbols that made a
-test relevant when that relationship is known.
+test relevant when that relationship is known. Contract-related tests use it to
+name affected interface or implementation signals when known.
 
 Entrypoints:
 
@@ -195,6 +197,7 @@ Test plans:
 {
   "direct": [],
   "related": [],
+  "contracts": [],
   "callerPackages": [],
   "fallback": []
 }
@@ -500,6 +503,7 @@ Data:
   "testPlan": {
     "direct": [],
     "related": [],
+    "contracts": [],
     "callerPackages": [],
     "fallback": []
   },
@@ -684,7 +688,7 @@ includes `kind` with `symbol`, `package`, or `file`, and `scope` with one of
 references when they exist. Related or affected test entries may include
 `reasons` with stable relationship labels such as
 `direct-reference`, `same-package`, `target-package`, `external-package`,
-`changed-symbol`, and `caller-package`.
+`changed-symbol`, `caller-package`, and `contract`.
 
 Composite impact, context, explain, tests-affected, and PR data that includes
 test recommendations may also include `testAnalysisMode`. It is `typechecked+ast`
@@ -697,11 +701,12 @@ When composed reports expose subanalysis fields such as
 `testAnalysisMode`, their `limitations` array also includes a concise note about
 the corresponding subanalysis path.
 
-Test plans group commands into `direct`, `related`, `callerPackages`, and
-`fallback`, preserve a flat `testCommands`/`commands` list for compatibility,
-include structured `tests` on plan items when concrete test names are known,
-and attach symbol or changed-symbol `targets` plus relationship `reasons` to
-related tests when known.
+Test plans group commands into `direct`, `related`, `contracts`,
+`callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
+list for compatibility, include structured `tests` on plan items when concrete
+test names are known, and attach symbol, changed-symbol, interface, or
+implementation `targets` plus relationship `reasons` to related tests when
+known.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

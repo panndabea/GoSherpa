@@ -103,6 +103,8 @@ TEST PLAN
   RELATED
     go test ./internal/parser
       reason: Same-package tests in ./internal/parser are related to ParseFile: TestParserPackage.
+  CONTRACTS
+    none
   CALLER PACKAGES
     none
   FALLBACK
@@ -168,6 +170,8 @@ TEST PLAN
   RELATED
     go test ./internal/auth
       reason: Tests in target package ./internal/auth: TestAuth.
+  CONTRACTS
+    none
   CALLER PACKAGES
     none
   FALLBACK
@@ -207,6 +211,8 @@ TEST PLAN
   DIRECT
     none
   RELATED
+    none
+  CONTRACTS
     none
   CALLER PACKAGES
     none
@@ -248,6 +254,8 @@ TEST PLAN
   DIRECT
     none
   RELATED
+    none
+  CONTRACTS
     none
   CALLER PACKAGES
     none

@@ -210,7 +210,8 @@ suite. Grouped recommendations make the tradeoff visible.
 
 Done when:
 
-- JSON distinguishes `direct`, `related`, and `fallback` test commands.
+- JSON distinguishes `direct`, `related`, `contracts`, and `fallback` test
+  commands.
 - Each suggested command includes a reason.
 - Diff-based recommendations include changed symbols when known.
 - Empty test results include the package fallback command when appropriate.

@@ -72,6 +72,8 @@ TEST PLAN
   RELATED
     go test ./internal/parser
       reason: Same-package tests in ./internal/parser are related to ParseFile: TestParserPackage.
+  CONTRACTS
+    none
   CALLER PACKAGES
     none
   FALLBACK
@@ -105,6 +107,8 @@ TEST PLAN
   DIRECT
     none
   RELATED
+    none
+  CONTRACTS
     none
   CALLER PACKAGES
     none
