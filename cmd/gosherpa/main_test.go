@@ -2857,6 +2857,73 @@ func TestMainRunsContextSymbolCommandWithMaxBytesAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainContextJSONByteBudgetContract(t *testing.T) {
+	tests := []struct {
+		name    string
+		root    func(t *testing.T) string
+		args    []string
+		command string
+		target  string
+	}{
+		{
+			name: "symbol",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"context", "symbol", "Target", "--tests", "--max-bytes", "1200", "--json"},
+			command: "context symbol",
+			target:  "Target",
+		},
+		{
+			name: "file",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"context", "file", "service.go", "--tests", "--max-bytes", "1200", "--json"},
+			command: "context file",
+			target:  "service.go",
+		},
+		{
+			name: "package",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"context", "package", ".", "--tests", "--max-bytes", "1200", "--json"},
+			command: "context package",
+			target:  ".",
+		},
+		{
+			name: "diff",
+			root: func(t *testing.T) string {
+				return writeMainPRDiffProject(t)
+			},
+			args:    []string{"context", "diff", "--base", "HEAD", "--tests", "--max-bytes", "1200", "--json"},
+			command: "context diff",
+			target:  "HEAD",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := test.root(t)
+			args := append([]string{"gosherpa", "--root", root}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+
+			payload := decodeMainTestJSON(t, result.Stdout)
+			data := assertMainTestJSONEnvelope(t, payload, root, test.command, test.target, "example.com/app")
+			assertMainTestContextJSONContract(t, payload, data)
+			assertMainTestContextByteBudget(t, data, 1200)
+		})
+	}
+}
+
 func TestMainRunsContextSymbolCommandWithMaxBytes(t *testing.T) {
 	tmp := writeMainImpactReportProject(t)
 
@@ -6414,9 +6481,35 @@ func assertMainTestContextJSONContract(t *testing.T, payload map[string]any, dat
 	testPlan := assertMainTestJSONObject(t, data, "testPlan")
 	assertMainTestJSONArray(t, testPlan, "direct")
 	assertMainTestJSONArray(t, testPlan, "related")
+	assertMainTestJSONArray(t, testPlan, "contracts")
 	assertMainTestJSONArray(t, testPlan, "callerPackages")
 	assertMainTestJSONArray(t, testPlan, "fallback")
 	assertMainTestJSONArray(t, data, "readingOrder")
+}
+
+func assertMainTestContextByteBudget(t *testing.T, data map[string]any, maxBytes int) {
+	t.Helper()
+
+	limits := assertMainTestJSONObject(t, data, "limits")
+	if limits["maxBytes"] != float64(maxBytes) {
+		t.Fatalf("expected maxBytes %d, got %#v", maxBytes, limits)
+	}
+
+	truncated := assertMainTestJSONObject(t, data, "truncated")
+	if len(truncated) == 0 {
+		t.Fatal("expected non-empty truncated object for byte-budgeted context")
+	}
+
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("expected context data to encode as JSON: %v", err)
+	}
+	if len(encoded) > maxBytes {
+		overage, ok := truncated["byteBudgetOverage"].(float64)
+		if !ok || overage <= 0 {
+			t.Fatalf("context data is %d bytes with budget %d but byteBudgetOverage is missing: %#v", len(encoded), maxBytes, truncated)
+		}
+	}
 }
 
 func assertMainTestJSONArray(t *testing.T, payload map[string]any, key string) []any {
