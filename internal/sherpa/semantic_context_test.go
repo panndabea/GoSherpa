@@ -2,6 +2,7 @@ package sherpa
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/panndabea/GoSherpa/internal/semantics"
@@ -162,5 +163,93 @@ func TestTarget(t *testing.T) {
 	}
 	if testRepositoryLoads != 1 {
 		t.Fatalf("expected one shared test repository load, got %d", testRepositoryLoads)
+	}
+}
+
+func TestSemanticContextSharesRepositoryForImpact(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	original := loadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	loadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+		return original(root, options)
+	}
+	defer func() {
+		loadSemanticContextRepository = original
+	}()
+
+	context, err := NewSemanticContext(tmp, SemanticContextOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	impact, err := FindImpactWithContext(context, "Target", ImpactOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if impact.ReferenceAnalysisMode != ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", impact.ReferenceAnalysisMode, ReferenceAnalysisModeTypechecked)
+	}
+	if impact.CallAnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", impact.CallAnalysisMode, CallAnalysisModeTypechecked)
+	}
+	if impact.TestAnalysisMode != TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s with warnings %#v", impact.TestAnalysisMode, TestAnalysisModeTypecheckedAST, impact.Warnings)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared non-test repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared test repository load, got %d", testRepositoryLoads)
+	}
+}
+
+func TestSemanticContextRejectsImpactBuildTagMismatch(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	context, err := NewSemanticContext(tmp, SemanticContextOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = FindImpactWithContext(context, "Target", ImpactOptions{
+		BuildTags: []string{"integration"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match impact options") {
+		t.Fatalf("expected build tag mismatch error, got %v", err)
+	}
+
+	results := FindSymbolImpactSignalsWithContext(context, []string{"Target"}, ImpactOptions{
+		BuildTags: []string{"integration"},
+	})
+	if len(results) != 1 || results[0].Err == nil || !strings.Contains(results[0].Err.Error(), "semantic context build tags do not match impact options") {
+		t.Fatalf("expected build tag mismatch batch error, got %#v", results)
 	}
 }

@@ -599,7 +599,14 @@ func runImpactCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 
 	target := invocation.CommandArgs[0]
 
-	result, err := sherpa.FindImpactWithOptions(root, target, sherpa.ImpactOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: invocation.BuildTags,
+	})
+	if err != nil {
+		return writeCommandError(invocation.JSON, root, "impact", target, stderr, err)
+	}
+
+	result, err := sherpa.FindImpactWithContext(semanticContext, target, sherpa.ImpactOptions{
 		BuildTags: invocation.BuildTags,
 	})
 	if err != nil {

@@ -73,6 +73,9 @@ func FindImpactWithContext(context *SemanticContext, target string, options Impa
 	if context == nil {
 		return ImpactResult{}, fmt.Errorf("semantic context is nil")
 	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return ImpactResult{}, fmt.Errorf("semantic context build tags do not match impact options")
+	}
 
 	if isImpactPackageTarget(target) {
 		return findPackageImpact(context.root, target)
@@ -105,6 +108,9 @@ func FindSymbolImpactSignalsWithOptions(root string, targets []string, options I
 func FindSymbolImpactSignalsWithContext(context *SemanticContext, targets []string, options ImpactOptions) []ImpactBatchResult {
 	if context == nil {
 		return impactBatchErrorResults(targets, fmt.Errorf("semantic context is nil"))
+	}
+	if !context.supportsBuildTags(options.BuildTags) {
+		return impactBatchErrorResults(targets, fmt.Errorf("semantic context build tags do not match impact options"))
 	}
 
 	cache := newImpactAnalysisCacheWithContext(context, options)
