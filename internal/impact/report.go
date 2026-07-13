@@ -153,7 +153,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.CallAnalysisMode = symbolImpact.CallAnalysisMode
 	report.TestAnalysisMode = symbolImpact.TestAnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, symbolImpact.Warnings...))
-	signals, err := interfaceSignalsForPackages(a.Root, report.ChangedPackages, InterfaceOptions{
+	signals, err := interfaceSignalsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {
@@ -280,7 +280,7 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 
 	report := reportFromImpactResult(result)
 	report.AffectedSymbols = []string{result.Target}
-	signals, err := interfaceSignalsForSymbol(a.Root, target, InterfaceOptions{
+	signals, err := interfaceSignalsForSymbolWithContext(context, a.Root, target, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {

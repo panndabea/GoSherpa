@@ -163,6 +163,63 @@ func Touch() string {
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth", "go test ./internal/billing"})
 }
 
+func TestAnalyzeDiffReusesSemanticContextForInterfaceSignals(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+type Authenticator interface {
+	Authenticate() error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "jwt", "jwt.go"), `package jwt
+
+type JWTAuthenticator struct{}
+
+func (JWTAuthenticator) Authenticate() error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Run(authenticator auth.Authenticator) error {
+	return authenticator.Authenticate()
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+// Authenticator validates callers.
+type Authenticator interface {
+	Authenticate() error
+}
+`)
+
+	oldLoader := loadSemanticInterfaceRepository
+	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("separate interface loader should not be used")
+	}
+	defer func() {
+		loadSemanticInterfaceRepository = oldLoader
+	}()
+
+	report, err := AnalyzeDiff(root, "HEAD", "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked interface analysis, got %q with warnings %#v", report.InterfaceAnalysisMode, report.Warnings)
+	}
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
 func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
 	root := initImpactGitTestRepository(t)
 
@@ -416,13 +473,41 @@ func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
 	}
 }
 
-func TestAnalyzeSymbolReportsFallbackInterfaceAnalysisMode(t *testing.T) {
+func TestAnalyzeSymbolWithContextReusesSemanticContextForInterfaceSignals(t *testing.T) {
+	root := writeInterfaceImpactProject(t)
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
 	oldLoader := loadSemanticInterfaceRepository
 	loadSemanticInterfaceRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
-		return semantics.Repository{}, errors.New("loader failed")
+		return semantics.Repository{}, errors.New("separate interface loader should not be used")
 	}
 	defer func() {
 		loadSemanticInterfaceRepository = oldLoader
+	}()
+
+	report, err := AnalyzeSymbolWithContext(context, "./internal/auth.Authenticator", AnalyzerOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbolWithContext returned error: %v", err)
+	}
+
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected shared typechecked interface analysis, got %q with warnings %#v", report.InterfaceAnalysisMode, report.Warnings)
+	}
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.Authenticator"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
+}
+
+func TestAnalyzeSymbolReportsFallbackInterfaceAnalysisMode(t *testing.T) {
+	oldLoader := impactTestLoadSemanticContextRepository
+	impactTestLoadSemanticContextRepository = func(string, semantics.LoadOptions) (semantics.Repository, error) {
+		return semantics.Repository{}, errors.New("loader failed")
+	}
+	defer func() {
+		impactTestLoadSemanticContextRepository = oldLoader
 	}()
 
 	root := writeInterfaceImpactProject(t)
@@ -435,7 +520,7 @@ func TestAnalyzeSymbolReportsFallbackInterfaceAnalysisMode(t *testing.T) {
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeASTFallback {
 		t.Fatalf("expected AST fallback interface analysis mode, got %q", report.InterfaceAnalysisMode)
 	}
-	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], "typechecked interface analysis unavailable: loader failed") {
+	if !strings.Contains(strings.Join(report.Warnings, "\n"), "typechecked interface analysis unavailable: loader failed") {
 		t.Fatalf("expected typechecked fallback warning, got %#v", report.Warnings)
 	}
 }
