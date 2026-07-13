@@ -106,6 +106,12 @@ func AnalyzeFileWithContext(context *sherpa.SemanticContext, file string, option
 		return ImpactReport{}, fmt.Errorf("semantic context is nil")
 	}
 
+	var err error
+	options, err = analyzerOptionsForContext(context, options)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
 	return NewAnalyzerWithOptions(context.Root(), options).AnalyzeFileWithContext(context, file)
 }
 
@@ -122,6 +128,12 @@ func AnalyzePackageWithContext(context *sherpa.SemanticContext, targetPackage st
 		return ImpactReport{}, fmt.Errorf("semantic context is nil")
 	}
 
+	var err error
+	options, err = analyzerOptionsForContext(context, options)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
 	return NewAnalyzerWithOptions(context.Root(), options).AnalyzePackageWithContext(context, targetPackage)
 }
 
@@ -136,6 +148,12 @@ func AnalyzeSymbolWithOptions(root string, target string, options AnalyzerOption
 func AnalyzeSymbolWithContext(context *sherpa.SemanticContext, target string, options AnalyzerOptions) (ImpactReport, error) {
 	if context == nil {
 		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	var err error
+	options, err = analyzerOptionsForContext(context, options)
+	if err != nil {
+		return ImpactReport{}, err
 	}
 
 	return NewAnalyzerWithOptions(context.Root(), options).AnalyzeSymbolWithContext(context, target)
@@ -222,6 +240,10 @@ func analyzerOptionsForContext(context *sherpa.SemanticContext, options Analyzer
 }
 
 func analyzerBuildTagsForContext(context *sherpa.SemanticContext, buildTags []string) ([]string, error) {
+	if context == nil {
+		return semantics.NormalizeBuildTags(buildTags), nil
+	}
+
 	contextTags := context.BuildTags()
 	optionTags := semantics.NormalizeBuildTags(buildTags)
 	if len(optionTags) == 0 {
@@ -239,6 +261,12 @@ func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeFileWithContext(context *sherpa.SemanticContext, file string) (ImpactReport, error) {
+	buildTags, err := analyzerBuildTagsForContext(context, a.BuildTags)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	a.BuildTags = buildTags
+
 	return a.analyzeFile(file, context)
 }
 
@@ -269,6 +297,12 @@ func (a Analyzer) AnalyzePackage(targetPackage string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzePackageWithContext(context *sherpa.SemanticContext, targetPackage string) (ImpactReport, error) {
+	buildTags, err := analyzerBuildTagsForContext(context, a.BuildTags)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	a.BuildTags = buildTags
+
 	return a.analyzePackage(targetPackage, context)
 }
 
@@ -321,6 +355,12 @@ func (a Analyzer) AnalyzeSymbol(target string) (ImpactReport, error) {
 }
 
 func (a Analyzer) AnalyzeSymbolWithContext(context *sherpa.SemanticContext, target string) (ImpactReport, error) {
+	buildTags, err := analyzerBuildTagsForContext(context, a.BuildTags)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	a.BuildTags = buildTags
+
 	return a.analyzeSymbol(target, context)
 }
 

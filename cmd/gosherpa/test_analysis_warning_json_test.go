@@ -105,6 +105,47 @@ func TestAnalyzePRSharesSemanticDiffSession(t *testing.T) {
 	}
 }
 
+func TestAnalyzeImpactSubcommandSharesSemanticSession(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	original := mainTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		mainTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := analyzeImpactSubcommand(tmp, "symbol", "Target", nil)
+	if err != nil {
+		t.Fatalf("analyzeImpactSubcommand returned error: %v", err)
+	}
+
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s with warnings %#v", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked, report.Warnings)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if report.TestAnalysisMode != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s", report.TestAnalysisMode, sherpa.TestAnalysisModeTypecheckedAST)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
 func mainTestJSONArrayContainsSubstring(values []any, substring string) bool {
 	for _, value := range values {
 		text, ok := value.(string)

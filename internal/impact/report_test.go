@@ -320,6 +320,52 @@ func TestAnalyzeDiffWithContextRejectsBuildTagMismatch(t *testing.T) {
 	}
 }
 
+func TestAnalyzeReportWithContextRejectsBuildTagMismatch(t *testing.T) {
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
+	options := AnalyzerOptions{BuildTags: []string{"integration"}}
+	tests := []struct {
+		name string
+		run  func() (ImpactReport, error)
+	}{
+		{
+			name: "file",
+			run: func() (ImpactReport, error) {
+				return AnalyzeFileWithContext(context, "missing.go", options)
+			},
+		},
+		{
+			name: "package",
+			run: func() (ImpactReport, error) {
+				return AnalyzePackageWithContext(context, ".", options)
+			},
+		},
+		{
+			name: "symbol",
+			run: func() (ImpactReport, error) {
+				return AnalyzeSymbolWithContext(context, "Target", options)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.run()
+			if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match analyzer options") {
+				t.Fatalf("expected build tag mismatch error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
 	root := initImpactGitTestRepository(t)
 

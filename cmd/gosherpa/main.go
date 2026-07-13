@@ -329,13 +329,20 @@ func isImpactReportSubcommand(command string) bool {
 
 func analyzeImpactSubcommand(root string, kind string, target string, buildTags []string) (impactengine.ImpactReport, error) {
 	options := impactengine.AnalyzerOptions{BuildTags: buildTags}
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: buildTags,
+	})
+	if err != nil {
+		return impactengine.ImpactReport{}, err
+	}
+
 	switch kind {
 	case "file":
-		return impactengine.AnalyzeFileWithOptions(root, target, options)
+		return impactengine.AnalyzeFileWithContext(semanticContext, target, options)
 	case "package":
-		return impactengine.AnalyzePackageWithOptions(root, target, options)
+		return impactengine.AnalyzePackageWithContext(semanticContext, target, options)
 	case "symbol":
-		return impactengine.AnalyzeSymbolWithOptions(root, target, options)
+		return impactengine.AnalyzeSymbolWithContext(semanticContext, target, options)
 	default:
 		return impactengine.ImpactReport{}, fmt.Errorf("unknown impact subcommand: %s", kind)
 	}
