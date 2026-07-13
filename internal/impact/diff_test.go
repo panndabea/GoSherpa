@@ -7,6 +7,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	gitdiff "github.com/panndabea/GoSherpa/internal/git"
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestPackagesForFiles(t *testing.T) {
@@ -26,6 +29,44 @@ func TestPackagesForFiles(t *testing.T) {
 	want := []string{".", "./internal/api", "./internal/auth"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("PackagesForFiles() = %#v, want %#v", got, want)
+	}
+}
+
+func TestSymbolsForChangedLineRangesUsesSnapshotCurrentSymbols(t *testing.T) {
+	root := t.TempDir()
+	changedLines := []gitdiff.ChangedFileLineRanges{
+		{
+			Path: "service.go",
+			Ranges: []gitdiff.ChangedLineRange{
+				{Start: 10, End: 10},
+			},
+		},
+	}
+	snapshotSymbols := []sherpa.Symbol{
+		{
+			Name: "SnapshotRun",
+			Kind: sherpa.SymbolKindFunction,
+			Position: sherpa.Position{
+				File: "service.go",
+				Line: 10,
+			},
+			Range: &sherpa.SourceRange{
+				Start: sherpa.Position{File: "service.go", Line: 10},
+				End:   sherpa.Position{File: "service.go", Line: 12},
+			},
+		},
+	}
+
+	got, err := symbolsForChangedLineRangesWithCurrentSymbols(root, "HEAD", "", changedLines, snapshotSymbols, true)
+	if err != nil {
+		t.Fatalf("symbolsForChangedLineRangesWithCurrentSymbols returned error: %v", err)
+	}
+
+	if len(got) != 1 || got[0].Name != "SnapshotRun" {
+		t.Fatalf("expected snapshot symbol, got %#v", got)
+	}
+	if got[0].Position.File != "service.go" || got[0].Position.Line != 10 {
+		t.Fatalf("expected snapshot position, got %#v", got[0].Position)
 	}
 }
 

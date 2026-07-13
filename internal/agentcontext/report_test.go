@@ -12,6 +12,7 @@ import (
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
 )
 
 //go:linkname agentContextTestLoadSemanticContextRepository github.com/panndabea/GoSherpa/internal/sherpa.loadSemanticContextRepository
@@ -1009,6 +1010,75 @@ func NewSession() Session {
 	}
 	if !agentContextLimitationsContain(report.Limitations, "Test analysis used typechecked") {
 		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzeDiffUsesValidSnapshotForCurrentChangedSymbols(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), "package app\n\nfunc Target() {}\n")
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), "package app\n\nfunc Target() {}\n\nfunc Added() {}\n")
+	snapshot, err := snapshotstore.Build(root, snapshotstore.BuildOptions{})
+	if err != nil {
+		t.Fatalf("Build snapshot returned error: %v", err)
+	}
+	if _, err := snapshotstore.Write(root, snapshot); err != nil {
+		t.Fatalf("Write snapshot returned error: %v", err)
+	}
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{UseSnapshot: true})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeSnapshotDiffTypechecked, report.Warnings)
+	}
+	if len(report.Warnings) != 0 {
+		t.Fatalf("expected no snapshot warnings, got %#v", report.Warnings)
+	}
+	if len(report.ChangedSymbolDetails) != 1 || report.ChangedSymbolDetails[0].Name != "Added" {
+		t.Fatalf("expected Added changed symbol from snapshot, got %#v", report.ChangedSymbolDetails)
+	}
+	if !agentContextLimitationsContain(report.Limitations, "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", report.Limitations)
+	}
+}
+
+func TestAnalyzeDiffFallsBackWhenSnapshotIsStale(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), "package app\n\nfunc Target() {}\n")
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+
+	snapshot, err := snapshotstore.Build(root, snapshotstore.BuildOptions{})
+	if err != nil {
+		t.Fatalf("Build snapshot returned error: %v", err)
+	}
+	if _, err := snapshotstore.Write(root, snapshot); err != nil {
+		t.Fatalf("Write snapshot returned error: %v", err)
+	}
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), "package app\n\nfunc Target() {}\n\nfunc Added() {}\n")
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{UseSnapshot: true})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s", report.AnalysisMode, AnalysisModeDiffTypechecked)
+	}
+	if len(report.Warnings) == 0 || !strings.Contains(strings.Join(report.Warnings, "\n"), "snapshot not used: Snapshot is stale") {
+		t.Fatalf("expected stale snapshot warning, got %#v", report.Warnings)
+	}
+	if report.Confidence != ConfidenceLow {
+		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceLow)
 	}
 }
 

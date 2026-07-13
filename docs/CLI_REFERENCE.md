@@ -46,9 +46,9 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ```
 
 Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
-reused by `analyze`, `symbols`, `symbol`, `search`, and `packages --tests` with
-`--use-snapshot`. Missing, stale, or invalid snapshots fall back to live
-repository analysis and report a warning.
+reused by `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and
+`context diff` with `--use-snapshot`. Missing, stale, or invalid snapshots fall
+back to live repository analysis and report a warning.
 
 ```bash
 ./gosherpa snapshot
@@ -56,6 +56,7 @@ repository analysis and report a warning.
 ./gosherpa symbols --use-snapshot
 ./gosherpa search parse --use-snapshot --json
 ./gosherpa packages --tests --use-snapshot
+./gosherpa context diff --base HEAD --use-snapshot --json
 ```
 
 Enable shell completion by evaluating the script for your shell. The generated
@@ -162,6 +163,7 @@ Found 4 references
 ./gosherpa context package ./internal/sherpa
 ./gosherpa context package ./internal/sherpa --json
 ./gosherpa context diff --base HEAD
+./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa context diff --base HEAD --json
 ./gosherpa doctor
 ./gosherpa doctor --json
@@ -254,7 +256,9 @@ Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
 typechecked package loading. `context diff` and `pr` include
 `changedSymbolDetails` and put changed-symbol locations first in
-`readingOrder` when positions are known.
+`readingOrder` when positions are known. With `context diff --use-snapshot`, a
+valid snapshot is reused for current changed-symbol inventory and reports
+`snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`.
 
 `pr --json` keeps the diff-oriented `risk` summary and also includes
 `repositoryRisk`, the full structural `RiskReport` from `gosherpa risk`.

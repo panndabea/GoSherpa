@@ -102,8 +102,10 @@ Supported context flags:
 - `--source-radius <n>` limits source excerpt radius for symbol, file, and
   package context. `0` means target line only.
 
-`context diff` supports `--max-files`, `--max-symbols`, `--max-tests`, and
-`--max-bytes`.
+`context diff` supports `--use-snapshot`, `--max-files`, `--max-symbols`,
+`--max-tests`, and `--max-bytes`. A valid snapshot can provide current
+changed-symbol inventory; missing, stale, or invalid snapshots fall back to live
+diff context analysis with a warning.
 
 Purpose and risk are computed before output truncation. The `truncated` object
 explains what was omitted from the bounded context bundle.

@@ -48,14 +48,25 @@ func ChangedSymbols(root string, base string, head string) ([]string, error) {
 }
 
 func symbolsForChangedLineRanges(root string, base string, head string, changedLines []gitdiff.ChangedFileLineRanges) ([]changedSymbol, error) {
+	return symbolsForChangedLineRangesWithCurrentSymbols(root, base, head, changedLines, nil, false)
+}
+
+func symbolsForChangedLineRangesWithCurrentSymbols(root string, base string, head string, changedLines []gitdiff.ChangedFileLineRanges, snapshotSymbols []sherpa.Symbol, useSnapshotSymbols bool) ([]changedSymbol, error) {
 	var symbols []changedSymbol
+	useSnapshotForCurrentFiles := useSnapshotSymbols && strings.TrimSpace(head) == ""
 
 	for _, changedFile := range changedLines {
 		if !changedFileHasGoPath(changedFile) {
 			continue
 		}
 
-		currentSymbols, err := changedSymbolsForCurrentFile(root, head, changedFile)
+		var currentSymbols []changedSymbol
+		var err error
+		if useSnapshotForCurrentFiles {
+			currentSymbols, err = changedSymbolsForCurrentFileFromSnapshot(root, changedFile, snapshotSymbols)
+		} else {
+			currentSymbols, err = changedSymbolsForCurrentFile(root, head, changedFile)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -69,6 +80,80 @@ func symbolsForChangedLineRanges(root string, base string, head string, changedL
 	}
 
 	return normalizeChangedSymbols(symbols), nil
+}
+
+func changedSymbolsForCurrentFileFromSnapshot(root string, changedFile gitdiff.ChangedFileLineRanges, snapshotSymbols []sherpa.Symbol) ([]changedSymbol, error) {
+	if len(changedFile.Ranges) == 0 {
+		return nil, nil
+	}
+	packagePath, ok := packageForChangedFile(changedFile.Path)
+	if !ok {
+		return nil, nil
+	}
+
+	symbols := changedSymbolRangesFromSnapshot(changedFile.Path, snapshotSymbols)
+	return changedSymbolRecords(root, packagePath, changedSymbolsForRanges(symbols, changedFile.Ranges), false), nil
+}
+
+func changedSymbolRangesFromSnapshot(file string, symbols []sherpa.Symbol) []changedSymbolRange {
+	var ranges []changedSymbolRange
+	for _, symbol := range symbols {
+		if !snapshotSymbolHasChangedSymbolKind(symbol) {
+			continue
+		}
+		if filepath.ToSlash(symbol.Position.File) != filepath.ToSlash(file) {
+			continue
+		}
+
+		symbolRange, ok := changedSymbolRangeFromSnapshotSymbol(symbol)
+		if !ok {
+			continue
+		}
+		ranges = append(ranges, symbolRange)
+	}
+
+	return ranges
+}
+
+func snapshotSymbolHasChangedSymbolKind(symbol sherpa.Symbol) bool {
+	switch symbol.Kind {
+	case sherpa.SymbolKindFunction, sherpa.SymbolKindMethod, sherpa.SymbolKindStruct, sherpa.SymbolKindInterface:
+		return true
+	default:
+		return false
+	}
+}
+
+func changedSymbolRangeFromSnapshotSymbol(symbol sherpa.Symbol) (changedSymbolRange, bool) {
+	name := strings.TrimSpace(symbol.DisplayName())
+	if name == "" || symbol.Position.Line <= 0 {
+		return changedSymbolRange{}, false
+	}
+
+	sourceRange := symbol.Range
+	if sourceRange == nil {
+		sourceRange = &sherpa.SourceRange{
+			Start: symbol.Position,
+			End:   symbol.Position,
+		}
+	}
+
+	start := sourceRange.Start.Line
+	end := sourceRange.End.Line
+	if start <= 0 {
+		start = symbol.Position.Line
+	}
+	if end <= 0 {
+		end = start
+	}
+
+	return changedSymbolRange{
+		Name:     name,
+		Position: symbol.Position,
+		Range:    sourceRange,
+		Start:    start,
+		End:      end,
+	}, true
 }
 
 func changedFileHasGoPath(changedFile gitdiff.ChangedFileLineRanges) bool {

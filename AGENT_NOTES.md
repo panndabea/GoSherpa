@@ -44,7 +44,7 @@ bounded diff context:
 
 ```bash
 gosherpa doctor --json
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa impact diff --base HEAD --json
 gosherpa tests affected --base HEAD --json
 ```
@@ -97,7 +97,7 @@ before broad inventory commands like unfiltered `symbols`.
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa interface <interface> --json`; use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
-| Analyze changed files | `gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
+| Analyze changed files | `gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
 | Plan tests for a symbol, package, or file | `gosherpa tests <target> --json`; for files use `gosherpa tests internal/service/service.go --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
 
@@ -110,7 +110,7 @@ editing. Add size controls whenever the repository or target may be large:
 gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --max-tests 10 --max-bytes 12000 --source-radius 1 --json
 gosherpa context package ./internal/sherpa --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ```
 
 Context output can include source excerpts, symbols, references, callers,
@@ -122,7 +122,7 @@ Use size controls for large repositories or limited context windows:
 ```bash
 gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --source-radius 1 --json
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ```
 
 ## JSON Output
@@ -190,8 +190,9 @@ Current analysis is intentionally conservative:
   changed statements.
 - Test discovery is useful but incomplete for dynamic table-driven test names
   and framework-specific behavior.
-- Snapshot creation and freshness diagnostics exist, but query commands still
-  analyze repository data directly instead of reusing snapshots.
+- Snapshot creation and freshness diagnostics exist. Inventory commands and
+  current changed-symbol inventory in `context diff` can reuse valid snapshots;
+  deeper relationship analysis still runs live.
 - GoSherpa is not a runtime profiler, security scanner, linter, formatter, or
   automatic refactoring engine.
 

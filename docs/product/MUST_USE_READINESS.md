@@ -210,8 +210,9 @@ Status: first slice implemented as `gosherpa snapshot`, writing a versioned
 `.gosherpa/snapshot.json` inventory with file freshness metadata, package
 summaries, symbols, build tags, and git state. `gosherpa doctor` reports
 missing, valid, stale, and invalid snapshots. `analyze`, `symbols`, `symbol`,
-`search`, and test-inclusive `packages --tests` can opt in to snapshot reuse;
-broader command reuse remains future work.
+`search`, test-inclusive `packages --tests`, and current changed-symbol
+inventory in `context diff` can opt in to snapshot reuse; broader semantic
+relationship reuse remains future work.
 
 Command sketch:
 

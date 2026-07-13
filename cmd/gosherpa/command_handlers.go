@@ -271,6 +271,7 @@ func runContextCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 		report, err := agentcontext.AnalyzeDiff(root, invocation.BaseRef, agentcontext.DiffAnalyzeOptions{
 			IncludeTests: invocation.IncludeTests,
 			BuildTags:    invocation.BuildTags,
+			UseSnapshot:  invocation.UseSnapshot,
 			Limits:       invocation.ContextLimits,
 		})
 		if err != nil {

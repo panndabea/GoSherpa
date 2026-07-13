@@ -14,12 +14,16 @@ import (
 )
 
 type Analyzer struct {
-	Root      string
-	BuildTags []string
+	Root               string
+	BuildTags          []string
+	UseSnapshotSymbols bool
+	SnapshotSymbols    []sherpa.Symbol
 }
 
 type AnalyzerOptions struct {
-	BuildTags []string
+	BuildTags          []string
+	UseSnapshotSymbols bool
+	SnapshotSymbols    []sherpa.Symbol
 }
 
 type RelatedTest = sherpa.RelatedTest
@@ -58,8 +62,10 @@ func NewAnalyzer(root string) Analyzer {
 
 func NewAnalyzerWithOptions(root string, options AnalyzerOptions) Analyzer {
 	return Analyzer{
-		Root:      root,
-		BuildTags: append([]string{}, options.BuildTags...),
+		Root:               root,
+		BuildTags:          append([]string{}, options.BuildTags...),
+		UseSnapshotSymbols: options.UseSnapshotSymbols,
+		SnapshotSymbols:    append([]sherpa.Symbol{}, options.SnapshotSymbols...),
 	}
 }
 
@@ -133,7 +139,7 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 		AffectedImplementations: []string{},
 	}
 
-	changedSymbols, err := changedSymbolsForDiff(a.Root, base, head)
+	changedSymbols, err := changedSymbolsForDiffWithCurrentSymbols(a.Root, base, head, a.SnapshotSymbols, a.UseSnapshotSymbols)
 	if err != nil {
 		return ImpactReport{}, err
 	}
@@ -420,12 +426,16 @@ func affectedPackagesForChangedPackages(root string, changedPackages []string) (
 }
 
 func changedSymbolsForDiff(root string, base string, head string) ([]changedSymbol, error) {
+	return changedSymbolsForDiffWithCurrentSymbols(root, base, head, nil, false)
+}
+
+func changedSymbolsForDiffWithCurrentSymbols(root string, base string, head string, currentSymbols []sherpa.Symbol, useCurrentSymbols bool) ([]changedSymbol, error) {
 	changedLines, err := gitdiff.ChangedLineRanges(root, base, head)
 	if err != nil {
 		return nil, err
 	}
 
-	return symbolsForChangedLineRanges(root, base, head, changedLines)
+	return symbolsForChangedLineRangesWithCurrentSymbols(root, base, head, changedLines, currentSymbols, useCurrentSymbols)
 }
 
 func (a Analyzer) analyzeChangedSymbolImpacts(symbols []changedSymbol) changedSymbolImpact {

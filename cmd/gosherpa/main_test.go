@@ -190,6 +190,7 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 		{"analyze", "--use-snapshot"},
 		{"--use-snapshot", "symbols"},
 		{"search", "target", "--use-snapshot"},
+		{"context", "diff", "--base", "HEAD", "--use-snapshot"},
 	}
 
 	for _, test := range tests {
@@ -677,7 +678,7 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 		"context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
 		"context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
 		"context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
-		"context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]",
+		"context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -2204,7 +2205,23 @@ func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, and packages") {
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff") {
+		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "context", "symbol", "Target", "--use-snapshot"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff") {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
@@ -3130,7 +3147,7 @@ func TestMainRunsContextPackageCommandAsJSON(t *testing.T) {
 func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "context", "diff"})
 
-	want := "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n"
+	want := "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -3475,6 +3492,49 @@ func NewSession() Session {
 
 	if strings.Contains(result.Stdout, "CONTEXT DIFF") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsContextDiffCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n")
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n\nfunc Added() {}\n")
+	snapshotResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "snapshot"})
+	if snapshotResult.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", snapshotResult.ExitCode, snapshotResult.Stderr)
+	}
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
+	details := assertMainTestJSONArray(t, data, "changedSymbolDetails")
+	firstDetail, ok := details[0].(map[string]any)
+	if !ok || firstDetail["name"] != "Added" {
+		t.Fatalf("expected Added changed symbol detail, got %#v", details)
+	}
+	if !mainTestJSONArrayContainsSubstring(data["limitations"].([]any), "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", data["limitations"])
 	}
 }
 

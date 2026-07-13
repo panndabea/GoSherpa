@@ -145,8 +145,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, and packages")
+	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation) {
+		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff")
 		return exitUsage
 	}
 
@@ -227,9 +227,19 @@ func supportsContextOption(command string) bool {
 	return ok && spec.Context
 }
 
-func supportsSnapshotOption(command string) bool {
-	spec, ok := commandSpecFor(command)
-	return ok && spec.Snapshot
+func supportsSnapshotOption(invocation cliInvocation) bool {
+	spec, ok := commandSpecFor(invocation.Command)
+	if !ok {
+		return false
+	}
+	if spec.Snapshot {
+		return true
+	}
+	if spec.SnapshotWhen != nil {
+		return spec.SnapshotWhen(invocation)
+	}
+
+	return false
 }
 
 func supportsTagsOption(invocation cliInvocation) bool {

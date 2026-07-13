@@ -18,6 +18,7 @@ type commandSpec struct {
 	Context       bool
 	ContextLimits bool
 	Snapshot      bool
+	SnapshotWhen  func(cliInvocation) bool
 	Tags          bool
 	TagsWhen      func(cliInvocation) bool
 	BaseWhen      func(cliInvocation) bool
@@ -55,6 +56,7 @@ var commandSpecs = []commandSpec{
 		Tests:         true,
 		ContextLimits: true,
 		Tags:          true,
+		SnapshotWhen:  isContextDiffInvocation,
 		BaseWhen:      isContextDiffInvocation,
 	},
 	{
@@ -239,7 +241,7 @@ const (
 	contextSymbolUsageLine  = "context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextFileUsageLine    = "context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextPackageUsageLine = "context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
-	contextDiffUsageLine    = "context diff --base <ref> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
+	contextDiffUsageLine    = "context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
 	doctorUsageLine         = "doctor"
 	snapshotUsageLine       = "snapshot"
 	completionUsageLine     = "completion zsh|bash|fish"

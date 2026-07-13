@@ -62,6 +62,7 @@ go build -o gosherpa ./cmd/gosherpa
 ./gosherpa snapshot
 ./gosherpa analyze --use-snapshot
 ./gosherpa symbols --use-snapshot
+./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa completion zsh
 ./gosherpa entrypoints ParseFile
 ./gosherpa impact diff --base HEAD
@@ -112,7 +113,7 @@ Every command supports machine-readable JSON through `--json` using a stable res
 gosherpa context symbol ParseFile --json
 gosherpa context file internal/sherpa/impact.go --json
 gosherpa context package ./internal/sherpa --json
-gosherpa context diff --base HEAD --json
+gosherpa context diff --base HEAD --use-snapshot --json
 ```
 
 ### Agent Quickstart
@@ -124,7 +125,7 @@ Agents should start with bounded, task-specific context instead of broad invento
 gosherpa doctor --json
 
 # 2. For a change, start with bounded diff context
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 
 # 3. For a symbol task, fetch focused context
 gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json

@@ -32,7 +32,7 @@ diff context:
 ```bash
 gosherpa doctor
 gosherpa impact diff --base HEAD --json
-gosherpa context diff --base HEAD --json
+gosherpa context diff --base HEAD --use-snapshot --json
 ```
 
 For focused work, use package-qualified targets when names are ambiguous, for
@@ -71,7 +71,7 @@ files.
 - `gosherpa symbol <target> --json`
 - `gosherpa search <terms> --json`
 - `gosherpa explain <symbol> --json`
-- `gosherpa context diff --base HEAD --json`
+- `gosherpa context diff --base HEAD --use-snapshot --json`
 - `gosherpa context symbol <target> --json`
 - `gosherpa context file <file> --json`
 - `gosherpa context package <package> --json`
@@ -102,7 +102,7 @@ Context commands are optimized for bounded pre-edit agent context:
 gosherpa context symbol ParseFile --json
 gosherpa context file internal/sherpa/impact.go --json
 gosherpa context package ./internal/sherpa --json
-gosherpa context diff --base HEAD --json
+gosherpa context diff --base HEAD --use-snapshot --json
 ```
 
 Supported size controls include `--max-files`, `--max-references`,

@@ -492,7 +492,7 @@ func completionFlagsForSpec(spec commandSpec) []completionFlag {
 	if spec.Context {
 		names = append(names, "--context")
 	}
-	if spec.Snapshot {
+	if spec.Snapshot || spec.SnapshotWhen != nil {
 		names = append(names, "--use-snapshot")
 	}
 	if spec.Tags || spec.TagsWhen != nil {

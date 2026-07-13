@@ -7,11 +7,13 @@ import (
 	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
 )
 
 type DiffAnalyzeOptions struct {
 	IncludeTests bool `json:"includeTests"`
 	BuildTags    []string
+	UseSnapshot  bool         `json:"useSnapshot"`
 	Limits       LimitOptions `json:"limits"`
 }
 
@@ -44,8 +46,11 @@ type DiffReport struct {
 }
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
+	snapshotSymbols, snapshotUsed, snapshotWarnings := diffSnapshotSymbols(root, options)
 	impactReport, err := impactengine.AnalyzeDiffWithOptions(root, base, "", impactengine.AnalyzerOptions{
-		BuildTags: options.BuildTags,
+		BuildTags:          options.BuildTags,
+		UseSnapshotSymbols: snapshotUsed,
+		SnapshotSymbols:    snapshotSymbols,
 	})
 	if err != nil {
 		return DiffReport{}, err
@@ -70,9 +75,9 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		TestAnalysisMode:        impactReport.TestAnalysisMode,
 		TestCommands:            impactReport.TestCommands,
 		TestPlan:                impactReport.TestPlan,
-		AnalysisMode:            diffAnalysisMode(impactReport),
+		AnalysisMode:            diffAnalysisMode(impactReport, snapshotUsed),
 		Limits:                  reportLimits(limits),
-		Warnings:                impactReport.Warnings,
+		Warnings:                append(snapshotWarnings, impactReport.Warnings...),
 	}
 	report.Purpose = diffPurpose(report)
 	report.Risk = diffRiskSummary(report)
@@ -82,6 +87,21 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 	report = applyDiffLimits(report, limits)
 
 	return normalizeDiffReport(report), nil
+}
+
+func diffSnapshotSymbols(root string, options DiffAnalyzeOptions) ([]sherpa.Symbol, bool, []string) {
+	if !options.UseSnapshot {
+		return nil, false, nil
+	}
+
+	stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{
+		BuildTags: options.BuildTags,
+	})
+	if inspect.Status == snapshotstore.StatusValid {
+		return append([]sherpa.Symbol{}, stored.Symbols...), true, nil
+	}
+
+	return nil, false, []string{diffSnapshotFallbackWarning(inspect)}
 }
 
 func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
@@ -226,13 +246,19 @@ func changedSymbolReadingTitle(symbol impactengine.ChangedSymbol) string {
 	return title
 }
 
-func diffAnalysisMode(report impactengine.ImpactReport) string {
+func diffAnalysisMode(report impactengine.ImpactReport, snapshotUsed bool) string {
 	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
 		report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
 		report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+		if snapshotUsed {
+			return AnalysisModeSnapshotDiffTypechecked
+		}
 		return AnalysisModeDiffTypechecked
 	}
 
+	if snapshotUsed {
+		return AnalysisModeSnapshotDiff
+	}
 	return AnalysisModeDiff
 }
 
@@ -242,9 +268,18 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 		"Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
-	if report.AnalysisMode == AnalysisModeDiffTypechecked {
+	switch report.AnalysisMode {
+	case AnalysisModeSnapshotDiffTypechecked:
+		values = append([]string{
+			"Diff context reused a valid snapshot for current changed-symbol inventory and uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
+		}, values...)
+	case AnalysisModeSnapshotDiff:
+		values = append([]string{
+			"Diff context reused a valid snapshot for current changed-symbol inventory and uses git diff plus syntax-level repository analysis.",
+		}, values...)
+	case AnalysisModeDiffTypechecked:
 		values = append([]string{"Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available."}, values...)
-	} else {
+	default:
 		values = append([]string{"Diff context uses git diff plus syntax-level repository analysis, not full module loading."}, values...)
 	}
 	if strings.TrimSpace(report.ReferenceAnalysisMode) != "" {
@@ -265,6 +300,18 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 	}
 
 	return values
+}
+
+func diffSnapshotFallbackWarning(inspect snapshotstore.InspectResult) string {
+	message := strings.TrimSpace(inspect.Message)
+	if message == "" {
+		message = "snapshot could not be used"
+	}
+	if len(inspect.StaleReasons) > 0 {
+		return fmt.Sprintf("snapshot not used: %s (%s); using live diff context analysis", message, strings.Join(inspect.StaleReasons, ", "))
+	}
+
+	return fmt.Sprintf("snapshot not used: %s; using live diff context analysis", message)
 }
 
 func diffConfidence(report DiffReport) string {
