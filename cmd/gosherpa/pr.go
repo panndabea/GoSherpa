@@ -37,7 +37,14 @@ type prReport struct {
 }
 
 func analyzePR(root string, base string, buildTags []string) (prReport, error) {
-	impactReport, err := impactengine.AnalyzeDiffWithOptions(root, base, "", impactengine.AnalyzerOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: buildTags,
+	})
+	if err != nil {
+		return prReport{}, err
+	}
+
+	impactReport, err := impactengine.AnalyzeDiffWithContext(semanticContext, base, "", impactengine.AnalyzerOptions{
 		BuildTags: buildTags,
 	})
 	if err != nil {

@@ -47,7 +47,14 @@ type DiffReport struct {
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
 	snapshotSymbols, snapshotUsed, snapshotWarnings := diffSnapshotSymbols(root, options)
-	impactReport, err := impactengine.AnalyzeDiffWithOptions(root, base, "", impactengine.AnalyzerOptions{
+	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return DiffReport{}, err
+	}
+
+	impactReport, err := impactengine.AnalyzeDiffWithContext(semanticContext, base, "", impactengine.AnalyzerOptions{
 		BuildTags:          options.BuildTags,
 		UseSnapshotSymbols: snapshotUsed,
 		SnapshotSymbols:    snapshotSymbols,

@@ -1013,6 +1013,79 @@ func NewSession() Session {
 	}
 }
 
+func TestAnalyzeDiffSharesSemanticSessionForImpactAndTests(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Entry() string {
+	return Target()
+}
+
+func Target() string {
+	return "old"
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service_test.go"), `package app
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	if Target() == "" {
+		t.Fatal("empty")
+	}
+}
+`)
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Entry() string {
+	return Target()
+}
+
+func Target() string {
+	return "new"
+}
+`)
+
+	original := agentContextTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	agentContextTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		agentContextTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeDiffTypechecked, report.Warnings)
+	}
+	if report.TestAnalysisMode != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s", report.TestAnalysisMode, sherpa.TestAnalysisModeTypecheckedAST)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
 func TestAnalyzeDiffUsesValidSnapshotForCurrentChangedSymbols(t *testing.T) {
 	root := initAgentContextGitRepository(t)
 

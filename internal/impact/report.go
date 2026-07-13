@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	gitdiff "github.com/panndabea/GoSherpa/internal/git"
+	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	"github.com/panndabea/GoSherpa/internal/symbolindex"
 )
@@ -78,6 +79,20 @@ func AnalyzeDiffWithOptions(root string, base string, head string, options Analy
 	return NewAnalyzerWithOptions(root, options).AnalyzeDiff(base, head)
 }
 
+func AnalyzeDiffWithContext(context *sherpa.SemanticContext, base string, head string, options AnalyzerOptions) (ImpactReport, error) {
+	if context == nil {
+		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	var err error
+	options, err = analyzerOptionsForContext(context, options)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
+	return NewAnalyzerWithOptions(context.Root(), options).AnalyzeDiffWithContext(context, base, head)
+}
+
 func AnalyzeFile(root string, file string) (ImpactReport, error) {
 	return NewAnalyzer(root).AnalyzeFile(file)
 }
@@ -127,6 +142,31 @@ func AnalyzeSymbolWithContext(context *sherpa.SemanticContext, target string, op
 }
 
 func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
+	semanticContext, err := sherpa.NewSemanticContext(a.Root, sherpa.SemanticContextOptions{
+		BuildTags: a.BuildTags,
+	})
+	if err != nil {
+		return ImpactReport{}, err
+	}
+
+	return a.AnalyzeDiffWithContext(semanticContext, base, head)
+}
+
+func (a Analyzer) AnalyzeDiffWithContext(context *sherpa.SemanticContext, base string, head string) (ImpactReport, error) {
+	if context == nil {
+		return ImpactReport{}, fmt.Errorf("semantic context is nil")
+	}
+
+	buildTags, err := analyzerBuildTagsForContext(context, a.BuildTags)
+	if err != nil {
+		return ImpactReport{}, err
+	}
+	a.BuildTags = buildTags
+
+	return a.analyzeDiffWithContext(context, base, head)
+}
+
+func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext, base string, head string) (ImpactReport, error) {
 	changedFiles, err := gitdiff.ChangedFiles(a.Root, base, head)
 	if err != nil {
 		return ImpactReport{}, err
@@ -147,12 +187,6 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	modulePath := impactModulePath(a.Root)
 	report.AffectedSymbols = changedSymbolNames(changedSymbols)
 	report.ChangedSymbolDetails = changedSymbolsWithTargets(changedSymbols, modulePath)
-	semanticContext, err := sherpa.NewSemanticContext(a.Root, sherpa.SemanticContextOptions{
-		BuildTags: a.BuildTags,
-	})
-	if err != nil {
-		return ImpactReport{}, err
-	}
 	symbolImpact := a.analyzeChangedSymbolImpactsWithContext(changedSymbols, semanticContext)
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, symbolImpact.Packages...))
@@ -175,6 +209,29 @@ func (a Analyzer) AnalyzeDiff(base string, head string) (ImpactReport, error) {
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
 
 	return normalizeReport(report), nil
+}
+
+func analyzerOptionsForContext(context *sherpa.SemanticContext, options AnalyzerOptions) (AnalyzerOptions, error) {
+	buildTags, err := analyzerBuildTagsForContext(context, options.BuildTags)
+	if err != nil {
+		return AnalyzerOptions{}, err
+	}
+	options.BuildTags = buildTags
+
+	return options, nil
+}
+
+func analyzerBuildTagsForContext(context *sherpa.SemanticContext, buildTags []string) ([]string, error) {
+	contextTags := context.BuildTags()
+	optionTags := semantics.NormalizeBuildTags(buildTags)
+	if len(optionTags) == 0 {
+		return contextTags, nil
+	}
+	if strings.Join(optionTags, "\x00") != strings.Join(contextTags, "\x00") {
+		return nil, fmt.Errorf("semantic context build tags do not match analyzer options")
+	}
+
+	return optionTags, nil
 }
 
 func (a Analyzer) AnalyzeFile(file string) (ImpactReport, error) {

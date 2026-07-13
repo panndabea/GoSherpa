@@ -220,6 +220,106 @@ type Authenticator interface {
 	assertStrings(t, report.AffectedImplementations, []string{"./internal/jwt.JWTAuthenticator"})
 }
 
+func TestAnalyzeDiffWithContextReusesSingleSemanticSession(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Entry() string {
+	return Target()
+}
+
+func Target() string {
+	return "old"
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "service_test.go"), `package app
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	if Target() == "" {
+		t.Fatal("empty")
+	}
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+
+	writeImpactTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Entry() string {
+	return Target()
+}
+
+func Target() string {
+	return "new"
+}
+`)
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
+	original := impactTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	impactTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		impactTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := AnalyzeDiffWithContext(context, "HEAD", "", AnalyzerOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeDiffWithContext returned error: %v", err)
+	}
+
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if report.TestAnalysisMode != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s", report.TestAnalysisMode, sherpa.TestAnalysisModeTypecheckedAST)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
+func TestAnalyzeDiffWithContextRejectsBuildTagMismatch(t *testing.T) {
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+
+	context, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+		BuildTags: []string{"enterprise"},
+	})
+	if err != nil {
+		t.Fatalf("NewSemanticContext returned error: %v", err)
+	}
+
+	_, err = AnalyzeDiffWithContext(context, "HEAD", "", AnalyzerOptions{
+		BuildTags: []string{"integration"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match analyzer options") {
+		t.Fatalf("expected build tag mismatch error, got %v", err)
+	}
+}
+
 func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
 	root := initImpactGitTestRepository(t)
 

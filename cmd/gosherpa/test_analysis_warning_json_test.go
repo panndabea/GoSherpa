@@ -67,6 +67,44 @@ func TestMainContextSymbolJSONPropagatesTestAnalysisWarnings(t *testing.T) {
 	}
 }
 
+func TestAnalyzePRSharesSemanticDiffSession(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	original := mainTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		mainTestLoadSemanticContextRepository = original
+	}()
+
+	report, err := analyzePR(tmp, "HEAD", nil)
+	if err != nil {
+		t.Fatalf("analyzePR returned error: %v", err)
+	}
+
+	if report.AnalysisMode != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, agentcontext.AnalysisModeDiffTypechecked, report.Warnings)
+	}
+	if report.TestAnalysisMode != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s", report.TestAnalysisMode, sherpa.TestAnalysisModeTypecheckedAST)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
 func mainTestJSONArrayContainsSubstring(values []any, substring string) bool {
 	for _, value := range values {
 		text, ok := value.(string)
