@@ -567,6 +567,32 @@ func TestParseCLIArgsAcceptsRefsKindFilter(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsReadWriteRefsKindFilters(t *testing.T) {
+	tests := []struct {
+		value string
+		want  sherpa.ReferenceKind
+	}{
+		{value: "read", want: sherpa.ReferenceKindRead},
+		{value: "write", want: sherpa.ReferenceKindWrite},
+	}
+
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			got, err := parseCLIArgs([]string{"refs", "Counter", "--kind", test.value})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got.ReferenceKind != test.want {
+				t.Fatalf("expected %s reference kind, got %s", test.want, got.ReferenceKind)
+			}
+			if !got.HasKindOption {
+				t.Fatal("expected kind option marker")
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsRejectsInvalidSearchFilters(t *testing.T) {
 	tests := [][]string{
 		{"search", "user", "--kind"},
@@ -5731,6 +5757,40 @@ func Run() {
 	}
 }
 
+func TestMainRunsRefsCommandWithWriteKindFilter(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+var Counter int
+
+func Run() {
+	Counter = Counter + 1
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "refs", "Counter", "--kind", "write", "--root", tmp})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d", exitSuccess, result.ExitCode)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	for _, want := range []string{"REFERENCES", "Counter", "write", "internal/service/service.go:6", "Found 1 references"} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("expected output to contain %s, got:\n%s", want, result.Stdout)
+		}
+	}
+
+	if strings.Contains(result.Stdout, "definition") || strings.Contains(result.Stdout, "read") {
+		t.Fatalf("expected filtered output to omit non-write references, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsRefsCommandWithContext(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -6323,7 +6383,7 @@ func TestMainPrintsFishCompletion(t *testing.T) {
 		"function __fish_gosherpa_seen_command",
 		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'completion' -d 'completion zsh|bash|fish'",
 		"complete -c gosherpa -f -n '__fish_seen_subcommand_from completion' -a 'zsh' -d 'zsh completion script'",
-		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface alias function method definition call type_usage field_access usage'",
+		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface alias function method definition call read write type_usage field_access usage'",
 	} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected fish completion to contain %q, got:\n%s", want, result.Stdout)

@@ -147,8 +147,9 @@ Implemented:
   reports.
 - Direct related and affected tests include `targetReferences` with concrete
   symbol occurrence positions and ranges when available.
-- Reference kind classification for definitions, calls, type usages, field
-  accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
+- Reference kind classification for definitions, calls, reads, writes, type
+  usages, field accesses, and fallback usages, with
+  `gosherpa refs --kind <kind>`.
 - Source ranges with columns for symbols, references, callers, callees, call
   paths, related tests, direct test target references, and range-backed
   reading-order entries in JSON output.
@@ -526,8 +527,8 @@ Done when:
 
 ### 2.2 Reference Kinds
 
-Status: first slice implemented for `gosherpa refs` and shared JSON reference
-payloads.
+Status: implemented for `gosherpa refs` and shared JSON reference payloads,
+including read/write classification for value and field references.
 
 Human question:
 
@@ -557,10 +558,9 @@ Reference kinds:
 
 MVP:
 
-- Start with definition, call, type usage, field access, and import. First
-  slice implemented for definition, call, type usage, field access, and
-  fallback usage.
-- Add read/write classification later.
+- Start with definition, call, type usage, field access, and import. Implemented
+  for definition, call, read, write, type usage, field access, and fallback
+  usage.
 
 Done when:
 

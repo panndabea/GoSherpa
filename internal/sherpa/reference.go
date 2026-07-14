@@ -41,6 +41,8 @@ type ReferenceKind string
 const (
 	ReferenceKindDefinition  ReferenceKind = "definition"
 	ReferenceKindCall        ReferenceKind = "call"
+	ReferenceKindRead        ReferenceKind = "read"
+	ReferenceKindWrite       ReferenceKind = "write"
 	ReferenceKindTypeUsage   ReferenceKind = "type_usage"
 	ReferenceKindFieldAccess ReferenceKind = "field_access"
 	ReferenceKindUsage       ReferenceKind = "usage"
@@ -236,6 +238,10 @@ func ParseReferenceKind(value string) (ReferenceKind, bool) {
 		return ReferenceKindDefinition, true
 	case string(ReferenceKindCall):
 		return ReferenceKindCall, true
+	case string(ReferenceKindRead):
+		return ReferenceKindRead, true
+	case string(ReferenceKindWrite):
+		return ReferenceKindWrite, true
 	case string(ReferenceKindTypeUsage), "type":
 		return ReferenceKindTypeUsage, true
 	case string(ReferenceKindFieldAccess), "field":
@@ -474,12 +480,16 @@ func findTypecheckedReferencesInPackage(root string, pkg referencePackage, targe
 }
 
 func referenceKindForTypecheckedSelector(object types.Object, selection *types.Selection, parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
-	if selection != nil && selection.Kind() == types.FieldVal {
-		return ReferenceKindFieldAccess
-	}
-
 	if _, ok := object.(*types.TypeName); ok {
 		return ReferenceKindTypeUsage
+	}
+
+	if referenceNodeIsCall(parent, selector) {
+		return ReferenceKindCall
+	}
+
+	if kind, ok := referenceReadWriteKindForObject(object, parent, selector); ok {
+		return kind
 	}
 
 	return referenceKindForSelector(selection, parent, selector)
@@ -736,7 +746,7 @@ func findReferencesInPackage(
 				}
 
 				if referenceSelectorMatchesImportedTarget(pkg.Info, node, target, targetPackages, imports) {
-					addReference(node.Sel.Pos(), node.Sel.End(), referenceKindForImportedSelector(parent, node))
+					addReference(node.Sel.Pos(), node.Sel.End(), referenceKindForImportedSelectorObject(pkg.Info.Uses[node.Sel], parent, node))
 				}
 			}
 
@@ -909,26 +919,36 @@ func referenceKindForIdent(object types.Object, definition bool, parent ast.Node
 		return ReferenceKindCall
 	}
 
+	if kind, ok := referenceReadWriteKindForObject(object, parent, ident); ok {
+		return kind
+	}
+
 	return ReferenceKindUsage
 }
 
 func referenceKindForSelector(selection *types.Selection, parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
-	if selection != nil && selection.Kind() == types.FieldVal {
-		return ReferenceKindFieldAccess
-	}
-
 	if referenceNodeIsTypeUsage(parent, selector) {
 		return ReferenceKindTypeUsage
 	}
 
 	if referenceNodeIsCall(parent, selector) {
 		return ReferenceKindCall
+	}
+
+	if selection != nil {
+		object := selection.Obj()
+		if kind, ok := referenceReadWriteKindForObject(object, parent, selector); ok {
+			return kind
+		}
+		if selection.Kind() == types.FieldVal {
+			return ReferenceKindFieldAccess
+		}
 	}
 
 	return ReferenceKindUsage
 }
 
-func referenceKindForImportedSelector(parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
+func referenceKindForImportedSelectorObject(object types.Object, parent ast.Node, selector *ast.SelectorExpr) ReferenceKind {
 	if referenceNodeIsTypeUsage(parent, selector) {
 		return ReferenceKindTypeUsage
 	}
@@ -937,7 +957,121 @@ func referenceKindForImportedSelector(parent ast.Node, selector *ast.SelectorExp
 		return ReferenceKindCall
 	}
 
+	if kind, ok := referenceReadWriteKindForObject(object, parent, selector); ok {
+		return kind
+	}
+
 	return ReferenceKindUsage
+}
+
+func referenceReadWriteKindForObject(object types.Object, parent ast.Node, expr ast.Expr) (ReferenceKind, bool) {
+	if !referenceObjectCanReadWrite(object) {
+		return "", false
+	}
+
+	if referenceNodeIsWrite(parent, expr, object) {
+		return ReferenceKindWrite, true
+	}
+
+	if referenceNodeIsRead(parent, expr, object) {
+		return ReferenceKindRead, true
+	}
+
+	if referenceObjectIsValue(object) {
+		return ReferenceKindRead, true
+	}
+
+	return "", false
+}
+
+func referenceObjectCanReadWrite(object types.Object) bool {
+	return referenceObjectIsValue(object) || referenceObjectIsField(object)
+}
+
+func referenceObjectIsValue(object types.Object) bool {
+	switch object := object.(type) {
+	case *types.Var:
+		return !object.IsField()
+	case *types.Const:
+		return true
+	default:
+		return false
+	}
+}
+
+func referenceObjectIsField(object types.Object) bool {
+	variable, ok := object.(*types.Var)
+	return ok && variable.IsField()
+}
+
+func referenceNodeIsWrite(parent ast.Node, expr ast.Expr, object types.Object) bool {
+	switch parent := parent.(type) {
+	case *ast.AssignStmt:
+		return referenceExprListContains(parent.Lhs, expr)
+	case *ast.IncDecStmt:
+		return parent.X == expr
+	case *ast.RangeStmt:
+		return parent.Key == expr || parent.Value == expr
+	case *ast.KeyValueExpr:
+		return parent.Key == expr && referenceObjectIsField(object)
+	default:
+		return false
+	}
+}
+
+func referenceNodeIsRead(parent ast.Node, expr ast.Expr, object types.Object) bool {
+	switch parent := parent.(type) {
+	case *ast.AssignStmt:
+		return referenceExprListContains(parent.Rhs, expr)
+	case *ast.BinaryExpr:
+		return parent.X == expr || parent.Y == expr
+	case *ast.CallExpr:
+		return referenceExprListContains(parent.Args, expr)
+	case *ast.CaseClause:
+		return referenceExprListContains(parent.List, expr)
+	case *ast.ForStmt:
+		return parent.Cond == expr
+	case *ast.IfStmt:
+		return parent.Cond == expr
+	case *ast.IndexExpr:
+		return parent.X == expr || parent.Index == expr
+	case *ast.IndexListExpr:
+		return parent.X == expr || referenceExprListContains(parent.Indices, expr)
+	case *ast.KeyValueExpr:
+		return parent.Value == expr || (parent.Key == expr && !referenceObjectIsField(object))
+	case *ast.ParenExpr:
+		return parent.X == expr
+	case *ast.RangeStmt:
+		return parent.X == expr
+	case *ast.ReturnStmt:
+		return referenceExprListContains(parent.Results, expr)
+	case *ast.SelectorExpr:
+		return parent.X == expr
+	case *ast.SendStmt:
+		return parent.Chan == expr || parent.Value == expr
+	case *ast.SliceExpr:
+		return parent.X == expr || parent.Low == expr || parent.High == expr || parent.Max == expr
+	case *ast.StarExpr:
+		return parent.X == expr
+	case *ast.SwitchStmt:
+		return parent.Tag == expr
+	case *ast.UnaryExpr:
+		return parent.X == expr
+	case *ast.ValueSpec:
+		return referenceExprListContains(parent.Values, expr)
+	default:
+		return false
+	}
+}
+
+func referenceExprListContains(expressions []ast.Expr, expr ast.Expr) bool {
+	for _, candidate := range expressions {
+		if candidate == expr {
+			return true
+		}
+	}
+
+	return false
 }
 
 func referenceNodeIsCall(parent ast.Node, expr ast.Expr) bool {
@@ -1052,6 +1186,10 @@ func sortReferences(refs []Reference) {
 
 		if refs[i].Position.Line != refs[j].Position.Line {
 			return refs[i].Position.Line < refs[j].Position.Line
+		}
+
+		if refs[i].Position.Column != refs[j].Position.Column {
+			return refs[i].Position.Column < refs[j].Position.Column
 		}
 
 		if refs[i].Kind != refs[j].Kind {

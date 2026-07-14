@@ -78,7 +78,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   where those modes are present.
 - Package inventory with `gosherpa packages`, including file, symbol, import, reverse-dependency, and test indicators
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
-- Reference kind classification and `gosherpa refs --kind <kind>` filtering
+- Reference kind classification and `gosherpa refs --kind <kind>` filtering,
+  including read/write classification for value and field references
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
 - Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, or invalid snapshots fall back to live analysis with warnings.
 

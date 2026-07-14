@@ -217,7 +217,73 @@ func Run(server Server) string {
 		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
 	}
 
-	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindDefinition, ReferenceKindFieldAccess})
+	assertReferenceKinds(t, refs, []ReferenceKind{ReferenceKindDefinition, ReferenceKindRead})
+}
+
+func TestFindReferencesClassifiesReadAndWriteReferences(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+var Counter int
+var Snapshot = Counter
+
+func Run() int {
+	Counter = Counter + 1
+	Counter++
+	return Counter
+}
+`)
+
+	refs, err := FindReferences(tmp, "Counter")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 6 {
+		t.Fatalf("expected 6 references, got %d: %v", len(refs), refs)
+	}
+
+	assertReferenceAt(t, refs, "service.go", 3, ReferenceKindDefinition)
+	assertReferenceAt(t, refs, "service.go", 4, ReferenceKindRead)
+	assertReferenceAt(t, refs, "service.go", 7, ReferenceKindWrite)
+	assertReferenceAt(t, refs, "service.go", 7, ReferenceKindRead)
+	assertReferenceAt(t, refs, "service.go", 8, ReferenceKindWrite)
+	assertReferenceAt(t, refs, "service.go", 9, ReferenceKindRead)
+}
+
+func TestFindReferencesClassifiesFieldReadsAndWrites(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Server struct {
+	Name string
+}
+
+func New(name string) Server {
+	return Server{Name: name}
+}
+
+func Rename(server *Server, name string) string {
+	server.Name = name
+	return server.Name
+}
+`)
+
+	refs, err := FindReferences(tmp, "Server.Name")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs) != 4 {
+		t.Fatalf("expected 4 references, got %d: %v", len(refs), refs)
+	}
+
+	assertReferenceAt(t, refs, "service.go", 4, ReferenceKindDefinition)
+	assertReferenceAt(t, refs, "service.go", 8, ReferenceKindWrite)
+	assertReferenceAt(t, refs, "service.go", 12, ReferenceKindWrite)
+	assertReferenceAt(t, refs, "service.go", 13, ReferenceKindRead)
 }
 
 func TestFindReferencesFiltersByKind(t *testing.T) {

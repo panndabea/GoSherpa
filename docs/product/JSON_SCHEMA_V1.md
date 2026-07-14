@@ -117,8 +117,8 @@ References:
 }
 ```
 
-Reference `kind` values include `definition`, `call`, `type_usage`,
-`field_access`, and `usage`.
+Reference `kind` values include `definition`, `call`, `read`, `write`,
+`type_usage`, `field_access`, and `usage`.
 
 Callers and callees share the same entry shape:
 
