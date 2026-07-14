@@ -2296,6 +2296,31 @@ func TestMainRunsTestsAffectedCommandFromWorkspaceRootWithGoModAsJSON(t *testing
 	}
 }
 
+func TestMainRunsTestsAffectedCommandFromWorkspaceRootWithGoModFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/root")
+
+	assertMainWorkspaceSnapshotDiffAnalysis(t, payload, data)
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "commands"), "go test ./service")
+	assertMainWorkspaceAffectedTest(t, data)
+}
+
 func TestMainRunsTestsAffectedCommandFromSnapshotAsJSON(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 	writeMainSnapshot(t, tmp)
@@ -3666,6 +3691,38 @@ func TestMainRunsPRCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainRunsPRCommandFromWorkspaceRootWithGoModFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "pr", "HEAD", "example.com/root")
+
+	assertMainWorkspaceSnapshotDiffAnalysis(t, payload, data)
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1), "service/service.go")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedSymbols", 1), "Service.Process")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./service.Processor")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedImplementations"), "./service.Service")
+	assertMainWorkspaceChangedSymbolDetail(t, data)
+	assertMainWorkspaceAffectedTest(t, data)
+}
+
 func TestMainRunsPRCommandFromSnapshotAsJSON(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 	writeMainSnapshot(t, tmp)
@@ -3975,6 +4032,39 @@ func TestMainRunsContextDiffCommandFromSnapshotAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainRunsContextDiffCommandFromWorkspaceRootWithGoModFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/root")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	assertMainWorkspaceSnapshotDiffAnalysis(t, payload, data)
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1), "service/service.go")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1), "Service.Process")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./service.Processor")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedImplementations"), "./service.Service")
+	assertMainWorkspaceChangedSymbolDetail(t, data)
+	assertMainWorkspaceAffectedTest(t, data)
+}
+
 func TestMainRunsContextDiffCommandWithLimitsAsJSON(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 
@@ -4210,6 +4300,38 @@ func TestMainRunsImpactDiffCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T)
 	if test["name"] != "TestServiceProcess" || test["package"] != "./service" {
 		t.Fatalf("expected service affected test, got %#v", test)
 	}
+}
+
+func TestMainRunsImpactDiffCommandFromWorkspaceRootWithGoModFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "diff", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact diff", "HEAD", "example.com/root")
+
+	assertMainWorkspaceSnapshotDiffAnalysis(t, payload, data)
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1), "service/service.go")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1), "Service.Process")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedInterfaces", 1), "./service.Processor")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedImplementations", 1), "./service.Service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "testCommands"), "go test ./service")
+	assertMainWorkspaceAffectedTest(t, data)
 }
 
 func TestMainRunsImpactDiffCommandFromSnapshotAsJSON(t *testing.T) {
@@ -7147,6 +7269,54 @@ func assertMainTestContextByteBudget(t *testing.T, data map[string]any, maxBytes
 		if !ok || overage <= 0 {
 			t.Fatalf("context data is %d bytes with budget %d but byteBudgetOverage is missing: %#v", len(encoded), maxBytes, truncated)
 		}
+	}
+}
+
+func assertMainWorkspaceSnapshotDiffAnalysis(t *testing.T, payload map[string]any, data map[string]any) {
+	t.Helper()
+
+	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	if data["interfaceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", limitations)
+	}
+}
+
+func assertMainWorkspaceChangedSymbolDetail(t *testing.T, data map[string]any) {
+	t.Helper()
+
+	details := assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
+	detail, ok := details[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected changed symbol detail object, got %T", details[0])
+	}
+	if detail["target"] != "./service.Service.Process" {
+		t.Fatalf("expected workspace changed symbol target, got %#v", detail)
+	}
+}
+
+func assertMainWorkspaceAffectedTest(t *testing.T, data map[string]any) {
+	t.Helper()
+
+	tests := assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	test, ok := tests[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected affected test object, got %T", tests[0])
+	}
+	if test["name"] != "TestServiceProcess" || test["package"] != "./service" {
+		t.Fatalf("expected service affected test, got %#v", test)
 	}
 }
 
