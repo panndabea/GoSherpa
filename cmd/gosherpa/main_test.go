@@ -2253,6 +2253,49 @@ func NewSession() Session {
 	}
 }
 
+func TestMainRunsTestsAffectedCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/root")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+	if data["interfaceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "commands"), "go test ./service")
+
+	tests := assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	test, ok := tests[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected affected test object, got %T", tests[0])
+	}
+	if test["name"] != "TestServiceProcess" || test["package"] != "./service" {
+		t.Fatalf("expected service affected test, got %#v", test)
+	}
+}
+
 func TestMainRunsTestsAffectedCommandFromSnapshotAsJSON(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 	writeMainSnapshot(t, tmp)
@@ -3569,7 +3612,7 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 }
 
 func TestMainRunsPRCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
-	tmp := writeMainWorkspacePRDiffProject(t)
+	tmp := writeMainWorkspaceDiffProject(t)
 
 	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--json"})
 
@@ -4116,6 +4159,56 @@ func NewSession() Session {
 
 	if strings.Contains(result.Stdout, "IMPACT DIFF") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactDiffCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
+	tmp := writeMainWorkspaceDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "diff", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact diff", "HEAD", "example.com/root")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+	if data["interfaceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1), "service/service.go")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1), "Service.Process")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedInterfaces", 1), "./service.Processor")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "affectedImplementations", 1), "./service.Service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "testCommands"), "go test ./service")
+
+	tests := assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	test, ok := tests[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected affected test object, got %T", tests[0])
+	}
+	if test["name"] != "TestServiceProcess" || test["package"] != "./service" {
+		t.Fatalf("expected service affected test, got %#v", test)
 	}
 }
 
@@ -6754,7 +6847,7 @@ func NewSession() Session {
 	return tmp
 }
 
-func writeMainWorkspacePRDiffProject(t *testing.T) string {
+func writeMainWorkspaceDiffProject(t *testing.T) string {
 	t.Helper()
 
 	tmp := t.TempDir()
