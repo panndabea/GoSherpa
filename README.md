@@ -85,6 +85,7 @@ Use `--root` to run GoSherpa from another working directory:
 | Command | What it shows |
 | --- | --- |
 | `gosherpa version` | GoSherpa and Go runtime version information |
+| `gosherpa help callers` | Usage for a command without running analysis |
 | `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
 | `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot |

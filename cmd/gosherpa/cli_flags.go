@@ -64,6 +64,20 @@ var cliFlagSpecs = []cliFlagSpec{
 		},
 	},
 	{
+		Name: "--help",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			invocation.HasHelpOption = true
+			return nil
+		},
+	},
+	{
+		Name: "-h",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			invocation.HasHelpOption = true
+			return nil
+		},
+	},
+	{
 		Name:       "--tags",
 		TakesValue: true,
 		Apply:      applyBuildTagsFlag,

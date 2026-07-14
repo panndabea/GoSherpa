@@ -78,6 +78,7 @@ symbol completion can come later.
 | Capability | Command | Result |
 | --- | --- | --- |
 | Version | `gosherpa version` | Prints GoSherpa and Go runtime version information |
+| Help | `gosherpa help callers` | Prints global or command-specific usage without running analysis |
 | Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, entrypoint candidates, structural risk, hotspots, tests, readiness, limitations, and suggested next commands |
 | Architecture overview | `gosherpa architecture` | Reports dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, and leaf packages |
 | Risk overview | `gosherpa risk` | Summarizes structural repository risk from cycles, fan-in/fan-out, public API surface, interfaces, and tests |

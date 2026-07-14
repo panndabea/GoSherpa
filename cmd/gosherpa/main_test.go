@@ -126,6 +126,28 @@ func TestParseCLIArgsRejectsUnknownFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsHelpFlag(t *testing.T) {
+	tests := [][]string{
+		{"--help"},
+		{"-h"},
+		{"callers", "--help"},
+		{"context", "diff", "-h"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			got, err := parseCLIArgs(test)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !got.HasHelpOption {
+				t.Fatalf("expected help option, got %#v", got)
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsBuildTags(t *testing.T) {
 	got, err := parseCLIArgs([]string{"--tags", "enterprise,integration", "refs", "Target"})
 	if err != nil {
@@ -750,6 +772,17 @@ func TestPrintUsageIncludesVersion(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesHelp(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	for _, want := range []string{"-h, --help       show global or command usage", "\n  help [command]\n"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
+		}
+	}
+}
+
 func TestPrintUsageIncludesTests(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -869,6 +902,105 @@ func TestRunReturnsUsageExitWhenCommandIsMissing(t *testing.T) {
 
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "usage: gosherpa [--root <path>] <command> [args]") {
+		t.Fatalf("expected usage in stderr, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainPrintsGlobalHelp(t *testing.T) {
+	tests := [][]string{
+		{"gosherpa", "--help"},
+		{"gosherpa", "-h"},
+		{"gosherpa", "help"},
+	}
+
+	for _, test := range tests {
+		t.Run(strings.Join(test, " "), func(t *testing.T) {
+			result := runMainTest(t, test)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+
+			for _, want := range []string{
+				"usage: gosherpa [--root <path>] <command> [args]",
+				"-h, --help       show global or command usage",
+				"help [command]",
+			} {
+				if !strings.Contains(result.Stdout, want) {
+					t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
+				}
+			}
+
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+		})
+	}
+}
+
+func TestMainPrintsCommandHelp(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "flag after command",
+			args: []string{"gosherpa", "callers", "--help"},
+			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n",
+		},
+		{
+			name: "help command",
+			args: []string{"gosherpa", "help", "callers"},
+			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n",
+		},
+		{
+			name: "subcommand flag",
+			args: []string{"gosherpa", "context", "diff", "--help"},
+			want: "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n",
+		},
+		{
+			name: "subcommand help command",
+			args: []string{"gosherpa", "help", "impact", "file"},
+			want: "usage: gosherpa [--root <path>] impact file <file>\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := runMainTest(t, test.args)
+
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+
+			if result.Stdout != test.want {
+				t.Fatalf("expected stdout %q, got %q", test.want, result.Stdout)
+			}
+
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+		})
+	}
+}
+
+func TestMainPrintsUsageForUnknownHelpCommand(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "help", "missing"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "unknown command: missing") {
+		t.Fatalf("expected unknown command error, got:\n%s", result.Stderr)
 	}
 
 	if !strings.Contains(result.Stderr, "usage: gosherpa [--root <path>] <command> [args]") {

@@ -49,6 +49,7 @@ type cliInvocation struct {
 	UseSnapshot        bool
 	HasSnapshotOption  bool
 	HasVersionOption   bool
+	HasHelpOption      bool
 	KindFilter         string
 	SearchKind         sherpa.SymbolKind
 	ReferenceKind      sherpa.ReferenceKind
@@ -75,6 +76,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return exitUsage
+	}
+
+	if invocation.HasHelpOption || invocation.Command == "help" {
+		return runHelpCommand(invocation, stdout, stderr)
 	}
 
 	if invocation.Command == "" {
@@ -168,6 +173,26 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	return spec.Handler(invocation, stdout, stderr)
+}
+
+func runHelpCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
+	args := invocation.CommandArgs
+	if invocation.Command != "" && invocation.Command != "help" {
+		args = append([]string{invocation.Command}, invocation.CommandArgs...)
+	}
+
+	if len(args) == 0 {
+		printUsage(stdout)
+		return exitSuccess
+	}
+
+	if !printHelpForCommand(stdout, args) {
+		fmt.Fprintln(stderr, "unknown command:", args[0])
+		printUsage(stderr)
+		return exitUsage
+	}
+
+	return exitSuccess
 }
 
 func knownCommand(command string) bool {
@@ -409,6 +434,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  --json           machine-readable output for all commands")
 	fmt.Fprintln(writer, "  --context        show source context for supported human output")
 	fmt.Fprintln(writer, "  --version        print GoSherpa version information")
+	fmt.Fprintln(writer, "  -h, --help       show global or command usage")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "commands:")
 	for _, spec := range commandSpecs {
@@ -431,6 +457,60 @@ func printUsageLines(writer io.Writer, usageLines []string) {
 
 func printCommandUsage(writer io.Writer, usage string) {
 	printUsageLines(writer, []string{usage})
+}
+
+func printHelpForCommand(writer io.Writer, args []string) bool {
+	if len(args) == 0 {
+		printUsage(writer)
+		return true
+	}
+
+	command := args[0]
+	if _, ok := commandSpecFor(command); !ok {
+		return false
+	}
+
+	switch command {
+	case "context":
+		if len(args) > 1 {
+			switch args[1] {
+			case "symbol":
+				printContextSymbolUsage(writer)
+				return true
+			case "file":
+				printContextFileUsage(writer)
+				return true
+			case "package":
+				printContextPackageUsage(writer)
+				return true
+			case "diff":
+				printContextDiffUsage(writer)
+				return true
+			}
+		}
+		printContextUsage(writer)
+	case "impact":
+		if len(args) > 1 {
+			printImpactSubcommandUsage(writer, args[1])
+			return true
+		}
+		printImpactUsage(writer)
+	case "tests":
+		if len(args) > 1 && args[1] == "affected" {
+			printTestsAffectedUsage(writer)
+			return true
+		}
+		printTestsUsage(writer)
+	case "deps":
+		printDepsUsage(writer)
+	case "path":
+		printCommandUsage(writer, pathDetailedUsageLine)
+	default:
+		spec, _ := commandSpecFor(command)
+		printUsageLines(writer, spec.Usage)
+	}
+
+	return true
 }
 
 func printContextUsage(writer io.Writer) {

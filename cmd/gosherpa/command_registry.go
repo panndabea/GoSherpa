@@ -84,6 +84,10 @@ var commandSpecs = []commandSpec{
 		JSON:    true,
 	},
 	{
+		Name:  "help",
+		Usage: []string{helpUsageLine},
+	},
+	{
 		Name:    "explain",
 		Usage:   []string{explainUsageLine},
 		Handler: runExplainCommand,
@@ -249,6 +253,7 @@ const (
 	snapshotUsageLine       = "snapshot"
 	completionUsageLine     = "completion zsh|bash|fish"
 	versionUsageLine        = "version"
+	helpUsageLine           = "help [command]"
 	explainUsageLine        = "explain <symbol> [--tests]"
 	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests] [--use-snapshot]"
 	symbolUsageLine         = "symbol <target> [--context] [--use-snapshot]"
