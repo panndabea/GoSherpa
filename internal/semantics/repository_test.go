@@ -82,6 +82,67 @@ func Run(client *service.Client) {
 	assertSemanticTestContains(t, got, "./service")
 }
 
+func TestPackageLoadPatternsUseGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/root\n")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	.
+	./service
+)
+`)
+
+	got := packageLoadPatterns(tmp, LoadOptions{})
+	want := []string{"./...", "./service/..."}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("packageLoadPatterns() = %#v, want %#v", got, want)
+	}
+}
+
+func TestLoadRepositoryUsesGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), `module example.com/root
+
+go 1.24
+
+require example.com/service v0.0.0
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	.
+	./service
+)
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "root.go"), `package root
+
+import "example.com/service"
+
+func Run(client *service.Client) {
+	client.Start()
+}
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n\ngo 1.24\n")
+	writeSemanticTestFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Client struct{}
+
+func (c *Client) Start() {}
+`)
+
+	repo, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := semanticTestPackagePaths(repo)
+	assertSemanticTestContains(t, got, ".")
+	assertSemanticTestContains(t, got, "./service")
+}
+
 func TestLoadRepositoryReportsPackageWarnings(t *testing.T) {
 	tmp := t.TempDir()
 

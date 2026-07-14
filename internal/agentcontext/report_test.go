@@ -208,6 +208,101 @@ func Run() {
 	}
 }
 
+func TestAnalyzeSymbolUsesGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), `module example.com/root
+
+go 1.24.4
+
+require example.com/service v0.0.0
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "go.work"), `go 1.24.4
+
+use (
+	.
+	./service
+)
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "root.go"), `package root
+
+import "example.com/service"
+
+func Run(svc service.Service) error {
+	process := svc.Process
+	return process(service.Payload{})
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	return nil
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service_test.go"), `package service
+
+import "testing"
+
+func TestServiceProcess(t *testing.T) {
+	if (Service{}).Process(Payload{}) != nil {
+		t.Fatal("unexpected error")
+	}
+}
+`)
+
+	report, err := AnalyzeSymbol(root, "./service.Service.Process", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.Identity.Package != "./service" {
+		t.Fatalf("identity package = %q, want ./service", report.Identity.Package)
+	}
+	if report.SourceContext.Position.File != "service/service.go" {
+		t.Fatalf("source context file = %q, want service/service.go", report.SourceContext.Position.File)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if len(report.Callers) != 1 || report.Callers[0].Name != "Run" || report.Callers[0].Position.File != "root.go" {
+		t.Fatalf("expected root Run caller through method value, got %#v", report.Callers)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if !agentContextStringSliceContains(report.AffectedInterfaces, "./service.Processor") {
+		t.Fatalf("expected service Processor interface, got %#v", report.AffectedInterfaces)
+	}
+	if !agentContextStringSliceContains(report.AffectedImplementations, "./service.Service") {
+		t.Fatalf("expected service implementation signal, got %#v", report.AffectedImplementations)
+	}
+	if len(report.RelatedTests) != 1 || report.RelatedTests[0].Name != "TestServiceProcess" {
+		t.Fatalf("expected service related test, got %#v", report.RelatedTests)
+	}
+
+	importPathReport, err := AnalyzeSymbol(root, "example.com/service.Service.Process", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol with workspace import path target returned error: %v", err)
+	}
+	if importPathReport.Identity.Package != "./service" {
+		t.Fatalf("import path identity package = %q, want ./service", importPathReport.Identity.Package)
+	}
+	if importPathReport.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("import path analysis mode = %q, want %s with warnings %#v", importPathReport.AnalysisMode, AnalysisModeTypecheckedAST, importPathReport.Warnings)
+	}
+}
+
 func TestAnalyzeSymbolUsesBuildTagsForSemanticIdentity(t *testing.T) {
 	root := t.TempDir()
 	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")

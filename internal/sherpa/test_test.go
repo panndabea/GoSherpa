@@ -486,6 +486,60 @@ func TestStart(t *testing.T) {
 	}
 }
 
+func TestFindTestsUsesGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), `module example.com/root
+
+go 1.24
+
+require example.com/service v0.0.0
+`)
+	writeFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	.
+	./service
+)
+`)
+	writeFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n\ngo 1.24\n")
+	writeFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	return nil
+}
+`)
+	writeFile(t, filepath.Join(tmp, "service", "service_test.go"), `package service
+
+import "testing"
+
+func TestServiceProcess(t *testing.T) {
+	if (Service{}).Process(Payload{}) != nil {
+		t.Fatal("unexpected error")
+	}
+}
+`)
+
+	result, err := FindTests(tmp, "./service.Service.Process")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.AnalysisMode != TestAnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", result.AnalysisMode, TestAnalysisModeTypecheckedAST, result.Warnings)
+	}
+	if len(result.Tests) != 1 || result.Tests[0].Name != "TestServiceProcess" {
+		t.Fatalf("expected workspace module related test, got %#v", result.Tests)
+	}
+	if !result.Tests[0].DirectReference {
+		t.Fatalf("expected direct reference marker, got %#v", result.Tests[0])
+	}
+}
+
 func TestFindTestsUsesTypeInfoForExternalTestReceiverMethodReferences(t *testing.T) {
 	tmp := t.TempDir()
 

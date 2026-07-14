@@ -533,6 +533,8 @@ func normalizeReferencePackagePath(root string, packagePath string) (string, err
 		}
 		if strings.HasPrefix(value, modulePath+"/") {
 			value = strings.TrimPrefix(value, modulePath+"/")
+		} else if localPath, ok := WorkspacePackagePathForImportPath(root, value); ok {
+			return localPath, nil
 		} else if !strings.HasPrefix(value, "./") && strings.Contains(value, ".") {
 			return "", fmt.Errorf("non-local package-qualified reference targets are not supported: %s", packagePath)
 		}

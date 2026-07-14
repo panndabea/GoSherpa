@@ -109,10 +109,6 @@ func packageLoadPatterns(root string, options LoadOptions) []string {
 }
 
 func workspacePackageLoadPatterns(root string) ([]string, bool) {
-	if fileExists(filepath.Join(root, "go.mod")) {
-		return nil, false
-	}
-
 	goWorkPath := filepath.Join(root, "go.work")
 	contents, err := os.ReadFile(goWorkPath)
 	if err != nil {
@@ -161,11 +157,6 @@ func workspacePackageLoadPatterns(root string) ([]string, bool) {
 	}
 
 	return patterns, true
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 func loadPackages(root string, options LoadOptions, patterns []string, goCache string) ([]*packages.Package, error) {

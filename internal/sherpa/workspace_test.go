@@ -26,6 +26,35 @@ func TestWorkspacePackagePathForImportPathUsesRootModule(t *testing.T) {
 	}
 }
 
+func TestWorkspacePackagePathForImportPathUsesGoWorkWhenRootHasGoMod(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/root\n\ngo 1.24.4\n")
+	writeFile(t, filepath.Join(root, "go.work"), `go 1.24.4
+
+use (
+	.
+	./service
+)
+`)
+	writeFile(t, filepath.Join(root, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+
+	got, ok := WorkspacePackagePathForImportPath(root, "example.com/service")
+	if !ok {
+		t.Fatal("expected service workspace import path to resolve")
+	}
+	if got != "./service" {
+		t.Fatalf("expected ./service, got %s", got)
+	}
+
+	got, ok = WorkspacePackagePathForImportPath(root, "example.com/root/internal/app")
+	if !ok {
+		t.Fatal("expected root workspace import path to resolve")
+	}
+	if got != "./internal/app" {
+		t.Fatalf("expected ./internal/app, got %s", got)
+	}
+}
+
 func TestWorkspacePackagePathForImportPathUsesGoWorkModules(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.work"), `go 1.24.4

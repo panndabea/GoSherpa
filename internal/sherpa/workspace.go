@@ -22,7 +22,9 @@ func WorkspacePackagePathForImportPath(root string, importPath string) (string, 
 	}
 
 	if modulePath := readModulePath(rootPath); modulePath != "" {
-		return localPackagePath(value, modulePath)
+		if localPath, ok := localPackagePath(value, modulePath); ok {
+			return localPath, true
+		}
 	}
 
 	for _, moduleDir := range workspaceModuleDirs(rootPath) {

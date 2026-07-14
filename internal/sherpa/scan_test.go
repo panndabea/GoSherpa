@@ -58,6 +58,33 @@ func TestFindGoFilesSkipsNestedModules(t *testing.T) {
 	assertScanTestNoFile(t, got, filepath.Join(tmp, "nested", "child", "child.go"))
 }
 
+func TestFindGoFilesIncludesGoWorkModulesWhenRootHasGoMod(t *testing.T) {
+	tmp := t.TempDir()
+	writeScanTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/root\n")
+	writeScanTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24
+
+use (
+	.
+	./service
+)
+`)
+	writeScanTestFile(t, filepath.Join(tmp, "main.go"), "package root")
+	writeScanTestFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n")
+	writeScanTestFile(t, filepath.Join(tmp, "service", "service.go"), "package service")
+	writeScanTestFile(t, filepath.Join(tmp, "unlisted", "go.mod"), "module example.com/unlisted\n")
+	writeScanTestFile(t, filepath.Join(tmp, "unlisted", "unlisted.go"), "package unlisted")
+
+	files, err := FindGoFiles(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := scanTestFileSet(files)
+	assertScanTestHasFile(t, got, filepath.Join(tmp, "main.go"))
+	assertScanTestHasFile(t, got, filepath.Join(tmp, "service", "service.go"))
+	assertScanTestNoFile(t, got, filepath.Join(tmp, "unlisted", "unlisted.go"))
+}
+
 func TestFindGoFilesKeepsNestedGoModWhenRootIsNotModule(t *testing.T) {
 	tmp := t.TempDir()
 	writeScanTestFile(t, filepath.Join(tmp, "main.go"), "package main")
