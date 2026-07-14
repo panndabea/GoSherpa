@@ -18,6 +18,7 @@ import (
 
 type Callee struct {
 	Name     string       `json:"name"`
+	Scope    CallScope    `json:"scope,omitempty"`
 	Position Position     `json:"position"`
 	Range    *SourceRange `json:"range,omitempty"`
 }
@@ -25,6 +26,15 @@ type Callee struct {
 const (
 	CallAnalysisModeTypechecked = "typechecked"
 	CallAnalysisModeASTFallback = "ast-fallback"
+)
+
+type CallScope string
+
+const (
+	CallScopeLocal    CallScope = "local"
+	CallScopeExternal CallScope = "external"
+	CallScopeBuiltin  CallScope = "builtin"
+	CallScopeDynamic  CallScope = "dynamic"
 )
 
 type CalleesResult struct {
@@ -1525,6 +1535,7 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 	for _, reference := range references {
 		callees = append(callees, Callee{
 			Name:     reference.Name,
+			Scope:    callReferenceScope(function, reference),
 			Position: reference.Position,
 			Range:    reference.Range,
 		})
@@ -1582,6 +1593,103 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	sortCallReferences(references)
 
 	return references
+}
+
+func callReferenceScope(function functionInfo, reference callReference) CallScope {
+	if scope, ok := typedCallReferenceScope(function, reference.Expr); ok {
+		return scope
+	}
+
+	if callNameIsBuiltin(reference.Name) {
+		return CallScopeBuiltin
+	}
+
+	if callExprLooksLocal(reference.Expr) {
+		return CallScopeLocal
+	}
+
+	return CallScopeExternal
+}
+
+func typedCallReferenceScope(function functionInfo, expr ast.Expr) (CallScope, bool) {
+	if function.TypeInfo == nil {
+		return "", false
+	}
+
+	if selection := callSelection(function, expr); selection != nil {
+		if _, ok := selection.Obj().(*types.Func); ok {
+			return callFunctionObjectScope(function, selection.Obj()), true
+		}
+	}
+
+	object := callObject(function, expr)
+	switch object := object.(type) {
+	case *types.Builtin:
+		return CallScopeBuiltin, true
+	case *types.Func:
+		return callFunctionObjectScope(function, object), true
+	case *types.Var:
+		if callTypeIsFunction(object.Type()) {
+			return CallScopeDynamic, true
+		}
+	}
+
+	return "", false
+}
+
+func callFunctionObjectScope(function functionInfo, object types.Object) CallScope {
+	if callObjectPackageIsLocal(function, object) {
+		return CallScopeLocal
+	}
+
+	return CallScopeExternal
+}
+
+func callObjectPackageIsLocal(function functionInfo, object types.Object) bool {
+	if object == nil || object.Pkg() == nil {
+		return false
+	}
+
+	packagePath := object.Pkg().Path()
+	if packagePath == "" {
+		return false
+	}
+
+	if function.ImportPaths != nil {
+		if _, ok := function.ImportPaths[packagePath]; ok {
+			return true
+		}
+	}
+
+	if packagePath == function.ImportPath && strings.TrimSpace(function.Package) != "" {
+		return true
+	}
+
+	_, ok := callLocalImportPackage(packagePath, function.ModulePath)
+	return ok
+}
+
+func callTypeIsFunction(typ types.Type) bool {
+	if typ == nil {
+		return false
+	}
+
+	_, ok := typ.Underlying().(*types.Signature)
+	return ok
+}
+
+func callNameIsBuiltin(name string) bool {
+	switch name {
+	case "append", "cap", "clear", "close", "complex", "copy", "delete", "imag", "len", "make", "max", "min", "new", "panic", "print", "println", "real", "recover":
+		return true
+	default:
+		return false
+	}
+}
+
+func callExprLooksLocal(expr ast.Expr) bool {
+	_, ok := callIdentName(expr)
+	return ok
 }
 
 func collectStaticCallValueAssignments(function functionInfo) staticCallValueAssignments {

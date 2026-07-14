@@ -83,6 +83,94 @@ Found 1 callees
 	}
 }
 
+func TestFormatCalleesGroupsLocalBeforeExternalBuiltinAndDynamic(t *testing.T) {
+	result := CalleesResult{
+		Target: "Run",
+		Callees: []Callee{
+			{
+				Name:  "fmt.Println",
+				Scope: CallScopeExternal,
+				Position: Position{
+					File: "service.go",
+					Line: 5,
+				},
+			},
+			{
+				Name:  "Step",
+				Scope: CallScopeLocal,
+				Position: Position{
+					File: "service.go",
+					Line: 4,
+				},
+			},
+			{
+				Name:  "append",
+				Scope: CallScopeBuiltin,
+				Position: Position{
+					File: "service.go",
+					Line: 6,
+				},
+			},
+			{
+				Name:  "callback",
+				Scope: CallScopeDynamic,
+				Position: Position{
+					File: "service.go",
+					Line: 7,
+				},
+			},
+		},
+	}
+	contexts := []SourceContext{
+		{
+			Lines: []SourceContextLine{
+				{Number: 5, Text: "\tfmt.Println(\"ready\")", Target: true},
+			},
+		},
+		{
+			Lines: []SourceContextLine{
+				{Number: 4, Text: "\tStep()", Target: true},
+			},
+		},
+		{
+			Lines: []SourceContextLine{
+				{Number: 6, Text: "\t_ = append([]int{}, 1)", Target: true},
+			},
+		},
+		{
+			Lines: []SourceContextLine{
+				{Number: 7, Text: "\tcallback()", Target: true},
+			},
+		},
+	}
+
+	got := FormatCalleesWithContext(result, contexts)
+	want := fmt.Sprintf(`CALLEES
+
+Run
+
+LOCAL
+  %-36s service.go:4
+    > 4 | 	Step()
+
+EXTERNAL / BUILTIN / DYNAMIC
+  %-36s service.go:5
+    > 5 | 	fmt.Println("ready")
+
+  %-36s service.go:6
+    > 6 | 	_ = append([]int{}, 1)
+
+  %-36s service.go:7
+    > 7 | 	callback()
+
+Found 4 callees
+`, "Step", "fmt.Println", "append", "callback")
+
+	if got != want {
+		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)
+	}
+}
+
 func TestFormatCalleesWithEmptyList(t *testing.T) {
 	result := CalleesResult{Target: "Empty"}
 

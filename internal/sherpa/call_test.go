@@ -558,6 +558,41 @@ func Stop() {}
 	assertContainsString(t, names, "Stop")
 }
 
+func TestFindCalleesClassifiesLocalExternalBuiltinAndDynamicCallees(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "fmt"
+
+func Run(callback func()) {
+	Step()
+	fmt.Println("ready")
+	_ = append([]int{}, 1)
+	callback()
+}
+
+func Step() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestCalleeScopes(result.Callees)
+	want := map[string]CallScope{
+		"Step":        CallScopeLocal,
+		"fmt.Println": CallScopeExternal,
+		"append":      CallScopeBuiltin,
+		"callback":    CallScopeDynamic,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected scopes %#v, got %#v from callees %#v", want, got, result.Callees)
+	}
+}
+
 func TestFindCalleesReturnsRootRelativeFilePositions(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -2128,6 +2163,15 @@ func callTestCalleeFiles(callees []Callee) []string {
 	}
 
 	return files
+}
+
+func callTestCalleeScopes(callees []Callee) map[string]CallScope {
+	scopes := make(map[string]CallScope)
+	for _, callee := range callees {
+		scopes[callee.Name] = callee.Scope
+	}
+
+	return scopes
 }
 
 func assertContainsCallLimitation(t *testing.T, limitations []string, substrings ...string) {

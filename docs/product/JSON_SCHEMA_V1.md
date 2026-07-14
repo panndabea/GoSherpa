@@ -125,6 +125,7 @@ Callers and callees share the same entry shape:
 ```json
 {
   "name": "Run",
+  "scope": "local",
   "position": {
     "file": "service.go",
     "line": 4,
@@ -132,6 +133,11 @@ Callers and callees share the same entry shape:
   }
 }
 ```
+
+`scope` is emitted for `callees` entries when GoSherpa can classify the call
+site. Current values are `local`, `external`, `builtin`, and `dynamic`.
+`callers` entries omit `scope` because callers are repository-local by
+construction.
 
 Related tests:
 
@@ -414,7 +420,9 @@ Data:
   `ast-fallback`.
 - `confidence`: deterministic trust label.
 - `limitations`: call-graph blind spots and scope boundaries.
-- `callees`: array of callee entries. The array is present even when empty.
+- `callees`: array of callee entries. Each entry includes `scope` when known so
+  local project calls can be separated from external, builtin, or dynamic calls.
+  The array is present even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 

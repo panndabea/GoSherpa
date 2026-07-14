@@ -32,20 +32,11 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 	writeCallAnalysis(&builder, result.AnalysisMode)
 	builder.WriteString("\n")
 
-	for index, callee := range result.Callees {
-		fmt.Fprintf(
-			&builder,
-			"  %-36s %s:%d\n",
-			callee.Name,
-			callee.Position.File,
-			callee.Position.Line,
-		)
-		if index < len(contexts) {
-			builder.WriteString(FormatSourceContext(contexts[index], "    "))
-			if index < len(result.Callees)-1 {
-				builder.WriteString("\n")
-			}
-		}
+	if shouldGroupCallees(result.Callees) {
+		writeGroupedCallees(&builder, result.Callees, contexts)
+	} else {
+		entries := calleeEntries(result.Callees, contexts)
+		writeCalleeEntries(&builder, entries, "")
 	}
 
 	builder.WriteString("\n")
@@ -58,6 +49,85 @@ func formatCallees(result CalleesResult, contexts []SourceContext) string {
 
 func PrintCallees(result CalleesResult) {
 	fmt.Print(FormatCallees(result))
+}
+
+type calleeEntry struct {
+	Callee  Callee
+	Context *SourceContext
+}
+
+func shouldGroupCallees(callees []Callee) bool {
+	hasLocal := false
+	hasOther := false
+	for _, callee := range callees {
+		switch callee.Scope {
+		case CallScopeLocal:
+			hasLocal = true
+		case CallScopeExternal, CallScopeBuiltin, CallScopeDynamic:
+			hasOther = true
+		}
+	}
+
+	return hasLocal && hasOther
+}
+
+func calleeEntries(callees []Callee, contexts []SourceContext) []calleeEntry {
+	entries := make([]calleeEntry, 0, len(callees))
+	for index, callee := range callees {
+		entry := calleeEntry{Callee: callee}
+		if index < len(contexts) {
+			entry.Context = &contexts[index]
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+func writeGroupedCallees(builder *strings.Builder, callees []Callee, contexts []SourceContext) {
+	entries := calleeEntries(callees, contexts)
+	local := make([]calleeEntry, 0, len(entries))
+	other := make([]calleeEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Callee.Scope == CallScopeLocal {
+			local = append(local, entry)
+			continue
+		}
+
+		other = append(other, entry)
+	}
+
+	if len(local) > 0 {
+		builder.WriteString("LOCAL\n")
+		writeCalleeEntries(builder, local, "")
+	}
+	if len(other) > 0 {
+		if len(local) > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString("EXTERNAL / BUILTIN / DYNAMIC\n")
+		writeCalleeEntries(builder, other, "")
+	}
+}
+
+func writeCalleeEntries(builder *strings.Builder, entries []calleeEntry, indent string) {
+	for index, entry := range entries {
+		callee := entry.Callee
+		fmt.Fprintf(
+			builder,
+			"%s  %-36s %s:%d\n",
+			indent,
+			callee.Name,
+			callee.Position.File,
+			callee.Position.Line,
+		)
+		if entry.Context != nil {
+			builder.WriteString(FormatSourceContext(*entry.Context, indent+"    "))
+			if index < len(entries)-1 {
+				builder.WriteString("\n")
+			}
+		}
+	}
 }
 
 func FormatCallers(result CallersResult) string {

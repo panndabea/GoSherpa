@@ -17,6 +17,7 @@
     "callees": [
       {
         "name": "First",
+        "scope": "local",
         "position": {
           "file": "service.go",
           "line": 6,
@@ -37,6 +38,7 @@
       },
       {
         "name": "Second",
+        "scope": "local",
         "position": {
           "file": "service.go",
           "line": 7,
