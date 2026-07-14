@@ -43,6 +43,28 @@
           "direct-reference",
           "same-package"
         ],
+        "targetReferences": [
+          {
+            "target": "Target",
+            "position": {
+              "file": "service_test.go",
+              "line": 6,
+              "column": 2
+            },
+            "range": {
+              "start": {
+                "file": "service_test.go",
+                "line": 6,
+                "column": 2
+              },
+              "end": {
+                "file": "service_test.go",
+                "line": 6,
+                "column": 8
+              }
+            }
+          }
+        ],
         "targets": [
           "Target"
         ]

@@ -727,7 +727,9 @@ Test plans group commands into `direct`, `related`, `contracts`,
 list for compatibility, include structured `tests` on plan items when concrete
 test names are known, and attach symbol, changed-symbol, interface, or
 implementation `targets` plus relationship `reasons` to related tests when
-known.
+known. Related and affected tests may also include `targetReferences`, a list
+of concrete direct target occurrences with `target`, `position`, and optional
+`range`; `targets` remains the compact compatibility list for planning.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

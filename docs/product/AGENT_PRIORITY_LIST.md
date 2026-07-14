@@ -306,6 +306,8 @@ Done for the first slice:
 
 - Symbol definitions include start and end positions.
 - References include enough position data to locate the exact occurrence.
+- Direct related and affected tests include exact target occurrence ranges when
+  available.
 - JSON keeps relative paths stable from the selected root.
 
 ## P2 - Make GoSherpa Easy To Integrate Everywhere

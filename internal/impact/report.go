@@ -835,12 +835,78 @@ func mergeRelatedTest(seen map[string]sherpa.RelatedTest, test sherpa.RelatedTes
 	test.DirectReference = test.DirectReference || existing.DirectReference
 	test.ExternalPackage = test.ExternalPackage || existing.ExternalPackage
 	test.Targets = uniqueSortedStrings(append(test.Targets, existing.Targets...))
+	test.TargetReferences = mergeRelatedTestTargetReferences(test.TargetReferences, existing.TargetReferences)
 	test.Reasons = mergeRelatedTestReasons(test.Reasons, existing.Reasons)
 	if test.Range == nil {
 		test.Range = existing.Range
 	}
 
 	seen[key] = test
+}
+
+func mergeRelatedTestTargetReferences(first []sherpa.RelatedTestTargetReference, second []sherpa.RelatedTestTargetReference) []sherpa.RelatedTestTargetReference {
+	byKey := make(map[string]sherpa.RelatedTestTargetReference)
+	for _, ref := range append(first, second...) {
+		ref.Target = strings.TrimSpace(ref.Target)
+		if ref.Target == "" {
+			continue
+		}
+
+		key := relatedTestTargetReferenceKey(ref)
+		if key == "" {
+			continue
+		}
+		if existing, ok := byKey[key]; ok && existing.Range != nil {
+			continue
+		}
+		byKey[key] = ref
+	}
+
+	refs := make([]sherpa.RelatedTestTargetReference, 0, len(byKey))
+	for _, ref := range byKey {
+		refs = append(refs, ref)
+	}
+
+	sort.Slice(refs, func(i int, j int) bool {
+		if refs[i].Target != refs[j].Target {
+			return refs[i].Target < refs[j].Target
+		}
+		if refs[i].Position.File != refs[j].Position.File {
+			return refs[i].Position.File < refs[j].Position.File
+		}
+		if refs[i].Position.Line != refs[j].Position.Line {
+			return refs[i].Position.Line < refs[j].Position.Line
+		}
+		if refs[i].Position.Column != refs[j].Position.Column {
+			return refs[i].Position.Column < refs[j].Position.Column
+		}
+		if refs[i].Range == nil || refs[j].Range == nil {
+			return refs[i].Range != nil
+		}
+		if refs[i].Range.End.Line != refs[j].Range.End.Line {
+			return refs[i].Range.End.Line < refs[j].Range.End.Line
+		}
+
+		return refs[i].Range.End.Column < refs[j].Range.End.Column
+	})
+
+	return refs
+}
+
+func relatedTestTargetReferenceKey(ref sherpa.RelatedTestTargetReference) string {
+	if ref.Target == "" {
+		return ""
+	}
+	if ref.Position.File == "" || ref.Position.Line <= 0 {
+		return ref.Target
+	}
+
+	key := ref.Target + ":" + ref.Position.File + ":" + strconv.Itoa(ref.Position.Line) + ":" + strconv.Itoa(ref.Position.Column)
+	if ref.Range != nil {
+		key += ":" + strconv.Itoa(ref.Range.End.Line) + ":" + strconv.Itoa(ref.Range.End.Column)
+	}
+
+	return key
 }
 
 func impactModulePath(root string) string {

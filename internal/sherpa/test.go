@@ -52,15 +52,22 @@ const (
 )
 
 type RelatedTest struct {
-	Name            string       `json:"name"`
-	Package         string       `json:"package"`
-	PackageName     string       `json:"packageName"`
-	Position        Position     `json:"position"`
-	Range           *SourceRange `json:"range,omitempty"`
-	DirectReference bool         `json:"directReference"`
-	ExternalPackage bool         `json:"externalPackage"`
-	Reasons         []string     `json:"reasons,omitempty"`
-	Targets         []string     `json:"targets,omitempty"`
+	Name             string                       `json:"name"`
+	Package          string                       `json:"package"`
+	PackageName      string                       `json:"packageName"`
+	Position         Position                     `json:"position"`
+	Range            *SourceRange                 `json:"range,omitempty"`
+	DirectReference  bool                         `json:"directReference"`
+	ExternalPackage  bool                         `json:"externalPackage"`
+	Reasons          []string                     `json:"reasons,omitempty"`
+	Targets          []string                     `json:"targets,omitempty"`
+	TargetReferences []RelatedTestTargetReference `json:"targetReferences,omitempty"`
+}
+
+type RelatedTestTargetReference struct {
+	Target   string       `json:"target"`
+	Position Position     `json:"position"`
+	Range    *SourceRange `json:"range,omitempty"`
 }
 
 type TestsResult struct {
@@ -88,7 +95,7 @@ type literalSubtest struct {
 	Func *ast.FuncLit
 }
 
-type testReferenceKeys map[string]map[string]struct{}
+type testReferenceKeys map[string]map[string]RelatedTestTargetReference
 
 type testReferenceAnalysis struct {
 	Keys         testReferenceKeys
@@ -561,9 +568,10 @@ func collectRelatedTestsForTargetsWithContext(context *SemanticContext, root str
 				continue
 			}
 
-			directTargets := typecheckedDirectReferences.Keys.Targets(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name)
-			directTargets = append(directTargets, functionReferenceTargets(funcDecl, targets, packageMatches, imports)...)
-			directTargets = uniqueSorted(directTargets)
+			targetReferences := typecheckedDirectReferences.Keys.TargetReferences(root, testFile.FileSet, funcDecl.Pos(), funcDecl.Name.Name)
+			targetReferences = append(targetReferences, functionReferenceTargetReferences(root, testFile.FileSet, funcDecl, targets, packageMatches, imports)...)
+			targetReferences = uniqueSortedRelatedTestTargetReferences(targetReferences)
+			directTargets := relatedTestTargetReferenceTargets(targetReferences)
 			directReference := len(directTargets) > 0
 
 			if !packageMatches && !directReference {
@@ -573,22 +581,24 @@ func collectRelatedTestsForTargetsWithContext(context *SemanticContext, root str
 			pos := testFile.FileSet.Position(funcDecl.Pos())
 			externalPackage := isExternalTestPackage(testFile.PackageName)
 			tests = append(tests, RelatedTest{
-				Name:            funcDecl.Name.Name,
-				Package:         testFile.Package,
-				PackageName:     testFile.PackageName,
-				Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
-				Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, funcDecl.Pos(), funcDecl.End()),
-				DirectReference: directReference,
-				ExternalPackage: externalPackage,
-				Reasons:         relatedTestReasons(packageMatches, directReference, externalPackage, kind),
-				Targets:         directTargets,
+				Name:             funcDecl.Name.Name,
+				Package:          testFile.Package,
+				PackageName:      testFile.PackageName,
+				Position:         positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
+				Range:            sourceRangeRelativeToRoot(root, testFile.FileSet, funcDecl.Pos(), funcDecl.End()),
+				DirectReference:  directReference,
+				ExternalPackage:  externalPackage,
+				Reasons:          relatedTestReasons(packageMatches, directReference, externalPackage, kind),
+				Targets:          directTargets,
+				TargetReferences: targetReferences,
 			})
 
 			for _, subtest := range literalSubtests(funcDecl) {
 				subtestName := funcDecl.Name.Name + "/" + subtest.Name
-				subtestDirectTargets := typecheckedDirectReferences.Keys.Targets(root, testFile.FileSet, subtest.Pos, subtestName)
-				subtestDirectTargets = append(subtestDirectTargets, nodeReferenceTargets(subtest.Func.Body, targets, packageMatches, imports)...)
-				subtestDirectTargets = uniqueSorted(subtestDirectTargets)
+				subtestTargetReferences := typecheckedDirectReferences.Keys.TargetReferences(root, testFile.FileSet, subtest.Pos, subtestName)
+				subtestTargetReferences = append(subtestTargetReferences, nodeReferenceTargetReferences(root, testFile.FileSet, subtest.Func.Body, targets, packageMatches, imports)...)
+				subtestTargetReferences = uniqueSortedRelatedTestTargetReferences(subtestTargetReferences)
+				subtestDirectTargets := relatedTestTargetReferenceTargets(subtestTargetReferences)
 				subtestDirectReference := len(subtestDirectTargets) > 0
 
 				if !packageMatches && !subtestDirectReference {
@@ -598,15 +608,16 @@ func collectRelatedTestsForTargetsWithContext(context *SemanticContext, root str
 				pos := testFile.FileSet.Position(subtest.Pos)
 				externalPackage := isExternalTestPackage(testFile.PackageName)
 				tests = append(tests, RelatedTest{
-					Name:            funcDecl.Name.Name + "/" + subtest.Name,
-					Package:         testFile.Package,
-					PackageName:     testFile.PackageName,
-					Position:        positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
-					Range:           sourceRangeRelativeToRoot(root, testFile.FileSet, subtest.Pos, subtest.End),
-					DirectReference: subtestDirectReference,
-					ExternalPackage: externalPackage,
-					Reasons:         relatedTestReasons(packageMatches, subtestDirectReference, externalPackage, kind),
-					Targets:         subtestDirectTargets,
+					Name:             funcDecl.Name.Name + "/" + subtest.Name,
+					Package:          testFile.Package,
+					PackageName:      testFile.PackageName,
+					Position:         positionRelativeToRoot(root, Position{File: pos.Filename, Line: pos.Line, Column: pos.Column}),
+					Range:            sourceRangeRelativeToRoot(root, testFile.FileSet, subtest.Pos, subtest.End),
+					DirectReference:  subtestDirectReference,
+					ExternalPackage:  externalPackage,
+					Reasons:          relatedTestReasons(packageMatches, subtestDirectReference, externalPackage, kind),
+					Targets:          subtestDirectTargets,
+					TargetReferences: subtestTargetReferences,
 				})
 			}
 		}
@@ -713,17 +724,17 @@ func analyzeTypecheckedDirectTestReferencesFromRepository(root string, targets [
 					continue
 				}
 
-				if directTargets := typecheckedNodeReferenceTargets(pkg.Info, funcDecl.Body, targetObjects); len(directTargets) > 0 {
-					keys.Add(root, pkg.FileSet, funcDecl.Pos(), funcDecl.Name.Name, directTargets)
+				if targetReferences := typecheckedNodeReferenceTargetReferences(root, pkg.FileSet, pkg.Info, funcDecl.Body, targetObjects); len(targetReferences) > 0 {
+					keys.Add(root, pkg.FileSet, funcDecl.Pos(), funcDecl.Name.Name, targetReferences)
 				}
 
 				for _, subtest := range literalSubtests(funcDecl) {
-					directTargets := typecheckedNodeReferenceTargets(pkg.Info, subtest.Func.Body, targetObjects)
-					if len(directTargets) == 0 {
+					targetReferences := typecheckedNodeReferenceTargetReferences(root, pkg.FileSet, pkg.Info, subtest.Func.Body, targetObjects)
+					if len(targetReferences) == 0 {
 						continue
 					}
 
-					keys.Add(root, pkg.FileSet, subtest.Pos, funcDecl.Name.Name+"/"+subtest.Name, directTargets)
+					keys.Add(root, pkg.FileSet, subtest.Pos, funcDecl.Name.Name+"/"+subtest.Name, targetReferences)
 				}
 			}
 		}
@@ -770,43 +781,63 @@ func semanticReferenceTargetObjectsByTarget(packages []referencePackage, targets
 	return objectsByTarget
 }
 
-func typecheckedNodeReferenceTargets(info types.Info, node ast.Node, targetObjects map[types.Object]map[string]struct{}) []string {
+func typecheckedNodeReferenceTargetReferences(root string, fileSet *token.FileSet, info types.Info, node ast.Node, targetObjects map[types.Object]map[string]struct{}) []RelatedTestTargetReference {
 	if node == nil {
 		return nil
 	}
 
-	targets := make(map[string]struct{})
+	var targetReferences []RelatedTestTargetReference
 	ast.Inspect(node, func(node ast.Node) bool {
 		switch node := node.(type) {
 		case *ast.Ident:
 			object, _ := referenceIdentObject(info, node)
-			addTypecheckedReferenceTargets(targets, object, targetObjects)
+			targetReferences = append(targetReferences, typecheckedReferenceTargetReferences(root, fileSet, node.Pos(), node.End(), object, targetObjects)...)
 		case *ast.SelectorExpr:
 			object := info.Uses[node.Sel]
 			selection := info.Selections[node]
-			addTypecheckedReferenceTargets(targets, object, targetObjects)
+			targetReferences = append(targetReferences, typecheckedReferenceTargetReferences(root, fileSet, node.Sel.Pos(), node.Sel.End(), object, targetObjects)...)
 			if selection != nil {
-				addTypecheckedReferenceTargets(targets, selection.Obj(), targetObjects)
+				targetReferences = append(targetReferences, typecheckedReferenceTargetReferences(root, fileSet, node.Sel.Pos(), node.Sel.End(), selection.Obj(), targetObjects)...)
 			}
 		}
 
 		return true
 	})
 
-	return sortedMapKeys(targets)
+	return uniqueSortedRelatedTestTargetReferences(targetReferences)
 }
 
-func addTypecheckedReferenceTargets(targets map[string]struct{}, object types.Object, targetObjects map[types.Object]map[string]struct{}) {
+func typecheckedReferenceTargetReferences(root string, fileSet *token.FileSet, start token.Pos, end token.Pos, object types.Object, targetObjects map[types.Object]map[string]struct{}) []RelatedTestTargetReference {
 	if object == nil {
-		return
+		return nil
 	}
 
-	for target := range targetObjects[object] {
-		targets[target] = struct{}{}
+	targets := targetObjects[object]
+	if len(targets) == 0 || fileSet == nil || !start.IsValid() {
+		return nil
 	}
+
+	position := fileSet.Position(start)
+	relativePosition := positionRelativeToRoot(root, Position{
+		File:   position.Filename,
+		Line:   position.Line,
+		Column: position.Column,
+	})
+	sourceRange := sourceRangeRelativeToRoot(root, fileSet, start, end)
+
+	var targetReferences []RelatedTestTargetReference
+	for target := range targets {
+		targetReferences = append(targetReferences, RelatedTestTargetReference{
+			Target:   target,
+			Position: relativePosition,
+			Range:    sourceRange,
+		})
+	}
+
+	return targetReferences
 }
 
-func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token.Pos, name string, targets []string) {
+func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token.Pos, name string, targetReferences []RelatedTestTargetReference) {
 	if keys == nil {
 		return
 	}
@@ -817,26 +848,28 @@ func (keys testReferenceKeys) Add(root string, fileSet *token.FileSet, pos token
 	}
 
 	if keys[key] == nil {
-		keys[key] = make(map[string]struct{})
+		keys[key] = make(map[string]RelatedTestTargetReference)
 	}
-	for _, target := range targets {
-		target = strings.TrimSpace(target)
-		if target != "" {
-			keys[key][target] = struct{}{}
+	for _, targetReference := range targetReferences {
+		targetReference.Target = strings.TrimSpace(targetReference.Target)
+		if targetReference.Target != "" && targetReference.Position.File != "" && targetReference.Position.Line > 0 {
+			keys[key][relatedTestTargetReferenceKey(targetReference)] = targetReference
 		}
 	}
 }
 
-func (keys testReferenceKeys) Contains(root string, fileSet *token.FileSet, pos token.Pos, name string) bool {
-	return len(keys.Targets(root, fileSet, pos, name)) > 0
-}
-
-func (keys testReferenceKeys) Targets(root string, fileSet *token.FileSet, pos token.Pos, name string) []string {
+func (keys testReferenceKeys) TargetReferences(root string, fileSet *token.FileSet, pos token.Pos, name string) []RelatedTestTargetReference {
 	if keys == nil {
 		return nil
 	}
 
-	return sortedMapKeys(keys[testReferenceKey(root, fileSet, pos, name)])
+	refsByKey := keys[testReferenceKey(root, fileSet, pos, name)]
+	refs := make([]RelatedTestTargetReference, 0, len(refsByKey))
+	for _, ref := range refsByKey {
+		refs = append(refs, ref)
+	}
+
+	return uniqueSortedRelatedTestTargetReferences(refs)
 }
 
 func testReferenceKey(root string, fileSet *token.FileSet, pos token.Pos, name string) string {
@@ -889,61 +922,142 @@ func isGoTestFunction(funcDecl *ast.FuncDecl) bool {
 	return funcDecl.Recv == nil && strings.HasPrefix(funcDecl.Name.Name, "Test")
 }
 
-func functionReferenceTargets(funcDecl *ast.FuncDecl, targets []referenceTarget, samePackage bool, imports map[string]string) []string {
+func functionReferenceTargetReferences(root string, fileSet *token.FileSet, funcDecl *ast.FuncDecl, targets []referenceTarget, samePackage bool, imports map[string]string) []RelatedTestTargetReference {
 	if funcDecl.Body == nil {
 		return nil
 	}
 
-	return nodeReferenceTargets(funcDecl.Body, targets, samePackage, imports)
+	return nodeReferenceTargetReferences(root, fileSet, funcDecl.Body, targets, samePackage, imports)
 }
 
-func functionReferencesTarget(funcDecl *ast.FuncDecl, target referenceTarget, samePackage bool, imports map[string]string) bool {
-	if funcDecl.Body == nil {
-		return false
-	}
-
-	return nodeReferencesTarget(funcDecl.Body, target, samePackage, imports)
-}
-
-func nodeReferenceTargets(node ast.Node, targets []referenceTarget, samePackage bool, imports map[string]string) []string {
+func nodeReferenceTargetReferences(root string, fileSet *token.FileSet, node ast.Node, targets []referenceTarget, samePackage bool, imports map[string]string) []RelatedTestTargetReference {
 	if node == nil || len(targets) == 0 {
 		return nil
 	}
 
-	var matches []string
-	for _, target := range targets {
-		if nodeReferencesTarget(node, target, samePackage, imports) {
-			matches = append(matches, target.String())
-		}
-	}
-
-	return uniqueSorted(matches)
-}
-
-func nodeReferencesTarget(node ast.Node, target referenceTarget, samePackage bool, imports map[string]string) bool {
-	found := false
+	var targetReferences []RelatedTestTargetReference
 	ast.Inspect(node, func(node ast.Node) bool {
-		if found {
-			return false
-		}
-
 		switch node := node.(type) {
 		case *ast.Ident:
-			if target.Receiver == "" && node.Name == target.Name && (target.Package == "" || samePackage) {
-				found = true
-				return false
+			for _, target := range targets {
+				if identReferencesTarget(node, target, samePackage) {
+					targetReferences = append(targetReferences, astRelatedTestTargetReference(root, fileSet, node.Pos(), node.End(), target.String()))
+				}
 			}
 		case *ast.SelectorExpr:
-			if selectorReferencesTarget(node, target, samePackage, imports) {
-				found = true
-				return false
+			for _, target := range targets {
+				if selectorReferencesTarget(node, target, samePackage, imports) {
+					targetReferences = append(targetReferences, astRelatedTestTargetReference(root, fileSet, node.Sel.Pos(), node.Sel.End(), target.String()))
+				}
 			}
 		}
 
 		return true
 	})
 
-	return found
+	return uniqueSortedRelatedTestTargetReferences(targetReferences)
+}
+
+func identReferencesTarget(ident *ast.Ident, target referenceTarget, samePackage bool) bool {
+	return target.Receiver == "" && ident.Name == target.Name && (target.Package == "" || samePackage)
+}
+
+func astRelatedTestTargetReference(root string, fileSet *token.FileSet, start token.Pos, end token.Pos, target string) RelatedTestTargetReference {
+	ref := RelatedTestTargetReference{
+		Target: strings.TrimSpace(target),
+	}
+	if fileSet == nil || !start.IsValid() {
+		return ref
+	}
+
+	position := fileSet.Position(start)
+	ref.Position = positionRelativeToRoot(root, Position{
+		File:   position.Filename,
+		Line:   position.Line,
+		Column: position.Column,
+	})
+	ref.Range = sourceRangeRelativeToRoot(root, fileSet, start, end)
+
+	return ref
+}
+
+func relatedTestTargetReferenceTargets(refs []RelatedTestTargetReference) []string {
+	targets := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		target := strings.TrimSpace(ref.Target)
+		if target != "" {
+			targets = append(targets, target)
+		}
+	}
+
+	return uniqueSorted(targets)
+}
+
+func uniqueSortedRelatedTestTargetReferences(refs []RelatedTestTargetReference) []RelatedTestTargetReference {
+	byKey := make(map[string]RelatedTestTargetReference)
+	for _, ref := range refs {
+		ref.Target = strings.TrimSpace(ref.Target)
+		if ref.Target == "" {
+			continue
+		}
+
+		key := relatedTestTargetReferenceKey(ref)
+		if key == "" {
+			continue
+		}
+		if existing, ok := byKey[key]; ok && existing.Range != nil {
+			continue
+		}
+
+		byKey[key] = ref
+	}
+
+	result := make([]RelatedTestTargetReference, 0, len(byKey))
+	for _, ref := range byKey {
+		result = append(result, ref)
+	}
+
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].Target != result[j].Target {
+			return result[i].Target < result[j].Target
+		}
+		if result[i].Position.File != result[j].Position.File {
+			return result[i].Position.File < result[j].Position.File
+		}
+		if result[i].Position.Line != result[j].Position.Line {
+			return result[i].Position.Line < result[j].Position.Line
+		}
+		if result[i].Position.Column != result[j].Position.Column {
+			return result[i].Position.Column < result[j].Position.Column
+		}
+		if result[i].Range == nil || result[j].Range == nil {
+			return result[i].Range != nil
+		}
+		if result[i].Range.End.Line != result[j].Range.End.Line {
+			return result[i].Range.End.Line < result[j].Range.End.Line
+		}
+
+		return result[i].Range.End.Column < result[j].Range.End.Column
+	})
+
+	return result
+}
+
+func relatedTestTargetReferenceKey(ref RelatedTestTargetReference) string {
+	target := strings.TrimSpace(ref.Target)
+	if target == "" {
+		return ""
+	}
+	if ref.Position.File == "" || ref.Position.Line <= 0 {
+		return target
+	}
+
+	key := target + ":" + ref.Position.File + ":" + strconv.Itoa(ref.Position.Line) + ":" + strconv.Itoa(ref.Position.Column)
+	if ref.Range != nil {
+		key += ":" + strconv.Itoa(ref.Range.End.Line) + ":" + strconv.Itoa(ref.Range.End.Column)
+	}
+
+	return key
 }
 
 func literalSubtests(funcDecl *ast.FuncDecl) []literalSubtest {

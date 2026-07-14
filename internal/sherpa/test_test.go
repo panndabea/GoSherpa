@@ -525,6 +525,14 @@ func TestStart(t *testing.T) {
 	if result.AnalysisMode != TestAnalysisModeTypecheckedAST {
 		t.Fatalf("expected typechecked+ast analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
 	}
+	if len(test.TargetReferences) != 1 {
+		t.Fatalf("expected one target reference, got %#v", test.TargetReferences)
+	}
+	if test.TargetReferences[0].Target != "./internal/service.Client.Start" {
+		t.Fatalf("expected method target reference, got %#v", test.TargetReferences[0])
+	}
+	assertPosition(t, test.TargetReferences[0].Position, "internal/service/service_test.go", 11, 9)
+	assertSourceRange(t, test.TargetReferences[0].Range, "internal/service/service_test.go", 11, 9, 11, 14)
 	if len(result.TestPlan.Direct) != 1 || result.TestPlan.Direct[0].Package != "./internal/service" {
 		t.Fatalf("expected direct test plan item for ./internal/service, got %#v", result.TestPlan)
 	}
@@ -683,12 +691,25 @@ func TestSubtests(t *testing.T) {
 		t.Fatalf("expected TestTarget, got %v", result.Tests)
 	}
 	assertSourceRange(t, topLevel.Range, "service_test.go", 5, 1, 7, 2)
+	if len(topLevel.TargetReferences) != 1 {
+		t.Fatalf("expected one top-level target reference, got %#v", topLevel.TargetReferences)
+	}
+	if topLevel.TargetReferences[0].Target != "Target" {
+		t.Fatalf("expected Target reference, got %#v", topLevel.TargetReferences[0])
+	}
+	assertPosition(t, topLevel.TargetReferences[0].Position, "service_test.go", 6, 2)
+	assertSourceRange(t, topLevel.TargetReferences[0].Range, "service_test.go", 6, 2, 6, 8)
 
 	subtest := findRelatedTest(result.Tests, "TestSubtests/case")
 	if subtest == nil {
 		t.Fatalf("expected TestSubtests/case, got %v", result.Tests)
 	}
 	assertSourceRange(t, subtest.Range, "service_test.go", 10, 2, 10, 48)
+	if len(subtest.TargetReferences) != 1 {
+		t.Fatalf("expected one subtest target reference, got %#v", subtest.TargetReferences)
+	}
+	assertPosition(t, subtest.TargetReferences[0].Position, "service_test.go", 10, 37)
+	assertSourceRange(t, subtest.TargetReferences[0].Range, "service_test.go", 10, 37, 10, 43)
 }
 
 func TestFindTestsAddsFallbackForSymbolPackageWithoutTests(t *testing.T) {
@@ -788,5 +809,13 @@ func assertRelatedTestReasons(t *testing.T, test *RelatedTest, want []string) {
 	}
 	if !reflect.DeepEqual(test.Reasons, want) {
 		t.Fatalf("expected reasons %v for %s, got %#v", want, test.Name, test.Reasons)
+	}
+}
+
+func assertPosition(t *testing.T, got Position, file string, line int, column int) {
+	t.Helper()
+
+	if got.File != file || got.Line != line || got.Column != column {
+		t.Fatalf("expected position %s:%d:%d, got %#v", file, line, column, got)
 	}
 }

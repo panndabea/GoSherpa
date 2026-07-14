@@ -233,13 +233,16 @@ Done when:
 
 Expose enough position data for tools to open the exact source occurrence.
 
-Current status: symbol definitions include columns and source ranges. References,
-call sites, and tests still need exact occurrence ranges.
+Current status: symbol definitions, references, call sites, call paths, related
+tests, and direct test target references include columns and source ranges when
+Go parser or typechecker positions identify the source span.
 
 Done when:
 
 - definitions include start and end positions
 - references include exact occurrence locations where possible
+- direct related and affected tests identify exact target occurrences where
+  possible
 - JSON keeps paths relative to the selected root
 
 ### 7. `gosherpa doctor`

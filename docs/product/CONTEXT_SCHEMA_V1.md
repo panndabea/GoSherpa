@@ -63,7 +63,10 @@ tests keep `position` and may include `range` when Go parser positions identify
 the exact source span. Related and affected tests may include `reasons` with
 stable relationship labels such as `direct-reference`, `same-package`,
 `target-package`, `external-package`, `changed-symbol`, `caller-package`, and
-`contract`.
+`contract`. Direct related or affected tests may also include
+`targetReferences`, where each item names the direct `target`, its `position`,
+and an optional exact occurrence `range`; the existing `targets` array remains
+the compact planning surface.
 
 When size controls are used, context results may also include:
 

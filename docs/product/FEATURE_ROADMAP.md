@@ -145,10 +145,13 @@ Implemented:
 - Structured test planning with direct, related, caller-package, and fallback
   groups, including changed-symbol targets and reasons for diff-oriented
   reports.
+- Direct related and affected tests include `targetReferences` with concrete
+  symbol occurrence positions and ranges when available.
 - Reference kind classification for definitions, calls, type usages, field
   accesses, and fallback usages, with `gosherpa refs --kind <kind>`.
 - Source ranges with columns for symbols, references, callers, callees, call
-  paths, related tests, and range-backed reading-order entries in JSON output.
+  paths, related tests, direct test target references, and range-backed
+  reading-order entries in JSON output.
 
 Current limitations:
 

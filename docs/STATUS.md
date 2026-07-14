@@ -67,6 +67,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Related test entries expose stable relationship `reasons` and concrete
   `targets` where the symbol or changed-symbol relationship is known; structured
   test plan items also expose concrete `tests` arrays and `targets`.
+- Direct related and affected tests expose `targetReferences` with target names,
+  positions, and exact occurrence ranges when parser or typechecker positions
+  identify the referenced symbol.
 - Structured test plans include a `contracts` group for interface or
   implementation contract packages, keeping those recommendations separate from
   direct, related, caller-package, and fallback test commands.
@@ -76,7 +79,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package inventory with `gosherpa packages`, including file, symbol, import, reverse-dependency, and test indicators
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering
-- Source ranges with columns for symbols, references, callers, callees, call paths, related tests, and range-backed reading-order entries in JSON output
+- Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
 - Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, or invalid snapshots fall back to live analysis with warnings.
 
 ## Known MVP Limitations
