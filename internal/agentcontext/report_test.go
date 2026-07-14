@@ -1108,6 +1108,124 @@ func NewSession() Session {
 	}
 }
 
+func TestAnalyzeDiffUsesGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
+	root := initAgentContextGitRepository(t)
+
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), `module example.com/root
+
+go 1.24.4
+
+require example.com/service v0.0.0
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "go.work"), `go 1.24.4
+
+use (
+	.
+	./service
+)
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "root.go"), `package root
+
+import "example.com/service"
+
+func Run(svc service.Service) error {
+	process := svc.Process
+	return process(service.Payload{})
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	return nil
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service_test.go"), `package service
+
+import "testing"
+
+func TestServiceProcess(t *testing.T) {
+	if (Service{}).Process(Payload{}) != nil {
+		t.Fatal("unexpected error")
+	}
+}
+`)
+	runAgentContextGit(t, root, "add", ".")
+	runAgentContextGit(t, root, "commit", "-m", "initial")
+
+	writeAgentContextTestFile(t, filepath.Join(root, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	_ = Payload{}
+	return nil
+}
+`)
+
+	report, err := AnalyzeDiff(root, "HEAD", DiffAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeDiffTypechecked, report.Warnings)
+	}
+	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if report.TestAnalysisMode != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s with warnings %#v", report.TestAnalysisMode, sherpa.TestAnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.InterfaceAnalysisMode != impactengine.InterfaceAnalysisModeTypechecked {
+		t.Fatalf("interface analysis mode = %q, want %s", report.InterfaceAnalysisMode, impactengine.InterfaceAnalysisModeTypechecked)
+	}
+	if len(report.ChangedFiles) != 1 || report.ChangedFiles[0] != "service/service.go" {
+		t.Fatalf("expected changed service file, got %#v", report.ChangedFiles)
+	}
+	if len(report.ChangedPackages) != 1 || report.ChangedPackages[0] != "./service" {
+		t.Fatalf("expected changed service package, got %#v", report.ChangedPackages)
+	}
+	if len(report.ChangedSymbolDetails) != 1 {
+		t.Fatalf("expected one changed symbol detail, got %#v", report.ChangedSymbolDetails)
+	}
+	if detail := report.ChangedSymbolDetails[0]; detail.Target != "./service.Service.Process" || detail.Position.File != "service/service.go" {
+		t.Fatalf("unexpected changed symbol detail: %#v", detail)
+	}
+	if !agentContextStringSliceContains(report.AffectedPackages, ".") || !agentContextStringSliceContains(report.AffectedPackages, "./service") {
+		t.Fatalf("expected root and service affected packages, got %#v", report.AffectedPackages)
+	}
+	if !agentContextStringSliceContains(report.AffectedInterfaces, "./service.Processor") {
+		t.Fatalf("expected service Processor interface, got %#v", report.AffectedInterfaces)
+	}
+	if !agentContextStringSliceContains(report.AffectedImplementations, "./service.Service") {
+		t.Fatalf("expected service implementation signal, got %#v", report.AffectedImplementations)
+	}
+	if len(report.AffectedTests) != 1 || report.AffectedTests[0].Name != "TestServiceProcess" {
+		t.Fatalf("expected service affected test, got %#v", report.AffectedTests)
+	}
+	if len(report.ReadingOrder) == 0 || report.ReadingOrder[0].Title != "Changed symbol: ./service.Service.Process" {
+		t.Fatalf("expected changed workspace symbol to lead reading order, got %#v", report.ReadingOrder)
+	}
+}
+
 func TestAnalyzeDiffSharesSemanticSessionForImpactAndTests(t *testing.T) {
 	root := initAgentContextGitRepository(t)
 

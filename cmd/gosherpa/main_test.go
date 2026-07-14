@@ -3568,6 +3568,61 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainRunsPRCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
+	tmp := writeMainWorkspacePRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "pr", "HEAD", "example.com/root")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("expected diff analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	if data["testAnalysisMode"] != sherpa.TestAnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked test analysis mode, got %v", data["testAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedFiles", 1), "service/service.go")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedPackages", 1), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArrayHasLength(t, data, "changedSymbols", 1), "Service.Process")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), "./service")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./service.Processor")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedImplementations"), "./service.Service")
+
+	details := assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
+	detail, ok := details[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected changed symbol detail object, got %T", details[0])
+	}
+	if detail["target"] != "./service.Service.Process" {
+		t.Fatalf("expected workspace changed symbol target, got %#v", detail)
+	}
+
+	tests := assertMainTestJSONArrayHasLength(t, data, "affectedTests", 1)
+	test, ok := tests[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected affected test object, got %T", tests[0])
+	}
+	if test["name"] != "TestServiceProcess" || test["package"] != "./service" {
+		t.Fatalf("expected service affected test, got %#v", test)
+	}
+}
+
 func TestMainRunsPRCommandFromSnapshotAsJSON(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 	writeMainSnapshot(t, tmp)
@@ -6693,6 +6748,81 @@ type Session struct{}
 
 func NewSession() Session {
 	return Session{}
+}
+`)
+
+	return tmp
+}
+
+func writeMainWorkspacePRDiffProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), `module example.com/root
+
+go 1.24.4
+
+require example.com/service v0.0.0
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "go.work"), `go 1.24.4
+
+use (
+	.
+	./service
+)
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "root.go"), `package root
+
+import "example.com/service"
+
+func Run(svc service.Service) error {
+	process := svc.Process
+	return process(service.Payload{})
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service", "go.mod"), "module example.com/service\n\ngo 1.24.4\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	return nil
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service", "service_test.go"), `package service
+
+import "testing"
+
+func TestServiceProcess(t *testing.T) {
+	if (Service{}).Process(Payload{}) != nil {
+		t.Fatal("unexpected error")
+	}
+}
+`)
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "service", "service.go"), `package service
+
+type Payload struct{}
+
+type Processor interface {
+	Process(Payload) error
+}
+
+type Service struct{}
+
+func (Service) Process(Payload) error {
+	_ = Payload{}
+	return nil
 }
 `)
 
