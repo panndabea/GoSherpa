@@ -65,7 +65,7 @@ go build -o gosherpa ./cmd/gosherpa
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa completion zsh
 ./gosherpa entrypoints ParseFile
-./gosherpa impact diff --base HEAD
+./gosherpa impact diff --base HEAD --use-snapshot
 ```
 
 When contributing to GoSherpa itself, run the full test suite:
@@ -100,8 +100,8 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa interface ./internal/auth.Authenticator` | Interface methods, implementers, type references, and visible interface method usage |
 | `gosherpa entrypoints ParseFile` | Public, runtime, test, and no-local-caller functions that can reach a target |
 | `gosherpa tests internal/sherpa/parse.go` | Related tests and commands for a changed file |
-| `gosherpa impact diff --base HEAD` | Changed files, affected packages, and suggested tests |
-| `gosherpa pr --base HEAD` | PR-style change summary with risk and verification commands |
+| `gosherpa impact diff --base HEAD --use-snapshot` | Changed files, affected packages, and suggested tests, with valid snapshot reuse for current changed-symbol inventory |
+| `gosherpa pr --base HEAD --use-snapshot` | PR-style change summary with risk and verification commands, with valid snapshot reuse where available |
 
 For the full command list, examples, JSON output shape, and agent-oriented context commands, see the [CLI reference](docs/CLI_REFERENCE.md).
 
@@ -131,8 +131,8 @@ gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40
 gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
 
 # 4. For impact and test planning
-gosherpa impact diff --base HEAD --json
-gosherpa tests affected --base HEAD --json
+gosherpa impact diff --base HEAD --use-snapshot --json
+gosherpa tests affected --base HEAD --use-snapshot --json
 ```
 
 Agent workflow rules:

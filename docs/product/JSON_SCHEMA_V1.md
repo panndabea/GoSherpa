@@ -258,6 +258,11 @@ labels. Broader explain, context, impact, test, and path commands currently use:
 - `git-diff+ast`: git diff discovery plus AST/local repository analysis.
 - `git-diff+typechecked+ast`: git diff discovery plus at least one
   typechecked changed-symbol, reference, call, or interface subanalysis.
+- `snapshot+git-diff+ast`: valid snapshot reuse for current changed-symbol
+  inventory plus git diff discovery and AST/local repository analysis.
+- `snapshot+git-diff+typechecked+ast`: valid snapshot reuse for current
+  changed-symbol inventory plus git diff discovery and at least one typechecked
+  changed-symbol, reference, call, or interface subanalysis.
 
 `callers.data.analysisMode` and `callees.data.analysisMode` use these values.
 `explain.data.callAnalysisMode` and `context symbol.data.callAnalysisMode` use
@@ -270,12 +275,13 @@ context bundle mode. It can be `typechecked+ast` when symbol identity comes from
 typechecked package loading, or `ast` when that semantic path is unavailable or
 does not include the target symbol. `context file.data.analysisMode` and
 `context package.data.analysisMode` can be `typechecked+ast` when package files
-and symbols come from typechecked package loading. `context diff.data.analysisMode`
-is `git-diff+typechecked+ast` when changed-symbol, reference, call, or
-interface signals use typechecked package loading, and `git-diff+ast`
-otherwise. With `context diff --use-snapshot` and a valid snapshot, it reports
-`snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast` to show that
-current changed-symbol inventory came from the snapshot.
+and symbols come from typechecked package loading. Diff-oriented commands
+(`context diff`, `impact diff`, `tests affected`, and `pr`) use
+`git-diff+typechecked+ast` when changed-symbol, reference, call, or interface
+signals use typechecked package loading, and `git-diff+ast` otherwise. With
+`--use-snapshot` and a valid snapshot on those diff-oriented commands, they
+report `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast` to show
+that current changed-symbol inventory came from the snapshot.
 
 `doctor.data.analysisMode` reports repository readiness rather than a code
 relationship graph. It is `typechecked` when package loading completed and
@@ -656,33 +662,34 @@ Data:
 - `snapshot.symbols`: parsed symbol inventory in the same shape as `symbols`.
 
 Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`,
-test-inclusive `packages --tests`, and `context diff` can opt in to snapshot
-reuse with `--use-snapshot`. When a valid snapshot is used, inventory command
-data objects may include `"analysisMode": "snapshot"`; `analyze` reports
+test-inclusive `packages --tests`, and diff-oriented commands `context diff`,
+`impact diff`, `tests affected`, and `pr` can opt in to snapshot reuse with
+`--use-snapshot`. When a valid snapshot is used, inventory command data objects
+may include `"analysisMode": "snapshot"`; `analyze` reports
 `"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness
-remain live-analysis signals. `context diff` reports
+remain live-analysis signals. Diff-oriented commands report
 `"snapshot+git-diff+typechecked+ast"` or `"snapshot+git-diff+ast"` because
 current changed-symbol inventory can come from the snapshot while impact
 relationships remain live-analysis signals. Missing, stale, or invalid
 snapshots fall back to live repository analysis and report the reason in the
-shared envelope
-`warnings`. Deeper semantic, context, impact, and call-graph queries still
-analyze repository data directly in this slice; use `doctor` to check whether
-the snapshot is missing, valid, stale, or invalid.
+shared envelope `warnings`. Deeper semantic, context, impact, and call-graph
+queries still analyze repository data directly in this slice; use `doctor` to
+check whether the snapshot is missing, valid, stale, or invalid.
 
 ## Impact And Test Data
 
 `impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`,
 `tests`, and `tests affected` data objects include the common metadata fields:
 
-- `analysisMode`: `ast`, `typechecked+ast`, `git-diff+ast`, or
-  `git-diff+typechecked+ast`. Direct impact queries use `typechecked+ast` when
-  one or more composed subanalyses used typechecked package loading; diff-based
-  queries use `git-diff+typechecked+ast` when changed-symbol, reference, call,
-  or interface subanalysis used typechecked package loading and `git-diff+ast`
-  otherwise. Direct `tests` queries use `typechecked+ast` when direct symbol or
-  file-contained symbol test-reference analysis loaded repository packages and
-  `ast` otherwise.
+- `analysisMode`: `ast`, `typechecked+ast`, `git-diff+ast`,
+  `git-diff+typechecked+ast`, `snapshot+git-diff+ast`, or
+  `snapshot+git-diff+typechecked+ast`. Direct impact queries use
+  `typechecked+ast` when one or more composed subanalyses used typechecked
+  package loading; diff-based queries use `git-diff+typechecked+ast` when
+  changed-symbol, reference, call, or interface subanalysis used typechecked
+  package loading and `git-diff+ast` otherwise. Direct `tests` queries use
+  `typechecked+ast` when direct symbol or file-contained symbol test-reference
+  analysis loaded repository packages and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific impact or test-planning blind spots.
 

@@ -87,7 +87,7 @@ func TestAnalyzePRSharesSemanticDiffSession(t *testing.T) {
 		mainTestLoadSemanticContextRepository = original
 	}()
 
-	report, err := analyzePR(tmp, "HEAD", nil)
+	report, err := analyzePR(tmp, "HEAD", prAnalyzeOptions{})
 	if err != nil {
 		t.Fatalf("analyzePR returned error: %v", err)
 	}

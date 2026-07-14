@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
 )
@@ -55,6 +56,26 @@ func loadPackagesForInventoryCommand(root string, invocation cliInvocation) ([]s
 	}
 
 	return packages, warnings, fallbackAnalysisMode(invocation), nil
+}
+
+func loadDiffAnalyzerOptions(root string, buildTags []string, useSnapshot bool) (impactengine.AnalyzerOptions, bool, []string) {
+	options := impactengine.AnalyzerOptions{
+		BuildTags: buildTags,
+	}
+	if !useSnapshot {
+		return options, false, nil
+	}
+
+	stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{
+		BuildTags: buildTags,
+	})
+	if inspect.Status == snapshotstore.StatusValid {
+		options.UseSnapshotSymbols = true
+		options.SnapshotSymbols = cloneSlice(stored.Symbols)
+		return options, true, nil
+	}
+
+	return options, false, []string{snapshotFallbackWarning(inspect)}
 }
 
 func snapshotFallbackWarning(inspect snapshotstore.InspectResult) string {

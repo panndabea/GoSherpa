@@ -308,7 +308,10 @@ func runPRCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) 
 		return exitFailure
 	}
 
-	report, err := analyzePR(root, invocation.BaseRef, invocation.BuildTags)
+	report, err := analyzePR(root, invocation.BaseRef, prAnalyzeOptions{
+		BuildTags:   invocation.BuildTags,
+		UseSnapshot: invocation.UseSnapshot,
+	})
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "pr", invocation.BaseRef, stderr, err)
 	}
@@ -537,12 +540,12 @@ func runImpactCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 			return exitFailure
 		}
 
-		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
-			BuildTags: invocation.BuildTags,
-		})
+		analyzerOptions, snapshotUsed, snapshotWarnings := loadDiffAnalyzerOptions(root, invocation.BuildTags, invocation.UseSnapshot)
+		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", analyzerOptions)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
 		}
+		report.Warnings = uniqueStringsInOrder(append(snapshotWarnings, report.Warnings...))
 
 		if invocation.JSON {
 			normalizedReport := impactDiffJSONResult(report)
@@ -551,7 +554,7 @@ func runImpactCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 				"impact diff",
 				invocation.BaseRef,
 				normalizedReport.Warnings,
-				impactDiffJSONDataFromReport(normalizedReport, analysisModeDiff),
+				impactDiffJSONDataFromReport(normalizedReport, diffAnalysisModeFallback(snapshotUsed)),
 			))
 		}
 
@@ -645,12 +648,12 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 			return exitFailure
 		}
 
-		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", impactengine.AnalyzerOptions{
-			BuildTags: invocation.BuildTags,
-		})
+		analyzerOptions, snapshotUsed, snapshotWarnings := loadDiffAnalyzerOptions(root, invocation.BuildTags, invocation.UseSnapshot)
+		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", analyzerOptions)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
 		}
+		report.Warnings = uniqueStringsInOrder(append(snapshotWarnings, report.Warnings...))
 
 		if invocation.JSON {
 			normalizedReport := impactDiffJSONResult(report)
@@ -659,7 +662,7 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 				"tests affected",
 				invocation.BaseRef,
 				normalizedReport.Warnings,
-				testsAffectedJSONDataFromReport(normalizedReport),
+				testsAffectedJSONDataFromReport(normalizedReport, diffAnalysisModeFallback(snapshotUsed)),
 			))
 		}
 

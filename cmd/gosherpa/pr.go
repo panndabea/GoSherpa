@@ -36,20 +36,25 @@ type prReport struct {
 	Warnings                []string                     `json:"-"`
 }
 
-func analyzePR(root string, base string, buildTags []string) (prReport, error) {
+type prAnalyzeOptions struct {
+	BuildTags   []string
+	UseSnapshot bool
+}
+
+func analyzePR(root string, base string, options prAnalyzeOptions) (prReport, error) {
+	analyzerOptions, snapshotUsed, snapshotWarnings := loadDiffAnalyzerOptions(root, options.BuildTags, options.UseSnapshot)
 	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
-		BuildTags: buildTags,
+		BuildTags: options.BuildTags,
 	})
 	if err != nil {
 		return prReport{}, err
 	}
 
-	impactReport, err := impactengine.AnalyzeDiffWithContext(semanticContext, base, "", impactengine.AnalyzerOptions{
-		BuildTags: buildTags,
-	})
+	impactReport, err := impactengine.AnalyzeDiffWithContext(semanticContext, base, "", analyzerOptions)
 	if err != nil {
 		return prReport{}, err
 	}
+	impactReport.Warnings = uniqueStringsInOrder(append(snapshotWarnings, impactReport.Warnings...))
 
 	repositoryRisk, err := sherpa.AnalyzeRisk(root, sherpa.RiskOptions{})
 	if err != nil {
@@ -58,7 +63,7 @@ func analyzePR(root string, base string, buildTags []string) (prReport, error) {
 
 	report := prReport{
 		Base:                    base,
-		AnalysisMode:            impactReportAnalysisMode(impactReport, analysisModeDiff),
+		AnalysisMode:            impactReportAnalysisMode(impactReport, diffAnalysisModeFallback(snapshotUsed)),
 		ChangedFiles:            impactReport.ChangedFiles,
 		ChangedPackages:         impactReport.ChangedPackages,
 		ChangedSymbols:          impactReport.AffectedSymbols,

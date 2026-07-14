@@ -130,28 +130,31 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
-		Name:     "impact",
-		Usage:    impactUsageLines,
-		Handler:  runImpactCommand,
-		JSON:     true,
-		Tags:     true,
-		BaseWhen: isImpactDiffInvocation,
+		Name:         "impact",
+		Usage:        impactUsageLines,
+		Handler:      runImpactCommand,
+		JSON:         true,
+		Tags:         true,
+		SnapshotWhen: isImpactDiffInvocation,
+		BaseWhen:     isImpactDiffInvocation,
 	},
 	{
-		Name:     "pr",
-		Usage:    []string{prUsageLine},
-		Handler:  runPRCommand,
-		JSON:     true,
-		Tags:     true,
-		BaseWhen: isPRInvocation,
+		Name:         "pr",
+		Usage:        []string{prUsageLine},
+		Handler:      runPRCommand,
+		JSON:         true,
+		Tags:         true,
+		SnapshotWhen: isPRInvocation,
+		BaseWhen:     isPRInvocation,
 	},
 	{
-		Name:     "tests",
-		Usage:    testsUsageLines,
-		Handler:  runTestsCommand,
-		JSON:     true,
-		TagsWhen: isTestsAffectedInvocation,
-		BaseWhen: isTestsAffectedInvocation,
+		Name:         "tests",
+		Usage:        testsUsageLines,
+		Handler:      runTestsCommand,
+		JSON:         true,
+		TagsWhen:     isTestsAffectedInvocation,
+		SnapshotWhen: isTestsAffectedInvocation,
+		BaseWhen:     isTestsAffectedInvocation,
 	},
 	{
 		Name:    "deps",
@@ -255,10 +258,10 @@ const (
 	impactFileUsageLine     = "impact file <file>"
 	impactPackageUsageLine  = "impact package <package>"
 	impactSymbolUsageLine   = "impact symbol <symbol>"
-	impactDiffUsageLine     = "impact diff --base <ref>"
-	prUsageLine             = "pr --base <ref>"
+	impactDiffUsageLine     = "impact diff --base <ref> [--use-snapshot]"
+	prUsageLine             = "pr --base <ref> [--use-snapshot]"
 	testsDefaultUsageLine   = "tests <symbol-or-package-or-file> [--scope direct|related|all]"
-	testsAffectedUsageLine  = "tests affected --base <ref>"
+	testsAffectedUsageLine  = "tests affected --base <ref> [--use-snapshot]"
 	depsPackageUsageLine    = "deps <package>"
 	depsAllUsageLine        = "deps --all"
 	packagesUsageLine       = "packages [--tests] [--use-snapshot]"

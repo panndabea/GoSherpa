@@ -229,8 +229,9 @@ Status: first slice implemented with explicit `gosherpa snapshot` creation,
 versioned `.gosherpa/snapshot.json` output, file freshness metadata, package and
 symbol inventory, build tags, git state, and `doctor` diagnostics for missing,
 valid, stale, and invalid snapshots. Opt-in reuse is available for `analyze`,
-`symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; broader
-automatic query reuse is still future work.
+`symbols`, `symbol`, `search`, test-inclusive `packages --tests`, and current
+changed-symbol inventory in `context diff`, `impact diff`, `tests affected`,
+and `pr`; broader automatic query reuse is still future work.
 
 Command sketches:
 

@@ -211,8 +211,8 @@ Status: first slice implemented as `gosherpa snapshot`, writing a versioned
 summaries, symbols, build tags, and git state. `gosherpa doctor` reports
 missing, valid, stale, and invalid snapshots. `analyze`, `symbols`, `symbol`,
 `search`, test-inclusive `packages --tests`, and current changed-symbol
-inventory in `context diff` can opt in to snapshot reuse; broader semantic
-relationship reuse remains future work.
+inventory in `context diff`, `impact diff`, `tests affected`, and `pr` can opt
+in to snapshot reuse; broader semantic relationship reuse remains future work.
 
 Command sketch:
 

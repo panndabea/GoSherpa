@@ -17,11 +17,13 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
-	analysisModeAST             = agentcontext.AnalysisModeAST
-	analysisModeDiff            = agentcontext.AnalysisModeDiff
-	analysisModeDiffTypechecked = agentcontext.AnalysisModeDiffTypechecked
-	confidenceMedium            = agentcontext.ConfidenceMedium
-	confidenceLow               = agentcontext.ConfidenceLow
+	analysisModeAST                     = agentcontext.AnalysisModeAST
+	analysisModeDiff                    = agentcontext.AnalysisModeDiff
+	analysisModeDiffTypechecked         = agentcontext.AnalysisModeDiffTypechecked
+	analysisModeSnapshotDiff            = agentcontext.AnalysisModeSnapshotDiff
+	analysisModeSnapshotDiffTypechecked = agentcontext.AnalysisModeSnapshotDiffTypechecked
+	confidenceMedium                    = agentcontext.ConfidenceMedium
+	confidenceLow                       = agentcontext.ConfidenceLow
 )
 
 type cliInvocation struct {
@@ -116,7 +118,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasBaseOption && !isBaseAwareInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, and tests affected")
+		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, tests affected, and pr")
 		return exitUsage
 	}
 
@@ -146,7 +148,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation) {
-		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff")
+		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr")
 		return exitUsage
 	}
 

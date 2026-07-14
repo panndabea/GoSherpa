@@ -77,7 +77,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, and range-backed reading-order entries in JSON output
-- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; `context diff --use-snapshot` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, or invalid snapshots fall back to live analysis with warnings.
+- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, or invalid snapshots fall back to live analysis with warnings.
 
 ## Known MVP Limitations
 
@@ -92,7 +92,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
-- Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and current changed-symbol inventory in `context diff`; deeper semantic relationship, impact, and call-graph queries still analyze repository data directly.
+- Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and current changed-symbol inventory in `context diff`, `impact diff`, `tests affected`, and `pr`; deeper semantic relationship, impact, and call-graph queries still analyze repository data directly.
 - The shared repository index v0 currently covers package, file, and symbol inventory. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship reuse remains separate follow-up work.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.

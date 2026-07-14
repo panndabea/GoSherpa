@@ -191,6 +191,9 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 		{"--use-snapshot", "symbols"},
 		{"search", "target", "--use-snapshot"},
 		{"context", "diff", "--base", "HEAD", "--use-snapshot"},
+		{"impact", "diff", "--base", "HEAD", "--use-snapshot"},
+		{"tests", "affected", "--base", "HEAD", "--use-snapshot"},
+		{"pr", "--base", "HEAD", "--use-snapshot"},
 	}
 
 	for _, test := range tests {
@@ -344,6 +347,12 @@ func TestParseCLIArgsAcceptsBaseFlagForDiffCommands(t *testing.T) {
 			args:        []string{"context", "diff", "--base", "HEAD"},
 			command:     "context",
 			commandArgs: []string{"diff"},
+		},
+		{
+			name:        "pr",
+			args:        []string{"pr", "--base", "HEAD"},
+			command:     "pr",
+			commandArgs: nil,
 		},
 	}
 
@@ -661,8 +670,8 @@ func TestPrintUsageIncludesImpact(t *testing.T) {
 		"impact file <file>",
 		"impact package <package>",
 		"impact symbol <symbol>",
-		"impact diff --base <ref>",
-		"pr --base <ref>",
+		"impact diff --base <ref> [--use-snapshot]",
+		"pr --base <ref> [--use-snapshot]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -721,7 +730,7 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 
 	for _, want := range []string{
 		"tests <symbol-or-package-or-file> [--scope direct|related|all]",
-		"tests affected --base <ref>",
+		"tests affected --base <ref> [--use-snapshot]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -800,7 +809,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] tests <symbol-or-package-or-file> [--scope direct|related|all]",
-		"gosherpa [--root <path>] tests affected --base <ref>",
+		"gosherpa [--root <path>] tests affected --base <ref> [--use-snapshot]",
 	} {
 		if !strings.Contains(result.Stderr, want) {
 			t.Fatalf("expected stderr to contain %s, got %q", want, result.Stderr)
@@ -815,7 +824,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainPrintsTestsAffectedUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "tests", "affected"})
 
-	want := "usage: gosherpa [--root <path>] tests affected --base <ref>\n"
+	want := "usage: gosherpa [--root <path>] tests affected --base <ref> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -2086,6 +2095,33 @@ func NewSession() Session {
 	}
 }
 
+func TestMainRunsTestsAffectedCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/app")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 2)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", limitations)
+	}
+}
+
 func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "impact"})
 
@@ -2095,7 +2131,7 @@ func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
 
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] impact <symbol-or-package>",
-		"gosherpa [--root <path>] impact diff --base <ref>",
+		"gosherpa [--root <path>] impact diff --base <ref> [--use-snapshot]",
 	} {
 		if !strings.Contains(result.Stderr, want) {
 			t.Fatalf("expected stderr to contain %s, got %q", want, result.Stderr)
@@ -2110,7 +2146,7 @@ func TestMainPrintsImpactUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainPrintsImpactDiffUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "impact", "diff"})
 
-	want := "usage: gosherpa [--root <path>] impact diff --base <ref>\n"
+	want := "usage: gosherpa [--root <path>] impact diff --base <ref> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -2173,7 +2209,7 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --base is only supported by context diff, impact diff, and tests affected") {
+	if !strings.Contains(result.Stderr, "error: --base is only supported by context diff, impact diff, tests affected, and pr") {
 		t.Fatalf("expected base flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2205,7 +2241,7 @@ func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff") {
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr") {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2221,7 +2257,7 @@ func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, and context diff") {
+	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr") {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
@@ -3231,7 +3267,7 @@ func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {
 func TestMainPrintsPRUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "pr"})
 
-	want := "usage: gosherpa [--root <path>] pr --base <ref>\n"
+	want := "usage: gosherpa [--root <path>] pr --base <ref> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -3371,6 +3407,84 @@ func TestMainRunsPRCommandAsJSON(t *testing.T) {
 
 	if strings.Contains(result.Stdout, "PR REVIEW") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsPRCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "pr", "HEAD", "example.com/app")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestJSONArrayHasLength(t, data, "changedSymbolDetails", 1)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", limitations)
+	}
+}
+
+func TestMainRunsPRCommandWithStaleSnapshotWarningAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n")
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+	writeMainSnapshot(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n\nfunc Added() {}\n")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["schemaVersion"] != float64(jsonSchemaVersion) {
+		t.Fatalf("expected schemaVersion %d, got %v", jsonSchemaVersion, payload["schemaVersion"])
+	}
+	if payload["command"] != "pr" {
+		t.Fatalf("expected pr command, got %v", payload["command"])
+	}
+	if payload["target"] != "HEAD" {
+		t.Fatalf("expected HEAD target, got %v", payload["target"])
+	}
+	if payload["root"] != filepath.Clean(tmp) {
+		t.Fatalf("expected root %s, got %v", filepath.Clean(tmp), payload["root"])
+	}
+	if payload["modulePath"] != "example.com/app" {
+		t.Fatalf("expected module path example.com/app, got %v", payload["modulePath"])
+	}
+	data := assertMainTestJSONObject(t, payload, "data")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("expected live diff analysis mode, got %v", data["analysisMode"])
+	}
+	warnings := assertMainTestJSONArray(t, payload, "warnings")
+	if !mainTestJSONArrayContainsSubstring(warnings, "snapshot not used: Snapshot is stale") {
+		t.Fatalf("expected stale snapshot warning, got %#v", warnings)
+	}
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
 	}
 }
 
@@ -3789,6 +3903,33 @@ func NewSession() Session {
 
 	if strings.Contains(result.Stdout, "IMPACT DIFF") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsImpactDiffCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "diff", "--base", "HEAD", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact diff", "HEAD", "example.com/app")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
+		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestJSONArrayHasLength(t, data, "affectedSymbols", 1)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "reused a valid snapshot") {
+		t.Fatalf("expected snapshot limitation, got %#v", limitations)
 	}
 }
 
@@ -6364,6 +6505,15 @@ func NewSession() Session {
 `)
 
 	return tmp
+}
+
+func writeMainSnapshot(t *testing.T, root string) {
+	t.Helper()
+
+	result := runMainTest(t, []string{"gosherpa", "--root", root, "snapshot"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected snapshot success, got %d\nstderr:\n%s", result.ExitCode, result.Stderr)
+	}
 }
 
 func writeMainInterfaceProject(t *testing.T) string {

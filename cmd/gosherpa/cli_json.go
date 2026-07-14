@@ -406,11 +406,22 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 	}
 }
 
+func diffAnalysisModeFallback(snapshotUsed bool) string {
+	if snapshotUsed {
+		return analysisModeSnapshotDiff
+	}
+
+	return analysisModeDiff
+}
+
 func impactReportAnalysisMode(report impactengine.ImpactReport, fallback string) string {
-	if fallback == analysisModeDiff {
+	if fallback == analysisModeDiff || fallback == analysisModeSnapshotDiff {
 		if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
 			report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
 			report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+			if fallback == analysisModeSnapshotDiff {
+				return analysisModeSnapshotDiffTypechecked
+			}
 			return analysisModeDiffTypechecked
 		}
 
@@ -445,8 +456,8 @@ func testsJSONDataFromResult(result sherpa.TestsResult) testsJSONData {
 	}
 }
 
-func testsAffectedJSONDataFromReport(report impactengine.ImpactReport) testsAffectedJSONData {
-	analysisMode := impactReportAnalysisMode(report, analysisModeDiff)
+func testsAffectedJSONDataFromReport(report impactengine.ImpactReport, analysisMode string) testsAffectedJSONData {
+	analysisMode = impactReportAnalysisMode(report, analysisMode)
 
 	return testsAffectedJSONData{
 		AnalysisMode:          analysisMode,
@@ -1001,10 +1012,16 @@ func testBundleLimitations(analysisMode string, referenceAnalysisMode string, ca
 }
 
 func impactLimitations(analysisMode string) []string {
-	if analysisMode == analysisModeDiff || analysisMode == analysisModeDiffTypechecked {
+	if isDiffAnalysisMode(analysisMode) {
 		semanticLine := "Impact analysis uses syntax plus local package dependency and interface signals."
-		if analysisMode == analysisModeDiffTypechecked {
+		if isTypecheckedDiffAnalysisMode(analysisMode) {
 			semanticLine = "Impact analysis uses git diff plus typechecked symbol, reference, call, or interface signals where available."
+		}
+		if isSnapshotDiffAnalysisMode(analysisMode) {
+			semanticLine = "Impact analysis reused a valid snapshot for current changed-symbol inventory and uses git diff plus repository analysis."
+			if isTypecheckedDiffAnalysisMode(analysisMode) {
+				semanticLine = "Impact analysis reused a valid snapshot for current changed-symbol inventory and uses git diff plus typechecked symbol, reference, call, or interface signals where available."
+			}
 		}
 
 		return []string{
@@ -1024,10 +1041,16 @@ func impactLimitations(analysisMode string) []string {
 }
 
 func testLimitations(analysisMode string) []string {
-	if analysisMode == analysisModeDiff || analysisMode == analysisModeDiffTypechecked {
+	if isDiffAnalysisMode(analysisMode) {
 		semanticLine := "Affected test planning is based on changed packages, affected packages, and syntactic test references."
-		if analysisMode == analysisModeDiffTypechecked {
+		if isTypecheckedDiffAnalysisMode(analysisMode) {
 			semanticLine = "Affected test planning includes typechecked changed-symbol impact where available, then falls back to package-level commands."
+		}
+		if isSnapshotDiffAnalysisMode(analysisMode) {
+			semanticLine = "Affected test planning reused a valid snapshot for current changed-symbol inventory, then falls back to package-level commands."
+			if isTypecheckedDiffAnalysisMode(analysisMode) {
+				semanticLine = "Affected test planning reused a valid snapshot for current changed-symbol inventory and includes typechecked changed-symbol impact where available."
+			}
 		}
 
 		return []string{
@@ -1050,6 +1073,23 @@ func testLimitations(analysisMode string) []string {
 		"Dynamic table-test names may be incomplete.",
 		"Fallback commands are package-level when direct test functions are not known.",
 	}
+}
+
+func isDiffAnalysisMode(analysisMode string) bool {
+	return analysisMode == analysisModeDiff ||
+		analysisMode == analysisModeDiffTypechecked ||
+		analysisMode == analysisModeSnapshotDiff ||
+		analysisMode == analysisModeSnapshotDiffTypechecked
+}
+
+func isTypecheckedDiffAnalysisMode(analysisMode string) bool {
+	return analysisMode == analysisModeDiffTypechecked ||
+		analysisMode == analysisModeSnapshotDiffTypechecked
+}
+
+func isSnapshotDiffAnalysisMode(analysisMode string) bool {
+	return analysisMode == analysisModeSnapshotDiff ||
+		analysisMode == analysisModeSnapshotDiffTypechecked
 }
 
 func testAnalysisLimitation(analysisMode string) string {

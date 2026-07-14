@@ -46,9 +46,11 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ```
 
 Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
-reused by `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and
-`context diff` with `--use-snapshot`. Missing, stale, or invalid snapshots fall
-back to live repository analysis and report a warning.
+reused by `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and by
+diff-oriented current changed-symbol inventory in `context diff`,
+`impact diff`, `tests affected`, and `pr` with `--use-snapshot`. Missing,
+stale, or invalid snapshots fall back to live repository analysis and report a
+warning.
 
 ```bash
 ./gosherpa snapshot
@@ -57,6 +59,8 @@ back to live repository analysis and report a warning.
 ./gosherpa search parse --use-snapshot --json
 ./gosherpa packages --tests --use-snapshot
 ./gosherpa context diff --base HEAD --use-snapshot --json
+./gosherpa impact diff --base HEAD --use-snapshot --json
+./gosherpa pr --base HEAD --use-snapshot --json
 ```
 
 Enable shell completion by evaluating the script for your shell. The generated
@@ -88,7 +92,7 @@ symbol completion can come later.
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
 | Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
-| Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory where available, with live-analysis fallback warnings |
+| Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory and diff changed-symbol inventory where available, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -185,8 +189,10 @@ Found 4 references
 ./gosherpa impact package ./internal/sherpa
 ./gosherpa impact symbol ParseFile
 ./gosherpa impact diff --base HEAD
+./gosherpa impact diff --base HEAD --use-snapshot
 ./gosherpa impact diff --base HEAD --json
 ./gosherpa pr --base HEAD
+./gosherpa pr --base HEAD --use-snapshot
 ./gosherpa pr --base HEAD --json
 ./gosherpa tests ParseFile
 ./gosherpa tests ParseFile --scope direct
@@ -195,6 +201,7 @@ Found 4 references
 ./gosherpa tests ./internal/sherpa
 ./gosherpa tests internal/sherpa/impact.go
 ./gosherpa tests affected --base HEAD
+./gosherpa tests affected --base HEAD --use-snapshot
 ./gosherpa tests affected --base HEAD --json
 ./gosherpa packages
 ./gosherpa packages --tests
@@ -256,8 +263,9 @@ Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
 typechecked package loading. `context diff` and `pr` include
 `changedSymbolDetails` and put changed-symbol locations first in
-`readingOrder` when positions are known. With `context diff --use-snapshot`, a
-valid snapshot is reused for current changed-symbol inventory and reports
+`readingOrder` when positions are known. With `--use-snapshot` on `context diff`,
+`impact diff`, `tests affected`, or `pr`, a valid snapshot is reused for current
+changed-symbol inventory and reports
 `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`.
 
 `pr --json` keeps the diff-oriented `risk` summary and also includes
