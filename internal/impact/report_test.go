@@ -626,6 +626,24 @@ func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSymbolReportsGenericInterfaceAliasImpact(t *testing.T) {
+	root := writeGenericInterfaceAliasProject(t)
+
+	report, err := AnalyzeSymbol(root, "./internal/auth.TokenLookup")
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedInterfaces, []string{"./internal/auth.AuditedTokenLookup", "./internal/auth.TokenLookup"})
+	assertStrings(t, report.AffectedImplementations, []string{"./internal/store.TokenStore"})
+	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
+	}
+	if len(report.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %#v", report.Warnings)
+	}
+}
+
 func TestAnalyzeSymbolReportsImplementedInterfaces(t *testing.T) {
 	root := writeInterfaceImpactProject(t)
 

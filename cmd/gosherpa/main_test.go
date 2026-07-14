@@ -2798,6 +2798,39 @@ func TestMainRunsImpactSymbolCommand(t *testing.T) {
 	}
 }
 
+func TestMainRunsImpactSymbolCommandForGenericInterfaceAliasAsJSON(t *testing.T) {
+	tmp := writeMainGenericInterfaceAliasProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "symbol", "./internal/auth.TokenLookup", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact symbol", "./internal/auth.TokenLookup", "example.com/app")
+
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["interfaceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./internal/auth.TokenLookup")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./internal/auth.AuditedTokenLookup")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedImplementations"), "./internal/store.TokenStore")
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	if strings.Contains(result.Stdout, "IMPACT SYMBOL") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsExplainCommand(t *testing.T) {
 	tmp := writeMainImpactReportProject(t)
 
@@ -2977,6 +3010,51 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
+func TestMainRunsContextSymbolCommandForGenericInterfaceAliasAsJSON(t *testing.T) {
+	tmp := writeMainGenericInterfaceAliasProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "./internal/auth.TokenLookup", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "./internal/auth.TokenLookup", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["interfaceAnalysisMode"] != "typechecked" {
+		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	}
+
+	identity, ok := data["identity"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected identity object, got %T", data["identity"])
+	}
+	if identity["kind"] != string(sherpa.SymbolKindAlias) {
+		t.Fatalf("expected alias identity, got %#v", identity)
+	}
+	if identity["signature"] != "type TokenLookup = contracts.Lookup[Token]" {
+		t.Fatalf("expected generic alias signature, got %v", identity["signature"])
+	}
+
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./internal/auth.TokenLookup")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedInterfaces"), "./internal/auth.AuditedTokenLookup")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedImplementations"), "./internal/store.TokenStore")
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	if strings.Contains(result.Stdout, "CONTEXT") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }
 
@@ -7078,6 +7156,56 @@ import "example.com/app/internal/auth"
 
 func Run(authenticator auth.Authenticator) error {
 	return authenticator.Authenticate()
+}
+`)
+
+	return tmp
+}
+
+func writeMainGenericInterfaceAliasProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "contracts", "lookup.go"), `package contracts
+
+type Lookup[T any] interface {
+	Lookup(string) (T, error)
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/contracts"
+
+type Token string
+
+type TokenLookup = contracts.Lookup[Token]
+
+type AuditedTokenLookup interface {
+	TokenLookup
+	Audit(Token) error
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "store", "store.go"), `package store
+
+import "example.com/app/internal/auth"
+
+type TokenStore struct{}
+
+func (TokenStore) Lookup(key string) (auth.Token, error) {
+	return auth.Token(key), nil
+}
+
+func (TokenStore) Audit(auth.Token) error {
+	return nil
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Load(lookup auth.TokenLookup) (auth.Token, error) {
+	return lookup.Lookup("current")
 }
 `)
 

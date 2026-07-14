@@ -507,20 +507,15 @@ func semanticInterfaceGraph(repo semantics.Repository) interfaceGraph {
 				continue
 			}
 
-			named, ok := typeName.Type().(*types.Named)
-			if !ok {
-				continue
-			}
-
-			iface, ok := named.Underlying().(*types.Interface)
+			graphType := typecheckedGraphType(typeName.Type())
+			iface, ok := typecheckedInterfaceType(typeName.Type())
 			if ok {
-				iface.Complete()
 				interfaces = append(interfaces, interfaceInfo{
 					Name:      typeName.Name(),
 					Package:   pkg.PackagePath,
 					Qualified: qualifiedSignalName(pkg.PackagePath, typeName.Name()),
 					Position:  interfacePosition(repo.Root, pkg.FileSet, typeName.Pos()),
-					Methods:   typecheckedInterfaceMethodSet(iface),
+					Methods:   typecheckedInterfaceMethodSet(modulePath, iface),
 					Embedded:  typecheckedEmbeddedInterfaces(modulePath, iface),
 					Type:      iface,
 				})
@@ -532,8 +527,8 @@ func semanticInterfaceGraph(repo semantics.Repository) interfaceGraph {
 				Package:   pkg.PackagePath,
 				Qualified: qualifiedSignalName(pkg.PackagePath, typeName.Name()),
 				Position:  interfacePosition(repo.Root, pkg.FileSet, typeName.Pos()),
-				Methods:   typecheckedTypeMethodSet(named),
-				Type:      named,
+				Methods:   typecheckedTypeMethodSet(modulePath, graphType),
+				Type:      graphType,
 			})
 		}
 	}
@@ -559,7 +554,29 @@ func semanticInterfacePackageUsable(pkg semantics.Package) bool {
 	return pkg.FileSet != nil && pkg.Types != nil
 }
 
-func typecheckedInterfaceMethodSet(iface *types.Interface) methodSet {
+func typecheckedGraphType(typ types.Type) types.Type {
+	if typ == nil {
+		return nil
+	}
+
+	return types.Unalias(typ)
+}
+
+func typecheckedInterfaceType(typ types.Type) (*types.Interface, bool) {
+	if typ == nil {
+		return nil, false
+	}
+
+	iface, ok := types.Unalias(typ).Underlying().(*types.Interface)
+	if !ok {
+		return nil, false
+	}
+
+	iface.Complete()
+	return iface, true
+}
+
+func typecheckedInterfaceMethodSet(modulePath string, iface *types.Interface) methodSet {
 	methods := make(methodSet)
 	if iface == nil {
 		return methods
@@ -568,22 +585,22 @@ func typecheckedInterfaceMethodSet(iface *types.Interface) methodSet {
 	iface.Complete()
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
-		methods[method.Name()] = method.Type().String()
+		methods[method.Name()] = localizeTypecheckedSignature(modulePath, method.Type().String())
 	}
 
 	return methods
 }
 
-func typecheckedTypeMethodSet(typ types.Type) methodSet {
-	methods := methodSetFromSelectionSet(types.NewMethodSet(typ))
+func typecheckedTypeMethodSet(modulePath string, typ types.Type) methodSet {
+	methods := methodSetFromSelectionSet(modulePath, types.NewMethodSet(typ))
 	if named, ok := typ.(*types.Named); ok {
-		mergeMethodSets(methods, methodSetFromSelectionSet(types.NewMethodSet(types.NewPointer(named))))
+		mergeMethodSets(methods, methodSetFromSelectionSet(modulePath, types.NewMethodSet(types.NewPointer(named))))
 	}
 
 	return methods
 }
 
-func methodSetFromSelectionSet(methodSetValue *types.MethodSet) methodSet {
+func methodSetFromSelectionSet(modulePath string, methodSetValue *types.MethodSet) methodSet {
 	methods := make(methodSet)
 	if methodSetValue == nil {
 		return methods
@@ -592,10 +609,21 @@ func methodSetFromSelectionSet(methodSetValue *types.MethodSet) methodSet {
 	for i := 0; i < methodSetValue.Len(); i++ {
 		selection := methodSetValue.At(i)
 		method := selection.Obj()
-		methods[method.Name()] = method.Type().String()
+		methods[method.Name()] = localizeTypecheckedSignature(modulePath, method.Type().String())
 	}
 
 	return methods
+}
+
+func localizeTypecheckedSignature(modulePath string, signature string) string {
+	modulePath = strings.TrimSuffix(strings.TrimSpace(modulePath), "/")
+	if modulePath == "" || signature == "" {
+		return signature
+	}
+
+	signature = strings.ReplaceAll(signature, modulePath+"/", "./")
+	signature = strings.ReplaceAll(signature, modulePath+".", ".")
+	return signature
 }
 
 func typecheckedEmbeddedInterfaces(modulePath string, iface *types.Interface) []interfaceRef {
@@ -615,20 +643,32 @@ func typecheckedEmbeddedInterfaces(modulePath string, iface *types.Interface) []
 }
 
 func typecheckedInterfaceRef(modulePath string, typ types.Type) (interfaceRef, bool) {
-	named, ok := typ.(*types.Named)
+	switch typ := typ.(type) {
+	case *types.Alias:
+		return typecheckedTypeNameRef(modulePath, typ.Obj())
+	case *types.Named:
+		return typecheckedTypeNameRef(modulePath, typ.Obj())
+	}
+
+	named, ok := types.Unalias(typ).(*types.Named)
 	if !ok {
 		return interfaceRef{}, false
 	}
-	if named.Obj() == nil || named.Obj().Pkg() == nil {
+
+	return typecheckedTypeNameRef(modulePath, named.Obj())
+}
+
+func typecheckedTypeNameRef(modulePath string, object *types.TypeName) (interfaceRef, bool) {
+	if object == nil || object.Pkg() == nil {
 		return interfaceRef{}, false
 	}
 
-	packagePath, ok := localInterfaceImportPackage(named.Obj().Pkg().Path(), modulePath)
+	packagePath, ok := localInterfaceImportPackage(object.Pkg().Path(), modulePath)
 	if !ok {
 		return interfaceRef{}, false
 	}
 
-	return interfaceRef{Package: packagePath, Name: named.Obj().Name()}, true
+	return interfaceRef{Package: packagePath, Name: object.Name()}, true
 }
 
 func buildASTInterfaceGraph(root string) (interfaceGraph, error) {
@@ -1079,17 +1119,11 @@ func semanticInterfaceMethodObjects(repo semantics.Repository, iface interfaceIn
 			continue
 		}
 
-		named, ok := object.Type().(*types.Named)
+		interfaceType, ok := typecheckedInterfaceType(object.Type())
 		if !ok {
 			continue
 		}
 
-		interfaceType, ok := named.Underlying().(*types.Interface)
-		if !ok {
-			continue
-		}
-
-		interfaceType.Complete()
 		methods := make(map[types.Object]string)
 		for i := 0; i < interfaceType.NumMethods(); i++ {
 			method := interfaceType.Method(i)

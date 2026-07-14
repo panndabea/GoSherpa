@@ -159,6 +159,63 @@ func TestFindImplementersUsesTypecheckedAliases(t *testing.T) {
 	}
 }
 
+func TestFindImplementersUsesGenericInterfaceAliases(t *testing.T) {
+	root := writeGenericInterfaceAliasProject(t)
+
+	result, err := FindImplementers(root, "./internal/auth.TokenLookup")
+	if err != nil {
+		t.Fatalf("FindImplementers returned error: %v", err)
+	}
+
+	if result.Target != "./internal/auth.TokenLookup" {
+		t.Fatalf("expected alias target, got %s", result.Target)
+	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
+	if len(result.Implementers) != 1 {
+		t.Fatalf("expected 1 implementer, got %#v", result.Implementers)
+	}
+	if result.Implementers[0].Name != "./internal/store.TokenStore" {
+		t.Fatalf("expected TokenStore implementer, got %#v", result.Implementers[0])
+	}
+}
+
+func TestInspectInterfaceUsesGenericInterfaceAliases(t *testing.T) {
+	root := writeGenericInterfaceAliasProject(t)
+
+	result, err := InspectInterface(root, "./internal/auth.TokenLookup")
+	if err != nil {
+		t.Fatalf("InspectInterface returned error: %v", err)
+	}
+
+	if result.Target != "./internal/auth.TokenLookup" {
+		t.Fatalf("expected alias target, got %s", result.Target)
+	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
+	if result.MethodUsageAnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked method usage mode, got %q with warnings %#v", result.MethodUsageAnalysisMode, result.Warnings)
+	}
+	if len(result.Methods) != 1 {
+		t.Fatalf("expected 1 method, got %#v", result.Methods)
+	}
+	method := result.Methods[0]
+	if method.Name != "Lookup" || method.Signature != "func(string) (./internal/auth.Token, error)" {
+		t.Fatalf("expected concrete Lookup signature, got %#v", method)
+	}
+	if len(method.Usages) != 1 {
+		t.Fatalf("expected 1 method usage, got %#v", method.Usages)
+	}
+	if method.Usages[0].Position.File != "internal/session/session.go" {
+		t.Fatalf("expected session usage, got %#v", method.Usages[0].Position)
+	}
+	if len(result.Implementers) != 1 || result.Implementers[0].Name != "./internal/store.TokenStore" {
+		t.Fatalf("expected TokenStore implementer, got %#v", result.Implementers)
+	}
+}
+
 func interfaceReferencesContain(references []sherpa.Reference, file string, kind sherpa.ReferenceKind) bool {
 	for _, reference := range references {
 		if reference.Position.File == file && reference.Kind == kind {
@@ -534,6 +591,56 @@ type JWTAuthenticator struct{}
 
 func (JWTAuthenticator) Authenticate(model.UserID) error {
 	return nil
+}
+`)
+
+	return root
+}
+
+func writeGenericInterfaceAliasProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "contracts", "lookup.go"), `package contracts
+
+type Lookup[T any] interface {
+	Lookup(string) (T, error)
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/contracts"
+
+type Token string
+
+type TokenLookup = contracts.Lookup[Token]
+
+type AuditedTokenLookup interface {
+	TokenLookup
+	Audit(Token) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "store", "store.go"), `package store
+
+import "example.com/app/internal/auth"
+
+type TokenStore struct{}
+
+func (TokenStore) Lookup(key string) (auth.Token, error) {
+	return auth.Token(key), nil
+}
+
+func (TokenStore) Audit(auth.Token) error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Load(lookup auth.TokenLookup) (auth.Token, error) {
+	return lookup.Lookup("current")
 }
 `)
 
