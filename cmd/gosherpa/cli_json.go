@@ -49,17 +49,23 @@ type referencesJSONData struct {
 }
 
 type symbolJSONData struct {
-	AnalysisMode string        `json:"analysisMode,omitempty"`
+	AnalysisMode string        `json:"analysisMode"`
+	Confidence   string        `json:"confidence"`
+	Limitations  []string      `json:"limitations"`
 	Symbol       sherpa.Symbol `json:"symbol"`
 }
 
 type symbolsJSONData struct {
-	AnalysisMode string          `json:"analysisMode,omitempty"`
+	AnalysisMode string          `json:"analysisMode"`
+	Confidence   string          `json:"confidence"`
+	Limitations  []string        `json:"limitations"`
 	Symbols      []sherpa.Symbol `json:"symbols"`
 }
 
 type searchJSONData struct {
-	AnalysisMode string                      `json:"analysisMode,omitempty"`
+	AnalysisMode string                      `json:"analysisMode"`
+	Confidence   string                      `json:"confidence"`
+	Limitations  []string                    `json:"limitations"`
 	Terms        []string                    `json:"terms"`
 	Results      []sherpa.SymbolSearchResult `json:"results"`
 }
@@ -125,17 +131,25 @@ type testsAffectedJSONData struct {
 }
 
 type dependenciesJSONData struct {
-	Package string   `json:"package"`
-	Imports []string `json:"imports"`
-	UsedBy  []string `json:"usedBy"`
+	AnalysisMode string   `json:"analysisMode"`
+	Confidence   string   `json:"confidence"`
+	Limitations  []string `json:"limitations"`
+	Package      string   `json:"package"`
+	Imports      []string `json:"imports"`
+	UsedBy       []string `json:"usedBy"`
 }
 
 type repositoryDependenciesJSONData struct {
-	Packages []sherpa.PackageDependencySummary `json:"packages"`
+	AnalysisMode string                            `json:"analysisMode"`
+	Confidence   string                            `json:"confidence"`
+	Limitations  []string                          `json:"limitations"`
+	Packages     []sherpa.PackageDependencySummary `json:"packages"`
 }
 
 type packagesJSONData struct {
-	AnalysisMode string                  `json:"analysisMode,omitempty"`
+	AnalysisMode string                  `json:"analysisMode"`
+	Confidence   string                  `json:"confidence"`
+	Limitations  []string                `json:"limitations"`
 	Packages     []sherpa.PackageSummary `json:"packages"`
 }
 
@@ -482,9 +496,12 @@ func dependenciesJSONResult(result sherpa.PackageDependencies) sherpa.PackageDep
 
 func dependenciesJSONDataFromResult(result sherpa.PackageDependencies) dependenciesJSONData {
 	return dependenciesJSONData{
-		Package: result.Package,
-		Imports: result.Imports,
-		UsedBy:  result.UsedBy,
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  dependencyLimitations(),
+		Package:      result.Package,
+		Imports:      result.Imports,
+		UsedBy:       result.UsedBy,
 	}
 }
 
@@ -551,7 +568,10 @@ func repositoryDependenciesJSONResult(result sherpa.RepositoryDependencies) sher
 
 func repositoryDependenciesJSONDataFromResult(result sherpa.RepositoryDependencies) repositoryDependenciesJSONData {
 	return repositoryDependenciesJSONData{
-		Packages: result.Packages,
+		AnalysisMode: analysisModeAST,
+		Confidence:   jsonConfidence(nil, analysisModeAST),
+		Limitations:  dependencyLimitations(),
+		Packages:     result.Packages,
 	}
 }
 
@@ -562,6 +582,8 @@ func packagesJSONResult(result []sherpa.PackageSummary) []sherpa.PackageSummary 
 func packagesJSONDataFromResult(result []sherpa.PackageSummary, analysisMode string) packagesJSONData {
 	return packagesJSONData{
 		AnalysisMode: analysisMode,
+		Confidence:   jsonConfidence(nil, analysisMode),
+		Limitations:  packageInventoryLimitations(analysisMode),
 		Packages:     result,
 	}
 }
@@ -895,6 +917,41 @@ func jsonConfidence(warnings []string, analysisModes ...string) string {
 	}
 
 	return confidenceMedium
+}
+
+func symbolInventoryLimitations(analysisMode string) []string {
+	return []string{
+		inventoryAnalysisLimitation(analysisMode),
+		"Symbol inventory is declaration-based and does not include references, callers, callees, or impact relationships.",
+		"Build tags follow the selected --tags options; generated-file handling follows repository parsing.",
+	}
+}
+
+func packageInventoryLimitations(analysisMode string) []string {
+	return []string{
+		inventoryAnalysisLimitation(analysisMode),
+		"Package inventory summarizes static Go files, imports, symbols, and test-file presence.",
+		"Runtime wiring, reflection, plugins, and generated files outside the parsed repository are not inferred.",
+	}
+}
+
+func inventoryAnalysisLimitation(analysisMode string) string {
+	switch analysisMode {
+	case analysisModeSnapshot:
+		return "Inventory analysis reused a valid snapshot."
+	case analysisModeAST:
+		return "Inventory analysis used AST parsing of repository source files."
+	default:
+		return "Inventory analysis used repository source parsing."
+	}
+}
+
+func dependencyLimitations() []string {
+	return []string{
+		"Dependency analysis uses static Go import declarations from repository packages.",
+		"Runtime wiring, reflection, plugins, and generated files outside the parsed repository are not inferred.",
+		"External dependency internals are not traversed.",
+	}
 }
 
 func referenceLimitations(analysisMode string) []string {

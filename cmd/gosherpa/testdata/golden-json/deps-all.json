@@ -6,6 +6,13 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Dependency analysis uses static Go import declarations from repository packages.",
+      "Runtime wiring, reflection, plugins, and generated files outside the parsed repository are not inferred.",
+      "External dependency internals are not traversed."
+    ],
     "packages": [
       {
         "package": ".",

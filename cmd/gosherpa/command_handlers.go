@@ -393,6 +393,8 @@ func runSymbolCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 	if invocation.JSON {
 		return writeJSON(stdout, stderr, newJSONResponse(root, "symbol", target, warnings, symbolJSONData{
 			AnalysisMode: analysisMode,
+			Confidence:   jsonConfidence(warnings, analysisMode),
+			Limitations:  symbolInventoryLimitations(analysisMode),
 			Symbol:       symbol,
 		}))
 	}
@@ -441,6 +443,8 @@ func runSearchCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 	if invocation.JSON {
 		return writeJSON(stdout, stderr, newJSONResponse(root, "search", target, warnings, searchJSONData{
 			AnalysisMode: analysisMode,
+			Confidence:   jsonConfidence(warnings, analysisMode),
+			Limitations:  symbolInventoryLimitations(analysisMode),
 			Terms:        nonNilSlice(terms),
 			Results:      nonNilSlice(results),
 		}))
@@ -470,6 +474,8 @@ func runSymbolsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 	if invocation.JSON {
 		return writeJSON(stdout, stderr, newJSONResponse(root, "symbols", "", warnings, symbolsJSONData{
 			AnalysisMode: analysisMode,
+			Confidence:   jsonConfidence(warnings, analysisMode),
+			Limitations:  symbolInventoryLimitations(analysisMode),
 			Symbols:      nonNilSlice(symbols),
 		}))
 	}

@@ -6,6 +6,13 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Inventory analysis used AST parsing of repository source files.",
+      "Symbol inventory is declaration-based and does not include references, callers, callees, or impact relationships.",
+      "Build tags follow the selected --tags options; generated-file handling follows repository parsing."
+    ],
     "terms": [
       "Target"
     ],

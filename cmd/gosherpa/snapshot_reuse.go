@@ -91,12 +91,8 @@ func snapshotFallbackWarning(inspect snapshotstore.InspectResult) string {
 	return fmt.Sprintf("snapshot not used: %s; using live repository analysis", message)
 }
 
-func fallbackAnalysisMode(invocation cliInvocation) string {
-	if invocation.UseSnapshot {
-		return analysisModeAST
-	}
-
-	return ""
+func fallbackAnalysisMode(_ cliInvocation) string {
+	return analysisModeAST
 }
 
 func writeHumanWarnings(stderr io.Writer, warnings []string) {

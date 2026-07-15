@@ -276,6 +276,60 @@ func TestMainAdditionalAgentJSONMetadataContracts(t *testing.T) {
 			target:  "Target",
 		},
 		{
+			name: "symbol",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"symbol", "Target", "--json"},
+			command: "symbol",
+			target:  "Target",
+		},
+		{
+			name: "symbols",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"symbols", "--json"},
+			command: "symbols",
+			target:  "",
+		},
+		{
+			name: "search",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"search", "Target", "--json"},
+			command: "search",
+			target:  "Target",
+		},
+		{
+			name: "packages",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"packages", "--json"},
+			command: "packages",
+			target:  "",
+		},
+		{
+			name: "deps",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"deps", ".", "--json"},
+			command: "deps",
+			target:  ".",
+		},
+		{
+			name: "deps all",
+			root: func(t *testing.T) string {
+				return writeMainImpactReportProject(t)
+			},
+			args:    []string{"deps", "--all", "--json"},
+			command: "deps",
+			target:  "all",
+		},
+		{
 			name: "path",
 			root: func(t *testing.T) string {
 				return writeMainImpactReportProject(t)

@@ -6,6 +6,13 @@
   "modulePath": "example.com/golden",
   "warnings": [],
   "data": {
+    "analysisMode": "ast",
+    "confidence": "medium",
+    "limitations": [
+      "Inventory analysis used AST parsing of repository source files.",
+      "Package inventory summarizes static Go files, imports, symbols, and test-file presence.",
+      "Runtime wiring, reflection, plugins, and generated files outside the parsed repository are not inferred."
+    ],
     "packages": [
       {
         "package": ".",

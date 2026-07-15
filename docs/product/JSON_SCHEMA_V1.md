@@ -293,6 +293,27 @@ that current changed-symbol inventory came from the snapshot.
 relationship graph. It is `typechecked` when package loading completed and
 `unavailable` when package loading failed.
 
+## Inventory And Dependency Metadata
+
+`symbol`, `symbols`, `search`, `packages`, `deps`, and `deps --all` data
+objects include the common metadata fields:
+
+- `analysisMode`: currently `ast` for live source parsing or `snapshot` when a
+  valid snapshot supplied inventory data.
+- `confidence`: deterministic trust label.
+- `limitations`: inventory or dependency-analysis blind spots and scope
+  boundaries.
+
+`symbol` returns one `symbol` object, `symbols` returns `symbols`, and `search`
+returns `terms` plus ranked `results`. These inventory commands are
+declaration-based; use `refs`, `callers`, `callees`, `interface`, or `impact`
+for relationship analysis.
+
+`deps` returns `package`, `imports`, and `usedBy`; `deps --all` returns
+`packages` with local, external, and reverse-import summaries. Dependency
+analysis is based on static Go import declarations and does not traverse
+external dependency internals.
+
 ## `analyze` Data
 
 Envelope:
@@ -672,8 +693,9 @@ Data:
 Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`,
 test-inclusive `packages --tests`, and diff-oriented commands `context diff`,
 `impact diff`, `tests affected`, and `pr` can opt in to snapshot reuse with
-`--use-snapshot`. When a valid snapshot is used, inventory command data objects
-may include `"analysisMode": "snapshot"`; `analyze` reports
+`--use-snapshot`. Inventory command data objects include `analysisMode`, and
+when a valid snapshot is used they report `"analysisMode": "snapshot"`;
+`analyze` reports
 `"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness
 remain live-analysis signals. Diff-oriented commands report
 `"snapshot+git-diff+typechecked+ast"` or `"snapshot+git-diff+ast"` because
@@ -776,6 +798,9 @@ Data:
 
 ```json
 {
+  "analysisMode": "ast",
+  "confidence": "medium",
+  "limitations": [],
   "packages": [
     {
       "package": "./internal/sherpa",
@@ -793,6 +818,10 @@ Data:
 }
 ```
 
+- `analysisMode`: `ast` for live source parsing or `snapshot` when a valid
+  snapshot supplied package inventory.
+- `confidence`: deterministic trust label.
+- `limitations`: package-inventory blind spots and scope boundaries.
 - `packages`: local package summaries sorted by package path.
 - `goFiles`: non-test `.go` file count.
 - `testFiles`: `_test.go` file count.
