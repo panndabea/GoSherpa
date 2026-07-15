@@ -216,6 +216,63 @@ func TestInspectInterfaceUsesGenericInterfaceAliases(t *testing.T) {
 	}
 }
 
+func TestInspectInterfaceUsesInstantiatedGenericEmbeddedInterfaces(t *testing.T) {
+	root := writeGenericInterfaceAliasProject(t)
+
+	result, err := InspectInterface(root, "./internal/auth.AuditedTokenLookup")
+	if err != nil {
+		t.Fatalf("InspectInterface returned error: %v", err)
+	}
+
+	if result.Target != "./internal/auth.AuditedTokenLookup" {
+		t.Fatalf("expected audited target, got %s", result.Target)
+	}
+	if result.AnalysisMode != InterfaceAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked analysis mode, got %q with warnings %#v", result.AnalysisMode, result.Warnings)
+	}
+
+	methods := interfaceTestMethodSignatures(result.Methods)
+	want := map[string]string{
+		"Audit":  "func(./internal/auth.Token) error",
+		"Lookup": "func(string) (./internal/auth.Token, error)",
+	}
+	if len(methods) != len(want) {
+		t.Fatalf("expected methods %#v, got %#v", want, methods)
+	}
+	for name, signature := range want {
+		if methods[name] != signature {
+			t.Fatalf("expected %s signature %q, got %q in %#v", name, signature, methods[name], methods)
+		}
+	}
+
+	if len(result.Implementers) != 1 || result.Implementers[0].Name != "./internal/store.TokenStore" {
+		t.Fatalf("expected TokenStore implementer, got %#v", result.Implementers)
+	}
+}
+
+func TestInspectInterfaceReportsUsagesForInstantiatedGenericEmbeddedMethods(t *testing.T) {
+	root := writeInstantiatedGenericEmbeddedInterfaceUsageProject(t)
+
+	result, err := InspectInterface(root, "./internal/auth.AuditedTokenLookup")
+	if err != nil {
+		t.Fatalf("InspectInterface returned error: %v", err)
+	}
+
+	usagesByMethod := interfaceTestMethodUsages(result.Methods)
+	for _, method := range []string{"Lookup", "Audit"} {
+		usages := usagesByMethod[method]
+		if len(usages) != 1 {
+			t.Fatalf("expected one %s usage, got %#v", method, usages)
+		}
+		if usages[0].Kind != sherpa.ReferenceKindCall {
+			t.Fatalf("expected %s call usage, got %#v", method, usages[0])
+		}
+		if usages[0].Position.File != "internal/session/session.go" {
+			t.Fatalf("expected %s usage in session.go, got %#v", method, usages[0].Position)
+		}
+	}
+}
+
 func interfaceReferencesContain(references []sherpa.Reference, file string, kind sherpa.ReferenceKind) bool {
 	for _, reference := range references {
 		if reference.Position.File == file && reference.Kind == kind {
@@ -224,6 +281,24 @@ func interfaceReferencesContain(references []sherpa.Reference, file string, kind
 	}
 
 	return false
+}
+
+func interfaceTestMethodSignatures(methods []InterfaceMethod) map[string]string {
+	result := make(map[string]string, len(methods))
+	for _, method := range methods {
+		result[method.Name] = method.Signature
+	}
+
+	return result
+}
+
+func interfaceTestMethodUsages(methods []InterfaceMethod) map[string][]InterfaceMethodUsage {
+	result := make(map[string][]InterfaceMethodUsage, len(methods))
+	for _, method := range methods {
+		result[method.Name] = method.Usages
+	}
+
+	return result
 }
 
 func TestFindImplementersUsesGenericPointerReceiver(t *testing.T) {
@@ -641,6 +716,59 @@ import "example.com/app/internal/auth"
 
 func Load(lookup auth.TokenLookup) (auth.Token, error) {
 	return lookup.Lookup("current")
+}
+`)
+
+	return root
+}
+
+func writeInstantiatedGenericEmbeddedInterfaceUsageProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "contracts", "lookup.go"), `package contracts
+
+type Lookup[T any] interface {
+	Lookup(string) (T, error)
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "auth.go"), `package auth
+
+import "example.com/app/internal/contracts"
+
+type Token string
+
+type AuditedTokenLookup interface {
+	contracts.Lookup[Token]
+	Audit(Token) error
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "store", "store.go"), `package store
+
+import "example.com/app/internal/auth"
+
+type TokenStore struct{}
+
+func (TokenStore) Lookup(key string) (auth.Token, error) {
+	return auth.Token(key), nil
+}
+
+func (TokenStore) Audit(auth.Token) error {
+	return nil
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "session", "session.go"), `package session
+
+import "example.com/app/internal/auth"
+
+func Verify(lookup auth.AuditedTokenLookup) error {
+	token, err := lookup.Lookup("current")
+	if err != nil {
+		return err
+	}
+
+	return lookup.Audit(token)
 }
 `)
 
