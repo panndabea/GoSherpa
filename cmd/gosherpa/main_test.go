@@ -3058,6 +3058,51 @@ func TestMainRunsContextSymbolCommandForGenericInterfaceAliasAsJSON(t *testing.T
 	}
 }
 
+func TestMainRunsContextSymbolCommandForGenericReceiverMethodAsJSON(t *testing.T) {
+	tmp := writeMainGenericReceiverMethodProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "./internal/cache.Cache.Get", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "./internal/cache.Cache.Get", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast analysis mode, got %v", data["analysisMode"])
+	}
+	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	}
+
+	identity := assertMainTestJSONObject(t, data, "identity")
+	if identity["package"] != "./internal/cache" {
+		t.Fatalf("expected identity package ./internal/cache, got %#v", identity)
+	}
+	if identity["symbol"] != "Cache.Get" {
+		t.Fatalf("expected identity symbol Cache.Get, got %#v", identity)
+	}
+	if identity["signature"] != "func (c Cache[T]) Get() T" {
+		t.Fatalf("expected generic receiver signature, got %#v", identity)
+	}
+
+	callers := assertMainTestJSONArrayHasLength(t, data, "callers", 2)
+	assertMainTestCallersContain(t, callers, "RunDirect", "cmd/app/main.go")
+	assertMainTestCallersContain(t, callers, "RunValue", "cmd/app/main.go")
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+
+	if strings.Contains(result.Stdout, "CONTEXT") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
 func TestMainRunsContextSymbolCommandAsJSONWithTests(t *testing.T) {
 	tmp := writeMainImpactReportProject(t)
 
@@ -7212,6 +7257,38 @@ func Load(lookup auth.TokenLookup) (auth.Token, error) {
 	return tmp
 }
 
+func writeMainGenericReceiverMethodProject(t *testing.T) string {
+	t.Helper()
+
+	tmp := t.TempDir()
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "cache", "cache.go"), `package cache
+
+type Cache[T any] struct {
+	value T
+}
+
+func (c Cache[T]) Get() T {
+	return c.value
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/cache"
+
+func RunDirect(values cache.Cache[string]) string {
+	return values.Get()
+}
+
+func RunValue(values cache.Cache[string]) string {
+	get := values.Get
+	return get()
+}
+`)
+
+	return tmp
+}
+
 func copyMainTestTree(t *testing.T, source string, destination string) {
 	t.Helper()
 
@@ -7481,6 +7558,26 @@ func assertMainTestStringArrayContains(t *testing.T, values []any, want string) 
 	}
 
 	t.Fatalf("expected JSON array to contain %q, got %#v", want, values)
+}
+
+func assertMainTestCallersContain(t *testing.T, callers []any, name string, file string) {
+	t.Helper()
+
+	for _, value := range callers {
+		caller, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("expected caller object, got %T", value)
+		}
+		position, ok := caller["position"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected caller position object, got %#v", caller)
+		}
+		if caller["name"] == name && position["file"] == file {
+			return
+		}
+	}
+
+	t.Fatalf("expected callers to contain %s in %s, got %#v", name, file, callers)
 }
 
 func assertMainTestJSONObject(t *testing.T, payload map[string]any, key string) map[string]any {
