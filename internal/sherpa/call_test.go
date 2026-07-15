@@ -1251,6 +1251,58 @@ func Run(client *service.Client) {
 	}
 }
 
+func TestFindCallsUseSemanticLoaderForGenericReceiverMethodCalls(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "cache", "cache.go"), `package cache
+
+type Cache[T any] struct {
+	value T
+}
+
+func (c Cache[T]) Get() T {
+	return c.value
+}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/cache"
+
+func Run(values cache.Cache[string]) string {
+	return values.Get()
+}
+`)
+
+	callees, err := FindCallees(tmp, "./cmd/app.Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callees.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked callee analysis mode, got %q", callees.AnalysisMode)
+	}
+	calleeNames := callTestCalleeNames(callees.Callees)
+	if !reflect.DeepEqual(calleeNames, []string{"Cache.Get"}) {
+		t.Fatalf("expected generic receiver method callee, got %v", calleeNames)
+	}
+
+	callers, err := FindCallers(tmp, "./internal/cache.Cache.Get")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callers.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("expected typechecked caller analysis mode, got %q", callers.AnalysisMode)
+	}
+	callerNames := callTestCallerNames(callers.Callers)
+	if !reflect.DeepEqual(callerNames, []string{"Run"}) {
+		t.Fatalf("expected generic receiver method caller, got %v", callerNames)
+	}
+	callerFiles := callTestCallerFiles(callers.Callers)
+	if !reflect.DeepEqual(callerFiles, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", callerFiles)
+	}
+}
+
 func TestFindCalleesResolvesLocalFunctionValues(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1342,6 +1394,46 @@ func Run(client *service.Client) {
 	names := callTestCallerNames(result.Callers)
 	if !reflect.DeepEqual(names, []string{"Run"}) {
 		t.Fatalf("expected method value caller, got %v", names)
+	}
+
+	files := callTestCallerFiles(result.Callers)
+	if !reflect.DeepEqual(files, []string{"cmd/app/main.go"}) {
+		t.Fatalf("expected caller file only, got %v", files)
+	}
+}
+
+func TestFindCallersResolvesGenericReceiverMethodValues(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "cache", "cache.go"), `package cache
+
+type Cache[T any] struct {
+	value T
+}
+
+func (c Cache[T]) Get() T {
+	return c.value
+}
+`)
+	writeFile(t, filepath.Join(tmp, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/cache"
+
+func Run(values cache.Cache[string]) string {
+	get := values.Get
+	return get()
+}
+`)
+
+	result, err := FindCallers(tmp, "./internal/cache.Cache.Get")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected generic method value caller, got %v", names)
 	}
 
 	files := callTestCallerFiles(result.Callers)
