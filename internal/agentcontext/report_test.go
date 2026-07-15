@@ -303,6 +303,67 @@ func TestServiceProcess(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSymbolBuildsContextForGenericReceiverMethod(t *testing.T) {
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "internal", "cache", "cache.go"), `package cache
+
+type Cache[T any] struct {
+	value T
+}
+
+func (c Cache[T]) Get() T {
+	return c.value
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "cmd", "app", "main.go"), `package main
+
+import "example.com/app/internal/cache"
+
+func RunDirect(values cache.Cache[string]) string {
+	return values.Get()
+}
+
+func RunValue(values cache.Cache[string]) string {
+	get := values.Get
+	return get()
+}
+`)
+
+	report, err := AnalyzeSymbol(root, "./internal/cache.Cache.Get", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.Identity.Package != "./internal/cache" {
+		t.Fatalf("identity package = %q, want ./internal/cache", report.Identity.Package)
+	}
+	if report.Identity.Symbol != "Cache.Get" {
+		t.Fatalf("identity symbol = %q, want Cache.Get", report.Identity.Symbol)
+	}
+	if report.Identity.Signature != "func (c Cache[T]) Get() T" {
+		t.Fatalf("identity signature = %q, want generic receiver signature", report.Identity.Signature)
+	}
+	if report.SourceContext.Position.File != "internal/cache/cache.go" {
+		t.Fatalf("source context file = %q, want internal/cache/cache.go", report.SourceContext.Position.File)
+	}
+	if report.CallAnalysisMode != sherpa.CallAnalysisModeTypechecked {
+		t.Fatalf("call analysis mode = %q, want %s", report.CallAnalysisMode, sherpa.CallAnalysisModeTypechecked)
+	}
+	if len(report.Callers) != 2 {
+		t.Fatalf("expected direct and method-value callers, got %#v", report.Callers)
+	}
+	if !agentContextCallersContain(report.Callers, "RunDirect", "cmd/app/main.go") {
+		t.Fatalf("expected RunDirect caller, got %#v", report.Callers)
+	}
+	if !agentContextCallersContain(report.Callers, "RunValue", "cmd/app/main.go") {
+		t.Fatalf("expected RunValue method-value caller, got %#v", report.Callers)
+	}
+}
+
 func TestAnalyzeSymbolUsesBuildTagsForSemanticIdentity(t *testing.T) {
 	root := t.TempDir()
 	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
@@ -1525,6 +1586,16 @@ func agentContextReportHasSymbol(symbols []sherpa.Symbol, name string) bool {
 func agentContextStringSliceContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+
+	return false
+}
+
+func agentContextCallersContain(callers []sherpa.Caller, name string, file string) bool {
+	for _, caller := range callers {
+		if caller.Name == name && caller.Position.File == file {
 			return true
 		}
 	}
