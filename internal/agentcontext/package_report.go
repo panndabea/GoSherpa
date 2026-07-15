@@ -376,7 +376,7 @@ func packageLimitations(includeTests bool, analysisMode string, interfaceAnalysi
 		packageContextAnalysisLimitation(analysisMode),
 		interfaceAnalysisLimitation(interfaceAnalysisMode),
 		testAnalysisLimitation(testAnalysisMode),
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 

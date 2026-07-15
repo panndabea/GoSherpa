@@ -394,7 +394,7 @@
       "Call analysis used typechecked package loading where available.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
-      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Call graph results are repository-local and may miss some imported-package receiver calls.",
       "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
       "Test callers are included only when --tests is used."

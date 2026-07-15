@@ -272,7 +272,7 @@ func diffAnalysisMode(report impactengine.ImpactReport, snapshotUsed bool) strin
 func diffLimitations(includeTests bool, report DiffReport) []string {
 	values := []string{
 		"Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
-		"Statement-level semantic impact, dynamic dispatch, reflection, and function values are not resolved.",
+		"Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 	switch report.AnalysisMode {

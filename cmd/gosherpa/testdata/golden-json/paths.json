@@ -11,7 +11,7 @@
     "limitations": [
       "Call analysis used typechecked package loading where available.",
       "Path analysis uses repository-local call graph edges.",
-      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Only bounded shortest paths requested by the command are returned."
     ],
     "from": "Entry",

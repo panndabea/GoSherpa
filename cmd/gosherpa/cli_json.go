@@ -958,7 +958,7 @@ func referenceLimitations(analysisMode string) []string {
 	return []string{
 		referenceAnalysisLimitation(analysisMode),
 		"References are repository-local and may not include generated or build-tagged code outside the loaded package set.",
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 	}
 }
 
@@ -977,7 +977,7 @@ func callLimitations(analysisMode string) []string {
 	return []string{
 		callAnalysisLimitation(analysisMode),
 		"Call graph results are repository-local.",
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Imported-package receiver calls may be incomplete.",
 	}
 }
@@ -997,7 +997,7 @@ func callPathLimitations(analysisMode string) []string {
 	return []string{
 		callAnalysisLimitation(analysisMode),
 		"Path analysis uses repository-local call graph edges.",
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Only bounded shortest paths requested by the command are returned.",
 	}
 }
@@ -1085,7 +1085,7 @@ func impactLimitations(analysisMode string) []string {
 			"Diff impact is based on git changed files and hunk-level changed symbol extraction.",
 			semanticLine,
 			"Statement-level semantic consequences are not fully inferred.",
-			"Dynamic dispatch, reflection, and function values are not resolved.",
+			"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		}
 	}
 
@@ -1093,7 +1093,7 @@ func impactLimitations(analysisMode string) []string {
 		"Impact analysis uses syntax plus local package dependency and interface signals.",
 		"Symbol impact includes references and conservative caller-package propagation.",
 		"Interface impact uses typechecked method sets when package loading succeeds and AST fallback otherwise.",
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 	}
 }
 

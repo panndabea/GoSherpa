@@ -15,7 +15,7 @@
       "Reference analysis used typechecked package loading where available.",
       "Call analysis used typechecked package loading where available.",
       "Call graph results are repository-local.",
-      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Imported-package receiver calls may be incomplete.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",

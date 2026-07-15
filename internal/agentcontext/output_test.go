@@ -61,7 +61,7 @@ func TestFormat(t *testing.T) {
 		InterfaceAnalysisMode: impactengine.InterfaceAnalysisModeTypechecked,
 		Confidence:            ConfidenceMedium,
 		Limitations: []string{
-			"Dynamic dispatch, reflection, and function values are not resolved.",
+			"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		},
 	}
 

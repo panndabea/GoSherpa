@@ -619,7 +619,7 @@
       "Package context used shared typechecked package loading for package files, symbols, and interface impact where available.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used AST/package fallback.",
-      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names."
     ]
   }

@@ -13,7 +13,7 @@
       "Diff impact is based on git changed files and hunk-level changed symbol extraction.",
       "Impact analysis uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Statement-level semantic consequences are not fully inferred.",
-      "Dynamic dispatch, reflection, and function values are not resolved.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Reference analysis used typechecked package loading where available.",
       "Call analysis used typechecked package loading where available.",
       "Interface analysis used typechecked method sets from repository-local packages.",

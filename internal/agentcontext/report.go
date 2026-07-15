@@ -235,7 +235,7 @@ func limitations(includeTestCallers bool, analysisMode string, referenceAnalysis
 		callAnalysisLimitation(callAnalysisMode),
 		interfaceAnalysisLimitation(interfaceAnalysisMode),
 		testAnalysisLimitation(testAnalysisMode),
-		"Dynamic dispatch, reflection, and function values are not resolved.",
+		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
