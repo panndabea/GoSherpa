@@ -23,6 +23,7 @@ type RepositoryIndex struct {
 	Packages       []Package
 	Files          []File
 	Symbols        []sherpa.Symbol
+	Relationships  RelationshipIndex
 	FilesByPackage map[string][]string
 	Warnings       []string
 }
@@ -68,6 +69,7 @@ func FromRepository(repo semantics.Repository) (RepositoryIndex, error) {
 	index := RepositoryIndex{
 		Root:           repo.Root,
 		ModulePath:     modulePath(repo.Root),
+		Relationships:  NewRelationshipIndex(),
 		FilesByPackage: make(map[string][]string),
 		Warnings:       append([]string{}, repo.Warnings...),
 	}
@@ -94,6 +96,7 @@ func FromRepository(repo semantics.Repository) (RepositoryIndex, error) {
 	sortPackages(index.Packages)
 	sortFiles(index.Files)
 	SortSymbols(index.Symbols)
+	index.Relationships = NormalizeRelationshipIndex(index.Root, index.Relationships)
 	index.Warnings = uniqueSortedStrings(index.Warnings)
 
 	return index, nil

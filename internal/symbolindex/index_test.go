@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
 
 func TestLoadHonorsBuildTagsForSymbols(t *testing.T) {
@@ -86,6 +88,14 @@ func Run() {
 	}
 	if len(index.Files) != 2 {
 		t.Fatalf("expected 2 files, got %#v", index.Files)
+	}
+	if index.Relationships.References == nil ||
+		index.Relationships.CallEdges == nil ||
+		index.Relationships.PossibleCallEdges == nil ||
+		index.Relationships.InterfaceImplementations == nil ||
+		index.Relationships.TestReferences == nil ||
+		index.Relationships.PackageRelationships == nil {
+		t.Fatalf("relationship slices should be non-nil, got %#v", index.Relationships)
 	}
 
 	pkg, ok := index.FindPackage("./cmd/app")
@@ -198,6 +208,184 @@ func Target() {}
 	}
 	if symbol.Package != "./internal/auth" {
 		t.Fatalf("symbol package = %q, want ./internal/auth", symbol.Package)
+	}
+}
+
+func TestNormalizeRelationshipIndexSortsDedupesAndRelativizes(t *testing.T) {
+	root := t.TempDir()
+	serviceFile := filepath.Join(root, "internal", "service", "service.go")
+	otherFile := filepath.Join(root, "internal", "service", "other.go")
+	target := SymbolIdentity{
+		Package: ".",
+		Name:    "Target",
+		Position: sherpa.Position{
+			File:   serviceFile,
+			Line:   3,
+			Column: 1,
+		},
+	}
+	source := SymbolIdentity{
+		Package: ".",
+		Name:    "Caller",
+		Position: sherpa.Position{
+			File:   serviceFile,
+			Line:   7,
+			Column: 1,
+		},
+	}
+
+	relationships := NormalizeRelationshipIndex(root, RelationshipIndex{
+		References: []ReferenceRecord{
+			{
+				Package:       ".",
+				File:          serviceFile,
+				Source:        source,
+				Target:        target,
+				ReferenceKind: sherpa.ReferenceKindCall,
+				Position: sherpa.Position{
+					File:   serviceFile,
+					Line:   8,
+					Column: 2,
+				},
+				Range: &sherpa.SourceRange{
+					Start: sherpa.Position{File: serviceFile, Line: 8, Column: 2},
+					End:   sherpa.Position{File: serviceFile, Line: 8, Column: 8},
+				},
+				Limitations: []string{"beta", "alpha", "alpha"},
+			},
+			{
+				Package:       ".",
+				File:          serviceFile,
+				Source:        source,
+				Target:        target,
+				ReferenceKind: sherpa.ReferenceKindCall,
+				Position: sherpa.Position{
+					File:   serviceFile,
+					Line:   8,
+					Column: 2,
+				},
+				Range: &sherpa.SourceRange{
+					Start: sherpa.Position{File: serviceFile, Line: 8, Column: 2},
+					End:   sherpa.Position{File: serviceFile, Line: 8, Column: 8},
+				},
+				Limitations: []string{"alpha", "beta"},
+			},
+			{
+				Package: ".",
+				File:    otherFile,
+				Target:  SymbolIdentity{Package: ".", Name: "Other"},
+				Position: sherpa.Position{
+					File: otherFile,
+					Line: 4,
+				},
+			},
+		},
+		CallEdges: []CallEdgeRecord{
+			{
+				Package:   ".",
+				File:      serviceFile,
+				Source:    source,
+				Target:    target,
+				CallScope: sherpa.CallScopeLocal,
+				Position:  sherpa.Position{File: serviceFile, Line: 8, Column: 2},
+			},
+		},
+		PossibleCallEdges: []PossibleCallEdgeRecord{
+			{
+				Package:   ".",
+				File:      serviceFile,
+				Source:    source,
+				Target:    target,
+				CallScope: sherpa.CallScopeDynamic,
+				Reason:    "interface dispatch",
+				Position:  sherpa.Position{File: serviceFile, Line: 9, Column: 2},
+			},
+		},
+		InterfaceImplementations: []InterfaceImplementationRecord{
+			{
+				Package:        ".",
+				File:           serviceFile,
+				Interface:      SymbolIdentity{Package: ".", Name: "Runner"},
+				Implementation: SymbolIdentity{Package: ".", Name: "Service"},
+				Position:       sherpa.Position{File: serviceFile, Line: 12, Column: 1},
+			},
+		},
+		TestReferences: []TestReferenceRecord{
+			{
+				Package:  ".",
+				File:     filepath.Join(root, "service_test.go"),
+				Test:     SymbolIdentity{Package: ".", Name: "TestTarget"},
+				Target:   target,
+				TestName: "TestTarget",
+				Reasons:  []string{"same-package", "direct-reference", "direct-reference"},
+				Position: sherpa.Position{File: filepath.Join(root, "service_test.go"), Line: 6, Column: 2},
+			},
+		},
+		PackageRelationships: []PackageRelationshipRecord{
+			{
+				Package:        "./internal/api",
+				RelatedPackage: "./internal/service",
+				Reasons:        []string{"import", "import"},
+			},
+		},
+	})
+
+	if len(relationships.References) != 2 {
+		t.Fatalf("expected duplicate references to be removed, got %#v", relationships.References)
+	}
+	if relationships.References[0].File != "internal/service/other.go" {
+		t.Fatalf("references should be sorted by normalized key, got %#v", relationships.References)
+	}
+	if relationships.References[1].File != "internal/service/service.go" ||
+		relationships.References[1].Position.File != "internal/service/service.go" ||
+		relationships.References[1].Range.Start.File != "internal/service/service.go" ||
+		relationships.References[1].Source.Position.File != "internal/service/service.go" {
+		t.Fatalf("reference paths should be root-relative, got %#v", relationships.References[1])
+	}
+	if got := relationships.References[1].Limitations; len(got) != 2 || got[0] != "alpha" || got[1] != "beta" {
+		t.Fatalf("limitations should be sorted and deduped, got %#v", got)
+	}
+	if relationships.References[1].Kind != RelationshipKindReference ||
+		relationships.References[1].Certainty != RelationshipCertaintyDirect {
+		t.Fatalf("reference defaults not applied: %#v", relationships.References[1])
+	}
+	if relationships.CallEdges[0].Kind != RelationshipKindCall ||
+		relationships.CallEdges[0].Certainty != RelationshipCertaintyDirect ||
+		relationships.CallEdges[0].CallScope != sherpa.CallScopeLocal {
+		t.Fatalf("call edge should keep scope separate from certainty: %#v", relationships.CallEdges[0])
+	}
+	if relationships.PossibleCallEdges[0].Kind != RelationshipKindPossibleCall ||
+		relationships.PossibleCallEdges[0].Certainty != RelationshipCertaintyPossible ||
+		relationships.PossibleCallEdges[0].CallScope != sherpa.CallScopeDynamic {
+		t.Fatalf("possible call edge defaults not applied: %#v", relationships.PossibleCallEdges[0])
+	}
+	if relationships.InterfaceImplementations[0].Kind != RelationshipKindInterfaceImplementation ||
+		relationships.InterfaceImplementations[0].Certainty != RelationshipCertaintyDirect {
+		t.Fatalf("interface defaults not applied: %#v", relationships.InterfaceImplementations[0])
+	}
+	if got := relationships.TestReferences[0].Reasons; len(got) != 2 || got[0] != "direct-reference" || got[1] != "same-package" {
+		t.Fatalf("test reasons should be sorted and deduped, got %#v", got)
+	}
+	if relationships.TestReferences[0].File != "service_test.go" ||
+		relationships.TestReferences[0].Position.File != "service_test.go" {
+		t.Fatalf("test reference paths should be root-relative, got %#v", relationships.TestReferences[0])
+	}
+	if relationships.PackageRelationships[0].Kind != RelationshipKindPackageRelationship ||
+		relationships.PackageRelationships[0].Certainty != RelationshipCertaintyDirect {
+		t.Fatalf("package relationship defaults not applied: %#v", relationships.PackageRelationships[0])
+	}
+}
+
+func TestNormalizeRelationshipIndexReturnsNonNilEmptySlices(t *testing.T) {
+	relationships := NormalizeRelationshipIndex("", RelationshipIndex{})
+
+	if relationships.References == nil ||
+		relationships.CallEdges == nil ||
+		relationships.PossibleCallEdges == nil ||
+		relationships.InterfaceImplementations == nil ||
+		relationships.TestReferences == nil ||
+		relationships.PackageRelationships == nil {
+		t.Fatalf("expected non-nil empty slices, got %#v", relationships)
 	}
 }
 
