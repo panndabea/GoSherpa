@@ -45,6 +45,11 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
+Generated Go files are included when they are repository-local and visible to
+the selected module or workspace. `gosherpa doctor` counts files with the
+standard `// Code generated ... DO NOT EDIT.` header; relationship and context
+commands treat those files like other compiler-visible Go files.
+
 Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
 reused by `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and by
 diff-oriented current changed-symbol inventory in `context diff`,
@@ -236,6 +241,16 @@ Found 4 references
 ./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6 --json
 ```
 
+`tests <target>` supports `--scope direct|related|all` for symbol, package, or
+file targets. It intentionally does not accept `--base`, `--tags`, or
+`--use-snapshot`. `tests affected --base <ref>` is diff-oriented, supports
+`--tags` and `--use-snapshot`, and intentionally does not accept `--scope`.
+Both commands expose grouped `testPlan` recommendations in JSON and grouped
+human output with `direct`, `related`, `contracts`, `callerPackages`, and
+`fallback` sections. Diff fallbacks are package-level when Go packages are
+known and whole-repository (`go test ./...`) when a change cannot be narrowed
+to repository-local Go packages.
+
 ## JSON Output
 
 JSON output for all commands uses a stable envelope:
@@ -254,10 +269,18 @@ JSON output for all commands uses a stable envelope:
 
 When `--json` is used with an ambiguous target, GoSherpa keeps stdout empty and emits a structured diagnostic to stderr with `error.code: "ambiguous_target"` and candidate package/file/line details.
 
-Context commands support size controls for agent workflows: `--max-files`,
-`--max-references`, `--max-symbols`, `--max-tests`, `--source-radius`, and
-`--max-bytes`. The byte budget omits large context fields deterministically and
-keeps JSON valid; any omissions are reported in `data.truncated`.
+Context commands support command-specific size controls for agent workflows:
+
+| Command | Supported limits |
+| --- | --- |
+| `context symbol` | `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context file` | `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context package` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context diff` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
+
+Unsupported context-limit combinations fail as usage errors. The byte budget
+omits large context fields deterministically and keeps JSON valid; any omissions
+are reported in `data.truncated`.
 
 Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `context diff` can report `git-diff+typechecked+ast` plus

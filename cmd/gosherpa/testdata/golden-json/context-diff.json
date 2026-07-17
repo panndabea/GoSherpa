@@ -191,6 +191,8 @@
       "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
       "Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+      "Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+      "Package load or snapshot warnings lower confidence; inspect envelope warnings before relying on semantic impact or tests.",
       "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
       "Reference analysis mode: typechecked.",
       "Call analysis mode: typechecked.",

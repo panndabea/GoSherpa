@@ -71,6 +71,13 @@ func TestAnalyzeSymbolBuildsAgentContext(t *testing.T) {
 	if !strings.Contains(report.Limitations[2], "typechecked") {
 		t.Fatalf("expected typechecked call limitation, got %#v", report.Limitations)
 	}
+	assertAgentContextLimitationsContainAll(t, report.Limitations,
+		"Dynamic dispatch",
+		"reflection",
+		"Generated Go files",
+		"Package load warnings lower confidence",
+		"Test callers are included only when --tests",
+	)
 	if len(report.Callers) != 1 || report.Callers[0].Name != "Entry" {
 		t.Fatalf("expected Entry caller, got %#v", report.Callers)
 	}
@@ -300,6 +307,37 @@ func TestServiceProcess(t *testing.T) {
 	}
 	if importPathReport.AnalysisMode != AnalysisModeTypecheckedAST {
 		t.Fatalf("import path analysis mode = %q, want %s with warnings %#v", importPathReport.AnalysisMode, AnalysisModeTypecheckedAST, importPathReport.Warnings)
+	}
+}
+
+func TestAnalyzeSymbolSkipsNestedModuleTargets(t *testing.T) {
+	root := writeAgentContextNestedModuleProject(t)
+
+	report, err := AnalyzeSymbol(root, "Target", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeSymbol returned error: %v", err)
+	}
+
+	if report.AnalysisMode != AnalysisModeTypecheckedAST {
+		t.Fatalf("analysis mode = %q, want %s with warnings %#v", report.AnalysisMode, AnalysisModeTypecheckedAST, report.Warnings)
+	}
+	if report.Identity.Package != "." {
+		t.Fatalf("identity package = %q, want .", report.Identity.Package)
+	}
+	if report.Identity.Definition.File != "service.go" {
+		t.Fatalf("expected root service.go definition, got %#v", report.Identity.Definition)
+	}
+	if report.SourceContext.Position.File != "service.go" {
+		t.Fatalf("expected root source context, got %#v", report.SourceContext.Position)
+	}
+	if agentContextRelatedTestsContain(report.RelatedTests, "TestNestedTarget") {
+		t.Fatalf("did not expect nested-module test, got %#v", report.RelatedTests)
+	}
+	if !agentContextRelatedTestsContain(report.RelatedTests, "TestTarget") {
+		t.Fatalf("expected root TestTarget, got %#v", report.RelatedTests)
+	}
+	if report.Confidence != ConfidenceMedium {
+		t.Fatalf("confidence = %q, want %s with warnings %#v", report.Confidence, ConfidenceMedium, report.Warnings)
 	}
 }
 
@@ -742,6 +780,12 @@ func TestAnalyzeFileBuildsAgentContext(t *testing.T) {
 	if !agentContextLimitationsContain(report.Limitations, "Test analysis used AST") {
 		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
+	assertAgentContextLimitationsContainAll(t, report.Limitations,
+		"Dynamic dispatch",
+		"reflection",
+		"Generated Go files",
+		"Package load warnings lower confidence",
+	)
 }
 
 func TestAnalyzeFileSharesSemanticContextForImpactAndSymbols(t *testing.T) {
@@ -772,6 +816,57 @@ func TestAnalyzeFileSharesSemanticContextForImpactAndSymbols(t *testing.T) {
 	}
 	if repositoryLoads != 1 {
 		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+}
+
+func TestAnalyzeFileAndPackageLowerConfidenceForPackageLoadWarnings(t *testing.T) {
+	root := writeAgentContextProjectWithPackageLoadWarning(t)
+
+	fileReport, err := AnalyzeFile(root, "service.go", FileAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeFile returned error: %v", err)
+	}
+	if fileReport.Confidence != ConfidenceLow {
+		t.Fatalf("file confidence = %q, want %s with warnings %#v", fileReport.Confidence, ConfidenceLow, fileReport.Warnings)
+	}
+	if !agentContextWarningsContain(fileReport.Warnings, "Missing") {
+		t.Fatalf("expected file context package load warning, got %#v", fileReport.Warnings)
+	}
+	if !agentContextLimitationsContain(fileReport.Limitations, "Package load warnings lower confidence") {
+		t.Fatalf("expected file context package load limitation, got %#v", fileReport.Limitations)
+	}
+
+	packageReport, err := AnalyzePackage(root, ".", PackageAnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzePackage returned error: %v", err)
+	}
+	if packageReport.Confidence != ConfidenceLow {
+		t.Fatalf("package confidence = %q, want %s with warnings %#v", packageReport.Confidence, ConfidenceLow, packageReport.Warnings)
+	}
+	if !agentContextWarningsContain(packageReport.Warnings, "Missing") {
+		t.Fatalf("expected package context package load warning, got %#v", packageReport.Warnings)
+	}
+	if !agentContextLimitationsContain(packageReport.Limitations, "Package load warnings lower confidence") {
+		t.Fatalf("expected package context package load limitation, got %#v", packageReport.Limitations)
+	}
+}
+
+func TestNormalizeContextReportsDeduplicateWarnings(t *testing.T) {
+	warnings := []string{"package load warning: ./service: Missing", "package load warning: ./service: Missing"}
+
+	fileReport := normalizeFileReport(FileReport{Warnings: warnings})
+	if len(fileReport.Warnings) != 1 {
+		t.Fatalf("expected deduplicated file warnings, got %#v", fileReport.Warnings)
+	}
+
+	packageReport := normalizePackageReport(PackageReport{Warnings: warnings})
+	if len(packageReport.Warnings) != 1 {
+		t.Fatalf("expected deduplicated package warnings, got %#v", packageReport.Warnings)
+	}
+
+	diffReport := normalizeDiffReport(DiffReport{Warnings: warnings})
+	if len(diffReport.Warnings) != 1 {
+		t.Fatalf("expected deduplicated diff warnings, got %#v", diffReport.Warnings)
 	}
 }
 
@@ -915,6 +1010,12 @@ func TestAnalyzePackageBuildsAgentContext(t *testing.T) {
 	if !agentContextLimitationsContain(report.Limitations, "Test analysis used AST") {
 		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
+	assertAgentContextLimitationsContainAll(t, report.Limitations,
+		"Dynamic dispatch",
+		"reflection",
+		"Generated Go files",
+		"Package load warnings lower confidence",
+	)
 }
 
 func TestAnalyzePackageSharesSemanticContextForImpactAndSymbols(t *testing.T) {
@@ -1152,6 +1253,9 @@ func NewSession() Session {
 	if len(report.AffectedTests) != 2 {
 		t.Fatalf("expected 2 affected tests, got %#v", report.AffectedTests)
 	}
+	if len(report.TestPlan.CallerPackages) != 1 || report.TestPlan.CallerPackages[0].Package != "./internal/api" {
+		t.Fatalf("expected caller-package test plan item for ./internal/api, got %#v", report.TestPlan.CallerPackages)
+	}
 	if len(report.TestCommands) != 2 {
 		t.Fatalf("expected 2 test commands, got %#v", report.TestCommands)
 	}
@@ -1167,6 +1271,13 @@ func NewSession() Session {
 	if !agentContextLimitationsContain(report.Limitations, "Test analysis used typechecked") {
 		t.Fatalf("expected test analysis limitation, got %#v", report.Limitations)
 	}
+	assertAgentContextLimitationsContainAll(t, report.Limitations,
+		"hunk-based",
+		"dynamic dispatch",
+		"reflection",
+		"Generated Go files",
+		"Package load or snapshot warnings lower confidence",
+	)
 }
 
 func TestAnalyzeDiffUsesGoWorkWhenRootAlsoHasGoMod(t *testing.T) {
@@ -1394,6 +1505,10 @@ func TestAnalyzeDiffUsesValidSnapshotForCurrentChangedSymbols(t *testing.T) {
 	if !agentContextLimitationsContain(report.Limitations, "reused a valid snapshot") {
 		t.Fatalf("expected snapshot limitation, got %#v", report.Limitations)
 	}
+	assertAgentContextLimitationsContainAll(t, report.Limitations,
+		"Generated Go files",
+		"Package load or snapshot warnings lower confidence",
+	)
 }
 
 func TestAnalyzeDiffFallsBackWhenSnapshotIsStale(t *testing.T) {
@@ -1573,9 +1688,100 @@ func TestTarget(t *testing.T) {
 	return root
 }
 
+func writeAgentContextProjectWithPackageLoadWarning(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package app
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+
+func Broken() {
+	Missing()
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service_test.go"), `package app
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	return root
+}
+
+func writeAgentContextNestedModuleProject(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writeAgentContextTestFile(t, filepath.Join(root, "go.mod"), "module example.com/root\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "service.go"), `package root
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "service_test.go"), `package root
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "nested", "go.mod"), "module example.com/nested\n\ngo 1.24.4\n")
+	writeAgentContextTestFile(t, filepath.Join(root, "nested", "service.go"), `package nested
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+`)
+	writeAgentContextTestFile(t, filepath.Join(root, "nested", "service_test.go"), `package nested
+
+import "testing"
+
+func TestNestedTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	return root
+}
+
 func agentContextReportHasSymbol(symbols []sherpa.Symbol, name string) bool {
 	for _, symbol := range symbols {
 		if symbol.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func agentContextRelatedTestsContain(tests []sherpa.RelatedTest, name string) bool {
+	for _, test := range tests {
+		if test.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func agentContextWarningsContain(warnings []string, want string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(warning, want) {
 			return true
 		}
 	}
@@ -1611,6 +1817,16 @@ func agentContextLimitationsContain(values []string, want string) bool {
 	}
 
 	return false
+}
+
+func assertAgentContextLimitationsContainAll(t *testing.T, values []string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !agentContextLimitationsContain(values, want) {
+			t.Fatalf("expected limitations to contain %q, got %#v", want, values)
+		}
+	}
 }
 
 func assertAgentContextReadingStepRange(t *testing.T, step explainengine.ReadingStep, file string, startLine int, startColumn int, endLine int, endColumn int) {

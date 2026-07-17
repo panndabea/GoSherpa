@@ -2253,6 +2253,45 @@ func NewSession() Session {
 	}
 }
 
+func TestMainRunsTestsAffectedCommandForNonGoOnlyDiffAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "README.md"), "# test\n")
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	writeMainTestFile(t, filepath.Join(tmp, "README.md"), "# changed\n")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/app")
+
+	assertMainTestJSONArrayHasLength(t, data, "affectedTests", 0)
+	commands := assertMainTestJSONArrayHasLength(t, data, "commands", 1)
+	if commands[0] != "go test ./..." {
+		t.Fatalf("expected whole-repository fallback command, got %#v", commands)
+	}
+	testPlan := assertMainTestJSONObject(t, data, "testPlan")
+	fallback := assertMainTestJSONArrayHasLength(t, testPlan, "fallback", 1)
+	item := fallback[0].(map[string]any)
+	if item["command"] != "go test ./..." || item["package"] != "./..." {
+		t.Fatalf("expected whole-repository fallback item, got %#v", item)
+	}
+	if reason, ok := item["reason"].(string); !ok || !strings.Contains(reason, "full test suite") {
+		t.Fatalf("expected whole-repository fallback reason, got %#v", item["reason"])
+	}
+}
+
 func TestMainRunsTestsAffectedCommandFromWorkspaceRootWithGoModAsJSON(t *testing.T) {
 	tmp := writeMainWorkspaceDiffProject(t)
 
@@ -2492,6 +2531,59 @@ func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
 	}
 }
 
+func TestMainRejectsTagsFlagForPlainTestsCommand(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "tests", "Target", "--tags", "enterprise"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, and snapshot") {
+		t.Fatalf("expected tags flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsDiffOnlyFlagsForPlainTestsCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "base",
+			args: []string{"gosherpa", "tests", "Target", "--base", "HEAD"},
+			want: "error: --base is only supported by context diff, impact diff, tests affected, and pr",
+		},
+		{
+			name: "use snapshot",
+			args: []string{"gosherpa", "tests", "Target", "--use-snapshot"},
+			want: "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := runMainTest(t, test.args)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+
+			if !strings.Contains(result.Stderr, test.want) {
+				t.Fatalf("expected flag error %q, got:\n%s", test.want, result.Stderr)
+			}
+
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
+	}
+}
+
 func TestMainRejectsAllFlagForOtherCommands(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "symbols", "--all"})
 
@@ -2510,6 +2602,22 @@ func TestMainRejectsAllFlagForOtherCommands(t *testing.T) {
 
 func TestMainRejectsScopeFlagForOtherCommands(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "symbols", "--scope", "direct"})
+
+	if result.ExitCode != exitUsage {
+		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "error: --scope is only supported by tests <symbol-or-package-or-file>") {
+		t.Fatalf("expected scope flag error, got:\n%s", result.Stderr)
+	}
+
+	if result.Stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	}
+}
+
+func TestMainRejectsScopeFlagForTestsAffectedCommand(t *testing.T) {
+	result := runMainTest(t, []string{"gosherpa", "tests", "affected", "--base", "HEAD", "--scope", "direct"})
 
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
@@ -3332,16 +3440,63 @@ func TestMainRunsContextSymbolCommandWithMaxBytes(t *testing.T) {
 func TestMainRejectsUnsupportedContextLimitOption(t *testing.T) {
 	tmp := writeMainImpactReportProject(t)
 
-	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--max-references", "1"})
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "symbol max files",
+			args: []string{"context", "symbol", "Target", "--max-files", "1"},
+			want: "unsupported context option for context symbol: --max-files",
+		},
+		{
+			name: "symbol max symbols",
+			args: []string{"context", "symbol", "Target", "--max-symbols", "1"},
+			want: "unsupported context option for context symbol: --max-symbols",
+		},
+		{
+			name: "file max files",
+			args: []string{"context", "file", "service.go", "--max-files", "1"},
+			want: "unsupported context option for context file: --max-files",
+		},
+		{
+			name: "file max references",
+			args: []string{"context", "file", "service.go", "--max-references", "1"},
+			want: "unsupported context option for context file: --max-references",
+		},
+		{
+			name: "package max references",
+			args: []string{"context", "package", ".", "--max-references", "1"},
+			want: "unsupported context option for context package: --max-references",
+		},
+		{
+			name: "diff max references",
+			args: []string{"context", "diff", "--base", "HEAD", "--max-references", "1"},
+			want: "unsupported context option for context diff: --max-references",
+		},
+		{
+			name: "diff source radius",
+			args: []string{"context", "diff", "--base", "HEAD", "--source-radius", "1"},
+			want: "unsupported context option for context diff: --source-radius",
+		},
+	}
 
-	if result.ExitCode != exitUsage {
-		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
-	}
-	if !strings.Contains(result.Stderr, "unsupported context option for context diff: --max-references") {
-		t.Fatalf("expected unsupported context option error, got %q", result.Stderr)
-	}
-	if result.Stdout != "" {
-		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"gosherpa", "--root", tmp}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+			if !strings.Contains(result.Stderr, test.want) {
+				t.Fatalf("expected unsupported context option error %q, got %q", test.want, result.Stderr)
+			}
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
 	}
 }
 
@@ -4152,6 +4307,37 @@ func TestMainRunsContextDiffCommandFromSnapshotAsJSON(t *testing.T) {
 	}
 	if !mainTestJSONArrayContainsSubstring(data["limitations"].([]any), "reused a valid snapshot") {
 		t.Fatalf("expected snapshot limitation, got %#v", data["limitations"])
+	}
+}
+
+func TestMainContextDiffHumanOutputShowsWarningsWithoutStderrNoise(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n")
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+	writeMainSnapshot(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n\nfunc Added() {}\n")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--use-snapshot"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected warning-free stderr, got %q", result.Stderr)
+	}
+	if !strings.Contains(result.Stdout, "CONTEXT DIFF") {
+		t.Fatalf("expected human context output, got:\n%s", result.Stdout)
+	}
+	if !strings.Contains(result.Stdout, "WARNINGS\n") || !strings.Contains(result.Stdout, "snapshot not used: Snapshot is stale") {
+		t.Fatalf("expected concise warning section in stdout, got:\n%s", result.Stdout)
+	}
+	if strings.Contains(result.Stdout, "\"warnings\"") {
+		t.Fatalf("expected human output, got JSON-looking warnings in:\n%s", result.Stdout)
 	}
 }
 
@@ -6456,6 +6642,108 @@ func Run() {
 	}
 }
 
+func TestMainIncludesGeneratedGoFilesConsistently(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeMainTestFile(t, filepath.Join(tmp, "generated.go"), `// Code generated by gosherpa test. DO NOT EDIT.
+
+package app
+
+func GeneratedTarget() {}
+
+type GeneratedWorker struct{}
+
+func (GeneratedWorker) Work() {}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+type Worker interface {
+	Work()
+}
+
+func Run() {
+	GeneratedTarget()
+	var worker Worker = GeneratedWorker{}
+	worker.Work()
+}
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "service_test.go"), `package app
+
+import "testing"
+
+func TestGeneratedTarget(t *testing.T) {
+	GeneratedTarget()
+}
+`)
+
+	doctor := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+	if doctor.ExitCode != exitSuccess {
+		t.Fatalf("expected doctor exit %d, got %d\nstderr:\n%s", exitSuccess, doctor.ExitCode, doctor.Stderr)
+	}
+	doctorData := assertMainTestJSONObject(t, decodeMainTestJSON(t, doctor.Stdout), "data")
+	repository := assertMainTestJSONObject(t, doctorData, "repository")
+	if repository["generatedFiles"] != float64(1) {
+		t.Fatalf("expected one generated file, got %#v", repository["generatedFiles"])
+	}
+
+	symbols := runMainTest(t, []string{"gosherpa", "--root", tmp, "symbols", "--json"})
+	if symbols.ExitCode != exitSuccess {
+		t.Fatalf("expected symbols exit %d, got %d\nstderr:\n%s", exitSuccess, symbols.ExitCode, symbols.Stderr)
+	}
+	symbolsData := assertMainTestJSONObject(t, decodeMainTestJSON(t, symbols.Stdout), "data")
+	assertMainTestObjectArrayContainsName(t, assertMainTestJSONArray(t, symbolsData, "symbols"), "GeneratedTarget")
+
+	refs := runMainTest(t, []string{"gosherpa", "--root", tmp, "refs", "GeneratedTarget", "--json"})
+	if refs.ExitCode != exitSuccess {
+		t.Fatalf("expected refs exit %d, got %d\nstderr:\n%s", exitSuccess, refs.ExitCode, refs.Stderr)
+	}
+	refsData := assertMainTestJSONObject(t, decodeMainTestJSON(t, refs.Stdout), "data")
+	refPositions := assertMainTestJSONArrayHasLength(t, refsData, "references", 2)
+	assertMainTestPositionArrayContainsFile(t, refPositions, "generated.go")
+	assertMainTestPositionArrayContainsFile(t, refPositions, "service.go")
+
+	callers := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "GeneratedTarget", "--json"})
+	if callers.ExitCode != exitSuccess {
+		t.Fatalf("expected callers exit %d, got %d\nstderr:\n%s", exitSuccess, callers.ExitCode, callers.Stderr)
+	}
+	callersData := assertMainTestJSONObject(t, decodeMainTestJSON(t, callers.Stdout), "data")
+	assertMainTestCallersContain(t, assertMainTestJSONArray(t, callersData, "callers"), "Run", "service.go")
+
+	tests := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "GeneratedTarget", "--json"})
+	if tests.ExitCode != exitSuccess {
+		t.Fatalf("expected tests exit %d, got %d\nstderr:\n%s", exitSuccess, tests.ExitCode, tests.Stderr)
+	}
+	testsData := assertMainTestJSONObject(t, decodeMainTestJSON(t, tests.Stdout), "data")
+	assertMainTestObjectArrayContainsName(t, assertMainTestJSONArray(t, testsData, "tests"), "TestGeneratedTarget")
+
+	context := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "GeneratedTarget", "--json"})
+	if context.ExitCode != exitSuccess {
+		t.Fatalf("expected context exit %d, got %d\nstderr:\n%s", exitSuccess, context.ExitCode, context.Stderr)
+	}
+	contextData := assertMainTestJSONObject(t, decodeMainTestJSON(t, context.Stdout), "data")
+	identity := assertMainTestJSONObject(t, contextData, "identity")
+	definition := assertMainTestJSONObject(t, identity, "definition")
+	if definition["file"] != "generated.go" {
+		t.Fatalf("expected generated.go context definition, got %#v", definition)
+	}
+
+	impact := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "symbol", "GeneratedTarget", "--json"})
+	if impact.ExitCode != exitSuccess {
+		t.Fatalf("expected impact exit %d, got %d\nstderr:\n%s", exitSuccess, impact.ExitCode, impact.Stderr)
+	}
+	impactData := assertMainTestJSONObject(t, decodeMainTestJSON(t, impact.Stdout), "data")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, impactData, "affectedSymbols"), "GeneratedTarget")
+
+	interfaceImpact := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "symbol", "GeneratedWorker.Work", "--json"})
+	if interfaceImpact.ExitCode != exitSuccess {
+		t.Fatalf("expected interface impact exit %d, got %d\nstderr:\n%s", exitSuccess, interfaceImpact.ExitCode, interfaceImpact.Stderr)
+	}
+	interfaceImpactData := assertMainTestJSONObject(t, decodeMainTestJSON(t, interfaceImpact.Stdout), "data")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, interfaceImpactData, "affectedInterfaces"), "Worker")
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, interfaceImpactData, "affectedImplementations"), "GeneratedWorker")
+}
+
 func TestMainRunsDepsCommandAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -7558,6 +7846,42 @@ func assertMainTestStringArrayContains(t *testing.T, values []any, want string) 
 	}
 
 	t.Fatalf("expected JSON array to contain %q, got %#v", want, values)
+}
+
+func assertMainTestObjectArrayContainsName(t *testing.T, values []any, want string) {
+	t.Helper()
+
+	for _, value := range values {
+		object, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("expected object array item, got %T", value)
+		}
+		if object["name"] == want {
+			return
+		}
+	}
+
+	t.Fatalf("expected JSON object array to contain name %q, got %#v", want, values)
+}
+
+func assertMainTestPositionArrayContainsFile(t *testing.T, values []any, file string) {
+	t.Helper()
+
+	for _, value := range values {
+		object, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("expected object array item, got %T", value)
+		}
+		position, ok := object["position"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected position object, got %#v", object)
+		}
+		if position["file"] == file {
+			return
+		}
+	}
+
+	t.Fatalf("expected JSON object array to contain position file %q, got %#v", file, values)
 }
 
 func assertMainTestCallersContain(t *testing.T, callers []any, name string, file string) {

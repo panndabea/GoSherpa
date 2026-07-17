@@ -57,6 +57,14 @@ syntax/local repository analysis. Diff context uses
 `git-diff+typechecked+ast` when changed-symbol, reference, call, or interface
 signals include typechecked package loading, and `git-diff+ast` otherwise.
 
+Current context confidence values are `medium` and `low`. `low` is used when
+warnings are present, AST fallback modes materially reduce trust, source
+context is missing, a package target cannot be resolved, or snapshot reuse falls
+back to live analysis. Envelope `warnings` hold the concrete diagnostics;
+`data.limitations` explains stable blind spots such as AST fallback, package
+load warnings, generated-file policy, hunk-based diff extraction, dynamic
+dispatch, reflection, and skipped test-file callers unless `--tests` is used.
+
 Location-bearing context entries reuse the shared position and range shapes from
 `JSON_SCHEMA_V1.md`. References, callers, callees, affected tests, and related
 tests keep `position` and may include `range` when Go parser positions identify
@@ -93,23 +101,30 @@ Example:
 
 ## Size Controls
 
-Supported context flags:
+Supported context flags are command-specific:
 
-- `--max-files <n>` limits file lists where a context kind has files.
-- `--max-references <n>` limits symbol references, callers, and callees.
-- `--max-symbols <n>` limits symbol lists and matching source excerpts.
-- `--max-tests <n>` limits related or affected test lists.
-- `--max-bytes <n>` applies a best-effort byte budget to the context `data`
-  payload, not the shared JSON envelope. Large fields are omitted in a
-  deterministic order while keeping JSON valid and leaving envelope warnings
-  outside `data`.
-- `--source-radius <n>` limits source excerpt radius for symbol, file, and
-  package context. `0` means target line only.
+| Context command | Supported limits |
+| --- | --- |
+| `context symbol` | `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context file` | `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context package` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context diff` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
 
-`context diff` supports `--use-snapshot`, `--max-files`, `--max-symbols`,
-`--max-tests`, and `--max-bytes`. A valid snapshot can provide current
-changed-symbol inventory; missing, stale, or invalid snapshots fall back to live
-diff context analysis with a warning.
+Unsupported combinations fail as usage errors. `--max-files <n>` limits file
+lists, `--max-references <n>` limits symbol references, callers, and callees,
+`--max-symbols <n>` limits symbol lists and matching source excerpts, and
+`--max-tests <n>` limits related or affected test lists. `--source-radius <n>`
+limits source excerpt radius for symbol, file, and package context; `0` means
+target line only.
+
+`--max-bytes <n>` applies a best-effort byte budget to the context `data`
+payload, not the shared JSON envelope. Large fields are omitted in a
+deterministic order while keeping JSON valid and leaving envelope warnings
+outside `data`.
+
+`context diff` also supports `--use-snapshot`. A valid snapshot can provide
+current changed-symbol inventory; missing, stale, or invalid snapshots fall back
+to live diff context analysis with a warning.
 
 Purpose and risk are computed before output truncation. The `truncated` object
 explains what was omitted from the bounded context `data` bundle.
@@ -117,6 +132,23 @@ If the requested byte budget is smaller than the minimum `data` report shell,
 the `truncated.byteBudgetOverage` field reports the remaining byte overage.
 
 ## Context Kinds
+
+The context variants intentionally expose different relationship scopes:
+
+| Context kind | Identity fields | Relationship fields |
+| --- | --- | --- |
+| `context symbol` | `target`, `identity`, `symbol`, `sourceContext` | `references`, `callers`, `callees`, `affectedPackages`, interface signals, related tests |
+| `context file` | `target`, `file`, `package`, `packageName`, `symbols`, `sourceContexts` | `affectedPackages`, interface signals, affected tests |
+| `context package` | `target`, `package`, `packageName`, `files`, `symbols`, `sourceContexts` | `affectedPackages`, interface signals, affected tests |
+| `context diff` | `target`, `base`, `changedFiles`, `changedPackages`, `affectedSymbols`, `changedSymbolDetails` | `affectedPackages`, changed-symbol subanalysis modes, interface signals, affected tests |
+
+`references`, `callers`, and `callees` are symbol-context fields. File,
+package, and diff context omit those arrays until a future contract defines
+their scope, limits, and ordering for broader bundles. File and package context
+also omit `referenceAnalysisMode` and `callAnalysisMode` because they do not
+run reference or call subanalysis directly. Diff context may include those mode
+fields when changed-symbol impact runs reference or call subanalysis, but still
+does not include full reference, caller, or callee arrays.
 
 `context symbol` adds symbol identity, definition, source context, references,
 `referenceAnalysisMode`, callers, callees, `callAnalysisMode`, affected

@@ -193,6 +193,86 @@ func TestMainImpactCommandSharesSemanticSession(t *testing.T) {
 	}
 }
 
+func TestMainImpactDiffCommandSharesSemanticSession(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	original := mainTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		mainTestLoadSemanticContextRepository = original
+	}()
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "diff", "--base", "HEAD", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact diff", "HEAD", "example.com/app")
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %v, want %s", data["analysisMode"], agentcontext.AnalysisModeDiffTypechecked)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
+func TestMainTestsAffectedCommandSharesSemanticSession(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	original := mainTestLoadSemanticContextRepository
+	repositoryLoads := 0
+	testRepositoryLoads := 0
+	mainTestLoadSemanticContextRepository = func(root string, options semantics.LoadOptions) (semantics.Repository, error) {
+		if options.IncludeTests {
+			testRepositoryLoads++
+		} else {
+			repositoryLoads++
+		}
+
+		return original(root, options)
+	}
+	defer func() {
+		mainTestLoadSemanticContextRepository = original
+	}()
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--base", "HEAD", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "tests affected", "HEAD", "example.com/app")
+	if data["analysisMode"] != agentcontext.AnalysisModeDiffTypechecked {
+		t.Fatalf("analysis mode = %v, want %s", data["analysisMode"], agentcontext.AnalysisModeDiffTypechecked)
+	}
+	if repositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic repository load, got %d", repositoryLoads)
+	}
+	if testRepositoryLoads != 1 {
+		t.Fatalf("expected one shared semantic test repository load, got %d", testRepositoryLoads)
+	}
+}
+
 func TestMainInterfaceCommandSharesSemanticSession(t *testing.T) {
 	tmp := writeMainInterfaceProject(t)
 

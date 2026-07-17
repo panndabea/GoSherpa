@@ -273,6 +273,8 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 	values := []string{
 		"Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
 		"Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+		"Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+		"Package load or snapshot warnings lower confidence; inspect envelope warnings before relying on semantic impact or tests.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 	switch report.AnalysisMode {
@@ -356,7 +358,7 @@ func normalizeDiffReport(report DiffReport) DiffReport {
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
-	report.Warnings = nonNilSlice(report.Warnings)
+	report.Warnings = nonNilSlice(uniqueStrings(report.Warnings))
 
 	return report
 }

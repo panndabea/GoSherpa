@@ -547,7 +547,13 @@ func runImpactCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 		}
 
 		analyzerOptions, snapshotUsed, snapshotWarnings := loadDiffAnalyzerOptions(root, invocation.BuildTags, invocation.UseSnapshot)
-		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", analyzerOptions)
+		semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+			BuildTags: invocation.BuildTags,
+		})
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
+		}
+		report, err := impactengine.AnalyzeDiffWithContext(semanticContext, invocation.BaseRef, "", analyzerOptions)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "impact diff", invocation.BaseRef, stderr, err)
 		}
@@ -655,7 +661,13 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 		}
 
 		analyzerOptions, snapshotUsed, snapshotWarnings := loadDiffAnalyzerOptions(root, invocation.BuildTags, invocation.UseSnapshot)
-		report, err := impactengine.AnalyzeDiffWithOptions(root, invocation.BaseRef, "", analyzerOptions)
+		semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
+			BuildTags: invocation.BuildTags,
+		})
+		if err != nil {
+			return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
+		}
+		report, err := impactengine.AnalyzeDiffWithContext(semanticContext, invocation.BaseRef, "", analyzerOptions)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "tests affected", invocation.BaseRef, stderr, err)
 		}

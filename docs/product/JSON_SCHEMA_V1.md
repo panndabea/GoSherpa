@@ -215,6 +215,17 @@ Each test plan item has `command` and `reason`, with optional `package`, `test`,
 made the plan item relevant. `targets` connects a recommended test command to
 the symbol target or changed symbols when known.
 
+Test plan group semantics:
+
+- `direct`: tests with direct references to the inspected or changed symbol.
+- `related`: tests in the target package or close package scope.
+- `contracts`: tests covering affected interfaces or implementations.
+- `callerPackages`: tests in packages that call affected symbols.
+- `fallback`: broader package commands when direct evidence is empty,
+  incomplete, or intentionally conservative. Package-level fallback uses
+  `go test <package>`; whole-repository fallback uses `go test ./...` when a
+  diff cannot be narrowed to repository-local Go packages.
+
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
 `{ "title": string, "reason": string, "position": position, "range": sourceRange? }`.
@@ -240,8 +251,9 @@ Agent-facing analysis data objects include:
 - `confidence`: deterministic trust label, currently `medium` or `low`.
 - `limitations`: known blind spots and conservative boundaries for the command.
 
-`confidence` is `low` when warnings were emitted or a typechecked path fell
-back to AST analysis. Otherwise, current agent-facing commands report
+`confidence` is `low` when warnings were emitted, a typechecked path fell back
+to AST analysis, source context is missing, or a target could not be mapped to
+the expected repository scope. Otherwise, current agent-facing commands report
 `medium`. `limitations` is always present on the documented agent-facing data
 objects below.
 

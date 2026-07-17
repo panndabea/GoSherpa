@@ -224,9 +224,21 @@ func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 	contractPackages := contractPackagesForSignals(signals)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
+	fallbackPackages := diffFallbackPackages(report.ChangedFiles, report.AffectedPackages)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, fallbackPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
 
 	return normalizeReport(report), nil
+}
+
+func diffFallbackPackages(changedFiles []string, affectedPackages []string) []string {
+	if len(affectedPackages) > 0 {
+		return affectedPackages
+	}
+	if len(changedFiles) > 0 {
+		return []string{sherpa.TestPlanWholeRepositoryPackage}
+	}
+
+	return nil
 }
 
 func analyzerOptionsForContext(context *sherpa.SemanticContext, options AnalyzerOptions) (AnalyzerOptions, error) {
@@ -338,7 +350,7 @@ func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticC
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, signals.Warnings...))
 	contractPackages := contractPackagesForSignals(signals)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
-	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, nil, nil, contractPackages, report.Warnings)
+	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, report.AffectedPackages, nil, nil, contractPackages, report.Warnings)
 
 	return normalizeReport(report), nil
 }
@@ -623,10 +635,10 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 }
 
 func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
-	return affectedTestsForPackagesWithContext(nil, root, changedPackages, packages, changedSymbols, extraTests, contractPackages, warnings)
+	return affectedTestsForPackagesWithContext(nil, root, changedPackages, packages, packages, changedSymbols, extraTests, contractPackages, warnings)
 }
 
-func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
+func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root string, changedPackages []string, packages []string, fallbackPackages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
 	seen := make(map[string]sherpa.RelatedTest)
 	modulePath := impactModulePath(root)
 	changedTargets := changedSymbolPlanTargets(changedSymbols, modulePath)
@@ -685,7 +697,7 @@ func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root s
 		TargetPackages:   changedPackages,
 		ContractPackages: contractPackages,
 		CallerPackages:   packageDifference(packages, changedPackages),
-		FallbackPackages: packages,
+		FallbackPackages: fallbackPackages,
 		Targets:          changedTargets,
 	})
 

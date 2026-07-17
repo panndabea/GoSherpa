@@ -13,6 +13,8 @@ type TestPlan struct {
 	Fallback       []TestPlanItem `json:"fallback"`
 }
 
+const TestPlanWholeRepositoryPackage = "./..."
+
 type TestPlanItem struct {
 	Command string   `json:"command"`
 	Reason  string   `json:"reason"`
@@ -269,6 +271,9 @@ func contractTestPlanReason(pkg string, names []string, targets []string) string
 }
 
 func fallbackTestPlanReason(kind TestTargetKind, target string, pkg string, targets []string) string {
+	if pkg == TestPlanWholeRepositoryPackage {
+		return "Run the full test suite because the change could not be narrowed to repository-local Go packages."
+	}
 	if len(targets) > 0 {
 		target = strings.TrimSpace(target)
 		if target == "changed symbols" {

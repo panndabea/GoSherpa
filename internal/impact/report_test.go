@@ -55,8 +55,72 @@ func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
 	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/api", "TestHandler"), []string{
 		sherpa.RelatedTestReasonCallerPackage,
 	})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{"./internal/auth"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.CallerPackages), []string{"./internal/api"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 	assertStrings(t, report.Warnings, []string{})
+}
+
+func TestAnalyzeDiffUsesCallerPackagePlanWhenOnlyNarrowTestsLiveInCaller(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	return Session{}
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler.go"), `package api
+
+import "example.com/app/internal/auth"
+
+func Build() auth.Session {
+	return auth.NewSession()
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "api", "handler_test.go"), `package api
+
+import "testing"
+
+func TestHandler(t *testing.T) {
+	_ = Build()
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+type Session struct{}
+
+func NewSession() Session {
+	session := Session{}
+	return session
+}
+`)
+
+	report, err := AnalyzeDiff(root, base, "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/api:TestHandler"})
+	assertStrings(t, relatedTestReasons(report.AffectedTests, "./internal/api", "TestHandler"), []string{
+		sherpa.RelatedTestReasonCallerPackage,
+	})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Direct), []string{})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Contracts), []string{})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.CallerPackages), []string{"./internal/api"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Fallback), []string{"./internal/auth"})
+	if !strings.Contains(report.TestPlan.CallerPackages[0].Reason, "caller package") {
+		t.Fatalf("expected caller-package reason, got %#v", report.TestPlan.CallerPackages[0])
+	}
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth"})
 }
 
 func TestAnalyzeDiffUsesChangedSymbolsForDirectTestPlan(t *testing.T) {
@@ -161,6 +225,53 @@ func Touch() string {
 	assertStrings(t, testPlanItemTargets(report.TestPlan.Direct, "./internal/auth"), []string{"./internal/auth.NewSession"})
 	assertStrings(t, testPlanItemTargets(report.TestPlan.Related, "./internal/billing"), []string{"./internal/billing.Touch"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/api", "go test ./internal/auth", "go test ./internal/billing"})
+}
+
+func TestAnalyzeDiffUsesMethodChangedSymbolForDirectTestPlan(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "work", "worker.go"), `package work
+
+type Worker struct{}
+
+func (Worker) Process() string {
+	return "old"
+}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "work", "worker_test.go"), `package work
+
+import "testing"
+
+func TestWorkerProcess(t *testing.T) {
+	if (Worker{}).Process() == "" {
+		t.Fatal("empty")
+	}
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "work", "worker.go"), `package work
+
+type Worker struct{}
+
+func (Worker) Process() string {
+	return "new"
+}
+`)
+
+	report, err := AnalyzeDiff(root, base, "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	assertStrings(t, report.AffectedSymbols, []string{"Worker.Process"})
+	assertStrings(t, directRelatedTestNames(report.AffectedTests), []string{"./internal/work:TestWorkerProcess"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Direct), []string{"./internal/work"})
+	assertStrings(t, testPlanItemTargets(report.TestPlan.Direct, "./internal/work"), []string{"./internal/work.Worker.Process"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/work"})
 }
 
 func TestAnalyzeDiffReusesSemanticContextForInterfaceSignals(t *testing.T) {
@@ -390,8 +501,88 @@ func TestAnalyzeDiffReturnsEmptyImpactForNonGoChanges(t *testing.T) {
 	assertStrings(t, report.AffectedPackages, []string{})
 	assertStrings(t, report.AffectedSymbols, []string{})
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{})
-	assertStrings(t, report.TestCommands, []string{})
+	assertStrings(t, report.TestCommands, []string{"go test ./..."})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Fallback), []string{sherpa.TestPlanWholeRepositoryPackage})
+	if len(report.TestPlan.Fallback) != 1 || !strings.Contains(report.TestPlan.Fallback[0].Reason, "full test suite") {
+		t.Fatalf("expected whole-repository fallback reason, got %#v", report.TestPlan.Fallback)
+	}
 	assertStrings(t, report.Warnings, []string{})
+}
+
+func TestAnalyzeDiffUsesPackageFallbackForGoHunkWithoutChangedSymbols(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "config.go"), `package auth
+
+const Version = "old"
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "config_test.go"), `package auth
+
+import "testing"
+
+func TestConfig(t *testing.T) {}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "config.go"), `package auth
+
+const Version = "new"
+`)
+
+	report, err := AnalyzeDiff(root, base, "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
+	assertStrings(t, report.AffectedSymbols, []string{})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestConfig"})
+	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{"./internal/auth"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+}
+
+func TestAnalyzeDiffKeepsFallbackUsefulForDeletedSymbols(t *testing.T) {
+	root := initImpactGitTestRepository(t)
+
+	writeImpactTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+func Removed() {}
+
+func Kept() {}
+`)
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session_test.go"), `package auth
+
+import "testing"
+
+func TestSession(t *testing.T) {
+	Kept()
+}
+`)
+	runImpactGit(t, root, "add", ".")
+	runImpactGit(t, root, "commit", "-m", "initial")
+	base := strings.TrimSpace(runImpactGit(t, root, "rev-parse", "HEAD"))
+
+	writeImpactTestFile(t, filepath.Join(root, "internal", "auth", "session.go"), `package auth
+
+func Kept() {}
+`)
+
+	report, err := AnalyzeDiff(root, base, "")
+	if err != nil {
+		t.Fatalf("AnalyzeDiff returned error: %v", err)
+	}
+
+	if len(report.ChangedSymbolDetails) != 1 || !report.ChangedSymbolDetails[0].Deleted || report.ChangedSymbolDetails[0].Name != "Removed" {
+		t.Fatalf("expected deleted Removed symbol detail, got %#v", report.ChangedSymbolDetails)
+	}
+	assertStrings(t, report.AffectedSymbols, []string{"Removed"})
+	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
+	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestSession"})
+	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
 }
 
 func TestAnalyzeFileReportsPackageImpact(t *testing.T) {
@@ -530,6 +721,11 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedInterfacePac
 		sherpa.RelatedTestReasonContract,
 	})
 	assertStrings(t, testPlanItemPackages(report.TestPlan.Contracts), []string{"./internal/auth", "./internal/jwt"})
+	for _, item := range report.TestPlan.Contracts {
+		if !strings.Contains(item.Reason, "affected interfaces or implementations") {
+			t.Fatalf("expected contract reason to explain interface signal, got %#v", item)
+		}
+	}
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth", "go test ./internal/jwt", "go test ./internal/session"})
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
 		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)

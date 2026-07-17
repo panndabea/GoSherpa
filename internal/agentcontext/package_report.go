@@ -377,6 +377,8 @@ func packageLimitations(includeTests bool, analysisMode string, interfaceAnalysi
 		interfaceAnalysisLimitation(interfaceAnalysisMode),
 		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+		"Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+		"Package load warnings lower confidence; inspect envelope warnings before relying on semantic interfaces or tests.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 
@@ -425,7 +427,7 @@ func normalizePackageReport(report PackageReport) PackageReport {
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
-	report.Warnings = nonNilSlice(report.Warnings)
+	report.Warnings = nonNilSlice(uniqueStrings(report.Warnings))
 
 	return report
 }

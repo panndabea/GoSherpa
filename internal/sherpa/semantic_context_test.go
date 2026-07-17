@@ -228,6 +228,70 @@ func TestTarget(t *testing.T) {
 	}
 }
 
+func TestSemanticContextPropagatesPackageLoadWarnings(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+
+func Broken() {
+	Missing()
+}
+`)
+	writeFile(t, filepath.Join(tmp, "service_test.go"), `package service
+
+import "testing"
+
+func TestTarget(t *testing.T) {
+	Target()
+}
+`)
+
+	context, err := NewSemanticContext(tmp, SemanticContextOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	references, err := FindReferenceReportWithContext(context, "Target", ReferenceOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if references.AnalysisMode != ReferenceAnalysisModeTypechecked {
+		t.Fatalf("reference analysis mode = %q, want %s", references.AnalysisMode, ReferenceAnalysisModeTypechecked)
+	}
+	if !semanticContextWarningsContain(references.Warnings, "Missing") {
+		t.Fatalf("expected reference package load warning, got %#v", references.Warnings)
+	}
+
+	callers, err := FindCallersWithContext(context, "Target", CallOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callers.AnalysisMode != CallAnalysisModeTypechecked {
+		t.Fatalf("caller analysis mode = %q, want %s", callers.AnalysisMode, CallAnalysisModeTypechecked)
+	}
+	if !semanticContextWarningsContain(callers.Warnings, "Missing") {
+		t.Fatalf("expected caller package load warning, got %#v", callers.Warnings)
+	}
+
+	tests, err := FindTestsWithContext(context, "Target", TestOptions{Scope: TestScopeDirect})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tests.AnalysisMode != TestAnalysisModeTypecheckedAST {
+		t.Fatalf("test analysis mode = %q, want %s", tests.AnalysisMode, TestAnalysisModeTypecheckedAST)
+	}
+	if !semanticContextWarningsContain(tests.Warnings, "Missing") {
+		t.Fatalf("expected test package load warning, got %#v", tests.Warnings)
+	}
+}
+
 func TestSemanticContextRejectsImpactBuildTagMismatch(t *testing.T) {
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
@@ -285,4 +349,14 @@ func TestSemanticContextRejectsRelationshipBuildTagMismatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "semantic context build tags do not match call options") {
 		t.Fatalf("expected callee build tag mismatch error, got %v", err)
 	}
+}
+
+func semanticContextWarningsContain(warnings []string, want string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(warning, want) {
+			return true
+		}
+	}
+
+	return false
 }

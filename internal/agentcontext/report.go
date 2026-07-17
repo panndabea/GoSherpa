@@ -237,6 +237,8 @@ func limitations(includeTestCallers bool, analysisMode string, referenceAnalysis
 		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		"Call graph results are repository-local and may miss some imported-package receiver calls.",
+		"Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+		"Package load warnings lower confidence; inspect envelope warnings before relying on semantic references, calls, interfaces, or tests.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
 	}
 

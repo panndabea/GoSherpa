@@ -166,6 +166,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 			target:  "Target",
 			wantFields: map[string]string{
 				"analysisMode":          agentcontext.AnalysisModeTypecheckedAST,
+				"referenceAnalysisMode": sherpa.ReferenceAnalysisModeTypechecked,
 				"callAnalysisMode":      sherpa.CallAnalysisModeTypechecked,
 				"interfaceAnalysisMode": impactengine.InterfaceAnalysisModeTypechecked,
 				"testAnalysisMode":      agentcontext.AnalysisModeTypecheckedAST,
@@ -486,6 +487,111 @@ func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 	}
 }
 
+func TestMainContextDiffEmptyJSONSchemaContract(t *testing.T) {
+	tmp := t.TempDir()
+	initMainTestGitRepository(t, tmp)
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), "package app\n\nfunc Target() {}\n")
+	runMainTestGit(t, tmp, "add", ".")
+	runMainTestGit(t, tmp, "commit", "-m", "initial")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "diff", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context diff", "HEAD", "example.com/app")
+
+	if confidence, ok := data["confidence"].(string); !ok || (confidence != agentcontext.ConfidenceMedium && confidence != agentcontext.ConfidenceLow) {
+		t.Fatalf("expected context confidence, got %#v", data["confidence"])
+	}
+	if limitations := assertMainTestJSONArray(t, data, "limitations"); len(limitations) == 0 {
+		t.Fatal("expected non-empty limitations")
+	}
+	for _, field := range []string{
+		"changedFiles",
+		"changedPackages",
+		"affectedPackages",
+		"affectedSymbols",
+		"changedSymbolDetails",
+		"affectedInterfaces",
+		"affectedImplementations",
+		"affectedTests",
+		"testCommands",
+		"readingOrder",
+	} {
+		assertMainTestJSONArrayHasLength(t, data, field, 0)
+	}
+	assertMainTestTestPlanContract(t, data, "testPlan")
+	assertMainTestJSONFieldsAbsent(t, data, "warnings")
+}
+
+func TestMainContextVariantRelationshipFieldBoundaries(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+
+	tests := []struct {
+		name       string
+		root       string
+		args       []string
+		command    string
+		target     string
+		absentKeys []string
+	}{
+		{
+			name:       "context file",
+			root:       tmp,
+			args:       []string{"context", "file", "service.go", "--json"},
+			command:    "context file",
+			target:     "service.go",
+			absentKeys: []string{"references", "referenceAnalysisMode", "callers", "callees", "callAnalysisMode"},
+		},
+		{
+			name:       "context package",
+			root:       tmp,
+			args:       []string{"context", "package", ".", "--json"},
+			command:    "context package",
+			target:     ".",
+			absentKeys: []string{"references", "referenceAnalysisMode", "callers", "callees", "callAnalysisMode"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"gosherpa", "--root", test.root}, test.args...)
+			result := runMainTest(t, args)
+			if result.ExitCode != exitSuccess {
+				t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+			}
+			if result.Stderr != "" {
+				t.Fatalf("expected empty stderr, got %q", result.Stderr)
+			}
+
+			payload := decodeMainTestJSON(t, result.Stdout)
+			data := assertMainTestJSONEnvelope(t, payload, test.root, test.command, test.target, "example.com/app")
+			assertMainTestJSONFieldsAbsent(t, data, test.absentKeys...)
+		})
+	}
+
+	diffRoot := writeMainPRDiffProject(t)
+	result := runMainTest(t, []string{"gosherpa", "--root", diffRoot, "context", "diff", "--base", "HEAD", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, diffRoot, "context diff", "HEAD", "example.com/app")
+	assertMainTestJSONFieldsAbsent(t, data, "references", "callers", "callees")
+}
+
 func TestMainTestsAffectedJSONSchemaContract(t *testing.T) {
 	tmp := writeMainPRDiffProject(t)
 
@@ -739,6 +845,16 @@ func assertMainTestTestPlanContract(t *testing.T, data map[string]any, key strin
 	for _, field := range []string{"direct", "related", "contracts", "callerPackages", "fallback"} {
 		if _, ok := testPlan[field].([]any); !ok {
 			t.Fatalf("expected data.%s.%s to be a JSON array, got %T", key, field, testPlan[field])
+		}
+	}
+}
+
+func assertMainTestJSONFieldsAbsent(t *testing.T, data map[string]any, keys ...string) {
+	t.Helper()
+
+	for _, key := range keys {
+		if _, ok := data[key]; ok {
+			t.Fatalf("expected data.%s to be absent, got %#v", key, data[key])
 		}
 	}
 }

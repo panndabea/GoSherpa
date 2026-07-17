@@ -25,11 +25,13 @@ GoSherpa already has real MVP substance:
 - stable JSON output for commands
 - ambiguity diagnostics and package-qualified target support
 
-The remaining gap is not mostly feature quantity. The remaining gap is trust:
-ordinary Go repositories need to be analyzed accurately enough that a developer
-or coding agent will prefer GoSherpa before opening many files manually.
+The remaining gap is no longer mostly command shape or schema coverage. The
+remaining gap is deeper semantic completeness: ordinary Go repositories need to
+be analyzed accurately enough around dynamic dispatch, runtime wiring, external
+dependencies, and large generated/build-tagged codebases that a developer or
+coding agent will prefer GoSherpa before opening many files manually.
 
-Estimated readiness: roughly 70-75 percent of the must-use threshold.
+Estimated readiness: roughly 82-85 percent of the must-use threshold.
 
 ## Must-Use Threshold
 
@@ -54,25 +56,26 @@ The output should give a compact, trustworthy editing map:
 
 ## P0 Work
 
-These are the next items that most directly decide whether GoSherpa becomes a
-default tool.
+These are the trust tracks that most directly decide whether GoSherpa becomes a
+default tool. The priority implementation slices have completed the current
+P0 shape; future work should harden these tracks before adding broader product
+surfaces.
 
 ### 1. Typechecked Loading Everywhere It Matters
 
 Move the highest-risk analysis paths from AST-first heuristics toward Go
 semantics using `go/packages` and the Go type checker.
 
-Current status: `gosherpa refs`, call graph commands, and standalone interface
-navigation have `go/packages`-backed typechecked paths with AST fallback. A
-first in-memory semantic context now shares one typechecked repository load
-across symbol identity, references, call signals, file/package context symbol
-inventory, and context interface-impact signals for `explain`, `context symbol`,
-`context file`, `context package`, symbol impact, and changed-symbol impact
-paths. Context and report-based impact bundles expose `interfaceAnalysisMode`
-for the interface subanalysis, but still need broader shared semantic loading
-across every analysis field.
+Current status: priority implementation slice complete. `gosherpa refs`, call
+graph commands, standalone interface navigation, context exports, impact
+reports, affected-test reports, and PR summaries use typechecked paths where
+available, with conservative AST fallback and structured warnings when package
+loading is partial. A shared in-memory semantic context now reuses typechecked
+repository loads across the main agent-facing flows, including `context diff`,
+`impact diff`, `tests affected`, and `pr`, while snapshot reuse remains scoped
+to inventory and current changed-symbol inventory.
 
-Focus areas:
+Continuing focus areas:
 
 - `go.work`
 - nested modules
@@ -106,16 +109,14 @@ The existing `gosherpa context symbol|file|package|diff` commands are the right
 center of gravity. Make them the first command a coding agent wants to run
 before editing.
 
-Needed next:
-
-- keep documented JSON schemas aligned with golden fixtures and command output
-- keep byte-budget and entry-count controls reliable across context outputs:
-  `--max-bytes`, `--max-files`, `--max-references`, `--max-symbols`,
-  `--max-tests`, and `--source-radius`
-- broaden and document `confidence`, `analysisMode`, and `limitations`
-  behavior consistently beyond the existing context reports
-- concise human warnings without noisy terminal output
-- consistent behavior for symbol, file, package, and diff targets
+Current status: priority implementation slice complete. Context schema docs,
+golden fixtures, and schema guard tests are aligned for symbol, file, package,
+and diff context. Context limit support is command-specific and documented;
+unsupported limit combinations fail intentionally. Byte budgets keep output
+valid and report truncation metadata. Confidence, analysis modes, warnings, and
+limitations now consistently describe fallback modes, package-load warnings,
+generated-file policy, nested-module boundaries, hunk-based diff limits, and
+test-analysis limits.
 
 Done when:
 
@@ -134,10 +135,13 @@ repository. A strong context command makes GoSherpa the first stop.
 Make test recommendations explain the tradeoff between fast confidence and broad
 coverage.
 
-Current status: first structured slice implemented. Test plans expose direct,
-related, interface/implementation contract, caller-package, and fallback groups
-with reasons, and diff-oriented reports attach changed-symbol targets when
-known.
+Current status: priority implementation slice complete. Test plans expose
+direct, related, interface/implementation contract, caller-package, and fallback
+groups with reasons, concrete tests and targets when known, and non-nil arrays.
+Diff-oriented reports attach changed-symbol targets when known, keep package
+fallback for Go changes that cannot be narrowed to direct tests, and use
+whole-repository fallback when changed files cannot be narrowed to
+repository-local Go packages.
 
 Recommended groups:
 
@@ -147,13 +151,14 @@ Recommended groups:
 - interface or implementation contract tests
 - fallback commands for broader safety
 
-Done when:
+Current contract:
 
-- JSON distinguishes `direct`, `related`, `contracts`, and `fallback` test
-  commands
+- JSON distinguishes `direct`, `related`, `contracts`, `callerPackages`, and
+  `fallback` test commands
 - each suggested command includes a reason
 - diff-based recommendations include changed symbols when known
-- empty direct results still provide a practical package fallback
+- empty direct results still provide a practical package or whole-repository
+  fallback
 
 Why this matters:
 

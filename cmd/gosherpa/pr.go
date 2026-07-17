@@ -110,7 +110,7 @@ func normalizePRReport(report prReport) prReport {
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.VerificationCommands = nonNilSlice(report.VerificationCommands)
 	report.Limitations = nonNilSlice(report.Limitations)
-	report.Warnings = nonNilSlice(report.Warnings)
+	report.Warnings = nonNilSlice(uniqueStringsInOrder(report.Warnings))
 
 	return report
 }

@@ -73,6 +73,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Structured test plans include a `contracts` group for interface or
   implementation contract packages, keeping those recommendations separate from
   direct, related, caller-package, and fallback test commands.
+- Diff test planning distinguishes package-level fallback from
+  whole-repository fallback, using `go test ./...` when changed files cannot be
+  narrowed to repository-local Go packages.
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.
@@ -96,6 +99,14 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
+- Nested modules below a module root are treated as separate analysis roots and
+  are skipped by root-level file walking, symbol lookup, references, callers,
+  context, impact, and test discovery unless they are included through an
+  explicit `go.work` workspace or inspected with their own `--root`.
+- Repository-local generated Go files are included when they are visible to the
+  selected module or workspace. `doctor` detects the standard
+  `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
+  context commands analyze generated files like other compiler-visible Go files.
 - Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and current changed-symbol inventory in `context diff`, `impact diff`, `tests affected`, and `pr`; deeper semantic relationship, impact, and call-graph queries still analyze repository data directly.
 - The shared repository index v0 currently covers package, file, and symbol inventory. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship reuse remains separate follow-up work.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
