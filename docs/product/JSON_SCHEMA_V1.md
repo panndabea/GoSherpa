@@ -160,7 +160,9 @@ Possible call entries are separate from direct callers and callees:
 caller or callee counts. `reason` values are stable categories such as
 `interface-dispatch`, `goroutine`, `function-literal`, `function-value`,
 `stdlib-http-handler`, and `imported-receiver`. `scope` continues to describe
-callee locality, not certainty.
+callee locality, not certainty. For example, a visible local `go Target()`
+possible call has `reason: "goroutine"` and `scope: "local"`, while an unknown
+callback function value remains `scope: "dynamic"`.
 
 Related tests:
 
@@ -501,8 +503,11 @@ Data:
   runtime-aware signals such as interface dispatch, goroutine starts, function
   literals, and function values. Interface dispatch is emitted only for known
   local implementer methods with matching signatures; unknown or broad
-  dispatch remains a limitation. It is separate from `callees` and is present
-  even when empty.
+  dispatch remains a limitation. Visible local targets in goroutine function
+  literals, immediately invoked function literals, and function literals passed
+  to simple local call sites are emitted when source ranges are available;
+  reassigned or escaping function values remain conservative. It is separate
+  from `callees` and is present even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 

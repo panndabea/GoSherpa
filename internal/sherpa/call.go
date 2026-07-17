@@ -196,6 +196,7 @@ type callUncertaintySignal struct {
 	Expr     ast.Expr
 	Position Position
 	Range    *SourceRange
+	Possible bool
 }
 
 type interfaceDispatchCatalog struct {
@@ -275,7 +276,7 @@ func findCalleesInFunctions(functions []functionInfo, target callTarget, analysi
 	}
 
 	callees := collectCalleesFromFunction(function)
-	possibleCalls := collectPossibleCallsFromFunctionWithCatalog(function, newInterfaceDispatchCatalog(functions))
+	possibleCalls := collectPossibleCallsFromFunctionWithFunctions(function, functions, newInterfaceDispatchCatalog(functions))
 	limitations := collectDynamicCallLimitations([]functionInfo{function})
 
 	return CalleesResult{
@@ -1602,9 +1603,17 @@ func collectPossibleCallsFromFunction(function functionInfo) []PossibleCall {
 }
 
 func collectPossibleCallsFromFunctionWithCatalog(function functionInfo, catalog interfaceDispatchCatalog) []PossibleCall {
+	return collectPossibleCallsFromFunctionWithFunctions(function, []functionInfo{function}, catalog)
+}
+
+func collectPossibleCallsFromFunctionWithFunctions(function functionInfo, functions []functionInfo, catalog interfaceDispatchCatalog) []PossibleCall {
 	signals := collectCallUncertaintySignals(function)
-	possibleCalls := make([]PossibleCall, 0, len(signals))
+	possibleCalls := collectConcreteRuntimePossibleCalls(function, functions)
 	for _, signal := range signals {
+		if !signal.Possible {
+			continue
+		}
+
 		if signal.Kind == callUncertaintyInterfaceDispatch {
 			concreteCalls := possibleInterfaceDispatchCalls(function, catalog, signal)
 			if len(concreteCalls) > 0 {
@@ -1618,15 +1627,7 @@ func collectPossibleCallsFromFunctionWithCatalog(function functionInfo, catalog 
 			continue
 		}
 
-		possibleCalls = append(possibleCalls, PossibleCall{
-			Caller:    function.Target,
-			Callee:    signal.Callee,
-			Certainty: CallCertaintyPossible,
-			Reason:    reason,
-			Scope:     CallScopeDynamic,
-			Position:  signal.Position,
-			Range:     signal.Range,
-		})
+		possibleCalls = append(possibleCalls, possibleCallFromUncertaintySignal(functions, function, signal, reason))
 	}
 
 	sortPossibleCalls(possibleCalls)
@@ -1637,7 +1638,7 @@ func collectPossibleCallersFromFunctions(functions []functionInfo, target callTa
 	var possibleCalls []PossibleCall
 	catalog := newInterfaceDispatchCatalog(functions)
 	for _, function := range functions {
-		for _, possibleCall := range collectPossibleCallsFromFunctionWithCatalog(function, catalog) {
+		for _, possibleCall := range collectPossibleCallsFromFunctionWithFunctions(function, functions, catalog) {
 			if !possibleCallMatchesTarget(possibleCall, target) {
 				continue
 			}
@@ -1648,6 +1649,152 @@ func collectPossibleCallersFromFunctions(functions []functionInfo, target callTa
 
 	sortPossibleCalls(possibleCalls)
 	return dedupePossibleCalls(possibleCalls)
+}
+
+func collectConcreteRuntimePossibleCalls(function functionInfo, functions []functionInfo) []PossibleCall {
+	if function.Decl.Body == nil {
+		return nil
+	}
+
+	var possibleCalls []PossibleCall
+	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		switch typed := node.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.GoStmt:
+			if typed.Call == nil {
+				return false
+			}
+			literal, ok := callFunctionLiteral(typed.Call.Fun)
+			if !ok {
+				return false
+			}
+
+			possibleCalls = append(possibleCalls, possibleCallsFromFunctionLiteralReferences(
+				function,
+				functions,
+				literal,
+				PossibleCallReasonGoroutine,
+			)...)
+			return false
+		case *ast.CallExpr:
+			if literal, ok := callFunctionLiteral(typed.Fun); ok {
+				possibleCalls = append(possibleCalls, possibleCallsFromFunctionLiteralReferences(
+					function,
+					functions,
+					literal,
+					PossibleCallReasonFunctionLiteral,
+				)...)
+				return false
+			}
+
+			if !callExprReferencesLocalFunction(functions, function, typed.Fun) {
+				return true
+			}
+			for _, arg := range typed.Args {
+				literal, ok := callFunctionLiteral(arg)
+				if !ok {
+					continue
+				}
+
+				possibleCalls = append(possibleCalls, possibleCallsFromFunctionLiteralReferences(
+					function,
+					functions,
+					literal,
+					PossibleCallReasonFunctionLiteral,
+				)...)
+			}
+		}
+
+		return true
+	})
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+func possibleCallsFromFunctionLiteralReferences(function functionInfo, functions []functionInfo, literal *ast.FuncLit, reason PossibleCallReason) []PossibleCall {
+	references := collectCallReferencesFromFunctionLiteral(function, literal)
+	possibleCalls := make([]PossibleCall, 0, len(references))
+	for _, reference := range references {
+		possibleCalls = append(possibleCalls, possibleCallFromReference(functions, function, reference, reason))
+	}
+
+	return possibleCalls
+}
+
+func possibleCallFromReference(functions []functionInfo, function functionInfo, reference callReference, reason PossibleCallReason) PossibleCall {
+	scope := callReferenceScope(function, reference)
+	if scope == "" {
+		scope = CallScopeDynamic
+	}
+
+	possibleCall := PossibleCall{
+		Caller:    function.Target,
+		Callee:    reference.Name,
+		Certainty: CallCertaintyPossible,
+		Reason:    reason,
+		Scope:     scope,
+		Position:  reference.Position,
+		Range:     reference.Range,
+	}
+
+	if match, ok := singleMatchingFunctionInfoForCall(functions, function, reference.Expr); ok {
+		possibleCall.Callee = match.Target
+		possibleCall.Scope = CallScopeLocal
+		possibleCall.calleePackage = match.Package
+	}
+
+	return possibleCall
+}
+
+func possibleCallFromUncertaintySignal(functions []functionInfo, function functionInfo, signal callUncertaintySignal, reason PossibleCallReason) PossibleCall {
+	scope := CallScopeDynamic
+	if signal.Expr != nil && !callExpressionIsFunctionLiteral(signal.Expr) {
+		scope = callReferenceScope(function, callReference{
+			Name: signal.Callee,
+			Expr: signal.Expr,
+		})
+		if scope == "" {
+			scope = CallScopeDynamic
+		}
+	}
+
+	possibleCall := PossibleCall{
+		Caller:    function.Target,
+		Callee:    signal.Callee,
+		Certainty: CallCertaintyPossible,
+		Reason:    reason,
+		Scope:     scope,
+		Position:  signal.Position,
+		Range:     signal.Range,
+	}
+
+	if match, ok := singleMatchingFunctionInfoForCall(functions, function, signal.Expr); ok {
+		possibleCall.Callee = match.Target
+		possibleCall.Scope = CallScopeLocal
+		possibleCall.calleePackage = match.Package
+	}
+
+	return possibleCall
+}
+
+func singleMatchingFunctionInfoForCall(functions []functionInfo, caller functionInfo, expr ast.Expr) (functionInfo, bool) {
+	matches := matchingFunctionInfosForCall(functions, caller, expr)
+	if len(matches) != 1 {
+		return functionInfo{}, false
+	}
+
+	return matches[0], true
+}
+
+func callExprReferencesLocalFunction(functions []functionInfo, caller functionInfo, expr ast.Expr) bool {
+	_, ok := singleMatchingFunctionInfoForCall(functions, caller, expr)
+	return ok
 }
 
 func collectCallReferencesFromFunction(function functionInfo) []callReference {
@@ -1697,6 +1844,62 @@ func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	sortCallReferences(references)
 
 	return references
+}
+
+func collectCallReferencesFromFunctionLiteral(function functionInfo, literal *ast.FuncLit) []callReference {
+	if literal == nil || literal.Body == nil {
+		return nil
+	}
+
+	var references []callReference
+	ast.Inspect(literal.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		if _, ok := node.(*ast.FuncLit); ok {
+			return false
+		}
+
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		expr := call.Fun
+		name, ok := callReferenceName(function, expr)
+		if !ok {
+			return true
+		}
+
+		references = append(references, callReference{
+			Name:     name,
+			Expr:     expr,
+			Position: callExpressionPosition(function, expr),
+			Range:    callExpressionRange(function, expr),
+		})
+
+		return true
+	})
+
+	sortCallReferences(references)
+	return references
+}
+
+func callFunctionLiteral(expr ast.Expr) (*ast.FuncLit, bool) {
+	switch typed := expr.(type) {
+	case *ast.FuncLit:
+		return typed, true
+	case *ast.ParenExpr:
+		return callFunctionLiteral(typed.X)
+	default:
+		return nil, false
+	}
+}
+
+func callExpressionIsFunctionLiteral(expr ast.Expr) bool {
+	_, ok := callFunctionLiteral(expr)
+	return ok
 }
 
 func callReferenceScope(function functionInfo, reference callReference) CallScope {
@@ -1979,23 +2182,32 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 		case *ast.GoStmt:
 			if typed.Call != nil {
 				expr := resolveStaticCallValue(function, staticValues, typed.Call.Fun)
+				possible := true
+				callee := callUncertaintyCalleeName(function, expr)
+				if literal, ok := callFunctionLiteral(expr); ok {
+					callee = "function literal"
+					possible = len(collectCallReferencesFromFunctionLiteral(function, literal)) == 0
+				}
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyGoroutine,
-					Callee:   callUncertaintyCalleeName(function, expr),
+					Callee:   callee,
 					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Call.Fun),
 					Range:    callExpressionRange(function, typed.Call.Fun),
+					Possible: possible,
 				})
 			}
 			return true
 		case *ast.CallExpr:
-			if _, ok := typed.Fun.(*ast.FuncLit); ok {
+			if literal, ok := callFunctionLiteral(typed.Fun); ok {
+				possible := len(collectCallReferencesFromFunctionLiteral(function, literal)) == 0
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionLiteral,
 					Callee:   "function literal",
 					Expr:     typed.Fun,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
+					Possible: possible,
 				})
 			}
 			expr := resolveStaticCallValue(function, staticValues, typed.Fun)
@@ -2006,6 +2218,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
+					Possible: true,
 				})
 			}
 			if callUsesFunctionValue(function, expr) {
@@ -2015,6 +2228,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
+					Possible: true,
 				})
 			}
 			if callUsesReflection(function, expr) {
@@ -2026,10 +2240,39 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 					Range:    callExpressionRange(function, typed.Fun),
 				})
 			}
+			signals = append(signals, collectEscapingFunctionArgumentSignals(function, typed)...)
 		}
 
 		return true
 	})
+
+	return signals
+}
+
+func collectEscapingFunctionArgumentSignals(function functionInfo, call *ast.CallExpr) []callUncertaintySignal {
+	var signals []callUncertaintySignal
+	for _, arg := range call.Args {
+		if literal, ok := callFunctionLiteral(arg); ok {
+			signals = append(signals, callUncertaintySignal{
+				Kind:     callUncertaintyFunctionLiteral,
+				Callee:   "function literal",
+				Expr:     literal,
+				Position: callExpressionPosition(function, literal),
+				Range:    callExpressionRange(function, literal),
+			})
+			continue
+		}
+
+		if callArgumentIsFunctionValue(function, arg) {
+			signals = append(signals, callUncertaintySignal{
+				Kind:     callUncertaintyFunctionValue,
+				Callee:   callUncertaintyCalleeName(function, arg),
+				Expr:     arg,
+				Position: callExpressionPosition(function, arg),
+				Range:    callExpressionRange(function, arg),
+			})
+		}
+	}
 
 	return signals
 }
@@ -2275,6 +2518,22 @@ func callUsesFunctionValue(function functionInfo, expr ast.Expr) bool {
 
 	typ := function.TypeInfo.TypeOf(expr)
 	return callTypeIsSignature(typ)
+}
+
+func callArgumentIsFunctionValue(function functionInfo, expr ast.Expr) bool {
+	if function.TypeInfo == nil || expr == nil {
+		return false
+	}
+	if _, ok := callFunctionLiteral(expr); ok {
+		return false
+	}
+
+	object := callObject(function, expr)
+	if _, ok := object.(*types.Func); ok {
+		return true
+	}
+
+	return callTypeIsSignature(function.TypeInfo.TypeOf(expr))
 }
 
 func functionValueCallObjectIsStaticFunction(function functionInfo, expr ast.Expr) bool {

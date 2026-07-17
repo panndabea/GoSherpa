@@ -288,7 +288,7 @@ func Target() {}
 	got := callTestPossibleCallSummaries(result.PossibleCalls)
 	want := []string{
 		"Run->callback:function-value:possible:dynamic:service.go:7",
-		"Run->Target:goroutine:possible:dynamic:service.go:8",
+		"Run->Target:goroutine:possible:local:service.go:8",
 		"Run->function literal:function-literal:possible:dynamic:service.go:9",
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -499,10 +499,225 @@ func Target() {}
 	}
 
 	got := callTestPossibleCallSummaries(result.PossibleCalls)
-	want := []string{"Run->Target:goroutine:possible:dynamic:service.go:4"}
+	want := []string{"Run->Target:goroutine:possible:local:service.go:4"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected target-matching possible call %v, got %v", want, got)
 	}
+}
+
+func TestFindCalleesReportsGoroutineFunctionLiteralTargetPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	go func() {
+		Target()
+	}()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callees) != 0 {
+		t.Fatalf("expected no direct callees from function literal body, got %#v", result.Callees)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Target:goroutine:possible:local:service.go:5"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Goroutine", "service.go:4")
+}
+
+func TestFindCalleesReportsImmediatelyInvokedFunctionLiteralTargetPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	func() {
+		Target()
+	}()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Callees) != 0 {
+		t.Fatalf("expected no direct callees from function literal body, got %#v", result.Callees)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Target:function-literal:possible:local:service.go:5"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:4")
+}
+
+func TestFindCalleesReportsLocalFunctionLiteralArgumentTargetPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	WithCallback(func() {
+		Target()
+	})
+}
+
+func WithCallback(callback func()) {}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	directNames := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(directNames, []string{"WithCallback"}) {
+		t.Fatalf("expected direct local callback registration only, got %v", directNames)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Target:function-literal:possible:local:service.go:5"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:4")
+}
+
+func TestFindCalleesKeepsSingleAssignedFunctionValueAsDirectCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	callback := Target
+	callback()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := callTestCalleeNames(result.Callees); !reflect.DeepEqual(got, []string{"Target"}) {
+		t.Fatalf("expected direct Target call through single assignment, got %v", got)
+	}
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible calls for single static function value, got %#v", result.PossibleCalls)
+	}
+}
+
+func TestFindCalleesKeepsReassignedFunctionValueConservative(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run(useOther bool) {
+	callback := Target
+	if useOther {
+		callback = Other
+	}
+	callback()
+}
+
+func Target() {}
+
+func Other() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->callback:function-value:possible:dynamic:service.go:8"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected conservative function value possible call %v, got %v", want, got)
+	}
+	for _, possibleCall := range result.PossibleCalls {
+		if possibleCall.Callee == "Target" || possibleCall.Callee == "Other" {
+			t.Fatalf("expected no guessed reassigned target, got %#v", result.PossibleCalls)
+		}
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function value", "service.go:8")
+}
+
+func TestFindCalleesKeepsStructFieldFunctionValueConservative(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type job struct {
+	callback func()
+}
+
+func Run() {
+	current := job{callback: Target}
+	current.callback()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->current.callback:function-value:possible:dynamic:service.go:9"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected conservative struct field possible call %v, got %v", want, got)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function value", "service.go:9")
+}
+
+func TestFindCalleesKeepsEscapingFunctionLiteralConservative(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "fmt"
+
+func Run() {
+	fmt.Println(func() {
+		Target()
+	})
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible target for escaping function literal, got %#v", result.PossibleCalls)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:6")
 }
 
 func TestFindCallPathsReportsDynamicCallLimitations(t *testing.T) {
@@ -719,6 +934,33 @@ func TestTarget() {
 
 	got := callTestEntryPointLabels(withTests.EntryPoints)
 	want := []string{"test:.:TestTarget"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindEntryPointsUsesGoroutineFunctionLiteralReachability(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func start() {
+	go func() {
+		target()
+	}()
+}
+
+func target() {}
+`)
+
+	result, err := FindEntryPoints(tmp, "target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestEntryPointLabels(result.EntryPoints)
+	want := []string{"no-local-callers:.:start"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}

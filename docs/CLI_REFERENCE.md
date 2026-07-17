@@ -263,7 +263,11 @@ signals such as interface dispatch, goroutine starts, function literals, and
 function values; they do not change direct call counts. Interface-dispatch
 entries are emitted only when typechecked analysis can name a bounded set of
 known local implementer methods. Unknown or broad interface dispatch remains a
-limitation rather than a guessed edge.
+limitation rather than a guessed edge. Visible local targets in direct
+goroutine starts, goroutine function literals, immediately invoked function
+literals, and function literals passed to simple local call sites are reported
+as possible calls with source ranges; reassigned or escaping function values
+remain conservative.
 
 `tests <target>` supports `--scope direct|related|all` for symbol, package, or
 file targets. It intentionally does not accept `--base`, `--tags`, or

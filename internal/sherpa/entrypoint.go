@@ -3,6 +3,7 @@ package sherpa
 import (
 	"go/ast"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -79,7 +80,7 @@ func FindEntryPointsWithOptions(root string, target string, options CallOptions)
 		sortFunctionInfos(graphFunctions)
 	}
 
-	graph := buildCallGraph(graphFunctions)
+	graph := buildEntryPointCallGraph(graphFunctions)
 	reverseGraph := reverseCallGraph(graph)
 	reachable := reachableCallerKeys(reverseGraph, functionNode(targetFunction).Key)
 	entryPoints := collectEntryPointsFromReachableFunctions(graphFunctions, reverseGraph, reachable)
@@ -90,6 +91,78 @@ func FindEntryPointsWithOptions(root string, target string, options CallOptions)
 		Warnings:     nonNilStrings(warnings),
 		EntryPoints:  entryPoints,
 	}, nil
+}
+
+func buildEntryPointCallGraph(functions []functionInfo) map[string][]callGraphEdge {
+	graph := buildCallGraph(functions)
+	catalog := newInterfaceDispatchCatalog(functions)
+
+	for _, function := range functions {
+		caller := functionNode(function)
+		for _, possibleCall := range collectPossibleCallsFromFunctionWithFunctions(function, functions, catalog) {
+			if possibleCall.Scope != CallScopeLocal {
+				continue
+			}
+			if possibleCall.Reason != PossibleCallReasonGoroutine &&
+				possibleCall.Reason != PossibleCallReasonFunctionLiteral {
+				continue
+			}
+
+			target := callTarget{
+				Package: possibleCall.calleePackage,
+			}
+			target.Receiver, target.Name = relationshipSplitDisplayName(possibleCall.Callee)
+			if target.Name == "" {
+				continue
+			}
+
+			match, ok := findMatchingFunctionInfo(functions, target)
+			if !ok {
+				continue
+			}
+
+			graph[caller.Key] = appendCallGraphEdgeIfMissing(graph[caller.Key], callGraphEdge{
+				Caller:   caller,
+				Callee:   functionNode(match),
+				Position: possibleCall.Position,
+				Range:    possibleCall.Range,
+			})
+		}
+		sortCallGraphEdges(graph[caller.Key])
+	}
+
+	return graph
+}
+
+func findMatchingFunctionInfo(functions []functionInfo, target callTarget) (functionInfo, bool) {
+	for _, function := range functions {
+		if functionMatchesCallTarget(function, target) {
+			return function, true
+		}
+	}
+
+	return functionInfo{}, false
+}
+
+func appendCallGraphEdgeIfMissing(edges []callGraphEdge, edge callGraphEdge) []callGraphEdge {
+	key := callGraphEdgeKey(edge)
+	for _, existing := range edges {
+		if callGraphEdgeKey(existing) == key {
+			return edges
+		}
+	}
+
+	return append(edges, edge)
+}
+
+func callGraphEdgeKey(edge callGraphEdge) string {
+	return strings.Join([]string{
+		edge.Caller.Key,
+		edge.Callee.Key,
+		edge.Position.File,
+		strconv.Itoa(edge.Position.Line),
+		strconv.Itoa(edge.Position.Column),
+	}, "\x00")
 }
 
 func reachableCallerKeys(reverseGraph map[string][]callGraphEdge, targetKey string) map[string]struct{} {

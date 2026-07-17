@@ -740,22 +740,22 @@ Goal: handle common visible runtime call patterns conservatively.
 
 Tasks:
 
-- [ ] Treat `go Target(...)` as a possible runtime entry/call edge with reason
+- [x] Treat `go Target(...)` as a possible runtime entry/call edge with reason
       `goroutine` while preserving the direct callee where already known.
-- [ ] Detect immediately invoked function literals and function literals passed
+- [x] Detect immediately invoked function literals and function literals passed
       to simple local call sites where source ranges can be named clearly.
-- [ ] Keep simple locally assigned function values that resolve to one static
+- [x] Keep simple locally assigned function values that resolve to one static
       target as direct or currently supported behavior.
-- [ ] Keep reassigned or escaping function values as limitations or possible
+- [x] Keep reassigned or escaping function values as limitations or possible
       edges only when a single bounded candidate set is visible.
-- [ ] Add fixtures for:
+- [x] Add fixtures for:
       - direct goroutine start
       - goroutine function literal calling a target
       - local function value assigned once
       - reassigned function value
       - function value stored in struct field
       - escaping function value passed to unknown function
-- [ ] Ensure entrypoint analysis can report goroutine-originating reachability
+- [x] Ensure entrypoint analysis can report goroutine-originating reachability
       where supported, with clear limitations.
 
 Primary files:

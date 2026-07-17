@@ -520,3 +520,45 @@ go test ./internal/sherpa ./internal/impact ./internal/agentcontext ./cmd/gosher
 go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
 go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project snapshot --json
 ```
+
+## Slice 2.3 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`
+(`080ab07749c3eb742bbf387da3d0ac807aed49a1` at verification time), though no
+diff-oriented verification was required for this slice.
+
+Slice 2.3 made visible goroutine and function-literal runtime flows more
+concrete without changing direct caller/callee counts:
+
+- `go Target()` still appears as a direct callee where statically known and now
+  emits a `possibleCalls` entry with reason `goroutine` and `scope: local` for
+  local targets.
+- Goroutine function literals such as `go func() { Target() }()` emit bounded
+  possible local target calls instead of only abstract function-literal
+  uncertainty.
+- Immediately invoked function literals and function literals passed to simple
+  local call sites emit possible target calls when their bodies contain visible
+  call sites with source ranges.
+- Single-assignment local function values continue to resolve as direct calls
+  when type information proves one static target.
+- Reassigned function values, struct-field function values, and escaping
+  function literals remain conservative: GoSherpa reports limitations or
+  dynamic possible calls without guessing hidden concrete targets.
+- Entrypoint reachability now uses bounded local `goroutine` and
+  `function-literal` possible edges so a target reached from a visible
+  goroutine function literal can report the originating entrypoint.
+
+Verification commands:
+
+```bash
+go test ./internal/sherpa
+go test ./cmd/gosherpa
+go test ./internal/snapshot
+go test ./internal/impact ./internal/agentcontext
+go test ./internal/sherpa ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/json_project entrypoints Target --json
+```
