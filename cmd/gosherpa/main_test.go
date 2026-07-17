@@ -218,7 +218,9 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 		{"implementers", "target", "--use-snapshot"},
 		{"interface", "target", "--use-snapshot"},
 		{"interfaces", "target", "--use-snapshot"},
+		{"context", "symbol", "target", "--use-snapshot"},
 		{"context", "diff", "--base", "HEAD", "--use-snapshot"},
+		{"impact", "symbol", "target", "--use-snapshot"},
 		{"impact", "diff", "--base", "HEAD", "--use-snapshot"},
 		{"tests", "affected", "--base", "HEAD", "--use-snapshot"},
 		{"pr", "--base", "HEAD", "--use-snapshot"},
@@ -723,7 +725,7 @@ func TestPrintUsageIncludesImpact(t *testing.T) {
 		"impact <symbol-or-package>",
 		"impact file <file>",
 		"impact package <package>",
-		"impact symbol <symbol>",
+		"impact symbol <symbol> [--use-snapshot]",
 		"impact diff --base <ref> [--use-snapshot]",
 		"pr --base <ref> [--use-snapshot]",
 	} {
@@ -738,7 +740,7 @@ func TestPrintUsageIncludesContext(t *testing.T) {
 	printUsage(&output)
 
 	for _, want := range []string{
-		"context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
+		"context symbol <target> [--tests] [--use-snapshot] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
 		"context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
 		"context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]",
 		"context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]",
@@ -2475,7 +2477,7 @@ func TestMainPrintsImpactSubcommandUsageWhenTargetIsMissing(t *testing.T) {
 		{
 			name: "symbol",
 			args: []string{"gosherpa", "impact", "symbol"},
-			want: "usage: gosherpa [--root <path>] impact symbol <symbol>\n",
+			want: "usage: gosherpa [--root <path>] impact symbol <symbol> [--use-snapshot]\n",
 		},
 	}
 
@@ -2547,18 +2549,23 @@ func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
 }
 
 func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
-	result := runMainTest(t, []string{"gosherpa", "context", "symbol", "Target", "--use-snapshot"})
+	for _, args := range [][]string{
+		{"gosherpa", "context", "file", "service.go", "--use-snapshot"},
+		{"gosherpa", "context", "package", ".", "--use-snapshot"},
+	} {
+		result := runMainTest(t, args)
 
-	if result.ExitCode != exitUsage {
-		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
-	}
+		if result.ExitCode != exitUsage {
+			t.Fatalf("expected exit %d, got %d for %v", exitUsage, result.ExitCode, args)
+		}
 
-	if !strings.Contains(result.Stderr, "error: "+snapshotSupportMessage) {
-		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
-	}
+		if !strings.Contains(result.Stderr, "error: "+snapshotSupportMessage) {
+			t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
+		}
 
-	if result.Stdout != "" {
-		t.Fatalf("expected empty stdout, got %q", result.Stdout)
+		if result.Stdout != "" {
+			t.Fatalf("expected empty stdout, got %q", result.Stdout)
+		}
 	}
 }
 
@@ -2937,6 +2944,39 @@ func TestMainRunsImpactSymbolCommand(t *testing.T) {
 	}
 }
 
+func TestMainRunsImpactSymbolCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "impact", "symbol", "Target", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "impact symbol", "Target", "example.com/app")
+
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	if data["testAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot test analysis mode, got %v", data["testAnalysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
+	assertMainTestObjectArrayContainsName(t, assertMainTestJSONArray(t, data, "affectedTests"), "TestTarget")
+}
+
 func TestMainRunsImpactSymbolCommandForGenericInterfaceAliasAsJSON(t *testing.T) {
 	tmp := writeMainGenericInterfaceAliasProject(t)
 
@@ -3149,6 +3189,41 @@ func TestMainRunsContextSymbolCommandAsJSON(t *testing.T) {
 
 	if _, ok := data["warnings"]; ok {
 		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+}
+
+func TestMainRunsContextSymbolCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "context", "symbol", "Target", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "context symbol", "Target", "example.com/app")
+	assertMainTestContextJSONContract(t, payload, data)
+
+	if data["analysisMode"] != agentcontext.AnalysisModeTypecheckedAST {
+		t.Fatalf("expected typechecked+ast symbol context mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	if data["callAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot call analysis mode, got %v", data["callAnalysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+	limitations := assertMainTestJSONArray(t, data, "limitations")
+	if !mainTestJSONArrayContainsSubstring(limitations, "reused a valid relationship snapshot") {
+		t.Fatalf("expected snapshot relationship limitation, got %#v", limitations)
 	}
 }
 
@@ -8017,14 +8092,14 @@ func assertMainWorkspaceSnapshotDiffAnalysis(t *testing.T, payload map[string]an
 	if data["analysisMode"] != agentcontext.AnalysisModeSnapshotDiffTypechecked {
 		t.Fatalf("expected snapshot diff analysis mode, got %v", data["analysisMode"])
 	}
-	if data["referenceAnalysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
-		t.Fatalf("expected typechecked reference analysis mode, got %v", data["referenceAnalysisMode"])
+	if data["referenceAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship reference analysis mode, got %v", data["referenceAnalysisMode"])
 	}
-	if data["callAnalysisMode"] != sherpa.CallAnalysisModeTypechecked {
-		t.Fatalf("expected typechecked call analysis mode, got %v", data["callAnalysisMode"])
+	if data["callAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship call analysis mode, got %v", data["callAnalysisMode"])
 	}
-	if data["interfaceAnalysisMode"] != "typechecked" {
-		t.Fatalf("expected typechecked interface analysis mode, got %v", data["interfaceAnalysisMode"])
+	if data["interfaceAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship interface analysis mode, got %v", data["interfaceAnalysisMode"])
 	}
 	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
 	limitations := assertMainTestJSONArray(t, data, "limitations")

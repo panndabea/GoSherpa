@@ -17,7 +17,7 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
-	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context diff, impact diff, tests affected, and pr"
+	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, and pr"
 
 	analysisModeAST                     = agentcontext.AnalysisModeAST
 	analysisModeDiff                    = agentcontext.AnalysisModeDiff
@@ -331,8 +331,20 @@ func isImpactDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
 }
 
+func isImpactSnapshotInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "impact" &&
+		len(invocation.CommandArgs) > 0 &&
+		(invocation.CommandArgs[0] == "symbol" || invocation.CommandArgs[0] == "diff")
+}
+
 func isContextDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "context" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
+}
+
+func isContextSnapshotInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "context" &&
+		len(invocation.CommandArgs) > 0 &&
+		(invocation.CommandArgs[0] == "symbol" || invocation.CommandArgs[0] == "diff")
 }
 
 func isTestsAffectedInvocation(invocation cliInvocation) bool {
@@ -356,10 +368,15 @@ func isImpactReportSubcommand(command string) bool {
 	}
 }
 
-func analyzeImpactSubcommand(root string, kind string, target string, buildTags []string) (impactengine.ImpactReport, error) {
-	options := impactengine.AnalyzerOptions{BuildTags: buildTags}
+func analyzeImpactSubcommand(root string, kind string, target string, invocation cliInvocation) (impactengine.ImpactReport, error) {
+	options := impactengine.AnalyzerOptions{BuildTags: invocation.BuildTags}
+	var snapshotWarnings []string
+	if kind == "symbol" {
+		options, _, snapshotWarnings = loadDiffAnalyzerOptions(root, invocation.BuildTags, invocation.UseSnapshot)
+	}
+
 	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
-		BuildTags: buildTags,
+		BuildTags: invocation.BuildTags,
 	})
 	if err != nil {
 		return impactengine.ImpactReport{}, err
@@ -371,7 +388,12 @@ func analyzeImpactSubcommand(root string, kind string, target string, buildTags 
 	case "package":
 		return impactengine.AnalyzePackageWithContext(semanticContext, target, options)
 	case "symbol":
-		return impactengine.AnalyzeSymbolWithContext(semanticContext, target, options)
+		report, err := impactengine.AnalyzeSymbolWithContext(semanticContext, target, options)
+		if err != nil {
+			return impactengine.ImpactReport{}, err
+		}
+		report.Warnings = uniqueStringsInOrder(append(snapshotWarnings, report.Warnings...))
+		return report, nil
 	default:
 		return impactengine.ImpactReport{}, fmt.Errorf("unknown impact subcommand: %s", kind)
 	}

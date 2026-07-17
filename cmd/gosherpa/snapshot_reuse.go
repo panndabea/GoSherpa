@@ -79,10 +79,21 @@ func loadDiffAnalyzerOptions(root string, buildTags []string, useSnapshot bool) 
 	if inspect.Status == snapshotstore.StatusValid {
 		options.UseSnapshotSymbols = true
 		options.SnapshotSymbols = cloneSlice(stored.Symbols)
+		if relationshipSnapshotHasReusableData(stored.Relationships) {
+			options.UseSnapshotRelationships = true
+			options.SnapshotRelationships = stored.Relationships
+		}
 		return options, true, nil
 	}
 
 	return options, false, []string{snapshotFallbackWarning(inspect)}
+}
+
+func relationshipSnapshotHasReusableData(relationships symbolindex.RelationshipIndex) bool {
+	return len(relationships.References) > 0 ||
+		len(relationships.CallEdges) > 0 ||
+		len(relationships.InterfaceImplementations) > 0 ||
+		len(relationships.TestReferences) > 0
 }
 
 func loadReferenceReportForCommand(root string, invocation cliInvocation, target string) (sherpa.ReferenceReport, error) {

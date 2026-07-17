@@ -372,3 +372,77 @@ deterministic, deduplicated, and covered by tests.
 No command should claim relationship snapshot reuse until the corresponding
 relationship kind is persisted, checked for compatibility, and surfaced through
 analysis modes or limitations.
+
+## Slice 1.4 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`.
+
+Slice 1.4 extended relationship snapshot reuse into the main must-use workflow:
+
+- `context symbol <target> --use-snapshot`
+- `context diff --base <ref> --use-snapshot`
+- `impact symbol <target> --use-snapshot`
+- `impact diff --base <ref> --use-snapshot`
+- `tests affected --base <ref> --use-snapshot`
+- `pr --base <ref> --use-snapshot`
+
+CLI contract changes:
+
+- `context symbol` and `impact symbol` now accept `--use-snapshot`.
+- `context file`, `context package`, `impact file`, `impact package`, `path`,
+  `paths`, and plain `tests <target>` still reject `--use-snapshot`.
+- `context diff`, `impact diff`, `tests affected`, and `pr` keep existing
+  snapshot support and now pass persisted relationship records to impact
+  subanalysis in addition to current changed-symbol inventory.
+
+Analysis-mode behavior:
+
+- Snapshot-backed relationship subanalysis reports `snapshot+typechecked`,
+  `snapshot+ast-fallback`, or `snapshot`.
+- `context symbol.data.analysisMode` remains the broader symbol/source-context
+  mode, while `referenceAnalysisMode`, `callAnalysisMode`,
+  `interfaceAnalysisMode`, and `testAnalysisMode` report their own snapshot or
+  live subanalysis modes.
+- Diff-oriented bundles continue to report
+  `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast` when a valid
+  snapshot is used.
+
+Implementation notes:
+
+- Snapshot relationship records are passed through `impact.AnalyzerOptions`
+  without making `internal/impact` depend on `internal/snapshot`.
+- `context symbol` uses a CLI-level overlay for references, callers, callees,
+  and selected interface signals; source context, purpose, and test planning
+  remain live where needed.
+- Relationship snapshots can seed direct affected tests from persisted
+  reference, call, or test-reference records when available. Package-level and
+  unsupported test planning still uses live analysis.
+- Limitations and docs now distinguish snapshot-backed subanalysis from live
+  report fields.
+
+Verification commands:
+
+```bash
+go test ./internal/impact ./internal/agentcontext ./internal/snapshot ./cmd/gosherpa
+go test ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa context diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa impact diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa tests affected --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa pr --base origin/main --use-snapshot --json
+```
+
+Observed JSON modes:
+
+- `context symbol` reported `referenceAnalysisMode: snapshot+typechecked` and
+  `callAnalysisMode: snapshot+typechecked`; broader symbol/source context
+  remained `typechecked+ast`.
+- `impact symbol` reported `analysisMode: snapshot+typechecked`.
+- `context diff`, `impact diff`, `tests affected`, and `pr` reported
+  `snapshot+git-diff+typechecked+ast` for the bundle-level mode with
+  `origin/main`.

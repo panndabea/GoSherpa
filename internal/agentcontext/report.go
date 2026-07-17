@@ -260,6 +260,12 @@ func symbolContextAnalysisLimitation(analysisMode string) string {
 
 func referenceAnalysisLimitation(referenceAnalysisMode string) string {
 	switch referenceAnalysisMode {
+	case "snapshot+typechecked":
+		return "Reference analysis reused a valid relationship snapshot built from typechecked package loading."
+	case "snapshot+ast-fallback":
+		return "Reference analysis reused a valid relationship snapshot built from AST fallback data."
+	case "snapshot":
+		return "Reference analysis reused a valid relationship snapshot."
 	case sherpa.ReferenceAnalysisModeTypechecked:
 		return "Reference analysis used typechecked package loading where available."
 	case sherpa.ReferenceAnalysisModeASTFallback:
@@ -271,6 +277,12 @@ func referenceAnalysisLimitation(referenceAnalysisMode string) string {
 
 func callAnalysisLimitation(callAnalysisMode string) string {
 	switch callAnalysisMode {
+	case "snapshot+typechecked":
+		return "Call analysis reused a valid relationship snapshot built from typechecked package loading."
+	case "snapshot+ast-fallback":
+		return "Call analysis reused a valid relationship snapshot built from AST fallback data."
+	case "snapshot":
+		return "Call analysis reused a valid relationship snapshot."
 	case sherpa.CallAnalysisModeTypechecked:
 		return "Call analysis used typechecked package loading where available."
 	case sherpa.CallAnalysisModeASTFallback:
@@ -282,6 +294,12 @@ func callAnalysisLimitation(callAnalysisMode string) string {
 
 func interfaceAnalysisLimitation(interfaceAnalysisMode string) string {
 	switch interfaceAnalysisMode {
+	case "snapshot+typechecked":
+		return "Interface analysis reused a valid relationship snapshot built from typechecked package loading."
+	case "snapshot+ast-fallback":
+		return "Interface analysis reused a valid relationship snapshot built from AST fallback data."
+	case "snapshot":
+		return "Interface analysis reused a valid relationship snapshot."
 	case impactengine.InterfaceAnalysisModeTypechecked:
 		return "Interface analysis used typechecked method sets from repository-local packages."
 	case impactengine.InterfaceAnalysisModeASTFallback:
@@ -293,6 +311,12 @@ func interfaceAnalysisLimitation(interfaceAnalysisMode string) string {
 
 func testAnalysisLimitation(testAnalysisMode string) string {
 	switch testAnalysisMode {
+	case "snapshot+typechecked":
+		return "Test analysis reused a valid relationship snapshot built from typechecked package loading."
+	case "snapshot+ast-fallback":
+		return "Test analysis reused a valid relationship snapshot built from AST fallback data."
+	case "snapshot":
+		return "Test analysis reused a valid relationship snapshot."
 	case sherpa.TestAnalysisModeTypecheckedAST:
 		return "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
 	case sherpa.TestAnalysisModeAST:
@@ -306,13 +330,13 @@ func confidence(report Report) string {
 	if len(report.Warnings) > 0 || len(report.SourceContext.Lines) == 0 {
 		return ConfidenceLow
 	}
-	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback {
+	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback || strings.Contains(report.ReferenceAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
-	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback {
+	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback || strings.Contains(report.CallAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
-	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
+	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback || strings.Contains(report.InterfaceAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
 

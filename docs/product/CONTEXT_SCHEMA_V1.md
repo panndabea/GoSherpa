@@ -122,9 +122,13 @@ payload, not the shared JSON envelope. Large fields are omitted in a
 deterministic order while keeping JSON valid and leaving envelope warnings
 outside `data`.
 
-`context diff` also supports `--use-snapshot`. A valid snapshot can provide
-current changed-symbol inventory; missing, stale, or invalid snapshots fall back
-to live diff context analysis with a warning.
+`context symbol` and `context diff` also support `--use-snapshot`. For
+`context symbol`, a valid relationship snapshot can provide reference, caller,
+callee, and selected interface signals while source context, purpose, and test
+planning remain live-analysis fields. For `context diff`, a valid snapshot can
+provide current changed-symbol inventory and selected relationship subanalysis
+signals. Missing, stale, or invalid snapshots fall back to live context analysis
+with a warning.
 
 Purpose and risk are computed before output truncation. The `truncated` object
 explains what was omitted from the bounded context `data` bundle.

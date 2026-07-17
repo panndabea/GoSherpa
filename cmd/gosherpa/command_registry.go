@@ -56,7 +56,7 @@ var commandSpecs = []commandSpec{
 		Tests:         true,
 		ContextLimits: true,
 		Tags:          true,
-		SnapshotWhen:  isContextDiffInvocation,
+		SnapshotWhen:  isContextSnapshotInvocation,
 		BaseWhen:      isContextDiffInvocation,
 	},
 	{
@@ -140,7 +140,7 @@ var commandSpecs = []commandSpec{
 		Handler:      runImpactCommand,
 		JSON:         true,
 		Tags:         true,
-		SnapshotWhen: isImpactDiffInvocation,
+		SnapshotWhen: isImpactSnapshotInvocation,
 		BaseWhen:     isImpactDiffInvocation,
 	},
 	{
@@ -251,7 +251,7 @@ const (
 	analyzeUsageLine        = "analyze [path] [--tests] [--use-snapshot]"
 	architectureUsageLine   = "architecture [--tests]"
 	riskUsageLine           = "risk [--tests]"
-	contextSymbolUsageLine  = "context symbol <target> [--tests] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
+	contextSymbolUsageLine  = "context symbol <target> [--tests] [--use-snapshot] [--max-references <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextFileUsageLine    = "context file <file> [--tests] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextPackageUsageLine = "context package <package> [--tests] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--source-radius <n>]"
 	contextDiffUsageLine    = "context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
@@ -268,7 +268,7 @@ const (
 	impactDefaultUsageLine  = "impact <symbol-or-package>"
 	impactFileUsageLine     = "impact file <file>"
 	impactPackageUsageLine  = "impact package <package>"
-	impactSymbolUsageLine   = "impact symbol <symbol>"
+	impactSymbolUsageLine   = "impact symbol <symbol> [--use-snapshot]"
 	impactDiffUsageLine     = "impact diff --base <ref> [--use-snapshot]"
 	prUsageLine             = "pr --base <ref> [--use-snapshot]"
 	testsDefaultUsageLine   = "tests <symbol-or-package-or-file> [--scope direct|related|all]"

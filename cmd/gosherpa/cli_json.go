@@ -430,16 +430,16 @@ func diffAnalysisModeFallback(snapshotUsed bool) string {
 
 func impactReportAnalysisMode(report impactengine.ImpactReport, fallback string) string {
 	if fallback == analysisModeDiff || fallback == analysisModeSnapshotDiff {
-		if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
-			report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
-			report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+		if isTypecheckedRelationshipAnalysisMode(report.ReferenceAnalysisMode) ||
+			isTypecheckedRelationshipAnalysisMode(report.CallAnalysisMode) ||
+			isTypecheckedRelationshipAnalysisMode(report.InterfaceAnalysisMode) {
 			if fallback == analysisModeSnapshotDiff {
 				return analysisModeSnapshotDiffTypechecked
 			}
 			return analysisModeDiffTypechecked
 		}
 
-		return analysisModeDiff
+		return fallback
 	}
 
 	return bundleAnalysisMode(report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode)
@@ -889,7 +889,22 @@ func explainAnalysisMode(report explainengine.Report) string {
 }
 
 func bundleAnalysisMode(analysisModes ...string) string {
+	hasSnapshot := false
+	hasSnapshotASTFallback := false
 	for _, mode := range analysisModes {
+		mode = strings.TrimSpace(mode)
+		if mode == analysisModeSnapshotTypechecked {
+			return analysisModeSnapshotTypechecked
+		}
+		if mode == analysisModeSnapshotASTFallback {
+			hasSnapshot = true
+			hasSnapshotASTFallback = true
+			continue
+		}
+		if mode == analysisModeSnapshot {
+			hasSnapshot = true
+			continue
+		}
 		if mode == agentcontext.AnalysisModeTypecheckedAST ||
 			mode == agentcontext.AnalysisModeDiffTypechecked ||
 			mode == explainengine.SymbolAnalysisModeTypecheckedAST ||
@@ -899,8 +914,23 @@ func bundleAnalysisMode(analysisModes ...string) string {
 			return agentcontext.AnalysisModeTypecheckedAST
 		}
 	}
+	if hasSnapshotASTFallback {
+		return analysisModeSnapshotASTFallback
+	}
+	if hasSnapshot {
+		return analysisModeSnapshot
+	}
 
 	return analysisModeAST
+}
+
+func isTypecheckedRelationshipAnalysisMode(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case analysisModeSnapshotTypechecked, "typechecked":
+		return true
+	default:
+		return false
+	}
 }
 
 func jsonConfidence(warnings []string, analysisModes ...string) string {
@@ -1101,6 +1131,14 @@ func impactLimitations(analysisMode string) []string {
 			"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
 		}
 	}
+	if strings.HasPrefix(analysisMode, "snapshot") {
+		return []string{
+			"Impact analysis reused a valid relationship snapshot where available.",
+			"Symbol impact includes persisted references and conservative caller-package propagation.",
+			"Interface impact uses persisted relationship records when present.",
+			"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+		}
+	}
 
 	return []string{
 		"Impact analysis uses syntax plus local package dependency and interface signals.",
@@ -1130,6 +1168,20 @@ func testLimitations(analysisMode string) []string {
 		}
 	}
 
+	if analysisMode == analysisModeSnapshotTypechecked {
+		return []string{
+			"Direct test planning reused valid snapshot relationship records where available; related and fallback tests may remain package-based.",
+			"Literal t.Run subtest names are extracted only from live test analysis; dynamic table-test names may be incomplete.",
+			"Fallback commands are package-level when direct test functions are not known.",
+		}
+	}
+	if analysisMode == analysisModeSnapshotASTFallback || analysisMode == analysisModeSnapshot {
+		return []string{
+			"Test planning reused valid snapshot relationship records where available, then falls back to package-level commands.",
+			"Literal t.Run subtest names are extracted only from live test analysis; dynamic table-test names may be incomplete.",
+			"Fallback commands are package-level when direct test functions are not known.",
+		}
+	}
 	if analysisMode == agentcontext.AnalysisModeTypecheckedAST {
 		return []string{
 			"Direct symbol and file test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
@@ -1164,6 +1216,12 @@ func isSnapshotDiffAnalysisMode(analysisMode string) bool {
 
 func testAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
+	case analysisModeSnapshotTypechecked:
+		return "Test analysis reused a valid relationship snapshot built from typechecked package loading."
+	case analysisModeSnapshotASTFallback:
+		return "Test analysis reused a valid relationship snapshot built from AST fallback data."
+	case analysisModeSnapshot:
+		return "Test analysis reused a valid relationship snapshot."
 	case sherpa.TestAnalysisModeTypecheckedAST:
 		return "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
 	case sherpa.TestAnalysisModeAST:

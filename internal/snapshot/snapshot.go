@@ -266,6 +266,7 @@ func relationshipSymbolIdentity(identity sherpa.RelationshipSymbolIdentity) symb
 		QualifiedName: identity.QualifiedName,
 		Kind:          identity.Kind,
 		Position:      identity.Position,
+		Range:         identity.Range,
 	}
 }
 

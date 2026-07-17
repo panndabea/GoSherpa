@@ -16,16 +16,20 @@ import (
 )
 
 type Analyzer struct {
-	Root               string
-	BuildTags          []string
-	UseSnapshotSymbols bool
-	SnapshotSymbols    []sherpa.Symbol
+	Root                     string
+	BuildTags                []string
+	UseSnapshotSymbols       bool
+	SnapshotSymbols          []sherpa.Symbol
+	UseSnapshotRelationships bool
+	SnapshotRelationships    symbolindex.RelationshipIndex
 }
 
 type AnalyzerOptions struct {
-	BuildTags          []string
-	UseSnapshotSymbols bool
-	SnapshotSymbols    []sherpa.Symbol
+	BuildTags                []string
+	UseSnapshotSymbols       bool
+	SnapshotSymbols          []sherpa.Symbol
+	UseSnapshotRelationships bool
+	SnapshotRelationships    symbolindex.RelationshipIndex
 }
 
 type RelatedTest = sherpa.RelatedTest
@@ -64,10 +68,12 @@ func NewAnalyzer(root string) Analyzer {
 
 func NewAnalyzerWithOptions(root string, options AnalyzerOptions) Analyzer {
 	return Analyzer{
-		Root:               root,
-		BuildTags:          append([]string{}, options.BuildTags...),
-		UseSnapshotSymbols: options.UseSnapshotSymbols,
-		SnapshotSymbols:    append([]sherpa.Symbol{}, options.SnapshotSymbols...),
+		Root:                     root,
+		BuildTags:                append([]string{}, options.BuildTags...),
+		UseSnapshotSymbols:       options.UseSnapshotSymbols,
+		SnapshotSymbols:          append([]sherpa.Symbol{}, options.SnapshotSymbols...),
+		UseSnapshotRelationships: options.UseSnapshotRelationships,
+		SnapshotRelationships:    cloneRelationshipIndex(options.SnapshotRelationships),
 	}
 }
 
@@ -212,7 +218,7 @@ func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext
 	report.CallAnalysisMode = symbolImpact.CallAnalysisMode
 	report.TestAnalysisMode = symbolImpact.TestAnalysisMode
 	report.Warnings = uniqueSortedStrings(append(report.Warnings, symbolImpact.Warnings...))
-	signals, err := interfaceSignalsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, InterfaceOptions{
+	signals, err := a.interfaceSignalsForPackagesWithSnapshot(semanticContext, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {
@@ -338,7 +344,7 @@ func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticC
 
 	report := reportFromImpactResult(result)
 	report.ChangedPackages = []string{result.Target}
-	signals, err := interfaceSignalsForPackagesWithContext(context, a.Root, report.ChangedPackages, InterfaceOptions{
+	signals, err := a.interfaceSignalsForPackagesWithSnapshot(context, report.ChangedPackages, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {
@@ -377,6 +383,10 @@ func (a Analyzer) AnalyzeSymbolWithContext(context *sherpa.SemanticContext, targ
 }
 
 func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) (ImpactReport, error) {
+	if report, ok, err := a.analyzeSymbolFromSnapshot(target, context); ok || err != nil {
+		return report, err
+	}
+
 	if err := a.requireUniqueSymbolTarget(target, context); err != nil {
 		return ImpactReport{}, err
 	}
@@ -400,7 +410,7 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 
 	report := reportFromImpactResult(result)
 	report.AffectedSymbols = []string{result.Target}
-	signals, err := interfaceSignalsForSymbolWithContext(context, a.Root, target, InterfaceOptions{
+	signals, err := a.interfaceSignalsForSymbolWithSnapshot(context, target, InterfaceOptions{
 		BuildTags: a.BuildTags,
 	})
 	if err != nil {
@@ -586,6 +596,9 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 	symbols = normalizeChangedSymbols(symbols)
 	if len(symbols) == 0 {
 		return changedSymbolImpact{}
+	}
+	if snapshotImpact, ok := a.analyzeChangedSymbolImpactsFromSnapshot(symbols); ok {
+		return snapshotImpact
 	}
 
 	modulePath := impactModulePath(a.Root)

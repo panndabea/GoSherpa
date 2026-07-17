@@ -53,8 +53,9 @@ commands treat those files like other compiler-visible Go files.
 Use `gosherpa snapshot` to create a reusable inventory and relationship-capable
 snapshot file. A valid snapshot can currently be reused by `analyze`,
 `symbols`, `symbol`, `search`, `packages --tests`, `refs`, `callers`,
-`callees`, `implementers`, `interface`, `interfaces`, and by diff-oriented
-current changed-symbol inventory in `context diff`, `impact diff`,
+`callees`, `implementers`, `interface`, `interfaces`, `context symbol`,
+`impact symbol`, and by diff-oriented current changed-symbol inventory plus
+selected relationship subanalysis in `context diff`, `impact diff`,
 `tests affected`, and `pr` with `--use-snapshot`. Missing, stale, invalid, or
 relationship-incompatible snapshots fall back to live repository analysis and
 report a warning.
@@ -68,6 +69,8 @@ report a warning.
 ./gosherpa refs ParseFile --use-snapshot --json
 ./gosherpa callers ParseFile --use-snapshot --json
 ./gosherpa callees ParseFile --use-snapshot --json
+./gosherpa context symbol ParseFile --use-snapshot --json
+./gosherpa impact symbol ParseFile --use-snapshot --json
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot --json
 ./gosherpa pr --base HEAD --use-snapshot --json
@@ -171,6 +174,7 @@ Found 4 references
 ./gosherpa search parse file --json
 ./gosherpa context symbol ParseFile
 ./gosherpa context symbol ParseFile --tests
+./gosherpa context symbol ParseFile --use-snapshot --json
 ./gosherpa context symbol ParseFile --json
 ./gosherpa context symbol ParseFile --max-bytes 12000 --json
 ./gosherpa context file internal/sherpa/impact.go
@@ -200,6 +204,7 @@ Found 4 references
 ./gosherpa impact file internal/sherpa/impact.go
 ./gosherpa impact package ./internal/sherpa
 ./gosherpa impact symbol ParseFile
+./gosherpa impact symbol ParseFile --use-snapshot
 ./gosherpa impact diff --base HEAD
 ./gosherpa impact diff --base HEAD --use-snapshot
 ./gosherpa impact diff --base HEAD --json
@@ -284,7 +289,7 @@ Context commands support command-specific size controls for agent workflows:
 
 | Command | Supported limits |
 | --- | --- |
-| `context symbol` | `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
+| `context symbol` | `--use-snapshot`, `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context file` | `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context package` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context diff` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
@@ -300,11 +305,12 @@ typechecked package loading. `context diff` and `pr` include
 `changedSymbolDetails` and put changed-symbol locations first in
 `readingOrder` when positions are known. With `--use-snapshot` on `context diff`,
 `impact diff`, `tests affected`, or `pr`, a valid snapshot is reused for current
-changed-symbol inventory and reports
+changed-symbol inventory and selected persisted relationship records, reporting
 `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`. With
 `--use-snapshot` on `refs`, `callers`, `callees`, `implementers`, `interface`,
-or `interfaces`, valid relationship records report `snapshot+typechecked` or
-`snapshot+ast-fallback` depending on how the snapshot was built.
+`interfaces`, `context symbol`, or `impact symbol`, valid relationship records
+report `snapshot+typechecked`, `snapshot+ast-fallback`, or `snapshot`
+depending on how the snapshot was built.
 
 `snapshot --json` returns a bounded summary of the persisted snapshot:
 `formatVersion`, environment and freshness inputs, `fileCount`,

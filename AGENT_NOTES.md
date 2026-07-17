@@ -66,11 +66,11 @@ For focused symbol work, use package-qualified targets when possible and cap
 context output:
 
 ```bash
-gosherpa context symbol ./internal/sherpa.ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
+gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa explain ./internal/sherpa.ParseFile --json
-gosherpa refs ./internal/sherpa.ParseFile --json
-gosherpa callers ./internal/sherpa.ParseFile --json
-gosherpa callees ./internal/sherpa.ParseFile --json
+gosherpa refs ./internal/sherpa.ParseFile --use-snapshot --json
+gosherpa callers ./internal/sherpa.ParseFile --use-snapshot --json
+gosherpa callees ./internal/sherpa.ParseFile --use-snapshot --json
 gosherpa tests ./internal/sherpa.ParseFile --json
 ```
 
@@ -91,13 +91,13 @@ before broad inventory commands like unfiltered `symbols`.
 | Inspect structural risk | `gosherpa risk --json` |
 | Find symbols by name or kind | `gosherpa search <terms> --limit <n> --json`; use `gosherpa symbols --json` only for broad inventory |
 | Inspect one symbol | `gosherpa symbol <target> --json` |
-| Get bounded pre-edit context | `gosherpa context symbol|file|package|diff ... --max-* ... --json` |
+| Get bounded pre-edit context | `gosherpa context symbol <target> --use-snapshot --max-* --json` when a fresh snapshot exists; otherwise `gosherpa context symbol|file|package|diff ... --max-* ... --json` |
 | Find references | `gosherpa refs <target> --json` |
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa interface <interface> --json`; add `--use-snapshot` when a fresh snapshot exists. Use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
-| Analyze changed files | `gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
+| Analyze changed files | `gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --use-snapshot --json` |
 | Plan tests for a symbol, package, or file | `gosherpa tests <target> --json`; for files use `gosherpa tests internal/service/service.go --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
 
@@ -107,7 +107,7 @@ Use `gosherpa context` when an agent needs a compact reading bundle before
 editing. Add size controls whenever the repository or target may be large:
 
 ```bash
-gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
+gosherpa context symbol ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --max-tests 10 --max-bytes 12000 --source-radius 1 --json
 gosherpa context package ./internal/sherpa --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
@@ -120,7 +120,7 @@ confidence, analysis modes, and limitations.
 Use size controls for large repositories or limited context windows:
 
 ```bash
-gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
+gosherpa context symbol ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --source-radius 1 --json
 gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ```

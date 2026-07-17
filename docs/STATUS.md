@@ -84,7 +84,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering,
   including read/write classification for value and field references
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
-- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; standalone relationship commands `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces` can reuse valid relationship records; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
+- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; standalone relationship commands `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`, plus `context symbol` and `impact symbol`, can reuse valid relationship records; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory and selected relationship subanalyses. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
 
 ## Known MVP Limitations
 

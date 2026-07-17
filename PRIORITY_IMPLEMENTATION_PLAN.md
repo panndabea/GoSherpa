@@ -487,25 +487,25 @@ Goal: make the main must-use workflow benefit from relationship reuse.
 
 Tasks:
 
-- [ ] Extend `context symbol`, `context diff`, `impact symbol`, `impact diff`,
+- [x] Extend `context symbol`, `context diff`, `impact symbol`, `impact diff`,
       `tests affected`, and `pr` to use relationship snapshots where safe.
-- [ ] Decide the exact `--use-snapshot` subcommand matrix before editing. If
+- [x] Decide the exact `--use-snapshot` subcommand matrix before editing. If
       `context file`, `context package`, `impact file`, or `impact package`
       remain unsupported, keep explicit validation tests and docs that say so.
-- [ ] When extending `--use-snapshot` beyond currently supported diff-oriented
+- [x] When extending `--use-snapshot` beyond currently supported diff-oriented
       commands, update `supportsSnapshotOption`, usage lines, completion, CLI
       validation tests, docs, and examples in the same slice.
-- [ ] Keep current changed-symbol inventory reuse intact.
-- [ ] Ensure `referenceAnalysisMode`, `callAnalysisMode`,
+- [x] Keep current changed-symbol inventory reuse intact.
+- [x] Ensure `referenceAnalysisMode`, `callAnalysisMode`,
       `interfaceAnalysisMode`, and `testAnalysisMode` reflect only their own
       subanalysis.
-- [ ] Add limitations that explain which parts used snapshot data and which
+- [x] Add limitations that explain which parts used snapshot data and which
       still ran live.
-- [ ] Keep byte budgets and truncation behavior valid after snapshot-backed
+- [x] Keep byte budgets and truncation behavior valid after snapshot-backed
       data is introduced.
-- [ ] Add performance-oriented tests or benchmark-style regression checks where
+- [x] Add performance-oriented tests or benchmark-style regression checks where
       practical, but do not make wall-clock timing brittle in unit tests.
-- [ ] Update `AGENT_NOTES.md`, `llms.txt`, `docs/CLI_REFERENCE.md`,
+- [x] Update `AGENT_NOTES.md`, `llms.txt`, `docs/CLI_REFERENCE.md`,
       `docs/STATUS.md`, and schema docs.
 
 Primary files:
@@ -543,6 +543,33 @@ go run ./cmd/gosherpa impact diff --base <base-ref> --use-snapshot --json
 go run ./cmd/gosherpa tests affected --base <base-ref> --use-snapshot --json
 go run ./cmd/gosherpa pr --base <base-ref> --use-snapshot --json
 ```
+
+Slice 1.4 implementation completed on 2026-07-17. Selected `<base-ref>`
+remains `origin/main`. `context symbol` and `impact symbol` now accept
+opt-in `--use-snapshot`; `context file`, `context package`, `impact file`, and
+`impact package` remain intentionally unsupported. Valid relationship snapshots
+can now supply selected reference, call, interface, direct-test, and changed
+symbol impact subanalysis for `context symbol`, `context diff`, `impact symbol`,
+`impact diff`, `tests affected`, and `pr`, while unsupported report portions
+continue to run live and remain documented in limitations.
+
+Final verification on 2026-07-17 used `origin/main` for `<base-ref>`:
+
+```bash
+go test ./internal/impact ./internal/agentcontext ./internal/snapshot ./cmd/gosherpa
+go test ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa context diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa impact diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa tests affected --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa pr --base origin/main --use-snapshot --json
+```
+
+The `context symbol` smoke reported snapshot-backed reference and call
+subanalysis, and `impact symbol` reported `snapshot+typechecked`.
 
 Phase 1 is done when:
 

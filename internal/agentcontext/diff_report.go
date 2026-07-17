@@ -8,6 +8,7 @@ import (
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
+	"github.com/panndabea/GoSherpa/internal/symbolindex"
 )
 
 type DiffAnalyzeOptions struct {
@@ -46,7 +47,7 @@ type DiffReport struct {
 }
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
-	snapshotSymbols, snapshotUsed, snapshotWarnings := diffSnapshotSymbols(root, options)
+	snapshotData, snapshotUsed, snapshotWarnings := loadDiffSnapshotData(root, options)
 	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
 		BuildTags: options.BuildTags,
 	})
@@ -55,9 +56,11 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 	}
 
 	impactReport, err := impactengine.AnalyzeDiffWithContext(semanticContext, base, "", impactengine.AnalyzerOptions{
-		BuildTags:          options.BuildTags,
-		UseSnapshotSymbols: snapshotUsed,
-		SnapshotSymbols:    snapshotSymbols,
+		BuildTags:                options.BuildTags,
+		UseSnapshotSymbols:       snapshotUsed,
+		SnapshotSymbols:          snapshotData.Symbols,
+		UseSnapshotRelationships: snapshotData.UseRelationships,
+		SnapshotRelationships:    snapshotData.Relationships,
 	})
 	if err != nil {
 		return DiffReport{}, err
@@ -96,19 +99,39 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 	return normalizeDiffReport(report), nil
 }
 
-func diffSnapshotSymbols(root string, options DiffAnalyzeOptions) ([]sherpa.Symbol, bool, []string) {
+type loadedDiffSnapshotData struct {
+	Symbols          []sherpa.Symbol
+	UseRelationships bool
+	Relationships    symbolindex.RelationshipIndex
+}
+
+func loadDiffSnapshotData(root string, options DiffAnalyzeOptions) (loadedDiffSnapshotData, bool, []string) {
 	if !options.UseSnapshot {
-		return nil, false, nil
+		return loadedDiffSnapshotData{}, false, nil
 	}
 
 	stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{
 		BuildTags: options.BuildTags,
 	})
 	if inspect.Status == snapshotstore.StatusValid {
-		return append([]sherpa.Symbol{}, stored.Symbols...), true, nil
+		data := loadedDiffSnapshotData{
+			Symbols: append([]sherpa.Symbol{}, stored.Symbols...),
+		}
+		if diffRelationshipSnapshotHasReusableData(stored.Relationships) {
+			data.UseRelationships = true
+			data.Relationships = stored.Relationships
+		}
+		return data, true, nil
 	}
 
-	return nil, false, []string{diffSnapshotFallbackWarning(inspect)}
+	return loadedDiffSnapshotData{}, false, []string{diffSnapshotFallbackWarning(inspect)}
+}
+
+func diffRelationshipSnapshotHasReusableData(relationships symbolindex.RelationshipIndex) bool {
+	return len(relationships.References) > 0 ||
+		len(relationships.CallEdges) > 0 ||
+		len(relationships.InterfaceImplementations) > 0 ||
+		len(relationships.TestReferences) > 0
 }
 
 func applyDiffLimits(report DiffReport, limits LimitOptions) DiffReport {
@@ -254,9 +277,9 @@ func changedSymbolReadingTitle(symbol impactengine.ChangedSymbol) string {
 }
 
 func diffAnalysisMode(report impactengine.ImpactReport, snapshotUsed bool) string {
-	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeTypechecked ||
-		report.CallAnalysisMode == sherpa.CallAnalysisModeTypechecked ||
-		report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeTypechecked {
+	if isTypecheckedDiffSubanalysis(report.ReferenceAnalysisMode) ||
+		isTypecheckedDiffSubanalysis(report.CallAnalysisMode) ||
+		isTypecheckedDiffSubanalysis(report.InterfaceAnalysisMode) {
 		if snapshotUsed {
 			return AnalysisModeSnapshotDiffTypechecked
 		}
@@ -267,6 +290,15 @@ func diffAnalysisMode(report impactengine.ImpactReport, snapshotUsed bool) strin
 		return AnalysisModeSnapshotDiff
 	}
 	return AnalysisModeDiff
+}
+
+func isTypecheckedDiffSubanalysis(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case "snapshot+typechecked", "typechecked":
+		return true
+	default:
+		return false
+	}
 }
 
 func diffLimitations(includeTests bool, report DiffReport) []string {
@@ -280,11 +312,11 @@ func diffLimitations(includeTests bool, report DiffReport) []string {
 	switch report.AnalysisMode {
 	case AnalysisModeSnapshotDiffTypechecked:
 		values = append([]string{
-			"Diff context reused a valid snapshot for current changed-symbol inventory and uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
+			"Diff context reused a valid snapshot for current changed-symbol inventory and persisted relationship data, then uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
 		}, values...)
 	case AnalysisModeSnapshotDiff:
 		values = append([]string{
-			"Diff context reused a valid snapshot for current changed-symbol inventory and uses git diff plus syntax-level repository analysis.",
+			"Diff context reused a valid snapshot for current changed-symbol inventory and persisted relationship data where available, then uses git diff plus syntax-level repository analysis.",
 		}, values...)
 	case AnalysisModeDiffTypechecked:
 		values = append([]string{"Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available."}, values...)
@@ -327,13 +359,13 @@ func diffConfidence(report DiffReport) string {
 	if len(report.Warnings) > 0 {
 		return ConfidenceLow
 	}
-	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback {
+	if report.ReferenceAnalysisMode == sherpa.ReferenceAnalysisModeASTFallback || strings.Contains(report.ReferenceAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
-	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback {
+	if report.CallAnalysisMode == sherpa.CallAnalysisModeASTFallback || strings.Contains(report.CallAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
-	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback {
+	if report.InterfaceAnalysisMode == impactengine.InterfaceAnalysisModeASTFallback || strings.Contains(report.InterfaceAnalysisMode, "ast-fallback") {
 		return ConfidenceLow
 	}
 

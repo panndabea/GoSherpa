@@ -293,7 +293,8 @@ labels. Broader explain, context, impact, test, and path commands currently use:
 `explain.data.callAnalysisMode` and `context symbol.data.callAnalysisMode` use
 the same values. `explain.data.referenceAnalysisMode` and
 `context symbol.data.referenceAnalysisMode` use the reference trust values
-`typechecked` or `ast-fallback`.
+`typechecked`, `ast-fallback`, `snapshot+typechecked`,
+`snapshot+ast-fallback`, or `snapshot`.
 
 `context symbol.data.analysisMode` is different: it describes the broader
 context bundle mode. It can be `typechecked+ast` when symbol identity comes from
@@ -306,7 +307,8 @@ and symbols come from typechecked package loading. Diff-oriented commands
 signals use typechecked package loading, and `git-diff+ast` otherwise. With
 `--use-snapshot` and a valid snapshot on those diff-oriented commands, they
 report `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast` to show
-that current changed-symbol inventory came from the snapshot.
+that current changed-symbol inventory and persisted relationship records came
+from the snapshot where safe.
 
 `doctor.data.analysisMode` reports repository readiness rather than a code
 relationship graph. It is `typechecked` when package loading completed and
@@ -764,9 +766,10 @@ to snapshot reuse with `--use-snapshot`. Inventory command data objects include
 `"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness
 remain live-analysis signals. Diff-oriented commands report
 `"snapshot+git-diff+typechecked+ast"` or `"snapshot+git-diff+ast"` because
-current changed-symbol inventory can come from the snapshot while impact
-relationships remain live-analysis signals. Relationship commands report
-`"snapshot+typechecked"`, `"snapshot+ast-fallback"`, or `"snapshot"` when
+current changed-symbol inventory and selected relationship subanalyses can come
+from the snapshot while unsupported parts remain live-analysis signals.
+Relationship commands and snapshot-backed symbol context/impact subanalyses
+report `"snapshot+typechecked"`, `"snapshot+ast-fallback"`, or `"snapshot"` when
 persisted relationship records are reused. Missing, stale, or invalid snapshots
 fall back to live repository analysis and report the reason in the shared
 envelope `warnings`; use `doctor` to check whether the snapshot is missing,
@@ -777,13 +780,17 @@ valid, stale, invalid, or missing relationship-capable metadata.
 `impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`,
 `tests`, and `tests affected` data objects include the common metadata fields:
 
-- `analysisMode`: `ast`, `typechecked+ast`, `git-diff+ast`,
+- `analysisMode`: `ast`, `typechecked+ast`, `snapshot`,
+  `snapshot+typechecked`, `snapshot+ast-fallback`, `git-diff+ast`,
   `git-diff+typechecked+ast`, `snapshot+git-diff+ast`, or
   `snapshot+git-diff+typechecked+ast`. Direct impact queries use
   `typechecked+ast` when one or more composed subanalyses used typechecked
-  package loading; diff-based queries use `git-diff+typechecked+ast` when
-  changed-symbol, reference, call, or interface subanalysis used typechecked
-  package loading and `git-diff+ast` otherwise. Direct `tests` queries use
+  package loading, and `impact symbol --use-snapshot` can report snapshot
+  relationship modes when persisted references, calls, interface signals, or
+  direct test seeds are reused. Diff-based queries use
+  `git-diff+typechecked+ast` when changed-symbol, reference, call, or interface
+  subanalysis used typechecked package loading and `git-diff+ast` otherwise.
+  Direct `tests` queries use
   `typechecked+ast` when direct symbol or file-contained symbol test-reference
   analysis loaded repository packages and `ast` otherwise.
 - `confidence`: deterministic trust label.
@@ -913,14 +920,18 @@ trust metadata:
   identity comes from typechecked package loading and `ast` otherwise.
 - `confidence`: deterministic trust label.
 - `limitations`: context, call, and test-planning blind spots.
-- `referenceAnalysisMode`: reference trust mode, either `typechecked` or
-  `ast-fallback`.
-- `callAnalysisMode`: call graph trust mode, either `typechecked` or
-  `ast-fallback`.
+- `referenceAnalysisMode`: reference trust mode, either `typechecked`,
+  `ast-fallback`, `snapshot+typechecked`, `snapshot+ast-fallback`, or
+  `snapshot`.
+- `callAnalysisMode`: call graph trust mode, either `typechecked`,
+  `ast-fallback`, `snapshot+typechecked`, `snapshot+ast-fallback`, or
+  `snapshot`.
 - `interfaceAnalysisMode`: trust mode for interface and implementation impact
-  fields when present, either `typechecked` or `ast-fallback`.
+  fields when present, either `typechecked`, `ast-fallback`,
+  `snapshot+typechecked`, `snapshot+ast-fallback`, or `snapshot`.
 - `testAnalysisMode`: trust mode for related-test and test-plan fields when
-  present, either `typechecked+ast` or `ast`.
+  present, either `typechecked+ast`, `ast`, `snapshot+typechecked`,
+  `snapshot+ast-fallback`, or `snapshot`.
 - `callers`: repository-local callers.
 - `callees`: repository-local callees.
 

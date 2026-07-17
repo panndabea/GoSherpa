@@ -125,7 +125,7 @@ func TestAnalyzeImpactSubcommandSharesSemanticSession(t *testing.T) {
 		mainTestLoadSemanticContextRepository = original
 	}()
 
-	report, err := analyzeImpactSubcommand(tmp, "symbol", "Target", nil)
+	report, err := analyzeImpactSubcommand(tmp, "symbol", "Target", cliInvocation{})
 	if err != nil {
 		t.Fatalf("analyzeImpactSubcommand returned error: %v", err)
 	}

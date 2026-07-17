@@ -167,11 +167,7 @@ func runContextCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 		}
 
 		target := invocation.CommandArgs[1]
-		report, err := agentcontext.AnalyzeSymbol(root, target, agentcontext.AnalyzeOptions{
-			IncludeTests: invocation.IncludeTests,
-			BuildTags:    invocation.BuildTags,
-			Limits:       invocation.ContextLimits,
-		})
+		report, err := loadContextSymbolReportForCommand(root, invocation, target)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "context symbol", target, stderr, err)
 		}
@@ -584,7 +580,7 @@ func runImpactCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writ
 
 		kind := invocation.CommandArgs[0]
 		target := invocation.CommandArgs[1]
-		report, err := analyzeImpactSubcommand(root, kind, target, invocation.BuildTags)
+		report, err := analyzeImpactSubcommand(root, kind, target, invocation)
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "impact "+kind, target, stderr, err)
 		}

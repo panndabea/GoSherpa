@@ -72,13 +72,13 @@ files.
 - `gosherpa search <terms> --json`
 - `gosherpa explain <symbol> --json`
 - `gosherpa context diff --base HEAD --use-snapshot --json`
-- `gosherpa context symbol <target> --json`
+- `gosherpa context symbol <target> --use-snapshot --json`
 - `gosherpa context file <file> --json`
 - `gosherpa context package <package> --json`
 - `gosherpa impact diff --base HEAD --json`
 - `gosherpa impact file <file> --json`
 - `gosherpa impact package <package> --json`
-- `gosherpa impact symbol <symbol> --json`
+- `gosherpa impact symbol <symbol> --use-snapshot --json`
 - `gosherpa pr --base HEAD --json`
 - `gosherpa refs <symbol> --json`
 - `gosherpa refs <symbol> --use-snapshot --json`
@@ -105,7 +105,7 @@ files.
 Context commands are optimized for bounded pre-edit agent context:
 
 ```bash
-gosherpa context symbol ParseFile --json
+gosherpa context symbol ParseFile --use-snapshot --json
 gosherpa context file internal/sherpa/impact.go --json
 gosherpa context package ./internal/sherpa --json
 gosherpa context diff --base HEAD --use-snapshot --json
