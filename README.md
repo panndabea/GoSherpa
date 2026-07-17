@@ -5,7 +5,7 @@
 
   <p>
     <strong>Structural code intelligence for Go projects.</strong><br>
-    Explore symbols, references, packages, callers, and callees from a calm, deterministic CLI.
+    Explore symbols, references, packages, callers, callees, tests, and diff impact from a calm, deterministic CLI.
   </p>
 
   <p>
@@ -19,163 +19,184 @@
 
 > Ask a code-structure question. Get a small, trustworthy answer.
 
-GoSherpa is a fast command-line companion for understanding Go repositories. It helps you find where a symbol lives, who uses it, what a function calls, which packages depend on each other, and what a change might affect.
+GoSherpa is a command-line companion for understanding Go repositories before
+you edit them. It helps developers and coding agents answer focused questions
+about where code lives, who uses it, what it calls, which packages and tests are
+nearby, and what a change might affect.
 
-It is built for developers and coding agents who want focused, repeatable answers without opening half the project in an editor.
+It is intentionally boring in the good way: local analysis, deterministic
+output, human-readable tables by default, and JSON when you want automation.
 
 ## What You Can Ask
 
-| When you ask... | GoSherpa helps you find... |
+| Question | Start with |
 | --- | --- |
-| "Where is this thing defined?" | Symbols, files, signatures, and line numbers |
-| "Who uses this function?" | References and direct callers |
-| "What does this function touch?" | Direct callees and local call paths |
-| "Which parts of this interface are used?" | Methods, implementers, type references, and visible interface method calls |
-| "What can reach this internal code?" | Runtime, test, exported, and no-local-caller entrypoints |
-| "What depends on this package?" | Local package imports and dependents |
-| "Which tests cover this file?" | Direct file-symbol references, same-package tests, and suggested commands |
-| "What might this change affect?" | Changed symbols, affected packages, and suggested tests |
+| What shape is this repository in? | `gosherpa doctor`, `gosherpa analyze .` |
+| Where is this symbol defined? | `gosherpa search <terms>`, `gosherpa symbol <target>` |
+| Who uses this function or type? | `gosherpa refs <target>`, `gosherpa callers <target>` |
+| What does this function call? | `gosherpa callees <target>`, `gosherpa path <from> <to>` |
+| Which interfaces and implementers are involved? | `gosherpa interface <interface>`, `gosherpa implementers <interface>` |
+| Which tests are related? | `gosherpa tests <target>`, `gosherpa tests affected --base <ref>` |
+| What might this change affect? | `gosherpa context diff --base <ref>`, `gosherpa impact diff --base <ref>` |
+| What should an agent read before editing? | `gosherpa context symbol|file|package|diff ... --json` |
 
-## Try It
+## Quickstart
 
 ```bash
 git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go run ./cmd/gosherpa version
+go run ./cmd/gosherpa doctor
+go run ./cmd/gosherpa analyze .
+```
+
+Try a few focused questions:
+
+```bash
 go run ./cmd/gosherpa search parse file
 go run ./cmd/gosherpa symbol ParseFile
 go run ./cmd/gosherpa refs ParseFile --kind call
+go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa tests internal/sherpa/parse.go
 ```
 
-For a broader repository overview, run:
-
-```bash
-go run ./cmd/gosherpa analyze .
-go run ./cmd/gosherpa doctor
-```
-
-Build a local binary when you are ready for repeated use:
+Build a local binary when you want repeated use:
 
 ```bash
 go build -o gosherpa ./cmd/gosherpa
 ./gosherpa snapshot
 ./gosherpa analyze --use-snapshot
-./gosherpa symbols --use-snapshot
-./gosherpa refs ParseFile --use-snapshot --json
-./gosherpa callers ParseFile --use-snapshot --json
-./gosherpa context diff --base HEAD --use-snapshot --json
-./gosherpa completion zsh
-./gosherpa entrypoints ParseFile
+./gosherpa context symbol ParseFile --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot
+./gosherpa pr --base HEAD --use-snapshot --json
 ```
 
-When contributing to GoSherpa itself, run the full test suite:
+When contributing to GoSherpa itself, run:
 
 ```bash
 go test ./...
 ```
 
-Use `--root` to run GoSherpa from another working directory:
+Use `--root` to inspect another Go module or workspace from your current
+directory:
 
 ```bash
-./gosherpa --root /path/to/GoSherpa symbols
+./gosherpa --root /path/to/project analyze .
+./gosherpa --root /path/to/project context diff --base HEAD --json
 ```
 
-## Common Commands
+## Common Workflows
 
-| Command | What it shows |
-| --- | --- |
-| `gosherpa version` | GoSherpa and Go runtime version information |
-| `gosherpa help callers` | Usage for a command without running analysis |
-| `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
-| `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
-| `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory and relationship snapshot |
-| `gosherpa completion zsh` | Prints shell completion scripts for zsh, bash, or fish |
-| `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory when available |
-| `gosherpa symbols --use-snapshot` | Reuses a valid snapshot for symbol inventory queries, with live-analysis fallback warnings |
-| `gosherpa symbols --kind function --package ./internal/sherpa` | Structs, interfaces, type aliases, functions, and methods with optional kind, package, and test filters |
-| `gosherpa symbol ParseFile` | One symbol's package, signature, docs, and source location |
-| `gosherpa search parse file` | Ranked partial symbol matches |
-| `gosherpa explain ParseFile` | Purpose, risk, relationships, reading order, and test signals |
-| `gosherpa refs ParseFile --kind call` | Go-aware references filtered by kind |
-| `gosherpa refs ParseFile --use-snapshot` | Reuses valid persisted reference relationships, with live-analysis fallback warnings |
-| `gosherpa callers ParseFile` | Direct callers of a function or method |
-| `gosherpa callers ParseFile --use-snapshot` | Reuses valid persisted direct call relationships |
-| `gosherpa interface ./internal/auth.Authenticator` | Interface methods, implementers, type references, and visible interface method usage |
-| `gosherpa interface ./internal/auth.Authenticator --use-snapshot` | Reuses valid persisted interface and reference relationships for a bounded interface profile |
-| `gosherpa entrypoints ParseFile` | Public, runtime, test, and no-local-caller functions that can reach a target |
-| `gosherpa tests internal/sherpa/parse.go` | Related tests and commands for a changed file |
-| `gosherpa impact diff --base HEAD --use-snapshot` | Changed files, affected packages, and suggested tests, with valid snapshot reuse for current changed-symbol inventory |
-| `gosherpa pr --base HEAD --use-snapshot` | PR-style change summary with risk and verification commands, with valid snapshot reuse where available |
-
-For the full command list, examples, JSON output shape, and agent-oriented context commands, see the [CLI reference](docs/CLI_REFERENCE.md).
-
-## For Agents And Automation
-
-Every command supports machine-readable JSON through `--json` using a stable response envelope. GoSherpa also includes context commands for symbol, file, package, and diff targets:
+For repository orientation:
 
 ```bash
-gosherpa context symbol ParseFile --json
-gosherpa context file internal/sherpa/impact.go --json
-gosherpa context package ./internal/sherpa --json
+gosherpa doctor
+gosherpa analyze .
+gosherpa architecture
+gosherpa risk
+```
+
+For focused symbol work:
+
+```bash
+gosherpa search parse file --limit 10
+gosherpa context symbol ./internal/sherpa.ParseFile --max-references 20 --max-tests 10 --json
+gosherpa refs ./internal/sherpa.ParseFile --json
+gosherpa callers ./internal/sherpa.ParseFile --json
+gosherpa callees ./internal/sherpa.ParseFile --json
+```
+
+For a change or pull request:
+
+```bash
+gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --json
+gosherpa impact diff --base HEAD --json
+gosherpa tests affected --base HEAD --json
+gosherpa pr --base HEAD --json
+```
+
+For faster repeated queries, create a snapshot and opt into reuse:
+
+```bash
+gosherpa snapshot
+gosherpa symbols --use-snapshot
+gosherpa refs ParseFile --use-snapshot --json
+gosherpa callers ParseFile --use-snapshot --json
+gosherpa interface ./internal/auth.Authenticator --use-snapshot --json
 gosherpa context diff --base HEAD --use-snapshot --json
 ```
 
-### Agent Quickstart
+## Command Map
 
-Agents should start with bounded, task-specific context instead of broad inventory dumps.
+| Area | Commands |
+| --- | --- |
+| Readiness and inventory | `doctor`, `analyze`, `snapshot`, `symbols`, `symbol`, `search`, `packages` |
+| Repository structure | `architecture`, `risk`, `deps` |
+| Relationships | `refs`, `callers`, `callees`, `path`, `paths`, `entrypoints` |
+| Interfaces | `implementers`, `interface`, `interfaces` |
+| Context exports | `context symbol`, `context file`, `context package`, `context diff` |
+| Impact and tests | `impact`, `impact file`, `impact package`, `impact symbol`, `impact diff`, `tests`, `tests affected`, `pr` |
+| Shell integration | `completion zsh`, `completion bash`, `completion fish` |
+
+For every command, flag, example, and JSON note, see the
+[CLI reference](docs/CLI_REFERENCE.md).
+
+## JSON And Snapshots
+
+Analysis commands support `--json` through a stable response envelope with the
+command, target, root, module path, warnings, and command-specific `data`.
+Context and diff workflows also expose confidence, limitations, reading order,
+target-risk evidence, and truncation metadata where relevant.
+
+`gosherpa snapshot` writes `.gosherpa/snapshot.json`, a reusable repository
+inventory and bounded relationship snapshot. A valid snapshot can currently be
+reused by:
+
+- `analyze`, `symbols`, `symbol`, `search`, and `packages --tests`
+- `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`
+- `context symbol` and `impact symbol`
+- `context diff`, `impact diff`, `tests affected`, and `pr` for current
+  changed-symbol inventory and selected relationship subanalysis
+
+If a snapshot is missing, stale, invalid, or does not contain the relationship
+records a command needs, GoSherpa falls back to live analysis and reports a
+warning.
+
+## For Agents
+
+Agents should prefer bounded, task-specific context over broad inventory dumps:
 
 ```bash
-# 1. Check whether analysis is trustworthy
 gosherpa doctor --json
-
-# 2. For a change, start with bounded diff context
 gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
-
-# 3. For a symbol task, fetch focused context
-gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --max-bytes 12000 --json
-
-# 4. For impact and test planning
-gosherpa impact diff --base HEAD --use-snapshot --json
+gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa tests affected --base HEAD --use-snapshot --json
 ```
 
-Agent workflow rules:
-
-- Use `--json` for automation and agent workflows.
-- Prefer `context ...` commands before editing files.
-- Always bound large context commands with `--max-*` flags.
-- Avoid broad inventory dumps like unfiltered `symbols` unless you really need them.
-- Use `search --limit <n>` to discover targets, then switch to `symbol`, `context symbol`, `refs`, `callers`, or `callees`.
-- If a target is ambiguous, rerun with the package-qualified target GoSherpa suggests.
-- Add `--tests` only when test code matters.
-
-Start with [GoSherpa for AI Agents](AGENT_NOTES.md) when deciding whether the tool is useful for a repository or task.
-
-See the [Agent JSON Schema](docs/product/JSON_SCHEMA_V1.md) and [Context JSON Schema](docs/product/CONTEXT_SCHEMA_V1.md) for the detailed contracts.
+Start with [GoSherpa for AI Agents](AGENT_NOTES.md) for workflow guidance, and
+use the [Agent JSON Schema](docs/product/JSON_SCHEMA_V1.md) and
+[Context JSON Schema](docs/product/CONTEXT_SCHEMA_V1.md) for machine-readable
+contracts.
 
 ## Status
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track is implemented, including file, package, symbol, and diff impact analysis. Current work continues the Symbol Intelligence track: deeper explanations, better context exports, and more precise semantic references.
+GoSherpa is an early MVP. The Impact Engine v0.1 track is implemented, and
+current work focuses on deeper symbol intelligence, reusable relationship data,
+runtime-aware possible call signals, and target-aware impact summaries.
 
-Read the [implementation status](docs/STATUS.md), [release notes](docs/releases/RELEASE_NOTES_V01.md), or [feature roadmap](docs/product/FEATURE_ROADMAP.md) for the full details.
+Read the [implementation status](docs/STATUS.md), [release notes](docs/releases/RELEASE_NOTES_V01.md),
+or [feature roadmap](docs/product/FEATURE_ROADMAP.md) for the current product
+state.
 
 ## Design Principles
 
-| Principle | What it means in practice |
+| Principle | What it means |
 | --- | --- |
-| Human-readable first | Output is meant to be scanned in a terminal, not decoded from a dump |
-| Deterministic by default | Stable answers make it easier to trust diffs and repeated runs |
-| Small commands | Each command answers one navigation question clearly |
+| Human-readable first | Terminal output should be scannable before it is exhaustive |
+| Deterministic by default | Repeated runs should produce stable, trustworthy answers |
+| Focused commands | Each command should answer one navigation question clearly |
 | Repository-native | GoSherpa uses information already present in the codebase |
-| No hidden ceremony | No annotations, no generated metadata, no project-specific setup for normal use |
-
-## Philosophy
-
-GoSherpa focuses on visibility, not magic.
-
-It does not try to become your IDE, rewrite your project, or infer more certainty than it has. It reads the code you already have and returns compact answers that help you keep moving.
+| Honest limits | Warnings, confidence, and limitations are part of the output contract |
 
 ## License
 
