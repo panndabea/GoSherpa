@@ -92,6 +92,7 @@ func loadDiffAnalyzerOptions(root string, buildTags []string, useSnapshot bool) 
 func relationshipSnapshotHasReusableData(relationships symbolindex.RelationshipIndex) bool {
 	return len(relationships.References) > 0 ||
 		len(relationships.CallEdges) > 0 ||
+		len(relationships.PossibleCallEdges) > 0 ||
 		len(relationships.InterfaceImplementations) > 0 ||
 		len(relationships.TestReferences) > 0
 }
@@ -309,7 +310,7 @@ func callersFromSnapshot(root string, invocation cliInvocation, target string) (
 	if inspect.Status != snapshotstore.StatusValid {
 		return sherpa.CallersResult{}, false, []string{snapshotFallbackWarning(inspect)}, nil
 	}
-	if len(stored.Relationships.CallEdges) == 0 {
+	if len(stored.Relationships.CallEdges) == 0 && len(stored.Relationships.PossibleCallEdges) == 0 {
 		return sherpa.CallersResult{}, false, []string{snapshotRelationshipFallbackWarning("call")}, nil
 	}
 
@@ -319,6 +320,7 @@ func callersFromSnapshot(root string, invocation cliInvocation, target string) (
 	}
 
 	var callers []sherpa.Caller
+	var possibleCalls []sherpa.PossibleCall
 	var limitations []string
 	var modes []string
 	for _, record := range stored.Relationships.CallEdges {
@@ -337,14 +339,28 @@ func callersFromSnapshot(root string, invocation cliInvocation, target string) (
 			Range:    record.Range,
 		})
 	}
+	for _, record := range stored.Relationships.PossibleCallEdges {
+		if !invocation.IncludeTests && snapshotRecordFromTestFile(record.Source, record.File) {
+			continue
+		}
+		if !snapshotIdentityMatchesSymbol(record.Target, symbol) {
+			continue
+		}
+
+		modes = append(modes, record.AnalysisMode)
+		limitations = append(limitations, record.Limitations...)
+		possibleCalls = append(possibleCalls, possibleCallFromSnapshotRecord(record))
+	}
 	sortCallersForSnapshot(callers)
+	sortPossibleCallsForSnapshot(possibleCalls)
 
 	return sherpa.CallersResult{
-		Target:       target,
-		AnalysisMode: snapshotRelationshipAnalysisMode(modes),
-		Warnings:     []string{},
-		Limitations:  uniqueStringsInOrder(limitations),
-		Callers:      nonNilSlice(callers),
+		Target:        target,
+		AnalysisMode:  snapshotRelationshipAnalysisMode(modes),
+		Warnings:      []string{},
+		Limitations:   uniqueStringsInOrder(limitations),
+		Callers:       nonNilSlice(callers),
+		PossibleCalls: nonNilSlice(possibleCalls),
 	}, true, nil, nil
 }
 
@@ -353,7 +369,7 @@ func calleesFromSnapshot(root string, invocation cliInvocation, target string) (
 	if inspect.Status != snapshotstore.StatusValid {
 		return sherpa.CalleesResult{}, false, []string{snapshotFallbackWarning(inspect)}, nil
 	}
-	if len(stored.Relationships.CallEdges) == 0 {
+	if len(stored.Relationships.CallEdges) == 0 && len(stored.Relationships.PossibleCallEdges) == 0 {
 		return sherpa.CalleesResult{}, false, []string{snapshotRelationshipFallbackWarning("call")}, nil
 	}
 
@@ -366,6 +382,7 @@ func calleesFromSnapshot(root string, invocation cliInvocation, target string) (
 	}
 
 	var callees []sherpa.Callee
+	var possibleCalls []sherpa.PossibleCall
 	var limitations []string
 	var modes []string
 	for _, record := range stored.Relationships.CallEdges {
@@ -382,14 +399,25 @@ func calleesFromSnapshot(root string, invocation cliInvocation, target string) (
 			Range:    record.Range,
 		})
 	}
+	for _, record := range stored.Relationships.PossibleCallEdges {
+		if !snapshotIdentityMatchesSymbol(record.Source, symbol) {
+			continue
+		}
+
+		modes = append(modes, record.AnalysisMode)
+		limitations = append(limitations, record.Limitations...)
+		possibleCalls = append(possibleCalls, possibleCallFromSnapshotRecord(record))
+	}
 	sortCalleesForSnapshot(callees)
+	sortPossibleCallsForSnapshot(possibleCalls)
 
 	return sherpa.CalleesResult{
-		Target:       target,
-		AnalysisMode: snapshotRelationshipAnalysisMode(modes),
-		Warnings:     []string{},
-		Limitations:  uniqueStringsInOrder(limitations),
-		Callees:      nonNilSlice(callees),
+		Target:        target,
+		AnalysisMode:  snapshotRelationshipAnalysisMode(modes),
+		Warnings:      []string{},
+		Limitations:   uniqueStringsInOrder(limitations),
+		Callees:       nonNilSlice(callees),
+		PossibleCalls: nonNilSlice(possibleCalls),
 	}, true, nil, nil
 }
 
@@ -537,6 +565,18 @@ func snapshotRelationshipFallbackWarning(kind string) string {
 	return fmt.Sprintf("snapshot not used: valid snapshot has no %s relationship records; using live repository analysis", kind)
 }
 
+func possibleCallFromSnapshotRecord(record symbolindex.PossibleCallEdgeRecord) sherpa.PossibleCall {
+	return sherpa.PossibleCall{
+		Caller:    snapshotIdentityDisplayName(record.Source),
+		Callee:    snapshotIdentityDisplayName(record.Target),
+		Certainty: sherpa.CallCertaintyPossible,
+		Reason:    sherpa.PossibleCallReason(record.Reason),
+		Scope:     record.CallScope,
+		Position:  record.Position,
+		Range:     record.Range,
+	}
+}
+
 func snapshotRelationshipAnalysisMode(modes []string) string {
 	hasTypechecked := false
 	hasASTFallback := false
@@ -666,6 +706,28 @@ func sortCalleesForSnapshot(callees []sherpa.Callee) {
 		}
 
 		return callees[i].Name < callees[j].Name
+	})
+}
+
+func sortPossibleCallsForSnapshot(possibleCalls []sherpa.PossibleCall) {
+	sort.Slice(possibleCalls, func(i int, j int) bool {
+		if possibleCalls[i].Position.File != possibleCalls[j].Position.File {
+			return possibleCalls[i].Position.File < possibleCalls[j].Position.File
+		}
+		if possibleCalls[i].Position.Line != possibleCalls[j].Position.Line {
+			return possibleCalls[i].Position.Line < possibleCalls[j].Position.Line
+		}
+		if possibleCalls[i].Position.Column != possibleCalls[j].Position.Column {
+			return possibleCalls[i].Position.Column < possibleCalls[j].Position.Column
+		}
+		if possibleCalls[i].Caller != possibleCalls[j].Caller {
+			return possibleCalls[i].Caller < possibleCalls[j].Caller
+		}
+		if possibleCalls[i].Callee != possibleCalls[j].Callee {
+			return possibleCalls[i].Callee < possibleCalls[j].Callee
+		}
+
+		return possibleCalls[i].Reason < possibleCalls[j].Reason
 	})
 }
 

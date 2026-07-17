@@ -49,6 +49,8 @@ type PossibleCall struct {
 	Scope     CallScope          `json:"scope,omitempty"`
 	Position  Position           `json:"position"`
 	Range     *SourceRange       `json:"range,omitempty"`
+
+	calleePackage string
 }
 
 const (
@@ -191,9 +193,22 @@ const (
 type callUncertaintySignal struct {
 	Kind     callUncertaintyKind
 	Callee   string
+	Expr     ast.Expr
 	Position Position
 	Range    *SourceRange
 }
+
+type interfaceDispatchCatalog struct {
+	candidates []interfaceDispatchCandidate
+}
+
+type interfaceDispatchCandidate struct {
+	Function  functionInfo
+	Object    *types.Func
+	Signature *types.Signature
+}
+
+const maxPossibleInterfaceDispatchCallees = 8
 
 var loadSemanticCallRepository = semantics.LoadRepository
 
@@ -260,7 +275,7 @@ func findCalleesInFunctions(functions []functionInfo, target callTarget, analysi
 	}
 
 	callees := collectCalleesFromFunction(function)
-	possibleCalls := collectPossibleCallsFromFunction(function)
+	possibleCalls := collectPossibleCallsFromFunctionWithCatalog(function, newInterfaceDispatchCatalog(functions))
 	limitations := collectDynamicCallLimitations([]functionInfo{function})
 
 	return CalleesResult{
@@ -1583,9 +1598,21 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 }
 
 func collectPossibleCallsFromFunction(function functionInfo) []PossibleCall {
+	return collectPossibleCallsFromFunctionWithCatalog(function, newInterfaceDispatchCatalog([]functionInfo{function}))
+}
+
+func collectPossibleCallsFromFunctionWithCatalog(function functionInfo, catalog interfaceDispatchCatalog) []PossibleCall {
 	signals := collectCallUncertaintySignals(function)
 	possibleCalls := make([]PossibleCall, 0, len(signals))
 	for _, signal := range signals {
+		if signal.Kind == callUncertaintyInterfaceDispatch {
+			concreteCalls := possibleInterfaceDispatchCalls(function, catalog, signal)
+			if len(concreteCalls) > 0 {
+				possibleCalls = append(possibleCalls, concreteCalls...)
+			}
+			continue
+		}
+
 		reason, ok := possibleCallReasonForUncertainty(signal.Kind)
 		if !ok {
 			continue
@@ -1608,8 +1635,9 @@ func collectPossibleCallsFromFunction(function functionInfo) []PossibleCall {
 
 func collectPossibleCallersFromFunctions(functions []functionInfo, target callTarget) []PossibleCall {
 	var possibleCalls []PossibleCall
+	catalog := newInterfaceDispatchCatalog(functions)
 	for _, function := range functions {
-		for _, possibleCall := range collectPossibleCallsFromFunction(function) {
+		for _, possibleCall := range collectPossibleCallsFromFunctionWithCatalog(function, catalog) {
 			if !possibleCallMatchesTarget(possibleCall, target) {
 				continue
 			}
@@ -1954,6 +1982,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyGoroutine,
 					Callee:   callUncertaintyCalleeName(function, expr),
+					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Call.Fun),
 					Range:    callExpressionRange(function, typed.Call.Fun),
 				})
@@ -1964,6 +1993,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionLiteral,
 					Callee:   "function literal",
+					Expr:     typed.Fun,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
 				})
@@ -1973,6 +2003,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyInterfaceDispatch,
 					Callee:   callUncertaintyCalleeName(function, expr),
+					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
 				})
@@ -1981,6 +2012,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionValue,
 					Callee:   callUncertaintyCalleeName(function, expr),
+					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
 				})
@@ -1989,6 +2021,7 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyReflection,
 					Callee:   callUncertaintyCalleeName(function, expr),
+					Expr:     expr,
 					Position: callExpressionPosition(function, typed.Fun),
 					Range:    callExpressionRange(function, typed.Fun),
 				})
@@ -1999,6 +2032,196 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 	})
 
 	return signals
+}
+
+func newInterfaceDispatchCatalog(functions []functionInfo) interfaceDispatchCatalog {
+	catalog := interfaceDispatchCatalog{}
+	for _, function := range functions {
+		candidate, ok := interfaceDispatchCandidateForFunction(function)
+		if !ok {
+			continue
+		}
+
+		catalog.candidates = append(catalog.candidates, candidate)
+	}
+
+	sort.Slice(catalog.candidates, func(i int, j int) bool {
+		left := catalog.candidates[i].Function
+		right := catalog.candidates[j].Function
+		if left.Package != right.Package {
+			return left.Package < right.Package
+		}
+		if left.Receiver != right.Receiver {
+			return left.Receiver < right.Receiver
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+
+		return positionRelationshipSortKey(left.Position) < positionRelationshipSortKey(right.Position)
+	})
+
+	return catalog
+}
+
+func interfaceDispatchCandidateForFunction(function functionInfo) (interfaceDispatchCandidate, bool) {
+	if function.Receiver == "" || function.TypeInfo == nil || function.Decl == nil || function.Decl.Name == nil {
+		return interfaceDispatchCandidate{}, false
+	}
+
+	object, ok := function.TypeInfo.Defs[function.Decl.Name].(*types.Func)
+	if !ok || object == nil {
+		return interfaceDispatchCandidate{}, false
+	}
+
+	signature, ok := object.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return interfaceDispatchCandidate{}, false
+	}
+
+	return interfaceDispatchCandidate{
+		Function:  function,
+		Object:    object,
+		Signature: signature,
+	}, true
+}
+
+func possibleInterfaceDispatchCalls(function functionInfo, catalog interfaceDispatchCatalog, signal callUncertaintySignal) []PossibleCall {
+	if function.TypeInfo == nil || signal.Expr == nil {
+		return nil
+	}
+
+	selection := callSelection(function, signal.Expr)
+	if selection == nil {
+		return nil
+	}
+
+	interfaceMethod, ok := selection.Obj().(*types.Func)
+	if !ok || interfaceMethod == nil {
+		return nil
+	}
+
+	iface, ok := callInterfaceType(selection.Recv())
+	if !ok {
+		return nil
+	}
+
+	var possibleCalls []PossibleCall
+	for _, candidate := range catalog.candidates {
+		if !interfaceDispatchCandidateMatches(candidate, interfaceMethod, iface) {
+			continue
+		}
+
+		possibleCalls = append(possibleCalls, PossibleCall{
+			Caller:        function.Target,
+			Callee:        relationshipDisplayName(candidate.Function.Receiver, candidate.Function.Name),
+			Certainty:     CallCertaintyPossible,
+			Reason:        PossibleCallReasonInterfaceDispatch,
+			Scope:         CallScopeLocal,
+			Position:      signal.Position,
+			Range:         signal.Range,
+			calleePackage: candidate.Function.Package,
+		})
+	}
+
+	if len(possibleCalls) > maxPossibleInterfaceDispatchCallees {
+		return nil
+	}
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+func interfaceDispatchCandidateMatches(candidate interfaceDispatchCandidate, interfaceMethod *types.Func, iface *types.Interface) bool {
+	if candidate.Object == nil || interfaceMethod == nil || iface == nil {
+		return false
+	}
+	if candidate.Object.Name() != interfaceMethod.Name() {
+		return false
+	}
+	if !callMethodSignaturesCompatible(interfaceMethod, candidate.Object) {
+		return false
+	}
+
+	return callTypeImplementsInterface(candidate.Signature.Recv().Type(), iface)
+}
+
+func callMethodSignaturesCompatible(left *types.Func, right *types.Func) bool {
+	leftSignature, ok := left.Type().(*types.Signature)
+	if !ok {
+		return false
+	}
+	rightSignature, ok := right.Type().(*types.Signature)
+	if !ok {
+		return false
+	}
+	if leftSignature.Variadic() != rightSignature.Variadic() {
+		return false
+	}
+	if !callTuplesIdentical(leftSignature.Params(), rightSignature.Params()) {
+		return false
+	}
+
+	return callTuplesIdentical(leftSignature.Results(), rightSignature.Results())
+}
+
+func callTuplesIdentical(left *types.Tuple, right *types.Tuple) bool {
+	leftLen := 0
+	if left != nil {
+		leftLen = left.Len()
+	}
+	rightLen := 0
+	if right != nil {
+		rightLen = right.Len()
+	}
+	if leftLen != rightLen {
+		return false
+	}
+
+	for i := 0; i < leftLen; i++ {
+		if !types.Identical(left.At(i).Type(), right.At(i).Type()) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func callTypeImplementsInterface(typ types.Type, iface *types.Interface) bool {
+	if typ == nil || iface == nil {
+		return false
+	}
+	if types.Implements(typ, iface) {
+		return true
+	}
+
+	named := callNamedReceiverType(typ)
+	return named != nil && types.Implements(types.NewPointer(named), iface)
+}
+
+func callNamedReceiverType(typ types.Type) *types.Named {
+	switch typed := types.Unalias(typ).(type) {
+	case *types.Named:
+		return typed
+	case *types.Pointer:
+		return callNamedReceiverType(typed.Elem())
+	default:
+		return nil
+	}
+}
+
+func callInterfaceType(typ types.Type) (*types.Interface, bool) {
+	if typ == nil {
+		return nil, false
+	}
+
+	iface, ok := types.Unalias(typ).Underlying().(*types.Interface)
+	if !ok {
+		return nil, false
+	}
+
+	iface.Complete()
+	return iface, true
 }
 
 func possibleCallReasonForUncertainty(kind callUncertaintyKind) (PossibleCallReason, bool) {
@@ -2351,6 +2574,9 @@ func sortPossibleCalls(possibleCalls []PossibleCall) {
 		if possibleCalls[i].Callee != possibleCalls[j].Callee {
 			return possibleCalls[i].Callee < possibleCalls[j].Callee
 		}
+		if possibleCalls[i].calleePackage != possibleCalls[j].calleePackage {
+			return possibleCalls[i].calleePackage < possibleCalls[j].calleePackage
+		}
 
 		return possibleCalls[i].Reason < possibleCalls[j].Reason
 	})
@@ -2377,13 +2603,26 @@ func dedupePossibleCalls(possibleCalls []PossibleCall) []PossibleCall {
 }
 
 func possibleCallMatchesTarget(possibleCall PossibleCall, target callTarget) bool {
+	if target.Package != "" && possibleCall.calleePackage != "" && target.Package != possibleCall.calleePackage {
+		return false
+	}
+
 	return callMatchesTarget(possibleCall.Callee, target.Symbol())
+}
+
+func positionRelationshipSortKey(position Position) string {
+	return strings.Join([]string{
+		filepath.ToSlash(position.File),
+		fmt.Sprintf("%08d", position.Line),
+		fmt.Sprintf("%08d", position.Column),
+	}, "\x00")
 }
 
 func possibleCallKey(possibleCall PossibleCall) string {
 	return strings.Join([]string{
 		possibleCall.Caller,
 		possibleCall.Callee,
+		possibleCall.calleePackage,
 		string(possibleCall.Certainty),
 		string(possibleCall.Reason),
 		string(possibleCall.Scope),

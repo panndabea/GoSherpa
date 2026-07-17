@@ -69,6 +69,42 @@ func TestLoadReusableLoadsValidRelationshipSnapshot(t *testing.T) {
 	}
 }
 
+func TestBuildPersistsPossibleCallRelationshipMetadata(t *testing.T) {
+	root := t.TempDir()
+	writeSnapshotTestFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24.4\n")
+	writeSnapshotTestFile(t, filepath.Join(root, "service.go"), `package app
+
+type Processor interface { Process() }
+
+type Worker struct{}
+
+func (Worker) Process() {}
+
+func Entry(processor Processor) {
+	processor.Process()
+}
+`)
+
+	built, err := Build(root, BuildOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(built.Relationships.PossibleCallEdges) != 1 {
+		t.Fatalf("expected one possible call edge, got %#v", built.Relationships.PossibleCallEdges)
+	}
+	edge := built.Relationships.PossibleCallEdges[0]
+	if edge.Target.Receiver != "Worker" || edge.Target.Name != "Process" {
+		t.Fatalf("expected Worker.Process possible call edge, got %#v", edge)
+	}
+	if edge.Reason != string(sherpa.PossibleCallReasonInterfaceDispatch) {
+		t.Fatalf("reason = %q, want %q", edge.Reason, sherpa.PossibleCallReasonInterfaceDispatch)
+	}
+	if got := relationshipCount(t, built.RelationshipMetadata, string(symbolindex.RelationshipKindPossibleCall)); got != 1 {
+		t.Fatalf("possible-call count = %d, want 1", got)
+	}
+}
+
 func TestLoadReusableReportsStaleRelationshipSnapshot(t *testing.T) {
 	root := writeSnapshotTestProject(t)
 	built, err := Build(root, BuildOptions{})

@@ -212,6 +212,30 @@ func buildRelationships(root string, options BuildOptions, symbols []sherpa.Symb
 		})
 	}
 
+	possibleCallEdges, _, _, err := sherpa.BuildPossibleCallRelationshipsWithOptions(root, sherpa.CallOptions{
+		IncludeTests: true,
+		BuildTags:    options.BuildTags,
+	})
+	if err != nil {
+		return relationships, err
+	}
+	for _, edge := range possibleCallEdges {
+		relationships.PossibleCallEdges = append(relationships.PossibleCallEdges, symbolindex.PossibleCallEdgeRecord{
+			Kind:         symbolindex.RelationshipKindPossibleCall,
+			Package:      edge.Package,
+			File:         edge.File,
+			Source:       relationshipSymbolIdentity(edge.Source),
+			Target:       relationshipSymbolIdentity(edge.Target),
+			CallScope:    edge.Scope,
+			Certainty:    symbolindex.RelationshipCertaintyPossible,
+			Reason:       string(edge.Reason),
+			AnalysisMode: edge.AnalysisMode,
+			Position:     edge.Position,
+			Range:        edge.Range,
+			Limitations:  nonNilSlice(edge.Limitations),
+		})
+	}
+
 	interfaceRelationships, _, _, err := impactengine.BuildInterfaceRelationshipsWithOptions(root, impactengine.InterfaceOptions{
 		BuildTags: options.BuildTags,
 	})

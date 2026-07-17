@@ -463,8 +463,10 @@ Data:
 - `limitations`: call-graph blind spots and scope boundaries.
 - `callers`: array of caller entries. The array is present even when empty.
 - `possibleCalls`: array of conservative possible call entries that match the
-  requested target when GoSherpa can name a bounded candidate. It is separate
-  from `callers` and is present even when empty.
+  requested target when GoSherpa can name a bounded candidate. Interface
+  dispatch entries resolve only to known local implementer methods with
+  matching signatures; unknown or broad dispatch remains a limitation. It is
+  separate from `callers` and is present even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 
@@ -497,7 +499,9 @@ Data:
   The array is present even when empty.
 - `possibleCalls`: array of conservative possible outgoing call entries for
   runtime-aware signals such as interface dispatch, goroutine starts, function
-  literals, and function values. It is separate from `callees` and is present
+  literals, and function values. Interface dispatch is emitted only for known
+  local implementer methods with matching signatures; unknown or broad
+  dispatch remains a limitation. It is separate from `callees` and is present
   even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.

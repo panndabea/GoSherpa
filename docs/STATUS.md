@@ -39,6 +39,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Direct caller and callee analysis with package-aware targets and receiver-variable method calls
 - Shortest and limited repository-local call path analysis
 - Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, and function literal calls; `callers --json` and `callees --json` also expose separate `possibleCalls` arrays for bounded possible runtime call signals without changing direct call counts
+- Typechecked interface-dispatch possible calls resolve selector calls on interface-typed values to known local implementer methods when the candidate set is bounded; unknown, broad, or unsupported dispatch remains a limitation instead of a direct call edge
 - Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, exported functions, and functions with no local callers
 - Package-aware standalone call graph commands for package-qualified targets
 - Type alias symbol discovery, including alias signatures and typechecked `context symbol` / `impact symbol` coverage

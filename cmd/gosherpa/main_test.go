@@ -6003,6 +6003,55 @@ func Step() {}
 	assertMainTestJSONArrayHasLength(t, data, "callees", 1)
 }
 
+func TestMainRunsCalleesCommandFromSnapshotIncludesPossibleInterfaceCallsAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process() }
+
+type Worker struct{}
+
+func (Worker) Process() {}
+
+func Run(processor Processor) {
+	processor.Process()
+}
+`)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callees", "Run", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callees", "Run", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	possibleCalls := assertMainTestJSONArrayHasLength(t, data, "possibleCalls", 1)
+	possibleCall, ok := possibleCalls[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected possible call object, got %#v", possibleCalls[0])
+	}
+	if possibleCall["callee"] != "Worker.Process" {
+		t.Fatalf("expected Worker.Process possible callee, got %#v", possibleCall["callee"])
+	}
+	if possibleCall["reason"] != string(sherpa.PossibleCallReasonInterfaceDispatch) {
+		t.Fatalf("expected interface-dispatch reason, got %#v", possibleCall["reason"])
+	}
+	if possibleCall["scope"] != string(sherpa.CallScopeLocal) {
+		t.Fatalf("expected local possible call scope, got %#v", possibleCall["scope"])
+	}
+}
+
 func TestMainRunsCalleesCommandReportsDynamicLimitationsAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 

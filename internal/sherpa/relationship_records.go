@@ -45,6 +45,19 @@ type CallRelationship struct {
 	Limitations  []string
 }
 
+type PossibleCallRelationship struct {
+	Package      string
+	File         string
+	Source       RelationshipSymbolIdentity
+	Target       RelationshipSymbolIdentity
+	Scope        CallScope
+	Reason       PossibleCallReason
+	AnalysisMode string
+	Position     Position
+	Range        *SourceRange
+	Limitations  []string
+}
+
 func BuildReferenceRelationshipsWithOptions(root string, options ReferenceOptions) ([]ReferenceRelationship, string, []string, error) {
 	rootPath, err := absoluteRootPath(root)
 	if err != nil {
@@ -103,6 +116,30 @@ func BuildCallRelationshipsWithOptions(root string, options CallOptions) ([]Call
 	}
 
 	return buildCallRelationshipsFromFunctions(functions, analysisMode), analysisMode, warnings, nil
+}
+
+func BuildPossibleCallRelationshipsWithOptions(root string, options CallOptions) ([]PossibleCallRelationship, string, []string, error) {
+	rootPath, err := absoluteRootPath(root)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	functions, analysisMode, warnings, err := collectCallFunctionInfos(rootPath, options)
+	if err != nil {
+		return nil, analysisMode, warnings, err
+	}
+
+	if options.IncludeTests {
+		testFunctions, testWarnings, err := collectTestCallerFunctionInfos(rootPath, options)
+		warnings = uniqueSorted(append(warnings, testWarnings...))
+		if err != nil {
+			return nil, analysisMode, warnings, err
+		}
+		functions = append(functions, testFunctions...)
+		sortFunctionInfos(functions)
+	}
+
+	return buildPossibleCallRelationshipsFromFunctions(functions, analysisMode), analysisMode, warnings, nil
 }
 
 func buildReferenceRelationshipsFromPackages(root string, packages []referencePackage, options ReferenceOptions, analysisMode string) []ReferenceRelationship {
@@ -411,6 +448,43 @@ func buildCallRelationshipsFromFunctions(functions []functionInfo, analysisMode 
 	return records
 }
 
+func buildPossibleCallRelationshipsFromFunctions(functions []functionInfo, analysisMode string) []PossibleCallRelationship {
+	seen := make(map[string]struct{})
+	var records []PossibleCallRelationship
+	catalog := newInterfaceDispatchCatalog(functions)
+
+	for _, function := range functions {
+		source := relationshipIdentityFromFunction(function)
+		limitations := collectDynamicCallLimitations([]functionInfo{function})
+		for _, possibleCall := range collectPossibleCallsFromFunctionWithCatalog(function, catalog) {
+			record := PossibleCallRelationship{
+				Package:      function.Package,
+				File:         possibleCall.Position.File,
+				Source:       source,
+				Target:       relationshipIdentityFromPossibleCall(functions, function, possibleCall),
+				Scope:        possibleCall.Scope,
+				Reason:       possibleCall.Reason,
+				AnalysisMode: analysisMode,
+				Position:     possibleCall.Position,
+				Range:        possibleCall.Range,
+				Limitations:  limitations,
+			}
+			key := possibleCallRelationshipKey(record)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			records = append(records, record)
+		}
+	}
+
+	sort.Slice(records, func(i int, j int) bool {
+		return possibleCallRelationshipKey(records[i]) < possibleCallRelationshipKey(records[j])
+	})
+
+	return records
+}
+
 func relationshipIdentityFromFunction(function functionInfo) RelationshipSymbolIdentity {
 	displayName := relationshipDisplayName(function.Receiver, function.Name)
 	kind := SymbolKindFunction
@@ -427,6 +501,40 @@ func relationshipIdentityFromFunction(function functionInfo) RelationshipSymbolI
 		Kind:          kind,
 		Position:      function.Position,
 		Range:         sourceRangeRelativeToRoot(function.Root, function.FileSet, function.Decl.Pos(), function.Decl.End()),
+	}
+}
+
+func relationshipIdentityFromPossibleCall(functions []functionInfo, source functionInfo, possibleCall PossibleCall) RelationshipSymbolIdentity {
+	receiver, name := relationshipSplitDisplayName(possibleCall.Callee)
+	target := callTarget{
+		Package:  possibleCall.calleePackage,
+		Receiver: receiver,
+		Name:     name,
+	}
+	for _, function := range functions {
+		if functionMatchesCallTarget(function, target) {
+			return relationshipIdentityFromFunction(function)
+		}
+	}
+
+	qualifiedName := strings.TrimSpace(possibleCall.Callee)
+	if possibleCall.calleePackage != "" {
+		qualifiedName = FormatPackageQualifiedTarget(possibleCall.calleePackage, relationshipDisplayName(receiver, name), source.ModulePath)
+	}
+
+	kind := SymbolKindFunction
+	if receiver != "" {
+		kind = SymbolKindMethod
+	}
+
+	return RelationshipSymbolIdentity{
+		Package:       possibleCall.calleePackage,
+		Name:          name,
+		Receiver:      receiver,
+		QualifiedName: qualifiedName,
+		Kind:          kind,
+		Position:      possibleCall.Position,
+		Range:         possibleCall.Range,
 	}
 }
 
@@ -535,6 +643,21 @@ func callRelationshipKey(record CallRelationship) string {
 		relationshipIdentityKey(record.Source),
 		relationshipIdentityKey(record.Target),
 		string(record.Scope),
+		record.AnalysisMode,
+		positionRelationshipKey(record.Position),
+		rangeRelationshipKey(record.Range),
+		strings.Join(record.Limitations, "\x00"),
+	}, "\x00")
+}
+
+func possibleCallRelationshipKey(record PossibleCallRelationship) string {
+	return strings.Join([]string{
+		record.Package,
+		record.File,
+		relationshipIdentityKey(record.Source),
+		relationshipIdentityKey(record.Target),
+		string(record.Scope),
+		string(record.Reason),
 		record.AnalysisMode,
 		positionRelationshipKey(record.Position),
 		rangeRelationshipKey(record.Range),

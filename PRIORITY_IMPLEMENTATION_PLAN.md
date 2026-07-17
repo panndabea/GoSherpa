@@ -674,21 +674,21 @@ possible callees.
 
 Tasks:
 
-- [ ] Detect selector calls on interface-typed values when typechecked data is
+- [x] Detect selector calls on interface-typed values when typechecked data is
       available.
-- [ ] Use the existing interface graph to find local implementers with matching
+- [x] Use the existing interface graph to find local implementers with matching
       method signatures.
-- [ ] Emit possible call edges from the caller to matching implementer methods.
-- [ ] Preserve current direct call behavior for concrete receiver calls.
-- [ ] Avoid possible edges when the implementer set is too broad or unknown;
+- [x] Emit possible call edges from the caller to matching implementer methods.
+- [x] Preserve current direct call behavior for concrete receiver calls.
+- [x] Avoid possible edges when the implementer set is too broad or unknown;
       add a limitation instead.
-- [ ] Add fixtures for:
+- [x] Add fixtures for:
       - interface and implementation in the same package
       - interface and implementation across packages
       - embedded interfaces
       - duplicate method names with different signatures
       - no known local implementer
-- [ ] Feed possible interface edges into context and impact limitations or
+- [x] Feed possible interface edges into context and impact limitations or
       relationship sections without making them direct impact evidence unless
       explicitly documented.
 
@@ -712,6 +712,26 @@ Verification:
 
 ```bash
 go test ./internal/sherpa ./internal/impact ./internal/agentcontext ./cmd/gosherpa
+```
+
+Slice 2.2 verification completed on 2026-07-17. Selected `<base-ref>` remains
+`origin/main`, though no diff-oriented verification was required for this
+slice. Interface-typed selector calls now resolve to bounded local implementer
+methods as `possibleCalls` with reason `interface-dispatch`, matching method
+signatures, source positions, and `scope: local`. Unknown, broad, or unsupported
+interface dispatch stays as a visible limitation and does not produce guessed
+possible edges. Snapshot relationship data now persists `possible-call` records
+and snapshot-backed `callers`/`callees` return additive `possibleCalls` without
+changing direct caller/callee arrays.
+
+Commands run:
+
+```bash
+go test ./...
+go test ./internal/sherpa ./internal/snapshot ./cmd/gosherpa
+go test ./internal/sherpa ./internal/impact ./internal/agentcontext ./cmd/gosherpa
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project snapshot --json
 ```
 
 ### Slice 2.3: Goroutines, Function Literals, And Function Values

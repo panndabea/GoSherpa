@@ -477,3 +477,46 @@ go test ./internal/sherpa ./cmd/gosherpa
 go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
 go test ./...
 ```
+
+## Slice 2.2 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`, though no diff-oriented
+verification was required for this slice.
+
+Slice 2.2 connected visible interface dispatch to bounded local implementer
+methods:
+
+- Interface-typed selector calls now use typechecked receiver and method data
+  to find repository-local implementer methods with matching method signatures.
+- Emitted possible calls keep `certainty: possible`, reason
+  `interface-dispatch`, call-site position/range, and `scope: local`.
+- Unknown, broad, or unsupported interface dispatch remains a limitation
+  instead of producing an abstract guessed edge.
+- Direct caller/callee arrays remain unchanged; concrete receiver calls are
+  still direct evidence, while interface-dispatch implementers are only
+  possible evidence.
+- Fixture coverage now includes same-package implementers, cross-package
+  implementers, embedded interfaces, duplicate method names with incompatible
+  signatures, and no-known-implementer cases.
+- Snapshot format v2 now persists `possible-call` relationship records, and
+  snapshot-backed `callers`/`callees` include additive `possibleCalls` from
+  valid relationship snapshots without dumping relationship details from
+  public `snapshot --json`.
+
+Implementation note: the call layer builds its own typechecked local method
+catalog for dispatch matching to avoid creating an import cycle with the
+interface impact package. The matching semantics remain aligned with the
+interface graph: local method sets, signature compatibility, embedded
+interfaces, and package-local implementer boundaries.
+
+Verification commands:
+
+```bash
+go test ./...
+go test ./internal/sherpa ./internal/snapshot ./cmd/gosherpa
+go test ./internal/sherpa ./internal/impact ./internal/agentcontext ./cmd/gosherpa
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project snapshot --json
+```

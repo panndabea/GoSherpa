@@ -287,7 +287,6 @@ func Target() {}
 
 	got := callTestPossibleCallSummaries(result.PossibleCalls)
 	want := []string{
-		"Run->Processor.Process:interface-dispatch:possible:dynamic:service.go:6",
 		"Run->callback:function-value:possible:dynamic:service.go:7",
 		"Run->Target:goroutine:possible:dynamic:service.go:8",
 		"Run->function literal:function-literal:possible:dynamic:service.go:9",
@@ -300,6 +299,180 @@ func Target() {}
 			t.Fatalf("expected possible call range, got %#v", possibleCall)
 		}
 	}
+}
+
+func TestFindCalleesReportsInterfaceDispatchPossibleCallToSamePackageImplementer(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process(string) error }
+
+type LocalProcessor struct{}
+
+func (LocalProcessor) Process(value string) error { return nil }
+
+func Run(processor Processor) {
+	_ = processor.Process("value")
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->LocalProcessor.Process:interface-dispatch:possible:local:service.go:10"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsInterfaceDispatchPossibleCallAcrossPackages(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "internal", "api", "api.go"), `package api
+
+type Processor interface { Process() }
+`)
+	writeFile(t, filepath.Join(tmp, "internal", "worker", "worker.go"), `package worker
+
+type Worker struct{}
+
+func (Worker) Process() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "example.com/app/internal/api"
+
+func Run(processor api.Processor) {
+	processor.Process()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Worker.Process:interface-dispatch:possible:local:service.go:6"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsInterfaceDispatchThroughEmbeddedInterface(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Reader interface { Read() }
+type Processor interface { Reader }
+
+type Worker struct{}
+
+func (Worker) Read() {}
+
+func Run(processor Processor) {
+	processor.Read()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Worker.Read:interface-dispatch:possible:local:service.go:11"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesFiltersInterfaceDispatchPossibleCallsBySignature(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process(string) }
+
+type Good struct{}
+type Bad struct{}
+
+func (Good) Process(value string) {}
+func (Bad) Process(value int) {}
+
+func Run(processor Processor) {
+	processor.Process("value")
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Good.Process:interface-dispatch:possible:local:service.go:12"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesAvoidsInterfaceDispatchPossibleCallWithoutLocalImplementer(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process() }
+
+func Run(processor Processor) {
+	processor.Process()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible calls without a known local implementer, got %#v", result.PossibleCalls)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Interface dispatch", "service.go:6")
+}
+
+func TestFindCalleesAvoidsInterfaceDispatchPossibleCallsWhenCandidateSetIsBroad(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+
+	var source strings.Builder
+	source.WriteString(`package service
+
+type Processor interface { Process() }
+
+`)
+	for i := 0; i < maxPossibleInterfaceDispatchCallees+1; i++ {
+		fmt.Fprintf(&source, "type Worker%d struct{}\n\nfunc (Worker%d) Process() {}\n\n", i, i)
+	}
+	source.WriteString(`func Run(processor Processor) {
+	processor.Process()
+}
+`)
+	writeFile(t, filepath.Join(tmp, "service.go"), source.String())
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible calls for broad interface dispatch, got %#v", result.PossibleCalls)
+	}
+	assertContainsCallLimitation(t, result.Limitations, "Interface dispatch", "service.go")
 }
 
 func TestFindCallersReportsTargetMatchingPossibleCalls(t *testing.T) {
