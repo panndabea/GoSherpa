@@ -29,8 +29,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, reading order, confidence, limitations, and JSON output
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
-- Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot, confidence, limitations, warnings, and JSON output
-- Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, and git state
+- Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
+- Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
 - Static shell completion script generation with `gosherpa completion zsh|bash|fish`
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
@@ -84,7 +84,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering,
   including read/write classification for value and field references
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
-- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, or invalid snapshots fall back to live analysis with warnings.
+- Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
 
 ## Known MVP Limitations
 
@@ -107,8 +107,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   selected module or workspace. `doctor` detects the standard
   `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
   context commands analyze generated files like other compiler-visible Go files.
-- Snapshot creation and stale/missing/valid diagnostics are implemented, with first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and current changed-symbol inventory in `context diff`, `impact diff`, `tests affected`, and `pr`; deeper semantic relationship, impact, and call-graph queries still analyze repository data directly.
-- The shared repository index v0 currently covers package, file, and symbol inventory. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship reuse remains separate follow-up work.
+- Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, first-slice reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and current changed-symbol inventory in `context diff`, `impact diff`, `tests affected`, and `pr`; deeper semantic relationship, impact, and call-graph queries still analyze repository data directly.
+- The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records exist behind bounded metadata, while command-level relationship reuse remains separate follow-up work.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.

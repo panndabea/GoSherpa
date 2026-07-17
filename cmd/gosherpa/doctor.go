@@ -72,18 +72,19 @@ type doctorPackageSummary struct {
 }
 
 type doctorSnapshotStatus struct {
-	Supported          bool     `json:"supported"`
-	Status             string   `json:"status"`
-	Path               string   `json:"path,omitempty"`
-	Message            string   `json:"message"`
-	FormatVersion      int      `json:"formatVersion,omitempty"`
-	CreatedAt          string   `json:"createdAt,omitempty"`
-	Fingerprint        string   `json:"fingerprint,omitempty"`
-	CurrentFingerprint string   `json:"currentFingerprint,omitempty"`
-	FileCount          int      `json:"fileCount,omitempty"`
-	PackageCount       int      `json:"packageCount,omitempty"`
-	SymbolCount        int      `json:"symbolCount,omitempty"`
-	StaleReasons       []string `json:"staleReasons"`
+	Supported            bool                               `json:"supported"`
+	Status               string                             `json:"status"`
+	Path                 string                             `json:"path,omitempty"`
+	Message              string                             `json:"message"`
+	FormatVersion        int                                `json:"formatVersion,omitempty"`
+	CreatedAt            string                             `json:"createdAt,omitempty"`
+	Fingerprint          string                             `json:"fingerprint,omitempty"`
+	CurrentFingerprint   string                             `json:"currentFingerprint,omitempty"`
+	FileCount            int                                `json:"fileCount,omitempty"`
+	PackageCount         int                                `json:"packageCount,omitempty"`
+	SymbolCount          int                                `json:"symbolCount,omitempty"`
+	RelationshipMetadata snapshotstore.RelationshipMetadata `json:"relationshipMetadata"`
+	StaleReasons         []string                           `json:"staleReasons"`
 }
 
 func analyzeDoctor(root string, buildTags []string) doctorReport {
@@ -212,7 +213,7 @@ func doctorLimitations() []string {
 		"Doctor checks repository readiness; it does not prove every downstream analysis is complete.",
 		"Package loading follows the current Go environment and any provided --tags values.",
 		"Generated files are included when Go package loading includes them; generated-file policy is currently informational.",
-		"Snapshots currently store repository inventory and freshness metadata; query commands still analyze the repository on demand.",
+		"Snapshots store repository inventory, freshness metadata, and bounded relationship metadata; relationship query reuse is still opt-in follow-up work.",
 	}
 }
 
@@ -299,6 +300,7 @@ func formatDoctorReport(report doctorReport) string {
 		fmt.Fprintf(&builder, "  Packages: %d\n", report.Snapshot.PackageCount)
 		fmt.Fprintf(&builder, "  Symbols: %d\n", report.Snapshot.SymbolCount)
 	}
+	writeSnapshotRelationshipMetadata(&builder, report.Snapshot.RelationshipMetadata)
 	fmt.Fprintf(&builder, "  %s\n", report.Snapshot.Message)
 	if len(report.Snapshot.StaleReasons) > 0 {
 		writeDoctorValues(&builder, "  Stale reasons", report.Snapshot.StaleReasons)
@@ -484,18 +486,19 @@ func inspectDoctorSnapshot(root string, buildTags []string) doctorSnapshotStatus
 	})
 
 	return doctorSnapshotStatus{
-		Supported:          result.Supported,
-		Status:             result.Status,
-		Path:               result.Path,
-		Message:            result.Message,
-		FormatVersion:      result.FormatVersion,
-		CreatedAt:          result.CreatedAt,
-		Fingerprint:        result.Fingerprint,
-		CurrentFingerprint: result.CurrentFingerprint,
-		FileCount:          result.FileCount,
-		PackageCount:       result.PackageCount,
-		SymbolCount:        result.SymbolCount,
-		StaleReasons:       result.StaleReasons,
+		Supported:            result.Supported,
+		Status:               result.Status,
+		Path:                 result.Path,
+		Message:              result.Message,
+		FormatVersion:        result.FormatVersion,
+		CreatedAt:            result.CreatedAt,
+		Fingerprint:          result.Fingerprint,
+		CurrentFingerprint:   result.CurrentFingerprint,
+		FileCount:            result.FileCount,
+		PackageCount:         result.PackageCount,
+		SymbolCount:          result.SymbolCount,
+		RelationshipMetadata: result.RelationshipMetadata,
+		StaleReasons:         result.StaleReasons,
 	}
 }
 

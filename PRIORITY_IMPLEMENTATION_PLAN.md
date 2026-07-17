@@ -316,22 +316,22 @@ Goal: persist the first relationship index slice safely.
 
 Tasks:
 
-- [ ] Add compatible snapshot fields or bump `FormatVersion` intentionally.
-- [ ] Separate the persisted snapshot file shape from public `snapshot --json`
+- [x] Add compatible snapshot fields or bump `FormatVersion` intentionally.
+- [x] Separate the persisted snapshot file shape from public `snapshot --json`
       output if needed. Adding relationship arrays directly to
       `snapshotstore.Snapshot` will otherwise expose unbounded relationship
       detail through the command JSON.
-- [ ] Persist relationship records only when they can be invalidated by the
+- [x] Persist relationship records only when they can be invalidated by the
       existing snapshot fingerprint inputs, or extend the fingerprint inputs in
       the same slice.
-- [ ] Ensure build tags are part of snapshot compatibility, as they are today.
-- [ ] Keep snapshot writes deterministic.
-- [ ] Ensure stale, invalid, and missing snapshot diagnostics remain clear in
+- [x] Ensure build tags are part of snapshot compatibility, as they are today.
+- [x] Keep snapshot writes deterministic.
+- [x] Ensure stale, invalid, and missing snapshot diagnostics remain clear in
       `doctor`.
-- [ ] Add bounded relationship metadata to inspect/status output, for example
+- [x] Add bounded relationship metadata to inspect/status output, for example
       presence flags, format capability, and counts by relationship kind. Do
       not dump full relationship records from `doctor`.
-- [ ] Add tests for:
+- [x] Add tests for:
       - valid relationship snapshot load
       - stale relationship snapshot fallback
       - build-tag mismatch fallback
@@ -340,7 +340,7 @@ Tasks:
         version is unchanged
       - intentional stale or invalid diagnostics for old snapshots if format
         version is bumped
-- [ ] Update schema docs for `snapshot` output.
+- [x] Update schema docs for `snapshot` output.
 
 Primary files:
 
@@ -370,6 +370,24 @@ Verification:
 
 ```bash
 go test ./internal/snapshot ./cmd/gosherpa
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa doctor --json
+```
+
+Slice 1.2 verification completed on 2026-07-17. Selected `<base-ref>` remains
+`origin/main`, though no diff-oriented verification was required for this
+slice. Implemented snapshot format v2 with persisted internal relationship
+arrays, explicit relationship-capability metadata, bounded public
+`snapshot --json` summaries, `doctor` relationship metadata, stale diagnostics
+for legacy v1 snapshots, build-tag mismatch checks, malformed relationship data
+fallback, schema/docs updates, and focused snapshot/CLI tests.
+
+Commands run:
+
+```bash
+go test ./internal/snapshot
+go test ./cmd/gosherpa
+go test ./...
 go run ./cmd/gosherpa snapshot --json
 go run ./cmd/gosherpa doctor --json
 ```

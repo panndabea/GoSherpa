@@ -637,6 +637,22 @@ Data:
     "status": "missing",
     "path": ".gosherpa/snapshot.json",
     "message": "No snapshot found. Run gosherpa snapshot to create one.",
+    "relationshipMetadata": {
+      "present": false,
+      "capable": false,
+      "totalCount": 0,
+      "countsByKind": [
+        { "kind": "symbol-definition", "count": 0 },
+        { "kind": "reference", "count": 0 },
+        { "kind": "call", "count": 0 },
+        { "kind": "possible-call", "count": 0 },
+        { "kind": "interface-implementation", "count": 0 },
+        { "kind": "satisfied-interface", "count": 0 },
+        { "kind": "test-reference", "count": 0 },
+        { "kind": "test-plan-seed", "count": 0 },
+        { "kind": "package-relationship", "count": 0 }
+      ]
+    },
     "staleReasons": []
   },
   "analysisMode": "typechecked",
@@ -654,7 +670,8 @@ Data:
   `warnings`, or `failed`.
 - `snapshot`: current snapshot support and status. Status is `missing`,
   `valid`, `stale`, or `invalid`; valid and stale snapshots include version,
-  creation, count, fingerprint, and stale-reason metadata.
+  creation, count, fingerprint, stale-reason metadata, and bounded
+  `relationshipMetadata`.
 - `analysisMode`: readiness mode, currently `typechecked` or `unavailable`.
 - `confidence`: `low` when warnings are emitted, otherwise `medium`.
 - `limitations`: boundaries of the readiness check.
@@ -677,7 +694,7 @@ Data:
   "status": "valid",
   "path": ".gosherpa/snapshot.json",
   "snapshot": {
-    "formatVersion": 1,
+    "formatVersion": 2,
     "createdAt": "2026-07-05T12:00:00Z",
     "root": "/repo",
     "modulePath": "example.com/app",
@@ -687,9 +704,26 @@ Data:
     "buildTags": [],
     "gitState": "ref:refs/heads/main@abc123",
     "fingerprint": "...",
-    "files": [],
-    "packages": [],
-    "symbols": []
+    "fileCount": 12,
+    "packageCount": 3,
+    "symbolCount": 42,
+    "relationshipMetadata": {
+      "present": true,
+      "capable": true,
+      "snapshotFormatVersion": 2,
+      "totalCount": 42,
+      "countsByKind": [
+        { "kind": "symbol-definition", "count": 42 },
+        { "kind": "reference", "count": 0 },
+        { "kind": "call", "count": 0 },
+        { "kind": "possible-call", "count": 0 },
+        { "kind": "interface-implementation", "count": 0 },
+        { "kind": "satisfied-interface", "count": 0 },
+        { "kind": "test-reference", "count": 0 },
+        { "kind": "test-plan-seed", "count": 0 },
+        { "kind": "package-relationship", "count": 0 }
+      ]
+    }
   }
 }
 ```
@@ -697,10 +731,17 @@ Data:
 - `status`: `valid` after a successful write.
 - `path`: root-relative snapshot path.
 - `snapshot.formatVersion`: cache format version.
-- `snapshot.files`: Go files plus module/workspace manifests used for
-  freshness checks; entries include path, size, mod time, and SHA-256.
-- `snapshot.packages`: package inventory in the same shape as `packages`.
-- `snapshot.symbols`: parsed symbol inventory in the same shape as `symbols`.
+- `snapshot.fileCount`, `snapshot.packageCount`, and `snapshot.symbolCount`:
+  bounded inventory counts for the persisted snapshot.
+- `snapshot.relationshipMetadata`: bounded relationship snapshot metadata. It
+  reports whether relationship data is present and relationship-capable, the
+  relationship-capable snapshot format, total relationship count, and stable
+  `countsByKind`. It does not dump persisted relationship records.
+
+The persisted `.gosherpa/snapshot.json` file may contain inventory arrays and
+internal relationship records. Public `snapshot --json` output intentionally
+returns only the summary above so relationship detail does not become an
+unbounded command response.
 
 Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`,
 test-inclusive `packages --tests`, and diff-oriented commands `context diff`,
@@ -716,7 +757,8 @@ relationships remain live-analysis signals. Missing, stale, or invalid
 snapshots fall back to live repository analysis and report the reason in the
 shared envelope `warnings`. Deeper semantic, context, impact, and call-graph
 queries still analyze repository data directly in this slice; use `doctor` to
-check whether the snapshot is missing, valid, stale, or invalid.
+check whether the snapshot is missing, valid, stale, invalid, or missing
+relationship-capable metadata.
 
 ## Impact And Test Data
 

@@ -14,12 +14,14 @@ import (
 
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
+	"github.com/panndabea/GoSherpa/internal/symbolindex"
 )
 
 const (
-	FormatVersion = 1
-	DirectoryName = ".gosherpa"
-	FileName      = "snapshot.json"
+	FormatVersion       = 2
+	legacyFormatVersion = 1
+	DirectoryName       = ".gosherpa"
+	FileName            = "snapshot.json"
 
 	StatusMissing = "missing"
 	StatusValid   = "valid"
@@ -32,19 +34,21 @@ type BuildOptions struct {
 }
 
 type Snapshot struct {
-	FormatVersion int                     `json:"formatVersion"`
-	CreatedAt     string                  `json:"createdAt"`
-	Root          string                  `json:"root"`
-	ModulePath    string                  `json:"modulePath"`
-	GoVersion     string                  `json:"goVersion"`
-	GOOS          string                  `json:"goos"`
-	GOARCH        string                  `json:"goarch"`
-	BuildTags     []string                `json:"buildTags"`
-	GitState      string                  `json:"gitState,omitempty"`
-	Fingerprint   string                  `json:"fingerprint"`
-	Files         []File                  `json:"files"`
-	Packages      []sherpa.PackageSummary `json:"packages"`
-	Symbols       []sherpa.Symbol         `json:"symbols"`
+	FormatVersion        int                           `json:"formatVersion"`
+	CreatedAt            string                        `json:"createdAt"`
+	Root                 string                        `json:"root"`
+	ModulePath           string                        `json:"modulePath"`
+	GoVersion            string                        `json:"goVersion"`
+	GOOS                 string                        `json:"goos"`
+	GOARCH               string                        `json:"goarch"`
+	BuildTags            []string                      `json:"buildTags"`
+	GitState             string                        `json:"gitState,omitempty"`
+	Fingerprint          string                        `json:"fingerprint"`
+	Files                []File                        `json:"files"`
+	Packages             []sherpa.PackageSummary       `json:"packages"`
+	Symbols              []sherpa.Symbol               `json:"symbols"`
+	Relationships        symbolindex.RelationshipIndex `json:"relationships"`
+	RelationshipMetadata RelationshipMetadata          `json:"relationshipMetadata"`
 }
 
 type File struct {
@@ -55,19 +59,50 @@ type File struct {
 	SHA256      string `json:"sha256"`
 }
 
+type Summary struct {
+	FormatVersion        int                  `json:"formatVersion"`
+	CreatedAt            string               `json:"createdAt"`
+	Root                 string               `json:"root"`
+	ModulePath           string               `json:"modulePath"`
+	GoVersion            string               `json:"goVersion"`
+	GOOS                 string               `json:"goos"`
+	GOARCH               string               `json:"goarch"`
+	BuildTags            []string             `json:"buildTags"`
+	GitState             string               `json:"gitState,omitempty"`
+	Fingerprint          string               `json:"fingerprint"`
+	FileCount            int                  `json:"fileCount"`
+	PackageCount         int                  `json:"packageCount"`
+	SymbolCount          int                  `json:"symbolCount"`
+	RelationshipMetadata RelationshipMetadata `json:"relationshipMetadata"`
+}
+
+type RelationshipMetadata struct {
+	Present               bool                    `json:"present"`
+	Capable               bool                    `json:"capable"`
+	SnapshotFormatVersion int                     `json:"snapshotFormatVersion,omitempty"`
+	TotalCount            int                     `json:"totalCount"`
+	CountsByKind          []RelationshipKindCount `json:"countsByKind"`
+}
+
+type RelationshipKindCount struct {
+	Kind  string `json:"kind"`
+	Count int    `json:"count"`
+}
+
 type InspectResult struct {
-	Supported          bool     `json:"supported"`
-	Status             string   `json:"status"`
-	Path               string   `json:"path"`
-	Message            string   `json:"message"`
-	FormatVersion      int      `json:"formatVersion,omitempty"`
-	CreatedAt          string   `json:"createdAt,omitempty"`
-	Fingerprint        string   `json:"fingerprint,omitempty"`
-	CurrentFingerprint string   `json:"currentFingerprint,omitempty"`
-	FileCount          int      `json:"fileCount,omitempty"`
-	PackageCount       int      `json:"packageCount,omitempty"`
-	SymbolCount        int      `json:"symbolCount,omitempty"`
-	StaleReasons       []string `json:"staleReasons"`
+	Supported            bool                 `json:"supported"`
+	Status               string               `json:"status"`
+	Path                 string               `json:"path"`
+	Message              string               `json:"message"`
+	FormatVersion        int                  `json:"formatVersion,omitempty"`
+	CreatedAt            string               `json:"createdAt,omitempty"`
+	Fingerprint          string               `json:"fingerprint,omitempty"`
+	CurrentFingerprint   string               `json:"currentFingerprint,omitempty"`
+	FileCount            int                  `json:"fileCount,omitempty"`
+	PackageCount         int                  `json:"packageCount,omitempty"`
+	SymbolCount          int                  `json:"symbolCount,omitempty"`
+	RelationshipMetadata RelationshipMetadata `json:"relationshipMetadata"`
+	StaleReasons         []string             `json:"staleReasons"`
 }
 
 func Build(root string, options BuildOptions) (Snapshot, error) {
@@ -112,10 +147,11 @@ func Build(root string, options BuildOptions) (Snapshot, error) {
 		Files:         files,
 		Packages:      nonNilSlice(packages),
 		Symbols:       nonNilSlice(symbols),
+		Relationships: symbolindex.NewRelationshipIndex(),
 	}
 	snapshot.Fingerprint = fingerprintSnapshotInputs(snapshot)
 
-	return snapshot, nil
+	return normalizeSnapshotForWrite(snapshot), nil
 }
 
 func Write(root string, snapshot Snapshot) (string, error) {
@@ -124,7 +160,7 @@ func Write(root string, snapshot Snapshot) (string, error) {
 		return "", fmt.Errorf("create snapshot directory: %w", err)
 	}
 
-	data, err := json.MarshalIndent(normalizeSnapshot(snapshot), "", "  ")
+	data, err := json.MarshalIndent(normalizeSnapshotForWrite(snapshot), "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode snapshot: %w", err)
 	}
@@ -148,7 +184,7 @@ func Load(root string) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	return normalizeSnapshot(snapshot), nil
+	return normalizeSnapshotForLoad(snapshot), nil
 }
 
 func LoadReusable(root string, options BuildOptions) (Snapshot, InspectResult) {
@@ -177,17 +213,18 @@ func LoadReusable(root string, options BuildOptions) (Snapshot, InspectResult) {
 	current, currentErr := buildSnapshotInputs(root, options)
 	if currentErr != nil {
 		return stored, normalizeInspectResult(InspectResult{
-			Supported:     true,
-			Status:        StatusInvalid,
-			Path:          displayPath,
-			Message:       fmt.Sprintf("Snapshot could not be checked: %v", currentErr),
-			FormatVersion: stored.FormatVersion,
-			CreatedAt:     stored.CreatedAt,
-			Fingerprint:   stored.Fingerprint,
-			FileCount:     len(stored.Files),
-			PackageCount:  len(stored.Packages),
-			SymbolCount:   len(stored.Symbols),
-			StaleReasons:  []string{"current repository fingerprint could not be computed"},
+			Supported:            true,
+			Status:               StatusInvalid,
+			Path:                 displayPath,
+			Message:              fmt.Sprintf("Snapshot could not be checked: %v", currentErr),
+			FormatVersion:        stored.FormatVersion,
+			CreatedAt:            stored.CreatedAt,
+			Fingerprint:          stored.Fingerprint,
+			FileCount:            len(stored.Files),
+			PackageCount:         len(stored.Packages),
+			SymbolCount:          len(stored.Symbols),
+			RelationshipMetadata: stored.RelationshipMetadata,
+			StaleReasons:         []string{"current repository fingerprint could not be computed"},
 		})
 	}
 
@@ -200,24 +237,45 @@ func LoadReusable(root string, options BuildOptions) (Snapshot, InspectResult) {
 	}
 
 	return stored, normalizeInspectResult(InspectResult{
-		Supported:          true,
-		Status:             status,
-		Path:               displayPath,
-		Message:            message,
-		FormatVersion:      stored.FormatVersion,
-		CreatedAt:          stored.CreatedAt,
-		Fingerprint:        stored.Fingerprint,
-		CurrentFingerprint: current.Fingerprint,
-		FileCount:          len(stored.Files),
-		PackageCount:       len(stored.Packages),
-		SymbolCount:        len(stored.Symbols),
-		StaleReasons:       reasons,
+		Supported:            true,
+		Status:               status,
+		Path:                 displayPath,
+		Message:              message,
+		FormatVersion:        stored.FormatVersion,
+		CreatedAt:            stored.CreatedAt,
+		Fingerprint:          stored.Fingerprint,
+		CurrentFingerprint:   current.Fingerprint,
+		FileCount:            len(stored.Files),
+		PackageCount:         len(stored.Packages),
+		SymbolCount:          len(stored.Symbols),
+		RelationshipMetadata: stored.RelationshipMetadata,
+		StaleReasons:         reasons,
 	})
 }
 
 func Inspect(root string, options BuildOptions) InspectResult {
 	_, result := LoadReusable(root, options)
 	return result
+}
+
+func Summarize(snapshot Snapshot) Summary {
+	snapshot = normalizeSnapshotForLoad(snapshot)
+	return Summary{
+		FormatVersion:        snapshot.FormatVersion,
+		CreatedAt:            snapshot.CreatedAt,
+		Root:                 snapshot.Root,
+		ModulePath:           snapshot.ModulePath,
+		GoVersion:            snapshot.GoVersion,
+		GOOS:                 snapshot.GOOS,
+		GOARCH:               snapshot.GOARCH,
+		BuildTags:            nonNilSlice(snapshot.BuildTags),
+		GitState:             snapshot.GitState,
+		Fingerprint:          snapshot.Fingerprint,
+		FileCount:            len(snapshot.Files),
+		PackageCount:         len(snapshot.Packages),
+		SymbolCount:          len(snapshot.Symbols),
+		RelationshipMetadata: snapshot.RelationshipMetadata,
+	}
 }
 
 func Path(root string) string {
@@ -288,10 +346,11 @@ func buildSnapshotInputs(root string, options BuildOptions) (Snapshot, error) {
 		BuildTags:     semantics.NormalizeBuildTags(options.BuildTags),
 		GitState:      readGitState(rootPath),
 		Files:         files,
+		Relationships: symbolindex.NewRelationshipIndex(),
 	}
 	snapshot.Fingerprint = fingerprintSnapshotInputs(snapshot)
 
-	return snapshot, nil
+	return normalizeSnapshotForWrite(snapshot), nil
 }
 
 func fileMetadata(root string, path string) (File, error) {
@@ -339,6 +398,9 @@ func staleReasons(stored Snapshot, current Snapshot) []string {
 	var reasons []string
 	if stored.FormatVersion != current.FormatVersion {
 		reasons = append(reasons, "snapshot format version changed")
+	}
+	if stored.FormatVersion >= FormatVersion && !stored.RelationshipMetadata.Capable {
+		reasons = append(reasons, "relationship metadata missing")
 	}
 	if filepath.Clean(stored.Root) != filepath.Clean(current.Root) {
 		reasons = append(reasons, "repository root changed")
@@ -453,14 +515,43 @@ func readGitRef(gitDir string, ref string) string {
 	return ""
 }
 
-func normalizeSnapshot(snapshot Snapshot) Snapshot {
+func normalizeSnapshotForWrite(snapshot Snapshot) Snapshot {
+	snapshot = normalizeSnapshotBase(snapshot)
+	if snapshot.FormatVersion == 0 {
+		snapshot.FormatVersion = FormatVersion
+	}
+	if snapshot.FormatVersion >= FormatVersion {
+		snapshot.Relationships = symbolindex.NormalizeRelationshipIndex(snapshot.Root, snapshot.Relationships)
+		snapshot.RelationshipMetadata = relationshipMetadata(snapshot, true)
+	} else {
+		snapshot.Relationships = symbolindex.NewRelationshipIndex()
+		snapshot.RelationshipMetadata = relationshipMetadata(snapshot, false)
+	}
+
+	return snapshot
+}
+
+func normalizeSnapshotForLoad(snapshot Snapshot) Snapshot {
+	snapshot = normalizeSnapshotBase(snapshot)
+	if snapshot.FormatVersion == 0 {
+		snapshot.FormatVersion = legacyFormatVersion
+	}
+	if snapshot.FormatVersion >= FormatVersion && snapshot.RelationshipMetadata.Capable {
+		snapshot.Relationships = symbolindex.NormalizeRelationshipIndex(snapshot.Root, snapshot.Relationships)
+		snapshot.RelationshipMetadata = relationshipMetadata(snapshot, true)
+	} else {
+		snapshot.Relationships = symbolindex.NewRelationshipIndex()
+		snapshot.RelationshipMetadata = relationshipMetadata(snapshot, false)
+	}
+
+	return snapshot
+}
+
+func normalizeSnapshotBase(snapshot Snapshot) Snapshot {
 	snapshot.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(snapshot.BuildTags))
 	snapshot.Files = nonNilSlice(snapshot.Files)
 	snapshot.Packages = nonNilSlice(snapshot.Packages)
 	snapshot.Symbols = nonNilSlice(snapshot.Symbols)
-	if snapshot.FormatVersion == 0 {
-		snapshot.FormatVersion = FormatVersion
-	}
 
 	return snapshot
 }
@@ -470,8 +561,138 @@ func normalizeInspectResult(result InspectResult) InspectResult {
 		result.Status = StatusInvalid
 	}
 	result.StaleReasons = nonNilSlice(result.StaleReasons)
+	result.RelationshipMetadata = normalizeRelationshipMetadata(result.RelationshipMetadata)
 
 	return result
+}
+
+func relationshipMetadata(snapshot Snapshot, capable bool) RelationshipMetadata {
+	if !capable {
+		return normalizeRelationshipMetadata(RelationshipMetadata{
+			Present:      false,
+			Capable:      false,
+			TotalCount:   0,
+			CountsByKind: zeroRelationshipKindCounts(),
+		})
+	}
+
+	counts := relationshipKindCounts(snapshot)
+	total := 0
+	for _, count := range counts {
+		total += count.Count
+	}
+
+	return normalizeRelationshipMetadata(RelationshipMetadata{
+		Present:               true,
+		Capable:               true,
+		SnapshotFormatVersion: snapshot.FormatVersion,
+		TotalCount:            total,
+		CountsByKind:          counts,
+	})
+}
+
+func normalizeRelationshipMetadata(metadata RelationshipMetadata) RelationshipMetadata {
+	metadata.CountsByKind = normalizeRelationshipKindCounts(metadata.CountsByKind)
+	if !metadata.Capable {
+		metadata.Present = false
+		metadata.SnapshotFormatVersion = 0
+		metadata.TotalCount = 0
+		metadata.CountsByKind = zeroRelationshipKindCounts()
+	}
+
+	return metadata
+}
+
+func relationshipKindCounts(snapshot Snapshot) []RelationshipKindCount {
+	counts := make(map[string]int)
+	counts[string(symbolindex.RelationshipKindSymbolDefinition)] = len(snapshot.Symbols)
+	addRelationshipCount := func(kind symbolindex.RelationshipKind, fallback symbolindex.RelationshipKind) {
+		if strings.TrimSpace(string(kind)) == "" {
+			kind = fallback
+		}
+		counts[string(kind)]++
+	}
+
+	for _, record := range snapshot.Relationships.References {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindReference)
+	}
+	for _, record := range snapshot.Relationships.CallEdges {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindCall)
+	}
+	for _, record := range snapshot.Relationships.PossibleCallEdges {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindPossibleCall)
+	}
+	for _, record := range snapshot.Relationships.InterfaceImplementations {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindInterfaceImplementation)
+	}
+	for _, record := range snapshot.Relationships.TestReferences {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindTestReference)
+	}
+	for _, record := range snapshot.Relationships.PackageRelationships {
+		addRelationshipCount(record.Kind, symbolindex.RelationshipKindPackageRelationship)
+	}
+
+	return relationshipKindCountsFromMap(counts)
+}
+
+func zeroRelationshipKindCounts() []RelationshipKindCount {
+	return relationshipKindCountsFromMap(map[string]int{})
+}
+
+func relationshipKindCountsFromMap(counts map[string]int) []RelationshipKindCount {
+	known := make(map[string]struct{})
+	var result []RelationshipKindCount
+	for _, kind := range orderedRelationshipKinds() {
+		value := string(kind)
+		known[value] = struct{}{}
+		result = append(result, RelationshipKindCount{
+			Kind:  value,
+			Count: counts[value],
+		})
+	}
+
+	var extra []string
+	for kind := range counts {
+		if _, ok := known[kind]; !ok {
+			extra = append(extra, kind)
+		}
+	}
+	sort.Strings(extra)
+	for _, kind := range extra {
+		result = append(result, RelationshipKindCount{
+			Kind:  kind,
+			Count: counts[kind],
+		})
+	}
+
+	return result
+}
+
+func normalizeRelationshipKindCounts(counts []RelationshipKindCount) []RelationshipKindCount {
+	values := make(map[string]int)
+	for _, count := range counts {
+		kind := strings.TrimSpace(count.Kind)
+		if kind == "" {
+			continue
+		}
+		values[kind] += count.Count
+	}
+
+	return relationshipKindCountsFromMap(values)
+}
+
+func orderedRelationshipKinds() []symbolindex.RelationshipKind {
+	return []symbolindex.RelationshipKind{
+		symbolindex.RelationshipKindSymbolDefinition,
+		symbolindex.RelationshipKindReference,
+		symbolindex.RelationshipKindCall,
+		symbolindex.RelationshipKindPossibleCall,
+		symbolindex.RelationshipKindInterfaceImplementation,
+		symbolindex.RelationshipKindSatisfiedInterface,
+		symbolindex.RelationshipKindTestReference,
+		symbolindex.RelationshipKindTestPlanSeed,
+		symbolindex.RelationshipKindPackageRelationship,
+	}
 }
 
 func equalStrings(left []string, right []string) bool {

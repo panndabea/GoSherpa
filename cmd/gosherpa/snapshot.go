@@ -10,9 +10,9 @@ import (
 )
 
 type snapshotCommandData struct {
-	Status   string                 `json:"status"`
-	Path     string                 `json:"path"`
-	Snapshot snapshotstore.Snapshot `json:"snapshot"`
+	Status   string                `json:"status"`
+	Path     string                `json:"path"`
+	Snapshot snapshotstore.Summary `json:"snapshot"`
 }
 
 func runSnapshotCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
@@ -48,7 +48,7 @@ func runSnapshotCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wr
 			snapshotCommandData{
 				Status:   snapshotstore.StatusValid,
 				Path:     displayPath,
-				Snapshot: builtSnapshot,
+				Snapshot: snapshotstore.Summarize(builtSnapshot),
 			},
 		))
 	}
@@ -82,8 +82,27 @@ func formatSnapshotCommand(snapshot snapshotstore.Snapshot, path string) string 
 	fmt.Fprintf(&builder, "  Files: %d\n", len(snapshot.Files))
 	fmt.Fprintf(&builder, "  Packages: %d\n", len(snapshot.Packages))
 	fmt.Fprintf(&builder, "  Symbols: %d\n", len(snapshot.Symbols))
+	writeSnapshotRelationshipMetadata(&builder, snapshot.RelationshipMetadata)
 
 	return builder.String()
+}
+
+func writeSnapshotRelationshipMetadata(builder *strings.Builder, metadata snapshotstore.RelationshipMetadata) {
+	builder.WriteString("  Relationship data:\n")
+	fmt.Fprintf(builder, "    Present: %t\n", metadata.Present)
+	fmt.Fprintf(builder, "    Capable: %t\n", metadata.Capable)
+	if metadata.SnapshotFormatVersion > 0 {
+		fmt.Fprintf(builder, "    Snapshot format: %d\n", metadata.SnapshotFormatVersion)
+	}
+	fmt.Fprintf(builder, "    Total relationships: %d\n", metadata.TotalCount)
+	if len(metadata.CountsByKind) == 0 {
+		builder.WriteString("    Counts: none\n")
+		return
+	}
+	builder.WriteString("    Counts:\n")
+	for _, count := range metadata.CountsByKind {
+		fmt.Fprintf(builder, "      %s: %d\n", count.Kind, count.Count)
+	}
 }
 
 func snapshotDisplayPath(root string, path string) string {

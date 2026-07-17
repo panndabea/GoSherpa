@@ -1264,6 +1264,7 @@ func TestMainRunsSnapshotCommand(t *testing.T) {
 		"Files:",
 		"Packages:",
 		"Symbols:",
+		"Relationship data:",
 	} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
@@ -1301,16 +1302,36 @@ func TestMainRunsSnapshotCommandJSON(t *testing.T) {
 	if snapshot["modulePath"] != "example.com/app" {
 		t.Fatalf("expected module path, got %v", snapshot["modulePath"])
 	}
-	if snapshot["formatVersion"] != float64(1) {
-		t.Fatalf("expected format version 1, got %v", snapshot["formatVersion"])
+	if snapshot["formatVersion"] != float64(2) {
+		t.Fatalf("expected format version 2, got %v", snapshot["formatVersion"])
 	}
 	if snapshot["fingerprint"] == "" {
 		t.Fatalf("expected fingerprint, got %v", snapshot["fingerprint"])
 	}
 	assertMainTestJSONArrayHasLength(t, snapshot, "buildTags", 1)
-	assertMainTestJSONArrayHasLength(t, snapshot, "files", 4)
-	assertMainTestJSONArrayHasLength(t, snapshot, "packages", 2)
-	assertMainTestJSONArrayHasLength(t, snapshot, "symbols", 4)
+	if snapshot["fileCount"] != float64(4) {
+		t.Fatalf("expected file count 4, got %v", snapshot["fileCount"])
+	}
+	if snapshot["packageCount"] != float64(2) {
+		t.Fatalf("expected package count 2, got %v", snapshot["packageCount"])
+	}
+	if snapshot["symbolCount"] != float64(4) {
+		t.Fatalf("expected symbol count 4, got %v", snapshot["symbolCount"])
+	}
+	relationshipMetadata := assertMainTestJSONObject(t, snapshot, "relationshipMetadata")
+	if relationshipMetadata["present"] != true || relationshipMetadata["capable"] != true {
+		t.Fatalf("expected relationship-capable metadata, got %#v", relationshipMetadata)
+	}
+	assertMainTestJSONArrayHasLength(t, relationshipMetadata, "countsByKind", 9)
+	if _, ok := snapshot["files"]; ok {
+		t.Fatalf("expected public snapshot summary not to include file records")
+	}
+	if _, ok := snapshot["packages"]; ok {
+		t.Fatalf("expected public snapshot summary not to include package records")
+	}
+	if _, ok := snapshot["symbols"]; ok {
+		t.Fatalf("expected public snapshot summary not to include symbol records")
+	}
 
 	if strings.Contains(result.Stdout, "SNAPSHOT\n") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
@@ -1338,6 +1359,10 @@ func TestMainDoctorReportsValidSnapshot(t *testing.T) {
 	}
 	if snapshot["fileCount"].(float64) <= 0 {
 		t.Fatalf("expected file count, got %v", snapshot["fileCount"])
+	}
+	relationshipMetadata := assertMainTestJSONObject(t, snapshot, "relationshipMetadata")
+	if relationshipMetadata["capable"] != true {
+		t.Fatalf("expected relationship-capable snapshot, got %#v", relationshipMetadata)
 	}
 	assertMainTestJSONArrayHasLength(t, snapshot, "staleReasons", 0)
 }

@@ -50,12 +50,13 @@ the selected module or workspace. `gosherpa doctor` counts files with the
 standard `// Code generated ... DO NOT EDIT.` header; relationship and context
 commands treat those files like other compiler-visible Go files.
 
-Use `gosherpa snapshot` to create a reusable inventory. A valid snapshot can be
-reused by `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, and by
-diff-oriented current changed-symbol inventory in `context diff`,
-`impact diff`, `tests affected`, and `pr` with `--use-snapshot`. Missing,
-stale, or invalid snapshots fall back to live repository analysis and report a
-warning.
+Use `gosherpa snapshot` to create a reusable inventory and relationship-capable
+snapshot file. A valid snapshot can currently be reused by `analyze`,
+`symbols`, `symbol`, `search`, `packages --tests`, and by diff-oriented current
+changed-symbol inventory in `context diff`, `impact diff`, `tests affected`,
+and `pr` with `--use-snapshot`. Missing, stale, invalid, or
+relationship-incompatible snapshots fall back to live repository analysis and
+report a warning.
 
 ```bash
 ./gosherpa snapshot
@@ -96,7 +97,7 @@ symbol completion can come later.
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
-| Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, and freshness metadata |
+| Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, freshness, and relationship metadata |
 | Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
 | Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory and diff changed-symbol inventory where available, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
@@ -291,6 +292,12 @@ typechecked package loading. `context diff` and `pr` include
 `impact diff`, `tests affected`, or `pr`, a valid snapshot is reused for current
 changed-symbol inventory and reports
 `snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`.
+
+`snapshot --json` returns a bounded summary of the persisted snapshot:
+`formatVersion`, environment and freshness inputs, `fileCount`,
+`packageCount`, `symbolCount`, and `relationshipMetadata` with stable
+`countsByKind`. It intentionally does not dump the persisted file, package,
+symbol, or relationship records.
 
 `pr --json` keeps the diff-oriented `risk` summary and also includes
 `repositoryRisk`, the full structural `RiskReport` from `gosherpa risk`.

@@ -156,14 +156,63 @@ Reasons:
 
 Compatibility rule for implementation:
 
-- v1 snapshots may continue to load for inventory reuse.
+- v1 snapshots may continue to decode for diagnostics, but after the v2 slice
+  they are intentionally stale for reuse until refreshed.
 - Relationship loaders must require explicit v2 relationship capability
   metadata before using persisted relationship data.
 - Missing, zero, v1, or malformed relationship metadata must produce a visible
   fallback to live analysis for relationship queries.
-- If `normalizeSnapshot` changes during the v2 slice, it must preserve old
-  inventory behavior without upgrading old files into relationship-capable
-  snapshots.
+- `normalizeSnapshot` behavior must preserve old file diagnostics without
+  upgrading old files into relationship-capable snapshots.
+
+## Slice 1.2 Implementation Update
+
+Date: 2026-07-17
+
+Slice 1.2 implemented snapshot format version `2` for relationship-capable
+snapshot files. The persisted `.gosherpa/snapshot.json` shape now includes
+internal relationship arrays and explicit `relationshipMetadata`; public
+`gosherpa snapshot --json` output is intentionally separated into a bounded
+summary with counts, not full relationship records.
+
+Compatibility behavior after the slice:
+
+- New snapshots write `formatVersion: 2`.
+- Missing or zero `formatVersion` normalizes to legacy version `1`, not to a
+  relationship-capable snapshot.
+- Legacy v1 snapshots load as inventory files but are reported stale against
+  the current v2 format with `snapshot format version changed`.
+- A v2 snapshot without explicit relationship-capable metadata is stale with
+  `relationship metadata missing`.
+- Malformed relationship data makes the snapshot invalid and falls back to live
+  analysis.
+- Build tags remain part of compatibility checks; mismatched build tags make
+  the snapshot stale.
+
+Bounded relationship metadata now appears in `doctor --json` and
+`snapshot --json`:
+
+- `present`
+- `capable`
+- `snapshotFormatVersion`
+- `totalCount`
+- `countsByKind`
+
+The first v2 snapshot created during verification reported relationship data as
+present and capable, with `symbol-definition` count populated from the symbol
+inventory and other relationship record counts currently `0`. Command-level
+relationship reuse remains a Slice 1.3/1.4 follow-up; no additional
+`--use-snapshot` CLI support was enabled in Slice 1.2.
+
+Verification commands:
+
+```bash
+go test ./internal/snapshot
+go test ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa doctor --json
+```
 
 ## Accepted Relationship Labels
 
