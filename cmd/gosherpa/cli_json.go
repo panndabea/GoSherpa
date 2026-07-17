@@ -75,6 +75,7 @@ type impactJSONData struct {
 	Confidence            string                     `json:"confidence"`
 	Limitations           []string                   `json:"limitations"`
 	Kind                  sherpa.ImpactKind          `json:"kind"`
+	TargetRisk            sherpa.TargetRiskSummary   `json:"targetRisk"`
 	References            []sherpa.Reference         `json:"references"`
 	ReferenceAnalysisMode string                     `json:"referenceAnalysisMode,omitempty"`
 	Callers               []sherpa.Caller            `json:"callers"`
@@ -95,6 +96,7 @@ type impactDiffJSONData struct {
 	ChangedPackages         []string                   `json:"changedPackages"`
 	AffectedPackages        []string                   `json:"affectedPackages"`
 	AffectedSymbols         []string                   `json:"affectedSymbols"`
+	TargetRisk              sherpa.TargetRiskSummary   `json:"targetRisk"`
 	ReferenceAnalysisMode   string                     `json:"referenceAnalysisMode,omitempty"`
 	CallAnalysisMode        string                     `json:"callAnalysisMode,omitempty"`
 	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
@@ -349,6 +351,7 @@ func impactJSONResult(result sherpa.ImpactResult) sherpa.ImpactResult {
 	result.TestAnalysisMode = strings.TrimSpace(result.TestAnalysisMode)
 	result.TestCommands = nonNilSlice(result.TestCommands)
 	result.TestPlan = sherpa.NormalizeTestPlan(result.TestPlan)
+	result.TargetRisk = sherpa.NormalizeTargetRiskSummary(result.TargetRisk)
 	result.Warnings = nonNilSlice(result.Warnings)
 
 	return result
@@ -362,6 +365,7 @@ func impactJSONDataFromResult(result sherpa.ImpactResult) impactJSONData {
 		Confidence:            jsonConfidence(result.Warnings, analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode),
 		Limitations:           impactBundleLimitations(analysisMode, result.ReferenceAnalysisMode, result.CallAnalysisMode, "", result.TestAnalysisMode),
 		Kind:                  result.Kind,
+		TargetRisk:            result.TargetRisk,
 		References:            result.References,
 		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
 		Callers:               result.Callers,
@@ -394,6 +398,7 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.Warnings = nonNilSlice(report.Warnings)
 
 	return report
@@ -410,6 +415,7 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 		ChangedPackages:         report.ChangedPackages,
 		AffectedPackages:        report.AffectedPackages,
 		AffectedSymbols:         report.AffectedSymbols,
+		TargetRisk:              report.TargetRisk,
 		ReferenceAnalysisMode:   report.ReferenceAnalysisMode,
 		CallAnalysisMode:        report.CallAnalysisMode,
 		AffectedInterfaces:      report.AffectedInterfaces,
@@ -1021,7 +1027,7 @@ func callLimitations(analysisMode string) []string {
 		callAnalysisLimitation(analysisMode),
 		"Call graph results are repository-local.",
 		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
-		"Imported-package receiver calls may be incomplete.",
+		"Imported-package receiver methods are external boundary signals; dependency internals are not analyzed.",
 	}
 }
 

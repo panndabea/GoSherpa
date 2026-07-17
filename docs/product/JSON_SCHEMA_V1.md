@@ -162,7 +162,10 @@ caller or callee counts. `reason` values are stable categories such as
 `stdlib-http-handler`, and `imported-receiver`. `scope` continues to describe
 callee locality, not certainty. For example, a visible local `go Target()`
 possible call has `reason: "goroutine"` and `scope: "local"`, while an unknown
-callback function value remains `scope: "dynamic"`.
+callback function value remains `scope: "dynamic"`. Imported receiver boundary
+signals use `reason: "imported-receiver"`, `scope: "external"`, and an
+import-path-qualified `callee` such as `strings.Builder.WriteString`; GoSherpa
+does not inspect dependency internals for those edges.
 
 Related tests:
 
@@ -843,14 +846,54 @@ valid, stale, invalid, or missing relationship-capable metadata.
 - `limitations`: command-specific impact or test-planning blind spots.
 
 Impact data keeps its existing arrays such as `references`, `callers`,
-`affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Test data
-keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests` also
-includes `kind` with `symbol`, `package`, or `file`, and `scope` with one of
-`direct`, `related`, or `all`; the default `related` scope focuses direct
+`affectedPackages`, `affectedTests`, `testCommands`, and `testPlan`. Impact,
+context, explain, and PR data may also include additive `targetRisk`:
+
+```json
+{
+  "level": "medium",
+  "scope": "cross-package",
+  "reasons": ["affected-packages", "fallback-tests"],
+  "signals": {
+    "affectedPackages": 2,
+    "directReferences": 0,
+    "transitiveCallers": 0,
+    "callerPackages": 0,
+    "exportedSymbol": false,
+    "exportedTypeMethod": false,
+    "interfaceContracts": 0,
+    "packageFanIn": 0,
+    "missingDirectTests": true,
+    "fallbackTests": true,
+    "possibleRuntimeCalls": 0,
+    "warnings": 0,
+    "nonGoOrHunkOnlyDiff": false,
+    "snapshotFallback": false
+  },
+  "limitations": [
+    "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+  ]
+}
+```
+
+`targetRisk` is separate from `confidence` and from repository structural risk.
+It is a deterministic, evidence-backed summary of blast-radius signals. Current
+`level` values are `low`, `medium`, and `high`; current `scope` values are
+`local`, `package`, `cross-package`, `exported-api`, and
+`interface-contract`. Current `reasons` use stable categories:
+`affected-packages`, `direct-references`, `transitive-callers`,
+`exported-symbol`, `exported-type-method`, `interface-contract`,
+`package-fan-in`, `missing-direct-tests`, `fallback-tests`,
+`possible-runtime-calls`, `non-go-or-hunk-only-diff`, `snapshot-fallback`, and
+`analysis-warning`.
+
+Test data keeps `tests` or `affectedTests`, `commands`, and `testPlan`. `tests`
+also includes `kind` with `symbol`, `package`, or `file`, and `scope` with one
+of `direct`, `related`, or `all`; the default `related` scope focuses direct
 references when they exist. Related or affected test entries may include
-`reasons` with stable relationship labels such as
-`direct-reference`, `same-package`, `target-package`, `external-package`,
-`changed-symbol`, `caller-package`, and `contract`.
+`reasons` with stable relationship labels such as `direct-reference`,
+`same-package`, `target-package`, `external-package`, `changed-symbol`,
+`caller-package`, and `contract`.
 
 Composite impact, context, explain, tests-affected, and PR data that includes
 test recommendations may also include `testAnalysisMode`. It is `typechecked+ast`
@@ -881,13 +924,15 @@ includes `affectedInterfaces`, `affectedImplementations`, and
 `interfaceAnalysisMode` when interface subanalysis ran; `tests affected` and
 `pr` expose `interfaceAnalysisMode` for the same underlying diff report when
 available. `context diff` and `pr` expose `changedSymbolDetails` with package,
-normalized target, position, optional range, and optional deleted status so
-agents can open changed symbols directly.
+normalized target, position, optional range, optional deleted status, and
+optional per-symbol `targetRisk` when a bounded changed-symbol impact analysis
+was available, so agents can open changed symbols directly and compare local
+symbol risk with aggregate diff risk.
 
-`pr` keeps the diff-oriented `risk` object and additionally includes
-`repositoryRisk`, a full structural risk report in the same shape emitted by
-`risk --json`, plus the same changed-symbol-first reading order used by
-`context diff`.
+`pr` keeps the diff-oriented `risk` object, includes `targetRisk` for the
+specific diff blast-radius summary, and additionally includes `repositoryRisk`,
+a full structural risk report in the same shape emitted by `risk --json`, plus
+the same changed-symbol-first reading order used by `context diff`.
 
 ## Interface And Path Data
 

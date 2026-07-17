@@ -146,6 +146,9 @@ Read these fields before acting:
 
 - `warnings`: successful-output warnings from the shared envelope.
 - `data.confidence`: a compact trust signal for the result.
+- `data.targetRisk`: deterministic impact-breadth evidence for the current
+  target or diff; inspect its reasons, signals, and limitations before treating
+  it as a planning input.
 - `data.analysisMode`, `data.referenceAnalysisMode`, `data.callAnalysisMode`,
   and `data.interfaceAnalysisMode`: how the result was assembled.
 - `data.limitations`: known blind spots for this result.
@@ -166,8 +169,8 @@ and package-qualified examples.
   an agent context window.
 - Prefer package-qualified targets for symbols that may appear in multiple
   packages.
-- Use reported confidence, warnings, analysis modes, and limitations in your
-  reasoning.
+- Use reported confidence, target-risk reasons/signals, warnings, analysis
+  modes, and limitations in your reasoning.
 - Do not claim complete call graph, runtime, security, or semantic certainty
   unless the output explicitly supports it.
 

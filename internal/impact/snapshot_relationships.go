@@ -1,6 +1,7 @@
 package impact
 
 import (
+	"go/token"
 	"path"
 	"path/filepath"
 	"sort"
@@ -163,8 +164,144 @@ func (a Analyzer) analyzeSymbolFromSnapshot(target string, context *sherpa.Seman
 	})
 	report.TestPlan = plan
 	report.TestCommands = sherpa.TestPlanCommands(plan)
+	report.TargetRisk = a.snapshotSymbolTargetRisk(report, symbol, references, callers, targetPackages)
 
 	return normalizeReport(report), true, nil
+}
+
+func (a Analyzer) snapshotSymbolTargetRisk(report ImpactReport, symbol sherpa.Symbol, references []sherpa.Reference, callers []sherpa.Caller, targetPackages []string) sherpa.TargetRiskSummary {
+	signals := sherpa.TargetRiskSignals{
+		AffectedPackages:     len(report.AffectedPackages),
+		DirectReferences:     snapshotDirectReferenceCount(references),
+		TransitiveCallers:    len(callers),
+		CallerPackages:       len(packagesFromCallerPositions(callers)),
+		ExportedSymbol:       token.IsExported(symbol.Name),
+		ExportedTypeMethod:   symbol.Kind == sherpa.SymbolKindMethod && (token.IsExported(symbol.Name) || token.IsExported(symbol.Receiver)),
+		PackageFanIn:         snapshotPackageFanIn(a.Root, targetPackages),
+		MissingDirectTests:   !impactHasDirectTest(report.AffectedTests),
+		FallbackTests:        len(report.TestPlan.Fallback) > 0,
+		PossibleRuntimeCalls: a.snapshotPossibleRuntimeCallCount(symbol),
+		Warnings:             len(report.Warnings),
+	}
+
+	score := 0
+	var reasons []string
+	scope := sherpa.TargetRiskScopeLocal
+	if signals.AffectedPackages > 1 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+		scope = sherpa.TargetRiskScopeCrossPackage
+	} else if signals.AffectedPackages == 1 {
+		score++
+		scope = sherpa.TargetRiskScopePackage
+	}
+	if signals.DirectReferences > 0 {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonDirectReferences)
+	}
+	if signals.DirectReferences >= 5 {
+		score++
+	}
+	if signals.TransitiveCallers > 0 {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonTransitiveCallers)
+	}
+	if signals.CallerPackages > 1 {
+		score++
+		scope = sherpa.TargetRiskScopeCrossPackage
+	}
+	if signals.ExportedTypeMethod {
+		score += 3
+		reasons = append(reasons, sherpa.TargetRiskReasonExportedTypeMethod)
+		scope = sherpa.TargetRiskScopeExportedAPI
+	} else if signals.ExportedSymbol {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonExportedSymbol)
+		scope = sherpa.TargetRiskScopeExportedAPI
+	}
+	if signals.PackageFanIn > 0 {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonPackageFanIn)
+	}
+	if signals.PackageFanIn >= 5 {
+		score += 2
+	}
+	if signals.MissingDirectTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonMissingDirectTests)
+	}
+	if signals.FallbackTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonFallbackTests)
+	}
+	if signals.PossibleRuntimeCalls > 0 {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonPossibleRuntimeCalls)
+	}
+	if signals.Warnings > 0 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAnalysisWarning)
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+	}
+
+	return sherpa.NormalizeTargetRiskSummary(sherpa.TargetRiskSummary{
+		Level:   sherpa.TargetRiskLevelForScore(score),
+		Scope:   scope,
+		Reasons: reasons,
+		Signals: signals,
+		Limitations: []string{
+			"Target risk summarizes deterministic impact breadth; it is not a defect prediction.",
+			"Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+			"Target risk remains separate from confidence and repository structural risk.",
+		},
+	})
+}
+
+func snapshotDirectReferenceCount(references []sherpa.Reference) int {
+	count := 0
+	for _, reference := range references {
+		if reference.Kind == sherpa.ReferenceKindDefinition {
+			continue
+		}
+		count++
+	}
+
+	return count
+}
+
+func snapshotPackageFanIn(root string, packages []string) int {
+	maxFanIn := 0
+	for _, pkg := range uniqueSortedStrings(packages) {
+		deps, err := sherpa.FindPackageDependencies(root, pkg)
+		if err != nil {
+			continue
+		}
+		if len(deps.UsedBy) > maxFanIn {
+			maxFanIn = len(deps.UsedBy)
+		}
+	}
+
+	return maxFanIn
+}
+
+func (a Analyzer) snapshotPossibleRuntimeCallCount(symbol sherpa.Symbol) int {
+	seen := make(map[string]struct{})
+	for _, record := range a.SnapshotRelationships.PossibleCallEdges {
+		if !snapshotIdentityMatchesSymbol(record.Source, symbol) && !snapshotIdentityMatchesSymbol(record.Target, symbol) {
+			continue
+		}
+		key := strings.Join([]string{
+			snapshotIdentityQualifiedName(record.Source),
+			snapshotIdentityQualifiedName(record.Target),
+			record.Reason,
+			positionSortKey(record.Position),
+		}, "\x00")
+		seen[key] = struct{}{}
+	}
+
+	return len(seen)
 }
 
 func (a Analyzer) snapshotReferencesForSymbol(symbol sherpa.Symbol, referenceKind sherpa.ReferenceKind) ([]sherpa.Reference, string) {

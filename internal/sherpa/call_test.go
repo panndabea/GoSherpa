@@ -906,6 +906,145 @@ func Register(handler http.Handler) {
 	}
 }
 
+func TestFindCalleesReportsStdlibImportedReceiverBoundaryPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "strings"
+
+func Run() {
+	var builder strings.Builder
+	builder.WriteString("ready")
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->strings.Builder.WriteString:imported-receiver:possible:external:service.go:7"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+	if result.PossibleCalls[0].Range == nil {
+		t.Fatalf("expected imported receiver possible call range, got %#v", result.PossibleCalls[0])
+	}
+}
+
+func TestFindCalleesReportsReplaceModuleImportedReceiverBoundaryPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), `module example.com/app
+
+require example.com/dep v0.0.0
+
+replace example.com/dep => ./dep
+`)
+	writeFile(t, filepath.Join(tmp, "dep", "go.mod"), "module example.com/dep\n")
+	writeFile(t, filepath.Join(tmp, "dep", "dep.go"), `package dep
+
+type Client struct{}
+
+func (Client) Do() {}
+`)
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "example.com/dep"
+
+func Run(client dep.Client) {
+	client.Do()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->example.com/dep.Client.Do:imported-receiver:possible:external:service.go:6"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsAliasedImportedReceiverBoundaryPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import text "strings"
+
+func Run() {
+	var builder text.Builder
+	builder.Len()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->strings.Builder.Len:imported-receiver:possible:external:service.go:7"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesDoesNotReportDotImportedPackageFunctionAsReceiverBoundary(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import . "strings"
+
+func Run() {
+	_ = Count("ready", "r")
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no imported receiver possible calls for dot-imported package function, got %#v", result.PossibleCalls)
+	}
+}
+
+func TestFindCalleesKeepsLocalReceiverCallsOutOfImportedBoundarySignals(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Client struct{}
+
+func (Client) Do() {}
+
+func Run(client Client) {
+	client.Do()
+}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCalleeNames(result.Callees)
+	if !reflect.DeepEqual(names, []string{"Client.Do"}) {
+		t.Fatalf("expected local direct receiver call, got %v", names)
+	}
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no imported receiver possible calls for local receiver, got %#v", result.PossibleCalls)
+	}
+}
+
 func TestFindCallPathsReportsDynamicCallLimitations(t *testing.T) {
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")

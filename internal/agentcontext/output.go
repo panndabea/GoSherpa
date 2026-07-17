@@ -216,6 +216,12 @@ func writeAnalysis(builder *strings.Builder, report Report) {
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
 	}
+	if report.TargetRisk.Level != "" {
+		fmt.Fprintf(builder, "  Target risk: %s (%s)\n", report.TargetRisk.Level, report.TargetRisk.Scope)
+		for _, reason := range report.TargetRisk.Reasons {
+			fmt.Fprintf(builder, "  - %s\n", reason)
+		}
+	}
 	if report.ArchitectureRole.Role != "" {
 		fmt.Fprintf(builder, "  Architecture role: %s\n", report.ArchitectureRole.Role)
 	}
@@ -239,6 +245,7 @@ func writeFileAnalysis(builder *strings.Builder, report FileReport) {
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
 	}
+	writeContextTargetRisk(builder, report.TargetRisk)
 	for _, reason := range report.Risk.Reasons {
 		fmt.Fprintf(builder, "  - %s\n", reason)
 	}
@@ -262,7 +269,16 @@ func writePackageAnalysis(builder *strings.Builder, report PackageReport) {
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
 	}
+	writeContextTargetRisk(builder, report.TargetRisk)
 	for _, reason := range report.Risk.Reasons {
+		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
+}
+
+func writeContextTargetRisk(builder *strings.Builder, risk sherpa.TargetRiskSummary) {
+	risk = sherpa.NormalizeTargetRiskSummary(risk)
+	fmt.Fprintf(builder, "  Target risk: %s (%s)\n", risk.Level, risk.Scope)
+	for _, reason := range risk.Reasons {
 		fmt.Fprintf(builder, "  - %s\n", reason)
 	}
 }

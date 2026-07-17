@@ -55,10 +55,10 @@ Prefer JSON for automation. Every command supports `--json` and emits a shared
 envelope with `schemaVersion`, `command`, `target`, `root`, `modulePath`,
 `warnings`, and `data`.
 
-Read `warnings`, `data.confidence`, `data.limitations`, analysis-mode fields,
-and any truncation metadata before acting. Treat GoSherpa output as grounded
-context that guides source reading; it does not replace inspecting the relevant
-files.
+Read `warnings`, `data.confidence`, `data.targetRisk`, `data.limitations`,
+analysis-mode fields, and any truncation metadata before acting. Treat
+GoSherpa output as grounded context that guides source reading; it does not
+replace inspecting the relevant files.
 
 ## Main CLI Commands
 

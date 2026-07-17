@@ -33,6 +33,35 @@
         "package": ".",
         "name": "Added",
         "target": "example.com/golden.Added",
+        "targetRisk": {
+          "level": "medium",
+          "scope": "exported-api",
+          "reasons": [
+            "exported-symbol",
+            "missing-direct-tests",
+            "package-fan-in"
+          ],
+          "signals": {
+            "affectedPackages": 1,
+            "directReferences": 0,
+            "transitiveCallers": 0,
+            "callerPackages": 0,
+            "exportedSymbol": true,
+            "exportedTypeMethod": false,
+            "interfaceContracts": 0,
+            "packageFanIn": 1,
+            "missingDirectTests": true,
+            "fallbackTests": false,
+            "possibleRuntimeCalls": 0,
+            "warnings": 0,
+            "nonGoOrHunkOnlyDiff": false,
+            "snapshotFallback": false
+          },
+          "limitations": [
+            "Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+            "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+          ]
+        },
         "position": {
           "file": "service.go",
           "line": 20,
@@ -65,6 +94,36 @@
       "level": "medium",
       "reasons": [
         "Changes reach dependent packages outside the directly changed package set."
+      ]
+    },
+    "targetRisk": {
+      "level": "medium",
+      "scope": "cross-package",
+      "reasons": [
+        "affected-packages",
+        "fallback-tests",
+        "missing-direct-tests"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 0,
+        "transitiveCallers": 0,
+        "callerPackages": 0,
+        "exportedSymbol": false,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 0,
+        "missingDirectTests": true,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Diff target risk summarizes deterministic changed and affected package evidence; it is not a defect prediction.",
+        "Hunk-only or non-Go changes may require file-level review because no changed top-level Go symbol was identified.",
+        "Target risk remains separate from confidence and repository structural risk."
       ]
     },
     "repositoryRisk": {
@@ -204,6 +263,7 @@
           ]
         }
       ],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -214,8 +274,7 @@
             "example.com/golden.Added"
           ]
         }
-      ],
-      "contracts": []
+      ]
     },
     "readingOrder": [
       {

@@ -24,6 +24,10 @@ Every context result includes:
 - `target`: normalized target string.
 - `purpose`: concise summary of what the context covers.
 - `risk`: deterministic risk level and reasons.
+- `targetRisk`: deterministic, target-specific impact breadth summary with
+  `level`, `scope`, stable `reasons`, structured `signals`, and
+  target-specific `limitations`. This is separate from `risk` and from
+  `confidence`; it is not a defect prediction.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan with `direct`, `related`, `contracts`,
   `callerPackages`, and `fallback` items. Plan items may include `test`,

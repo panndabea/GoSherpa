@@ -174,9 +174,10 @@ Current limitations:
   symbols, and literal `t.Run` subtest names; dynamic table-driven names may be
   incomplete.
 - Callers, callees, paths, and entrypoints still do not resolve dynamic
-  dispatch, reflection, function values, or every imported-package receiver
-  call. Caller, callee, and path outputs now surface detected dynamic-call
-  uncertainty patterns when visible in the loaded syntax/type data.
+  dispatch, reflection, reassigned or escaping function values, or dependency
+  internals. Caller and callee JSON outputs now surface bounded imported
+  receiver calls as external `possibleCalls` when typechecked selector data can
+  name the receiver method.
 - Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP
   routers and CLI command handlers are not inferred yet.
 - Unqualified standalone call graph targets can be ambiguous across packages;

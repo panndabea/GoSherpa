@@ -78,6 +78,7 @@ func writeDiffAnalysis(builder *strings.Builder, report DiffReport) {
 	if report.Risk.Level != "" {
 		fmt.Fprintf(builder, "  Risk: %s\n", report.Risk.Level)
 	}
+	writeContextTargetRisk(builder, report.TargetRisk)
 	for _, reason := range report.Risk.Reasons {
 		fmt.Fprintf(builder, "  - %s\n", reason)
 	}

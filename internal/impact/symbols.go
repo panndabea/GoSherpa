@@ -23,12 +23,13 @@ type changedSymbolRange struct {
 }
 
 type ChangedSymbol struct {
-	Package  string              `json:"package"`
-	Name     string              `json:"name"`
-	Target   string              `json:"target,omitempty"`
-	Position sherpa.Position     `json:"position"`
-	Range    *sherpa.SourceRange `json:"range,omitempty"`
-	Deleted  bool                `json:"deleted,omitempty"`
+	Package    string                    `json:"package"`
+	Name       string                    `json:"name"`
+	Target     string                    `json:"target,omitempty"`
+	TargetRisk *sherpa.TargetRiskSummary `json:"targetRisk,omitempty"`
+	Position   sherpa.Position           `json:"position"`
+	Range      *sherpa.SourceRange       `json:"range,omitempty"`
+	Deleted    bool                      `json:"deleted,omitempty"`
 }
 
 type changedSymbol = ChangedSymbol

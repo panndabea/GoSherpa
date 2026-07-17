@@ -562,3 +562,115 @@ go test ./...
 go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
 go run ./cmd/gosherpa --root cmd/gosherpa/testdata/json_project entrypoints Target --json
 ```
+
+## Slice 2.5 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`, though no diff-oriented
+verification was required for this slice.
+
+Slice 2.5 added imported receiver boundary signals without expanding analysis
+into dependency internals:
+
+- Typechecked selector calls to imported receiver methods now emit additive
+  `possibleCalls` with reason `imported-receiver`, `certainty: possible`,
+  `scope: external`, call-site position/range, and an import-path-qualified
+  callee such as `strings.Builder.WriteString` or `example.com/dep.Client.Do`.
+- Direct caller/callee arrays and existing `CallScopeExternal` semantics are
+  preserved; local receiver calls remain direct/local and do not produce
+  imported-boundary possible calls.
+- Standard-library receivers, local replace-module dependencies, alias imports,
+  dot-import package-function non-cases, and local receiver calls are covered by
+  focused fixtures.
+- `callers` target matching avoids treating external possible-call method names
+  as unqualified local target matches.
+- Context, impact, and PR workflows continue to keep external dependencies out
+  of local affected-package evidence and describe imported receivers only as
+  external boundary/limitation context.
+
+Verification commands:
+
+```bash
+go test ./internal/sherpa
+go test ./cmd/gosherpa
+go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./cmd/gosherpa
+```
+
+## Phase 3 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`.
+
+Phase 3 promoted the accepted target-aware risk model into the public workflow
+without replacing raw impact evidence:
+
+- Impact, explain, context, and PR reports now include additive `targetRisk`
+  summaries with `level`, `scope`, `reasons`, `signals`, and `limitations`.
+- The implementation keeps target risk separate from confidence and from the
+  existing repository structural risk surfaced by `gosherpa risk` and `pr`.
+- Deterministic scoring uses current evidence such as affected packages, direct
+  references, transitive callers, exported symbols, exported type methods,
+  interface-contract involvement, package fan-in, missing/fallback test
+  evidence, possible runtime calls, analysis warnings, hunk-only or non-Go
+  diffs, and snapshot fallback.
+- `impact file|package|symbol|diff` JSON and human output expose concise
+  target-risk summaries while preserving the detailed affected package,
+  reference, caller, callee, test, confidence, and limitation sections.
+- `impact diff` and downstream `context diff`/`pr` outputs include aggregate
+  diff target risk and per-changed-symbol target risk where bounded symbol
+  analysis is available.
+- `context symbol|file|package|diff`, `explain`, and `pr` carry target risk so
+  agents see impact breadth before editing, while docs instruct consumers to
+  treat it as deterministic evidence rather than proof or defect prediction.
+- JSON schema docs, context schema docs, CLI docs, agent guidance, and golden
+  fixtures were updated for the additive `targetRisk` contract.
+
+Verification commands:
+
+```bash
+go test ./internal/sherpa ./internal/impact ./internal/explain ./internal/agentcontext ./cmd/gosherpa
+go test ./cmd/gosherpa
+```
+
+## Final Integration Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remained `origin/main` for the final workflow pass.
+`context symbol --use-snapshot` and `impact symbol --use-snapshot` are both
+supported, so the non-snapshot symbol fallback pair was not needed.
+
+Final verification covered a fresh relationship-capable v2 snapshot, doctor,
+the must-use diff-oriented command set, the snapshot-backed symbol pair, and
+the full Go test suite:
+
+```bash
+go test ./internal/sherpa ./internal/impact ./internal/explain ./internal/agentcontext ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa context diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa impact diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa tests affected --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa pr --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --use-snapshot --json
+```
+
+Observed results:
+
+- `doctor --json` reported the snapshot as valid with relationship metadata
+  present and capable.
+- `context diff`, `impact diff`, `tests affected`, and `pr` reported
+  `snapshot+git-diff+typechecked+ast` with no warnings.
+- `context diff`, `impact diff`, and `pr` reported
+  `targetRisk: medium/cross-package`; `tests affected` remains focused on test
+  planning and does not expose target risk.
+- `context symbol ./internal/sherpa.PlanTests --use-snapshot --json` reported
+  snapshot-backed reference/call subanalysis, broader `typechecked+ast`
+  context, and `targetRisk: high/exported-api`.
+- `impact symbol ./internal/sherpa.PlanTests --use-snapshot --json` reported
+  `snapshot+typechecked` and `targetRisk: high/exported-api`.
+- No final smoke command emitted envelope warnings.

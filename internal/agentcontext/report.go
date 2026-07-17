@@ -34,6 +34,7 @@ type Report struct {
 	SourceContext           sherpa.SourceContext           `json:"sourceContext"`
 	Purpose                 string                         `json:"purpose"`
 	Risk                    explainengine.RiskSummary      `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary       `json:"targetRisk"`
 	ArchitectureRole        explainengine.ArchitectureRole `json:"architectureRole"`
 	References              []sherpa.Reference             `json:"references"`
 	ReferenceAnalysisMode   string                         `json:"referenceAnalysisMode,omitempty"`
@@ -96,6 +97,7 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		SourceContext:           sourceContext,
 		Purpose:                 explainReport.Purpose,
 		Risk:                    explainReport.Risk,
+		TargetRisk:              explainReport.TargetRisk,
 		ArchitectureRole:        explainReport.ArchitectureRole,
 		References:              explainReport.References,
 		ReferenceAnalysisMode:   explainReport.ReferenceAnalysisMode,
@@ -236,7 +238,7 @@ func limitations(includeTestCallers bool, analysisMode string, referenceAnalysis
 		interfaceAnalysisLimitation(interfaceAnalysisMode),
 		testAnalysisLimitation(testAnalysisMode),
 		"Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
-		"Call graph results are repository-local and may miss some imported-package receiver calls.",
+		"Imported-package receiver methods are external boundary signals; dependency internals are not analyzed.",
 		"Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
 		"Package load warnings lower confidence; inspect envelope warnings before relying on semantic references, calls, interfaces, or tests.",
 		"Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
@@ -357,6 +359,7 @@ func normalizeReport(report Report) Report {
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.ArchitectureRole.Reasons = nonNilSlice(report.ArchitectureRole.Reasons)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.SourceContext.Lines = nonNilSlice(report.SourceContext.Lines)

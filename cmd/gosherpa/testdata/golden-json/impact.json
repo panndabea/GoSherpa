@@ -18,6 +18,38 @@
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
     ],
     "kind": "symbol",
+    "targetRisk": {
+      "level": "high",
+      "scope": "exported-api",
+      "reasons": [
+        "affected-packages",
+        "direct-references",
+        "exported-symbol",
+        "fallback-tests",
+        "package-fan-in",
+        "transitive-callers"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 2,
+        "transitiveCallers": 4,
+        "callerPackages": 2,
+        "exportedSymbol": true,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 1,
+        "missingDirectTests": false,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+        "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+      ]
+    },
     "references": [
       {
         "name": "Target",
@@ -205,6 +237,9 @@
           "same-package",
           "target-package"
         ],
+        "targets": [
+          "Target"
+        ],
         "targetReferences": [
           {
             "target": "Target",
@@ -226,9 +261,6 @@
               }
             }
           }
-        ],
-        "targets": [
-          "Target"
         ]
       }
     ],
@@ -253,6 +285,7 @@
         }
       ],
       "related": [],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -263,8 +296,7 @@
             "Target"
           ]
         }
-      ],
-      "contracts": []
+      ]
     }
   }
 }

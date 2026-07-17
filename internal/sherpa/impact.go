@@ -3,6 +3,7 @@ package sherpa
 import (
 	"fmt"
 	"go/token"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ const (
 type ImpactResult struct {
 	Target                string              `json:"target"`
 	Kind                  ImpactKind          `json:"kind"`
+	TargetRisk            TargetRiskSummary   `json:"targetRisk"`
 	References            []Reference         `json:"references"`
 	ReferenceAnalysisMode string              `json:"referenceAnalysisMode,omitempty"`
 	Callers               []Caller            `json:"callers"`
@@ -218,7 +220,7 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 		FallbackPackages: packages,
 	})
 
-	return ImpactResult{
+	result := ImpactResult{
 		Target:           deps.Package,
 		Kind:             ImpactKindPackage,
 		Dependencies:     deps,
@@ -228,7 +230,10 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 		TestCommands:     TestPlanCommands(plan),
 		TestPlan:         plan,
 		Warnings:         warnings,
-	}, nil
+	}
+	result.TargetRisk = packageTargetRisk(result)
+
+	return result, nil
 }
 
 func findSymbolImpact(root string, target string, options ImpactOptions) (ImpactResult, error) {
@@ -289,8 +294,265 @@ func findSymbolImpactWithCache(root string, target string, options ImpactOptions
 		result.Warnings = append(result.Warnings, tests.Warnings...)
 		result.Warnings = append(result.Warnings, warnings...)
 	}
+	result.TargetRisk = symbolTargetRisk(root, result, targetPackages, options, cache)
 
 	return result, nil
+}
+
+func packageTargetRisk(result ImpactResult) TargetRiskSummary {
+	signals := TargetRiskSignals{
+		AffectedPackages:   len(result.Packages),
+		PackageFanIn:       len(result.Dependencies.UsedBy),
+		MissingDirectTests: !hasDirectRelatedTest(result.RelatedTests),
+		FallbackTests:      len(result.TestPlan.Fallback) > 0,
+		Warnings:           len(result.Warnings),
+	}
+
+	score := 1
+	reasons := []string{TargetRiskReasonAffectedPackages}
+	scope := TargetRiskScopePackage
+	if signals.AffectedPackages > 1 {
+		score += 2
+		scope = TargetRiskScopeCrossPackage
+	}
+	if signals.PackageFanIn > 0 {
+		score += 1
+		reasons = append(reasons, TargetRiskReasonPackageFanIn)
+	}
+	if signals.PackageFanIn >= 5 {
+		score += 2
+	}
+	if signals.MissingDirectTests {
+		score++
+		reasons = append(reasons, TargetRiskReasonMissingDirectTests)
+	}
+	if signals.FallbackTests {
+		score++
+		reasons = append(reasons, TargetRiskReasonFallbackTests)
+	}
+	if signals.Warnings > 0 {
+		score += 2
+		reasons = append(reasons, TargetRiskReasonAnalysisWarning)
+	}
+
+	return NormalizeTargetRiskSummary(TargetRiskSummary{
+		Level:   TargetRiskLevelForScore(score),
+		Scope:   scope,
+		Reasons: reasons,
+		Signals: signals,
+		Limitations: []string{
+			"Target risk summarizes deterministic impact breadth; it is not a defect prediction.",
+			"Package risk uses local import fan-in and affected-package/test signals only.",
+		},
+	})
+}
+
+func symbolTargetRisk(root string, result ImpactResult, targetPackages []string, options ImpactOptions, cache *impactAnalysisCache) TargetRiskSummary {
+	symbol, symbolFound := impactTargetSymbol(root, result.Target)
+	signals := TargetRiskSignals{
+		AffectedPackages:     len(result.Packages),
+		DirectReferences:     directReferenceCount(result.References),
+		TransitiveCallers:    len(result.Callers),
+		CallerPackages:       callerPackageCount(result.Callers),
+		ExportedSymbol:       symbolFound && impactSymbolExported(symbol),
+		ExportedTypeMethod:   symbolFound && impactSymbolExportedTypeMethod(symbol),
+		PackageFanIn:         targetPackageFanIn(root, targetPackages),
+		MissingDirectTests:   !hasDirectRelatedTest(result.RelatedTests),
+		FallbackTests:        len(result.TestPlan.Fallback) > 0,
+		PossibleRuntimeCalls: possibleRuntimeCallCount(root, result.Target, options, cache),
+		Warnings:             len(result.Warnings),
+	}
+
+	score := 0
+	var reasons []string
+	scope := TargetRiskScopeLocal
+	if signals.AffectedPackages > 1 {
+		score += 2
+		reasons = append(reasons, TargetRiskReasonAffectedPackages)
+		scope = TargetRiskScopeCrossPackage
+	} else if signals.AffectedPackages == 1 {
+		score++
+		scope = TargetRiskScopePackage
+	}
+	if signals.DirectReferences > 0 {
+		score++
+		reasons = append(reasons, TargetRiskReasonDirectReferences)
+	}
+	if signals.DirectReferences >= 5 {
+		score++
+	}
+	if signals.TransitiveCallers > 0 {
+		score++
+		reasons = append(reasons, TargetRiskReasonTransitiveCallers)
+	}
+	if signals.CallerPackages > 1 {
+		score++
+		scope = TargetRiskScopeCrossPackage
+	}
+	if signals.ExportedTypeMethod {
+		score += 3
+		reasons = append(reasons, TargetRiskReasonExportedTypeMethod)
+		scope = TargetRiskScopeExportedAPI
+	} else if signals.ExportedSymbol {
+		score += 2
+		reasons = append(reasons, TargetRiskReasonExportedSymbol)
+		scope = TargetRiskScopeExportedAPI
+	}
+	if signals.PackageFanIn > 0 {
+		score++
+		reasons = append(reasons, TargetRiskReasonPackageFanIn)
+	}
+	if signals.PackageFanIn >= 5 {
+		score += 2
+	}
+	if signals.MissingDirectTests {
+		score++
+		reasons = append(reasons, TargetRiskReasonMissingDirectTests)
+	}
+	if signals.FallbackTests {
+		score++
+		reasons = append(reasons, TargetRiskReasonFallbackTests)
+	}
+	if signals.PossibleRuntimeCalls > 0 {
+		score++
+		reasons = append(reasons, TargetRiskReasonPossibleRuntimeCalls)
+	}
+	if signals.Warnings > 0 {
+		score += 2
+		reasons = append(reasons, TargetRiskReasonAnalysisWarning)
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, TargetRiskReasonAffectedPackages)
+	}
+
+	return NormalizeTargetRiskSummary(TargetRiskSummary{
+		Level:   TargetRiskLevelForScore(score),
+		Scope:   scope,
+		Reasons: reasons,
+		Signals: signals,
+		Limitations: []string{
+			"Target risk summarizes deterministic impact breadth; it is not a defect prediction.",
+			"Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+		},
+	})
+}
+
+func impactTargetSymbol(root string, target string) (Symbol, bool) {
+	symbols, err := ParseRepository(root)
+	if err != nil {
+		return Symbol{}, false
+	}
+
+	symbol, err := FindSymbolTarget(root, symbols, target)
+	if err != nil {
+		return Symbol{}, false
+	}
+
+	return symbol, true
+}
+
+func impactSymbolExported(symbol Symbol) bool {
+	return token.IsExported(symbol.Name)
+}
+
+func impactSymbolExportedTypeMethod(symbol Symbol) bool {
+	if symbol.Kind != SymbolKindMethod {
+		return false
+	}
+
+	return token.IsExported(symbol.Name) || token.IsExported(symbol.Receiver)
+}
+
+func directReferenceCount(references []Reference) int {
+	count := 0
+	for _, reference := range references {
+		if reference.Kind == ReferenceKindDefinition {
+			continue
+		}
+		count++
+	}
+
+	return count
+}
+
+func callerPackageCount(callers []Caller) int {
+	packages := make(map[string]struct{})
+	for _, caller := range callers {
+		pkg, ok := impactPackageForFile(caller.Position.File)
+		if !ok {
+			continue
+		}
+		packages[pkg] = struct{}{}
+	}
+
+	return len(packages)
+}
+
+func impactPackageForFile(file string) (string, bool) {
+	file = strings.TrimSpace(file)
+	if file == "" {
+		return "", false
+	}
+
+	file = filepath.ToSlash(file)
+	file = path.Clean(file)
+	if file == "." || path.IsAbs(file) || file == ".." || strings.HasPrefix(file, "../") {
+		return "", false
+	}
+	if path.Ext(file) != ".go" {
+		return "", false
+	}
+
+	dir := path.Dir(file)
+	if dir == "." {
+		return ".", true
+	}
+
+	return "./" + dir, true
+}
+
+func targetPackageFanIn(root string, packages []string) int {
+	maxFanIn := 0
+	for _, pkg := range uniqueSorted(packages) {
+		deps, err := FindPackageDependencies(root, pkg)
+		if err != nil {
+			continue
+		}
+		if len(deps.UsedBy) > maxFanIn {
+			maxFanIn = len(deps.UsedBy)
+		}
+	}
+
+	return maxFanIn
+}
+
+func hasDirectRelatedTest(tests []RelatedTest) bool {
+	for _, test := range tests {
+		if test.DirectReference {
+			return true
+		}
+	}
+
+	return false
+}
+
+func possibleRuntimeCallCount(root string, target string, options ImpactOptions, cache *impactAnalysisCache) int {
+	normalizedTarget, err := normalizeCallTarget(root, target)
+	if err != nil {
+		return 0
+	}
+
+	functions, _, _, err := collectImpactCallFunctionInfos(root, options, cache)
+	if err != nil {
+		return 0
+	}
+	function, err := findFunctionInfo(functions, normalizedTarget)
+	if err != nil {
+		return 0
+	}
+
+	possibleCalls := collectPossibleCallsFromFunctionWithFunctions(function, functions, newInterfaceDispatchCatalog(functions))
+	return len(possibleCalls)
 }
 
 func impactSymbolCallers(root string, target string, options ImpactOptions) ([]Caller, string, []string, error) {

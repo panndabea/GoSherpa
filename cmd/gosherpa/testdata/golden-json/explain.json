@@ -16,7 +16,7 @@
       "Call analysis used typechecked package loading where available.",
       "Call graph results are repository-local.",
       "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
-      "Imported-package receiver calls may be incomplete.",
+      "Imported-package receiver methods are external boundary signals; dependency internals are not analyzed.",
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
       "Direct symbol and file test references use typechecked package loading where available; same-package related tests and fallback commands remain package-based.",
@@ -213,6 +213,9 @@
           "same-package",
           "target-package"
         ],
+        "targets": [
+          "Target"
+        ],
         "targetReferences": [
           {
             "target": "Target",
@@ -234,9 +237,6 @@
               }
             }
           }
-        ],
-        "targets": [
-          "Target"
         ]
       }
     ],
@@ -261,6 +261,7 @@
         }
       ],
       "related": [],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -271,8 +272,7 @@
             "Target"
           ]
         }
-      ],
-      "contracts": []
+      ]
     },
     "readingOrder": [
       {

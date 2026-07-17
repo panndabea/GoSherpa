@@ -31,6 +31,7 @@ type FileReport struct {
 	SourceContexts          []sherpa.SourceContext      `json:"sourceContexts"`
 	Purpose                 string                      `json:"purpose"`
 	Risk                    explainengine.RiskSummary   `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary    `json:"targetRisk"`
 	AffectedPackages        []string                    `json:"affectedPackages"`
 	AffectedInterfaces      []string                    `json:"affectedInterfaces"`
 	AffectedImplementations []string                    `json:"affectedImplementations"`
@@ -110,6 +111,7 @@ func AnalyzeFile(root string, target string, options FileAnalyzeOptions) (FileRe
 		PackageName:             packageName,
 		Symbols:                 symbols,
 		SourceContexts:          sourceContexts,
+		TargetRisk:              impactReport.TargetRisk,
 		AffectedPackages:        impactReport.AffectedPackages,
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
@@ -400,6 +402,7 @@ func normalizeFileReport(report FileReport) FileReport {
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Warnings = nonNilSlice(uniqueStrings(report.Warnings))

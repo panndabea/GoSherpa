@@ -26,6 +26,7 @@ type prReport struct {
 	AffectedImplementations []string                     `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                       `json:"interfaceAnalysisMode,omitempty"`
 	Risk                    explainengine.RiskSummary    `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary     `json:"targetRisk"`
 	RepositoryRisk          sherpa.RiskReport            `json:"repositoryRisk"`
 	AffectedTests           []impactengine.RelatedTest   `json:"affectedTests"`
 	TestAnalysisMode        string                       `json:"testAnalysisMode,omitempty"`
@@ -74,6 +75,7 @@ func analyzePR(root string, base string, options prAnalyzeOptions) (prReport, er
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
 		InterfaceAnalysisMode:   strings.TrimSpace(impactReport.InterfaceAnalysisMode),
+		TargetRisk:              impactReport.TargetRisk,
 		AffectedTests:           impactReport.AffectedTests,
 		TestAnalysisMode:        strings.TrimSpace(impactReport.TestAnalysisMode),
 		TestCommands:            impactReport.TestCommands,
@@ -102,6 +104,7 @@ func normalizePRReport(report prReport) prReport {
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.RepositoryRisk = riskJSONResult(report.RepositoryRisk)
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
@@ -209,6 +212,8 @@ func formatPRReport(report prReport) string {
 
 	writePRRisk(&builder, report.Risk)
 	builder.WriteString("\n")
+	writePRTargetRisk(&builder, report.TargetRisk)
+	builder.WriteString("\n")
 	writePRRepositoryRisk(&builder, report.RepositoryRisk)
 	builder.WriteString("\n")
 	writePRValues(&builder, "CHANGED FILES", report.ChangedFiles)
@@ -246,6 +251,16 @@ func writePRRisk(builder *strings.Builder, risk explainengine.RiskSummary) {
 		level = "unknown"
 	}
 	fmt.Fprintf(builder, "  Level: %s\n", level)
+	for _, reason := range risk.Reasons {
+		fmt.Fprintf(builder, "  %s\n", reason)
+	}
+}
+
+func writePRTargetRisk(builder *strings.Builder, risk sherpa.TargetRiskSummary) {
+	risk = sherpa.NormalizeTargetRiskSummary(risk)
+	builder.WriteString("TARGET RISK\n")
+	fmt.Fprintf(builder, "  Level: %s\n", risk.Level)
+	fmt.Fprintf(builder, "  Scope: %s\n", risk.Scope)
 	for _, reason := range risk.Reasons {
 		fmt.Fprintf(builder, "  %s\n", reason)
 	}

@@ -23,11 +23,11 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa analyze [path]` repository overview with package summaries, symbol counts, important symbols, entrypoint candidates, structural risk, hotspots, testing overview, readiness, limitations, suggested next commands, and JSON output
 - Initial `gosherpa architecture` overview with dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, leaf packages, limitations, and JSON output
 - Initial `gosherpa risk` overview with structural risk level, score, factors, package signals, dependency cycles, limitations, and JSON output
-- Initial `gosherpa explain <symbol>` profile with purpose, risk, architecture role, reading order, human output, and JSON output
-- Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, confidence, limitations, and JSON output
-- Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
-- Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, reading order, confidence, limitations, and JSON output
-- Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, reading order, confidence, limitations, and JSON output
+- Initial `gosherpa explain <symbol>` profile with purpose, risk, target risk, architecture role, reading order, human output, and JSON output
+- Initial `gosherpa context symbol <target>` export with source excerpt, symbol identity, references, callers, callees, impact signals, tests, target risk, confidence, limitations, and JSON output
+- Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
+- Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
+- Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
@@ -38,7 +38,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Package dependency analysis
 - Direct caller and callee analysis with package-aware targets and receiver-variable method calls
 - Shortest and limited repository-local call path analysis
-- Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, and function literal calls; `callers --json` and `callees --json` also expose separate `possibleCalls` arrays for bounded possible runtime call signals without changing direct call counts
+- Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, function literal calls, and imported receiver boundaries; `callers --json` and `callees --json` also expose separate `possibleCalls` arrays for bounded possible runtime call signals without changing direct call counts
 - Typechecked interface-dispatch possible calls resolve selector calls on interface-typed values to known local implementer methods when the candidate set is bounded; unknown, broad, or unsupported dispatch remains a limitation instead of a direct call edge
 - Runtime possible calls now name visible local targets for direct goroutine starts, goroutine function literals, immediately invoked function literals, and function literals passed to simple local call sites; reassigned, struct-field, or escaping function values remain conservative limitations or dynamic possible calls
 - Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, statically visible stdlib `net/http` handlers, exported functions, and functions with no local callers
@@ -58,7 +58,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
 - `gosherpa tests affected --base <ref>` with human and JSON output
-- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, diff risk notes, structural repository risk, affected tests, and verification commands
+- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, diff risk notes, target risk, structural repository risk, affected tests, and verification commands
 - Diff-oriented reports enrich changed top-level symbols with typechecked reference and call impact when package loading is available, exposing `git-diff+typechecked+ast`, `referenceAnalysisMode`, and `callAnalysisMode`
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
@@ -81,6 +81,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.
+- Impact, context, explain, and PR JSON expose additive `targetRisk` summaries
+  with deterministic levels, scopes, reason categories, structured evidence
+  signals, and limitations; repository structural risk remains separate.
 - Package inventory with `gosherpa packages`, including file, symbol, import, reverse-dependency, and test indicators
 - All-package dependency overview with `gosherpa deps --all`, including local imports, external imports, and reverse dependencies
 - Reference kind classification and `gosherpa refs --kind <kind>` filtering,
@@ -98,7 +101,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but generated-file, build-tag, and generic edge cases may remain incomplete.
 - Interface method usage reports statically visible selector usage for interface-typed values when typechecked package loading succeeds; dynamic dispatch, reflection, and runtime wiring can hide additional usage.
 - Test discovery uses direct references, same-package tests, file-contained symbols, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
-- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
+- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or dependency internals; caller and callee JSON outputs surface bounded imported receiver calls as external `possibleCalls` when typechecked selector data can name the receiver method.
 - Entrypoint analysis is heuristic; statically visible stdlib `net/http` handler registrations are inferred, but framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Nested modules below a module root are treated as separate analysis roots and
@@ -109,8 +112,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   selected module or workspace. `doctor` detects the standard
   `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
   context commands analyze generated files like other compiler-visible Go files.
-- Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, inventory reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, relationship reuse for `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`, and current changed-symbol inventory reuse in `context diff`, `impact diff`, `tests affected`, and `pr`; context, impact, affected-test, and PR relationship subanalysis still run live beyond current changed-symbol inventory.
-- The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records now back selected standalone relationship commands, while must-use context/impact workflow relationship reuse remains follow-up work.
+- Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, inventory reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, relationship reuse for `refs`, `callers`, `callees`, `implementers`, `interface`, `interfaces`, `context symbol`, `impact symbol`, and selected diff-oriented relationship subanalysis in `context diff`, `impact diff`, `tests affected`, and `pr`; unsupported portions fall back to live analysis with warnings.
+- The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records now back selected standalone and must-use workflow relationship queries while unsupported relationship shapes remain live-only.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.

@@ -36,26 +36,28 @@ type RelatedTest = sherpa.RelatedTest
 type TestPlan = sherpa.TestPlan
 
 type ImpactReport struct {
-	ChangedFiles            []string        `json:"changedFiles"`
-	ChangedPackages         []string        `json:"changedPackages"`
-	AffectedPackages        []string        `json:"affectedPackages"`
-	AffectedSymbols         []string        `json:"affectedSymbols"`
-	ChangedSymbolDetails    []ChangedSymbol `json:"changedSymbolDetails,omitempty"`
-	ReferenceAnalysisMode   string          `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string          `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string        `json:"affectedInterfaces"`
-	AffectedImplementations []string        `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string          `json:"interfaceAnalysisMode,omitempty"`
-	AffectedTests           []RelatedTest   `json:"affectedTests"`
-	TestAnalysisMode        string          `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string        `json:"testCommands"`
-	TestPlan                TestPlan        `json:"testPlan"`
-	Warnings                []string        `json:"warnings"`
+	ChangedFiles            []string                 `json:"changedFiles"`
+	ChangedPackages         []string                 `json:"changedPackages"`
+	AffectedPackages        []string                 `json:"affectedPackages"`
+	AffectedSymbols         []string                 `json:"affectedSymbols"`
+	ChangedSymbolDetails    []ChangedSymbol          `json:"changedSymbolDetails,omitempty"`
+	TargetRisk              sherpa.TargetRiskSummary `json:"targetRisk"`
+	ReferenceAnalysisMode   string                   `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                   `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string                 `json:"affectedInterfaces"`
+	AffectedImplementations []string                 `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                   `json:"interfaceAnalysisMode,omitempty"`
+	AffectedTests           []RelatedTest            `json:"affectedTests"`
+	TestAnalysisMode        string                   `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                 `json:"testCommands"`
+	TestPlan                TestPlan                 `json:"testPlan"`
+	Warnings                []string                 `json:"warnings"`
 }
 
 type changedSymbolImpact struct {
 	Packages              []string
 	Tests                 []sherpa.RelatedTest
+	TargetRisks           map[string]sherpa.TargetRiskSummary
 	TestAnalysisMode      string
 	ReferenceAnalysisMode string
 	CallAnalysisMode      string
@@ -212,6 +214,7 @@ func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext
 	report.AffectedSymbols = changedSymbolNames(changedSymbols)
 	report.ChangedSymbolDetails = changedSymbolsWithTargets(changedSymbols, modulePath)
 	symbolImpact := a.analyzeChangedSymbolImpactsWithContext(changedSymbols, semanticContext)
+	report.ChangedSymbolDetails = changedSymbolDetailsWithTargetRisks(report.ChangedSymbolDetails, symbolImpact.TargetRisks)
 	report.AffectedPackages, report.Warnings = affectedPackagesForChangedPackages(a.Root, report.ChangedPackages)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, symbolImpact.Packages...))
 	report.ReferenceAnalysisMode = symbolImpact.ReferenceAnalysisMode
@@ -232,6 +235,7 @@ func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
 	fallbackPackages := diffFallbackPackages(report.ChangedFiles, report.AffectedPackages)
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, fallbackPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
+	report.TargetRisk = diffTargetRisk(report)
 
 	return normalizeReport(report), nil
 }
@@ -357,6 +361,7 @@ func (a Analyzer) analyzePackage(targetPackage string, context *sherpa.SemanticC
 	contractPackages := contractPackagesForSignals(signals)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(context, a.Root, report.ChangedPackages, report.AffectedPackages, report.AffectedPackages, nil, nil, contractPackages, report.Warnings)
+	report.TargetRisk = impactReportTargetRisk(report)
 
 	return normalizeReport(report), nil
 }
@@ -423,6 +428,7 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 	contractPackages := contractPackagesForSignals(signals)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
 	report = a.enrichSymbolContractTestsWithContext(context, report, result, contractPackages, contractTargetsByPackage(signals))
+	report.TargetRisk = impactReportTargetRisk(report)
 
 	return normalizeReport(report), nil
 }
@@ -456,6 +462,7 @@ func (a Analyzer) requireUniqueSymbolTarget(target string, context *sherpa.Seman
 func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 	return ImpactReport{
 		AffectedPackages:      result.Packages,
+		TargetRisk:            result.TargetRisk,
 		ReferenceAnalysisMode: result.ReferenceAnalysisMode,
 		CallAnalysisMode:      result.CallAnalysisMode,
 		AffectedTests:         result.RelatedTests,
@@ -464,6 +471,188 @@ func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 		TestPlan:              result.TestPlan,
 		Warnings:              result.Warnings,
 	}
+}
+
+func impactReportTargetRisk(report ImpactReport) sherpa.TargetRiskSummary {
+	summary := report.TargetRisk
+	signals := summary.Signals
+	signals.AffectedPackages = len(report.AffectedPackages)
+	signals.InterfaceContracts = len(report.AffectedInterfaces) + len(report.AffectedImplementations)
+	signals.MissingDirectTests = !impactHasDirectTest(report.AffectedTests)
+	signals.FallbackTests = len(report.TestPlan.Fallback) > 0
+	signals.Warnings = len(report.Warnings)
+	signals.SnapshotFallback = impactHasSnapshotFallbackWarning(report.Warnings)
+
+	score := impactTargetRiskBaseScore(summary.Level)
+	reasons := append([]string{}, summary.Reasons...)
+	scope := summary.Scope
+	if scope == "" {
+		scope = sherpa.TargetRiskScopeLocal
+	}
+	if signals.AffectedPackages > 1 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+		scope = widerTargetRiskScope(scope, sherpa.TargetRiskScopeCrossPackage)
+	} else if signals.AffectedPackages == 1 {
+		score++
+		scope = widerTargetRiskScope(scope, sherpa.TargetRiskScopePackage)
+	}
+	if signals.InterfaceContracts > 0 {
+		score += 3
+		reasons = append(reasons, sherpa.TargetRiskReasonInterfaceContract)
+		scope = widerTargetRiskScope(scope, sherpa.TargetRiskScopeInterfaceContract)
+	}
+	if signals.MissingDirectTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonMissingDirectTests)
+	}
+	if signals.FallbackTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonFallbackTests)
+	}
+	if signals.SnapshotFallback {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonSnapshotFallback)
+	}
+	if signals.Warnings > 0 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAnalysisWarning)
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+	}
+
+	return sherpa.NormalizeTargetRiskSummary(sherpa.TargetRiskSummary{
+		Level:       sherpa.TargetRiskLevelForScore(score),
+		Scope:       scope,
+		Reasons:     reasons,
+		Signals:     signals,
+		Limitations: append(summary.Limitations, "Target risk remains separate from confidence and repository structural risk."),
+	})
+}
+
+func diffTargetRisk(report ImpactReport) sherpa.TargetRiskSummary {
+	signals := sherpa.TargetRiskSignals{
+		AffectedPackages:    len(report.AffectedPackages),
+		InterfaceContracts:  len(report.AffectedInterfaces) + len(report.AffectedImplementations),
+		MissingDirectTests:  !impactHasDirectTest(report.AffectedTests),
+		FallbackTests:       len(report.TestPlan.Fallback) > 0,
+		Warnings:            len(report.Warnings),
+		NonGoOrHunkOnlyDiff: len(report.AffectedSymbols) == 0 && len(report.ChangedFiles) > 0,
+		SnapshotFallback:    impactHasSnapshotFallbackWarning(report.Warnings),
+	}
+
+	score := 0
+	var reasons []string
+	scope := sherpa.TargetRiskScopeLocal
+	if signals.AffectedPackages > 1 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+		scope = sherpa.TargetRiskScopeCrossPackage
+	} else if signals.AffectedPackages == 1 {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+		scope = sherpa.TargetRiskScopePackage
+	}
+	if len(report.ChangedPackages) > 1 {
+		score++
+		scope = sherpa.TargetRiskScopeCrossPackage
+	}
+	if signals.InterfaceContracts > 0 {
+		score += 3
+		reasons = append(reasons, sherpa.TargetRiskReasonInterfaceContract)
+		scope = sherpa.TargetRiskScopeInterfaceContract
+	}
+	if signals.NonGoOrHunkOnlyDiff {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonNonGoOrHunkOnlyDiff)
+		scope = widerTargetRiskScope(scope, sherpa.TargetRiskScopePackage)
+	}
+	if signals.MissingDirectTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonMissingDirectTests)
+	}
+	if signals.FallbackTests {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonFallbackTests)
+	}
+	if signals.SnapshotFallback {
+		score++
+		reasons = append(reasons, sherpa.TargetRiskReasonSnapshotFallback)
+	}
+	if signals.Warnings > 0 {
+		score += 2
+		reasons = append(reasons, sherpa.TargetRiskReasonAnalysisWarning)
+	}
+	if len(reasons) == 0 {
+		reasons = append(reasons, sherpa.TargetRiskReasonAffectedPackages)
+	}
+
+	return sherpa.NormalizeTargetRiskSummary(sherpa.TargetRiskSummary{
+		Level:   sherpa.TargetRiskLevelForScore(score),
+		Scope:   scope,
+		Reasons: reasons,
+		Signals: signals,
+		Limitations: []string{
+			"Diff target risk summarizes deterministic changed and affected package evidence; it is not a defect prediction.",
+			"Hunk-only or non-Go changes may require file-level review because no changed top-level Go symbol was identified.",
+			"Target risk remains separate from confidence and repository structural risk.",
+		},
+	})
+}
+
+func impactTargetRiskBaseScore(level string) int {
+	switch level {
+	case sherpa.TargetRiskLevelHigh:
+		return 6
+	case sherpa.TargetRiskLevelMedium:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func widerTargetRiskScope(current string, candidate string) string {
+	if targetRiskScopeRank(candidate) > targetRiskScopeRank(current) {
+		return candidate
+	}
+
+	return current
+}
+
+func targetRiskScopeRank(scope string) int {
+	switch scope {
+	case sherpa.TargetRiskScopeInterfaceContract:
+		return 5
+	case sherpa.TargetRiskScopeExportedAPI:
+		return 4
+	case sherpa.TargetRiskScopeCrossPackage:
+		return 3
+	case sherpa.TargetRiskScopePackage:
+		return 2
+	default:
+		return 1
+	}
+}
+
+func impactHasDirectTest(tests []sherpa.RelatedTest) bool {
+	for _, test := range tests {
+		if test.DirectReference {
+			return true
+		}
+	}
+
+	return false
+}
+
+func impactHasSnapshotFallbackWarning(warnings []string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(strings.ToLower(warning), "snapshot not used") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (a Analyzer) enrichSymbolContractTestsWithContext(context *sherpa.SemanticContext, report ImpactReport, result sherpa.ImpactResult, contractPackages []string, targetsByPackage map[string][]string) ImpactReport {
@@ -613,6 +802,7 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 	}
 
 	var impact changedSymbolImpact
+	impact.TargetRisks = make(map[string]sherpa.TargetRiskSummary)
 	impactOptions := sherpa.ImpactOptions{BuildTags: a.BuildTags}
 	var batches []sherpa.ImpactBatchResult
 	if context != nil {
@@ -628,6 +818,9 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 
 		result := batch.Result
 		impact.Packages = append(impact.Packages, result.Packages...)
+		if result.TargetRisk.Level != "" {
+			impact.TargetRisks[batch.Target] = result.TargetRisk
+		}
 		for _, test := range result.RelatedTests {
 			mergeRelatedTest(seenTests, test)
 		}
@@ -645,6 +838,24 @@ func (a Analyzer) analyzeChangedSymbolImpactsWithContext(symbols []changedSymbol
 	sortRelatedTests(impact.Tests)
 
 	return impact
+}
+
+func changedSymbolDetailsWithTargetRisks(details []ChangedSymbol, targetRisks map[string]sherpa.TargetRiskSummary) []ChangedSymbol {
+	if len(details) == 0 || len(targetRisks) == 0 {
+		return details
+	}
+
+	result := append([]ChangedSymbol{}, details...)
+	for i := range result {
+		risk, ok := targetRisks[result[i].Target]
+		if !ok {
+			continue
+		}
+		risk = sherpa.NormalizeTargetRiskSummary(risk)
+		result[i].TargetRisk = &risk
+	}
+
+	return result
 }
 
 func affectedTestsForPackages(root string, changedPackages []string, packages []string, changedSymbols []changedSymbol, extraTests []sherpa.RelatedTest, contractPackages []string, warnings []string) ([]sherpa.RelatedTest, sherpa.TestPlan, []string, string, []string) {
@@ -1152,6 +1363,7 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.AffectedPackages = nonNilStrings(report.AffectedPackages)
 	report.AffectedSymbols = nonNilStrings(report.AffectedSymbols)
 	report.ChangedSymbolDetails = nonNilChangedSymbols(report.ChangedSymbolDetails)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)
 	report.CallAnalysisMode = strings.TrimSpace(report.CallAnalysisMode)
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
@@ -1201,6 +1413,14 @@ func nonNilStrings(values []string) []string {
 func nonNilChangedSymbols(values []ChangedSymbol) []ChangedSymbol {
 	if values == nil {
 		return []ChangedSymbol{}
+	}
+
+	for i := range values {
+		if values[i].TargetRisk == nil {
+			continue
+		}
+		risk := sherpa.NormalizeTargetRiskSummary(*values[i].TargetRisk)
+		values[i].TargetRisk = &risk
 	}
 
 	return values

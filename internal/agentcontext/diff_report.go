@@ -23,6 +23,7 @@ type DiffReport struct {
 	Base                    string                       `json:"base"`
 	Purpose                 string                       `json:"purpose"`
 	Risk                    explainengine.RiskSummary    `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary     `json:"targetRisk"`
 	ChangedFiles            []string                     `json:"changedFiles"`
 	ChangedPackages         []string                     `json:"changedPackages"`
 	AffectedPackages        []string                     `json:"affectedPackages"`
@@ -76,6 +77,7 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		AffectedPackages:        impactReport.AffectedPackages,
 		AffectedSymbols:         impactReport.AffectedSymbols,
 		ChangedSymbolDetails:    impactReport.ChangedSymbolDetails,
+		TargetRisk:              impactReport.TargetRisk,
 		ReferenceAnalysisMode:   impactReport.ReferenceAnalysisMode,
 		CallAnalysisMode:        impactReport.CallAnalysisMode,
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
@@ -388,6 +390,7 @@ func normalizeDiffReport(report DiffReport) DiffReport {
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Warnings = nonNilSlice(uniqueStrings(report.Warnings))

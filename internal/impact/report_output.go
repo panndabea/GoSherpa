@@ -53,6 +53,9 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 		builder.WriteString("\n")
 	}
 
+	writeReportTargetRisk(&builder, report.TargetRisk)
+	builder.WriteString("\n")
+
 	if includeChangedFiles {
 		writeReportValues(&builder, "CHANGED FILES", report.ChangedFiles)
 		builder.WriteString("\n")
@@ -100,6 +103,15 @@ func writeReportAnalysis(builder *strings.Builder, report ImpactReport) bool {
 	}
 
 	return true
+}
+
+func writeReportTargetRisk(builder *strings.Builder, risk sherpa.TargetRiskSummary) {
+	risk = sherpa.NormalizeTargetRiskSummary(risk)
+	builder.WriteString("TARGET RISK\n")
+	fmt.Fprintf(builder, "  %s (%s)\n", risk.Level, risk.Scope)
+	for _, reason := range risk.Reasons {
+		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
 }
 
 func writeReportValues(builder *strings.Builder, title string, values []string) {

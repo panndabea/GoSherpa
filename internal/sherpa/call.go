@@ -1635,6 +1635,7 @@ func collectPossibleCallsFromFunctionWithFunctions(function functionInfo, functi
 	signals := collectCallUncertaintySignals(function)
 	possibleCalls := collectConcreteRuntimePossibleCalls(function, functions)
 	possibleCalls = append(possibleCalls, collectStdlibHTTPHandlerPossibleCalls(function, functions)...)
+	possibleCalls = append(possibleCalls, collectImportedReceiverPossibleCalls(function)...)
 	for _, signal := range signals {
 		if !signal.Possible {
 			continue
@@ -1658,6 +1659,97 @@ func collectPossibleCallsFromFunctionWithFunctions(function functionInfo, functi
 
 	sortPossibleCalls(possibleCalls)
 	return dedupePossibleCalls(possibleCalls)
+}
+
+func collectImportedReceiverPossibleCalls(function functionInfo) []PossibleCall {
+	if function.Decl.Body == nil || function.TypeInfo == nil {
+		return nil
+	}
+
+	staticValues := collectStaticCallValueAssignments(function)
+	var possibleCalls []PossibleCall
+	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		if _, ok := node.(*ast.FuncLit); ok {
+			return false
+		}
+
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		expr := resolveStaticCallValue(function, staticValues, call.Fun)
+		possibleCall, ok := importedReceiverPossibleCall(function, expr, call.Fun)
+		if !ok {
+			return true
+		}
+
+		possibleCalls = append(possibleCalls, possibleCall)
+		return true
+	})
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+func importedReceiverPossibleCall(function functionInfo, expr ast.Expr, positionExpr ast.Expr) (PossibleCall, bool) {
+	selection := callSelection(function, expr)
+	if selection == nil {
+		return PossibleCall{}, false
+	}
+
+	method, ok := selection.Obj().(*types.Func)
+	if !ok || method == nil || method.Pkg() == nil {
+		return PossibleCall{}, false
+	}
+	if callObjectPackageIsLocal(function, method) {
+		return PossibleCall{}, false
+	}
+	if callTypeIsInterface(selection.Recv()) {
+		return PossibleCall{}, false
+	}
+
+	callee, ok := importedReceiverMethodDisplayName(method)
+	if !ok {
+		return PossibleCall{}, false
+	}
+
+	if positionExpr == nil {
+		positionExpr = expr
+	}
+
+	return PossibleCall{
+		Caller:        function.Target,
+		Callee:        callee,
+		Certainty:     CallCertaintyPossible,
+		Reason:        PossibleCallReasonImportedReceiver,
+		Scope:         CallScopeExternal,
+		Position:      callExpressionPosition(function, positionExpr),
+		Range:         callExpressionRange(function, positionExpr),
+		calleePackage: method.Pkg().Path(),
+	}, true
+}
+
+func importedReceiverMethodDisplayName(method *types.Func) (string, bool) {
+	if method == nil || method.Pkg() == nil {
+		return "", false
+	}
+
+	receiver := callFuncReceiverName(method)
+	if receiver == "" {
+		return "", false
+	}
+
+	packagePath := strings.TrimSpace(method.Pkg().Path())
+	if packagePath == "" {
+		return "", false
+	}
+
+	return packagePath + "." + receiver + "." + method.Name(), true
 }
 
 func collectStdlibHTTPHandlerPossibleCalls(function functionInfo, functions []functionInfo) []PossibleCall {
@@ -3119,6 +3211,9 @@ func dedupePossibleCalls(possibleCalls []PossibleCall) []PossibleCall {
 }
 
 func possibleCallMatchesTarget(possibleCall PossibleCall, target callTarget) bool {
+	if possibleCall.Scope == CallScopeExternal && possibleCall.calleePackage != "" && target.Package == "" {
+		return false
+	}
 	if target.Package != "" && possibleCall.calleePackage != "" && target.Package != possibleCall.calleePackage {
 		return false
 	}

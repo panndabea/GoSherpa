@@ -98,11 +98,11 @@ symbol completion can come later.
 | Symbol atlas | `gosherpa symbols --kind function --package ./internal/sherpa` | Lists discovered structs, interfaces, type aliases, functions, and methods with optional kind, package, and test filters |
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
-| Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, architecture role, reading order, callers/callees, impact signals, and tests |
-| Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, confidence, and limitations |
-| File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
-| Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, reading order, confidence, and limitations |
-| Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, reading order, confidence, and limitations |
+| Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, target risk, architecture role, reading order, callers/callees, impact signals, and tests |
+| Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, target risk, confidence, and limitations |
+| File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
+| Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
+| Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, freshness, and relationship metadata |
 | Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
@@ -112,7 +112,7 @@ symbol completion can come later.
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, changed-symbol impact, affected packages, and affected tests |
-| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, diff risk, repository risk, affected tests, and verification commands |
+| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, diff risk, target risk, repository risk, affected tests, and verification commands |
 | Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests for a symbol, package, or file and suggested `go test` commands with optional direct/related/all scope |
 | Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
@@ -330,8 +330,9 @@ depending on how the snapshot was built.
 `countsByKind`. It intentionally does not dump the persisted file, package,
 symbol, or relationship records.
 
-`pr --json` keeps the diff-oriented `risk` summary and also includes
-`repositoryRisk`, the full structural `RiskReport` from `gosherpa risk`.
+`pr --json` keeps the diff-oriented `risk` summary, adds `targetRisk` for the
+specific diff blast-radius judgment, and also includes `repositoryRisk`, the
+full structural `RiskReport` from `gosherpa risk`.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,

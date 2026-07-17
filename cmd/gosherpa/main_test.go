@@ -2977,6 +2977,14 @@ func TestMainRunsImpactSymbolCommandFromSnapshotAsJSON(t *testing.T) {
 	assertMainTestJSONArrayHasLength(t, payload, "warnings", 0)
 	assertMainTestStringArrayContains(t, assertMainTestJSONArray(t, data, "affectedPackages"), ".")
 	assertMainTestObjectArrayContainsName(t, assertMainTestJSONArray(t, data, "affectedTests"), "TestTarget")
+	targetRisk := assertMainTestJSONObject(t, data, "targetRisk")
+	if targetRisk["level"] != sherpa.TargetRiskLevelHigh || targetRisk["scope"] != sherpa.TargetRiskScopeExportedAPI {
+		t.Fatalf("expected high exported-api snapshot target risk, got %#v", targetRisk)
+	}
+	signals := assertMainTestJSONObject(t, targetRisk, "signals")
+	if signals["affectedPackages"] == float64(0) || signals["directReferences"] == float64(0) || signals["exportedSymbol"] != true {
+		t.Fatalf("expected snapshot target risk signals from relationships, got %#v", signals)
+	}
 }
 
 func TestMainRunsImpactSymbolCommandForGenericInterfaceAliasAsJSON(t *testing.T) {

@@ -76,6 +76,17 @@ func TestUsesParser(t *testing.T) {
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
 	}
+	if result.TargetRisk.Level != TargetRiskLevelHigh {
+		t.Fatalf("expected high target risk, got %#v", result.TargetRisk)
+	}
+	if result.TargetRisk.Scope != TargetRiskScopeExportedAPI {
+		t.Fatalf("expected exported API target risk scope, got %#v", result.TargetRisk)
+	}
+	assertContainsString(t, result.TargetRisk.Reasons, TargetRiskReasonAffectedPackages)
+	assertContainsString(t, result.TargetRisk.Reasons, TargetRiskReasonExportedSymbol)
+	if result.TargetRisk.Signals.AffectedPackages != 2 || result.TargetRisk.Signals.CallerPackages != 1 {
+		t.Fatalf("expected affected/caller package signals, got %#v", result.TargetRisk.Signals)
+	}
 }
 
 func TestFindImpactPropagatesTestAnalysisWarnings(t *testing.T) {
@@ -363,6 +374,13 @@ func TestAuth(t *testing.T) {}
 	wantCommands := []string{"go test ./cmd/api", "go test ./internal/auth"}
 	if !reflect.DeepEqual(result.TestCommands, wantCommands) {
 		t.Fatalf("expected %v, got %v", wantCommands, result.TestCommands)
+	}
+	if result.TargetRisk.Scope != TargetRiskScopeCrossPackage {
+		t.Fatalf("expected cross-package target risk, got %#v", result.TargetRisk)
+	}
+	assertContainsString(t, result.TargetRisk.Reasons, TargetRiskReasonPackageFanIn)
+	if result.TargetRisk.Signals.PackageFanIn != 1 {
+		t.Fatalf("expected package fan-in signal, got %#v", result.TargetRisk.Signals)
 	}
 }
 

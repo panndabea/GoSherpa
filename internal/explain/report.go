@@ -21,27 +21,28 @@ const (
 )
 
 type Report struct {
-	Target                  string               `json:"target"`
-	Symbol                  sherpa.Symbol        `json:"symbol"`
-	SymbolAnalysisMode      string               `json:"symbolAnalysisMode,omitempty"`
-	Purpose                 string               `json:"purpose"`
-	Risk                    RiskSummary          `json:"risk"`
-	ArchitectureRole        ArchitectureRole     `json:"architectureRole"`
-	References              []sherpa.Reference   `json:"references"`
-	ReferenceAnalysisMode   string               `json:"referenceAnalysisMode,omitempty"`
-	Callers                 []sherpa.Caller      `json:"callers"`
-	Callees                 []sherpa.Callee      `json:"callees"`
-	CallAnalysisMode        string               `json:"callAnalysisMode"`
-	AffectedPackages        []string             `json:"affectedPackages"`
-	AffectedInterfaces      []string             `json:"affectedInterfaces"`
-	AffectedImplementations []string             `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string               `json:"interfaceAnalysisMode,omitempty"`
-	RelatedTests            []sherpa.RelatedTest `json:"relatedTests"`
-	TestAnalysisMode        string               `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string             `json:"testCommands"`
-	TestPlan                sherpa.TestPlan      `json:"testPlan"`
-	ReadingOrder            []ReadingStep        `json:"readingOrder"`
-	Warnings                []string             `json:"warnings"`
+	Target                  string                   `json:"target"`
+	Symbol                  sherpa.Symbol            `json:"symbol"`
+	SymbolAnalysisMode      string                   `json:"symbolAnalysisMode,omitempty"`
+	Purpose                 string                   `json:"purpose"`
+	Risk                    RiskSummary              `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary `json:"targetRisk"`
+	ArchitectureRole        ArchitectureRole         `json:"architectureRole"`
+	References              []sherpa.Reference       `json:"references"`
+	ReferenceAnalysisMode   string                   `json:"referenceAnalysisMode,omitempty"`
+	Callers                 []sherpa.Caller          `json:"callers"`
+	Callees                 []sherpa.Callee          `json:"callees"`
+	CallAnalysisMode        string                   `json:"callAnalysisMode"`
+	AffectedPackages        []string                 `json:"affectedPackages"`
+	AffectedInterfaces      []string                 `json:"affectedInterfaces"`
+	AffectedImplementations []string                 `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                   `json:"interfaceAnalysisMode,omitempty"`
+	RelatedTests            []sherpa.RelatedTest     `json:"relatedTests"`
+	TestAnalysisMode        string                   `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                 `json:"testCommands"`
+	TestPlan                sherpa.TestPlan          `json:"testPlan"`
+	ReadingOrder            []ReadingStep            `json:"readingOrder"`
+	Warnings                []string                 `json:"warnings"`
 }
 
 type AnalyzeOptions struct {
@@ -103,6 +104,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		Target:                impactResult.Target,
 		Symbol:                symbol,
 		SymbolAnalysisMode:    symbolAnalysisMode,
+		TargetRisk:            impactResult.TargetRisk,
 		References:            impactResult.References,
 		ReferenceAnalysisMode: impactResult.ReferenceAnalysisMode,
 		AffectedPackages:      impactResult.Packages,
@@ -129,6 +131,7 @@ func AnalyzeWithOptions(root string, target string, options AnalyzeOptions) (Rep
 		report.AffectedInterfaces = impactReport.AffectedInterfaces
 		report.AffectedImplementations = impactReport.AffectedImplementations
 		report.InterfaceAnalysisMode = impactReport.InterfaceAnalysisMode
+		report.TargetRisk = impactReport.TargetRisk
 		report.Warnings = append(report.Warnings, impactReport.Warnings...)
 	}
 
@@ -637,6 +640,7 @@ func limitRelatedTests(values []sherpa.RelatedTest, limit int) []sherpa.RelatedT
 func normalizeReport(report Report) Report {
 	report.SymbolAnalysisMode = strings.TrimSpace(report.SymbolAnalysisMode)
 	report.Risk.Reasons = nonNil(uniqueStrings(report.Risk.Reasons))
+	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.ArchitectureRole.Reasons = nonNil(uniqueStrings(report.ArchitectureRole.Reasons))
 	report.References = nonNil(report.References)
 	report.ReferenceAnalysisMode = strings.TrimSpace(report.ReferenceAnalysisMode)

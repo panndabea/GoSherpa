@@ -863,24 +863,24 @@ signals without pretending GoSherpa can inspect arbitrary dependency behavior.
 
 Tasks:
 
-- [ ] Use typechecked selector information to name imported package receiver
+- [x] Use typechecked selector information to name imported package receiver
       method calls when the method object and import path are visible.
-- [ ] Emit these as external boundary edges or possible call records with call
+- [x] Emit these as external boundary edges or possible call records with call
       site position and range. Do not require a repository-local definition
       range for imported methods.
-- [ ] Preserve existing direct local caller/callee behavior and existing
+- [x] Preserve existing direct local caller/callee behavior and existing
       `CallScopeExternal` semantics.
-- [ ] Do not parse the module cache, vendor trees, or remote dependencies in
+- [x] Do not parse the module cache, vendor trees, or remote dependencies in
       this slice unless a separate design note explicitly approves that scope.
-- [ ] Add limitations that external dependency internals and runtime dispatch
+- [x] Add limitations that external dependency internals and runtime dispatch
       remain outside local impact evidence.
-- [ ] Add fixtures for:
+- [x] Add fixtures for:
       - standard-library receiver method
       - imported module or replace-module receiver method
       - alias import selector
       - dot import or unsupported selector shape
       - local receiver call remains direct/local
-- [ ] Feed imported receiver boundary signals into context, impact, and PR only
+- [x] Feed imported receiver boundary signals into context, impact, and PR only
       as bounded relationship or limitation evidence, not as local affected
       package evidence.
 
@@ -903,6 +903,24 @@ Exit criteria:
 Verification:
 
 ```bash
+go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./cmd/gosherpa
+```
+
+Slice 2.5 implementation completed on 2026-07-17. Selected `<base-ref>`
+remains `origin/main`, though no diff-oriented verification was required for
+this slice. Typechecked selector calls to imported receiver methods now emit
+additive `possibleCalls` with reason `imported-receiver`, `scope: external`,
+call-site position/range, and an import-path-qualified callee such as
+`strings.Builder.WriteString` or `example.com/dep.Client.Do`. Direct
+local caller/callee behavior and `CallScopeExternal` remain unchanged;
+dependency internals are still outside local impact evidence and are surfaced
+only as boundary/limitation context.
+
+Commands run:
+
+```bash
+go test ./internal/sherpa
+go test ./cmd/gosherpa
 go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./cmd/gosherpa
 ```
 
@@ -935,19 +953,19 @@ risk.
 
 Tasks:
 
-- [ ] Add a target risk summary type with:
+- [x] Add a target risk summary type with:
       - `level`: use existing risk levels where appropriate, not confidence
       - `scope`: `local`, `package`, `cross-package`, `exported-api`,
         `interface-contract`, or another documented stable value
       - `reasons`: short evidence-backed strings
       - `signals`: structured counts or facts where useful
       - `limitations`: target-specific uncertainty
-- [ ] Choose JSON field names before implementation. Prefer additive
+- [x] Choose JSON field names before implementation. Prefer additive
       `targetRisk` fields for impact, context, and PR outputs unless a slice
       intentionally evolves an existing `risk` field. Do not create two
       ambiguous meanings for `risk` in the same output.
-- [ ] Keep repository risk (`gosherpa risk`) separate from target impact risk.
-- [ ] Define deterministic scoring rules based on current evidence:
+- [x] Keep repository risk (`gosherpa risk`) separate from target impact risk.
+- [x] Define deterministic scoring rules based on current evidence:
       - number of affected packages
       - number of direct references
       - transitive caller packages
@@ -957,7 +975,7 @@ Tasks:
       - high fan-in as a signal or reason, not a scope value unless documented
       - missing or fallback test evidence
       - possible call edges from Phase 2 when available
-- [ ] Add tests for local, package-level, cross-package, exported API, and
+- [x] Add tests for local, package-level, cross-package, exported API, and
       interface contract cases.
 
 Primary files:
@@ -988,16 +1006,16 @@ Goal: expose target risk summaries in `impact file|package|symbol|diff`.
 
 Tasks:
 
-- [ ] Add target risk summaries to impact reports.
-- [ ] Preserve existing impact fields and ordering.
-- [ ] Ensure `impact diff` summarizes both aggregate diff risk and individual
+- [x] Add target risk summaries to impact reports.
+- [x] Preserve existing impact fields and ordering.
+- [x] Ensure `impact diff` summarizes both aggregate diff risk and individual
       changed-symbol risk where bounded.
-- [ ] Add human output that is short enough to scan:
+- [x] Add human output that is short enough to scan:
       - one headline line
       - a few reasons
       - raw evidence sections unchanged
-- [ ] Add JSON schema coverage and update golden fixtures.
-- [ ] Ensure empty or non-Go-only diffs still produce useful fallback risk
+- [x] Add JSON schema coverage and update golden fixtures.
+- [x] Ensure empty or non-Go-only diffs still produce useful fallback risk
       wording without pretending symbol impact exists.
 
 Primary files:
@@ -1030,19 +1048,19 @@ Goal: make risk summaries visible where users actually start work.
 
 Tasks:
 
-- [ ] Add target risk summary to `context symbol`, `context file`,
+- [x] Add target risk summary to `context symbol`, `context file`,
       `context package`, and `context diff` only where it helps and remains
       bounded.
-- [ ] Align `pr --base <ref>` risk summary with the new target risk model while
+- [x] Align `pr --base <ref>` risk summary with the new target risk model while
       preserving existing repository risk.
-- [ ] Ensure `pr` distinguishes:
+- [x] Ensure `pr` distinguishes:
       - diff target risk
       - repository structural risk
       - test plan confidence and fallback breadth
-- [ ] Add risk summary reasons to reading order or suggested next commands only
+- [x] Add risk summary reasons to reading order or suggested next commands only
       if they point to real evidence.
-- [ ] Update golden JSON fixtures for context and PR outputs.
-- [ ] Update `AGENT_NOTES.md` and `llms.txt` so agents read risk summaries
+- [x] Update golden JSON fixtures for context and PR outputs.
+- [x] Update `AGENT_NOTES.md` and `llms.txt` so agents read risk summaries
       without treating them as proof.
 
 Primary files:
@@ -1080,19 +1098,19 @@ Goal: keep the public contract clear after risk summaries become first-class.
 
 Tasks:
 
-- [ ] Update:
+- [x] Update:
       - `docs/CLI_REFERENCE.md`
       - `docs/STATUS.md`
       - `docs/product/MUST_USE_READINESS.md`
       - `docs/product/JSON_SCHEMA_V1.md`
       - `docs/product/CONTEXT_SCHEMA_V1.md`
       - `README.md` if examples materially change
-- [ ] Ensure examples use `<base-ref>` unless a real verified ref is needed.
-- [ ] Document risk summary as deterministic evidence, not a defect prediction.
-- [ ] Document how possible call edges affect risk, if Phase 2 has landed.
-- [ ] Document the compatibility rule for existing `risk` fields versus new
+- [x] Ensure examples use `<base-ref>` unless a real verified ref is needed.
+- [x] Document risk summary as deterministic evidence, not a defect prediction.
+- [x] Document how possible call edges affect risk, if Phase 2 has landed.
+- [x] Document the compatibility rule for existing `risk` fields versus new
       `targetRisk` fields.
-- [ ] Run schema and golden tests.
+- [x] Run schema and golden tests.
 
 Primary files:
 
@@ -1125,18 +1143,18 @@ Goal: prove the three tracks work together as one product workflow.
 
 Tasks:
 
-- [ ] Select and record `<base-ref>`.
-- [ ] Confirm that `context symbol --use-snapshot` and
+- [x] Select and record `<base-ref>`.
+- [x] Confirm that `context symbol --use-snapshot` and
       `impact symbol --use-snapshot` are supported by the CLI after Phase 1.4.
       If either remains intentionally unsupported, run the non-snapshot form
       and record the reason.
-- [ ] Refresh or create a snapshot:
+- [x] Refresh or create a snapshot:
 
       ```bash
       go run ./cmd/gosherpa snapshot --json
       ```
 
-- [ ] Run the must-use diff-oriented command set:
+- [x] Run the must-use diff-oriented command set:
 
       ```bash
       go run ./cmd/gosherpa doctor --json
@@ -1146,7 +1164,7 @@ Tasks:
       go run ./cmd/gosherpa pr --base <base-ref> --use-snapshot --json
       ```
 
-- [ ] Run the symbol command pair. Use this pair if Phase 1.4 intentionally
+- [x] Run the symbol command pair. Use this pair if Phase 1.4 intentionally
       enabled snapshot reuse for symbol commands:
 
       ```bash
@@ -1154,7 +1172,7 @@ Tasks:
       go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --use-snapshot --json
       ```
 
-- [ ] If symbol command snapshot reuse remains intentionally unsupported, run
+- [x] If symbol command snapshot reuse remains intentionally unsupported, run
       this pair instead and record the reason:
 
       ```bash
@@ -1162,7 +1180,7 @@ Tasks:
       go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --json
       ```
 
-- [ ] Verify the outputs answer:
+- [x] Verify the outputs answer:
       - what changed or what is inspected
       - where relevant code lives
       - who calls it and what it calls
@@ -1172,12 +1190,50 @@ Tasks:
       - how wide the change appears
       - what uncertainty remains
       - which command should run next
-- [ ] Run `go test ./...`.
-- [ ] Update `docs/STATUS.md` with completed readiness improvements.
-- [ ] Update `docs/product/MUST_USE_READINESS.md` if readiness estimate or
+- [x] Run `go test ./...`.
+- [x] Update `docs/STATUS.md` with completed readiness improvements.
+- [x] Update `docs/product/MUST_USE_READINESS.md` if readiness estimate or
       priority order changes.
-- [ ] Update `README.md`, `AGENT_NOTES.md`, and `llms.txt` if workflows or
+- [x] Update `README.md`, `AGENT_NOTES.md`, and `llms.txt` if workflows or
       agent guidance materially change.
+
+Final integration completed on 2026-07-17 with `<base-ref>` set to
+`origin/main`. `context symbol --use-snapshot` and
+`impact symbol --use-snapshot` are supported, so the non-snapshot fallback
+symbol pair was not needed. A fresh snapshot reported format v2 with
+relationship metadata present and capable, and `doctor --json` reported the
+snapshot as valid.
+
+Observed JSON modes and risk summaries:
+
+- `context diff`, `impact diff`, `tests affected`, and `pr` reported
+  `snapshot+git-diff+typechecked+ast` with no warnings.
+- `context diff`, `impact diff`, and `pr` reported aggregate
+  `targetRisk: medium/cross-package`; `tests affected` does not expose a
+  target-risk object.
+- `context symbol ./internal/sherpa.PlanTests --use-snapshot --json` reported
+  snapshot-backed reference and call subanalysis, broader
+  `typechecked+ast` context, and `targetRisk: high/exported-api`.
+- `impact symbol ./internal/sherpa.PlanTests --use-snapshot --json` reported
+  `snapshot+typechecked` and `targetRisk: high/exported-api`.
+- No command emitted envelope warnings.
+- `README.md` did not require a material workflow change; agent guidance was
+  updated in `AGENT_NOTES.md` and `llms.txt`.
+
+Commands run:
+
+```bash
+go test ./internal/sherpa ./internal/impact ./internal/explain ./internal/agentcontext ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa context diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa impact diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa tests affected --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa pr --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot --json
+go run ./cmd/gosherpa impact symbol ./internal/sherpa.PlanTests --use-snapshot --json
+```
 
 Exit criteria:
 

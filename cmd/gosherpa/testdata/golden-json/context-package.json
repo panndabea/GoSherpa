@@ -376,6 +376,37 @@
         "Affected tests found: 1."
       ]
     },
+    "targetRisk": {
+      "level": "high",
+      "scope": "cross-package",
+      "reasons": [
+        "affected-packages",
+        "fallback-tests",
+        "missing-direct-tests",
+        "package-fan-in"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 0,
+        "transitiveCallers": 0,
+        "callerPackages": 0,
+        "exportedSymbol": false,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 1,
+        "missingDirectTests": true,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Package risk uses local import fan-in and affected-package/test signals only.",
+        "Target risk remains separate from confidence and repository structural risk.",
+        "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+      ]
+    },
     "affectedPackages": [
       ".",
       "./cmd/app"
@@ -430,6 +461,7 @@
           ]
         }
       ],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -437,8 +469,7 @@
           "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
           "package": "./cmd/app"
         }
-      ],
-      "contracts": []
+      ]
     },
     "readingOrder": [
       {

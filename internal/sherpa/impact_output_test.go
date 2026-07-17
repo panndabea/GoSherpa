@@ -81,6 +81,9 @@ func TestFormatImpactForSymbol(t *testing.T) {
 TARGET
   ParseFile (symbol)
 
+TARGET RISK
+  low (local)
+
 REFERENCES
   internal/parser/parser.go:3
   cmd/app/main.go:6
@@ -154,6 +157,9 @@ func TestFormatImpactForPackage(t *testing.T) {
 TARGET
   ./internal/auth (package)
 
+TARGET RISK
+  low (local)
+
 DIRECT DEPENDENTS
   ./cmd/api
 
@@ -194,6 +200,9 @@ func TestFormatImpactWithEmptySections(t *testing.T) {
 
 TARGET
   Missing (symbol)
+
+TARGET RISK
+  low (local)
 
 REFERENCES
   none
@@ -237,6 +246,9 @@ func TestFormatImpactWithWarnings(t *testing.T) {
 
 TARGET
   Run (symbol)
+
+TARGET RISK
+  low (local)
 
 REFERENCES
   none

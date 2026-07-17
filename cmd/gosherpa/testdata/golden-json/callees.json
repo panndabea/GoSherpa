@@ -12,7 +12,7 @@
       "Call analysis used typechecked package loading where available.",
       "Call graph results are repository-local.",
       "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
-      "Imported-package receiver calls may be incomplete."
+      "Imported-package receiver methods are external boundary signals; dependency internals are not analyzed."
     ],
     "callees": [
       {

@@ -41,6 +41,9 @@ func TestAnalyzeDiffReportsChangedAndAffectedPackages(t *testing.T) {
 	assertStrings(t, report.ChangedPackages, []string{"./internal/auth"})
 	assertStrings(t, report.AffectedPackages, []string{"./internal/api", "./internal/auth"})
 	assertStrings(t, report.AffectedSymbols, []string{"NewSession"})
+	if len(report.ChangedSymbolDetails) != 1 || report.ChangedSymbolDetails[0].TargetRisk == nil {
+		t.Fatalf("expected changed symbol target risk, got %#v", report.ChangedSymbolDetails)
+	}
 	if report.ReferenceAnalysisMode != sherpa.ReferenceAnalysisModeTypechecked {
 		t.Fatalf("reference analysis mode = %q, want %s", report.ReferenceAnalysisMode, sherpa.ReferenceAnalysisModeTypechecked)
 	}
@@ -542,6 +545,14 @@ const Version = "new"
 	assertStrings(t, relatedTestNames(report.AffectedTests), []string{"./internal/auth:TestConfig"})
 	assertStrings(t, testPlanItemPackages(report.TestPlan.Related), []string{"./internal/auth"})
 	assertStrings(t, report.TestCommands, []string{"go test ./internal/auth"})
+	if !report.TargetRisk.Signals.NonGoOrHunkOnlyDiff {
+		t.Fatalf("expected hunk-only target risk signal, got %#v", report.TargetRisk)
+	}
+	assertStrings(t, report.TargetRisk.Reasons, []string{
+		sherpa.TargetRiskReasonAffectedPackages,
+		sherpa.TargetRiskReasonMissingDirectTests,
+		sherpa.TargetRiskReasonNonGoOrHunkOnlyDiff,
+	})
 }
 
 func TestAnalyzeDiffKeepsFallbackUsefulForDeletedSymbols(t *testing.T) {
@@ -730,6 +741,16 @@ func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedInterfacePac
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
 		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
 	}
+	if report.TargetRisk.Scope != sherpa.TargetRiskScopeInterfaceContract {
+		t.Fatalf("expected interface-contract target risk, got %#v", report.TargetRisk)
+	}
+	assertStrings(t, report.TargetRisk.Reasons, []string{
+		sherpa.TargetRiskReasonAffectedPackages,
+		sherpa.TargetRiskReasonFallbackTests,
+		sherpa.TargetRiskReasonInterfaceContract,
+		sherpa.TargetRiskReasonMissingDirectTests,
+		sherpa.TargetRiskReasonPackageFanIn,
+	})
 }
 
 func TestAnalyzePackageReportsInterfacesAndImplementationsForChangedImplementationPackage(t *testing.T) {
@@ -820,6 +841,18 @@ func TestAnalyzeSymbolReportsInterfaceImplementations(t *testing.T) {
 	if report.InterfaceAnalysisMode != InterfaceAnalysisModeTypechecked {
 		t.Fatalf("expected typechecked interface analysis mode, got %q", report.InterfaceAnalysisMode)
 	}
+	if report.TargetRisk.Scope != sherpa.TargetRiskScopeInterfaceContract {
+		t.Fatalf("expected interface-contract target risk, got %#v", report.TargetRisk)
+	}
+	assertStrings(t, report.TargetRisk.Reasons, []string{
+		sherpa.TargetRiskReasonAffectedPackages,
+		sherpa.TargetRiskReasonDirectReferences,
+		sherpa.TargetRiskReasonExportedSymbol,
+		sherpa.TargetRiskReasonFallbackTests,
+		sherpa.TargetRiskReasonInterfaceContract,
+		sherpa.TargetRiskReasonMissingDirectTests,
+		sherpa.TargetRiskReasonPackageFanIn,
+	})
 }
 
 func TestAnalyzeSymbolReportsGenericInterfaceAliasImpact(t *testing.T) {

@@ -31,6 +31,36 @@
     "affectedSymbols": [
       "Added"
     ],
+    "targetRisk": {
+      "level": "medium",
+      "scope": "cross-package",
+      "reasons": [
+        "affected-packages",
+        "fallback-tests",
+        "missing-direct-tests"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 0,
+        "transitiveCallers": 0,
+        "callerPackages": 0,
+        "exportedSymbol": false,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 0,
+        "missingDirectTests": true,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Diff target risk summarizes deterministic changed and affected package evidence; it is not a defect prediction.",
+        "Hunk-only or non-Go changes may require file-level review because no changed top-level Go symbol was identified.",
+        "Target risk remains separate from confidence and repository structural risk."
+      ]
+    },
     "referenceAnalysisMode": "typechecked",
     "callAnalysisMode": "typechecked",
     "affectedInterfaces": [],
@@ -90,6 +120,7 @@
           ]
         }
       ],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -100,8 +131,7 @@
             "example.com/golden.Added"
           ]
         }
-      ],
-      "contracts": []
+      ]
     }
   }
 }

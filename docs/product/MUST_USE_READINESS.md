@@ -17,11 +17,11 @@ GoSherpa already has real MVP substance:
 - interface implementer and satisfied-interface navigation
 - file, package, symbol, and diff impact analysis
 - affected test suggestions
-- context export for symbols, files, packages, and diffs, including confidence,
-  analysis mode, and limitations fields
+- context export for symbols, files, packages, and diffs, including target risk,
+  confidence, analysis mode, and limitations fields
 - PR review summaries through `gosherpa pr --base <ref>`, including changed
-  files, packages, symbols, risk notes, affected tests, and verification
-  commands
+  files, packages, symbols, risk notes, target risk, affected tests, and
+  verification commands
 - stable JSON output for commands
 - ambiguity diagnostics and package-qualified target support
 
@@ -188,6 +188,7 @@ The first slice summarizes:
 - affected symbols
 - affected interfaces and implementers
 - risk notes
+- target risk summary
 - recommended tests
 - verification commands
 

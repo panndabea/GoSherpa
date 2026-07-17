@@ -81,6 +81,39 @@
         "Related tests found: 1."
       ]
     },
+    "targetRisk": {
+      "level": "high",
+      "scope": "exported-api",
+      "reasons": [
+        "affected-packages",
+        "direct-references",
+        "exported-symbol",
+        "fallback-tests",
+        "package-fan-in",
+        "transitive-callers"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 2,
+        "transitiveCallers": 4,
+        "callerPackages": 2,
+        "exportedSymbol": true,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 1,
+        "missingDirectTests": false,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+        "Target risk remains separate from confidence and repository structural risk.",
+        "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+      ]
+    },
     "architectureRole": {
       "role": "leaf_dependency",
       "reasons": [
@@ -234,6 +267,9 @@
           "same-package",
           "target-package"
         ],
+        "targets": [
+          "Target"
+        ],
         "targetReferences": [
           {
             "target": "Target",
@@ -255,9 +291,6 @@
               }
             }
           }
-        ],
-        "targets": [
-          "Target"
         ]
       }
     ],
@@ -282,6 +315,7 @@
         }
       ],
       "related": [],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [
         {
@@ -292,8 +326,7 @@
             "Target"
           ]
         }
-      ],
-      "contracts": []
+      ]
     },
     "readingOrder": [
       {
@@ -395,7 +428,7 @@
       "Interface analysis used typechecked method sets from repository-local packages.",
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
       "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
-      "Call graph results are repository-local and may miss some imported-package receiver calls.",
+      "Imported-package receiver methods are external boundary signals; dependency internals are not analyzed.",
       "Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
       "Package load warnings lower confidence; inspect envelope warnings before relying on semantic references, calls, interfaces, or tests.",
       "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",

@@ -14,6 +14,9 @@ func FormatImpact(result ImpactResult) string {
 	fmt.Fprintf(&builder, "  %s (%s)\n", result.Target, result.Kind)
 	builder.WriteString("\n")
 
+	writeImpactTargetRisk(&builder, result.TargetRisk)
+	builder.WriteString("\n")
+
 	if result.Kind == ImpactKindPackage {
 		writeImpactValues(&builder, "DIRECT DEPENDENTS", result.Dependencies.UsedBy)
 		builder.WriteString("\n")
@@ -42,6 +45,15 @@ func FormatImpact(result ImpactResult) string {
 
 func PrintImpact(result ImpactResult) {
 	fmt.Print(FormatImpact(result))
+}
+
+func writeImpactTargetRisk(builder *strings.Builder, risk TargetRiskSummary) {
+	risk = NormalizeTargetRiskSummary(risk)
+	builder.WriteString("TARGET RISK\n")
+	fmt.Fprintf(builder, "  %s (%s)\n", risk.Level, risk.Scope)
+	for _, reason := range risk.Reasons {
+		fmt.Fprintf(builder, "  - %s\n", reason)
+	}
 }
 
 func writeImpactReferences(builder *strings.Builder, refs []Reference) {
