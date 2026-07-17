@@ -535,6 +535,11 @@ Data:
 - `limitations`: call-graph and entrypoint-classification blind spots.
 - `entrypoints`: array of entrypoint entries. The array is present even when
   empty.
+  Entrypoint `kind` values include `main`, `test`, `stdlib-http-handler`,
+  `exported`, and `no-local-callers`. `stdlib-http-handler` is used for
+  statically visible `net/http` handler registrations such as `http.HandleFunc`,
+  `http.Handle` values with local `ServeHTTP` methods, and
+  `http.Server{Handler: ...}`.
 
 `data.warnings` is absent; use envelope `warnings`.
 

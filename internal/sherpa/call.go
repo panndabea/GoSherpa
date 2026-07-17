@@ -58,6 +58,8 @@ const (
 	CallAnalysisModeASTFallback = "ast-fallback"
 )
 
+const stdlibHTTPPackagePath = "net/http"
+
 type CallScope string
 
 const (
@@ -1534,6 +1536,29 @@ func callObjectPackageMatchesTarget(function functionInfo, object types.Object, 
 	return localPackage == target.Package
 }
 
+func callObjectLocalPackage(function functionInfo, object types.Object) (string, bool) {
+	if object == nil || object.Pkg() == nil {
+		return "", false
+	}
+
+	packagePath := object.Pkg().Path()
+	if packagePath == "" {
+		return "", false
+	}
+
+	if function.ImportPaths != nil {
+		if localPackage, ok := function.ImportPaths[packagePath]; ok {
+			return localPackage, true
+		}
+	}
+
+	if packagePath == function.ImportPath && strings.TrimSpace(function.Package) != "" {
+		return function.Package, true
+	}
+
+	return callLocalImportPackage(packagePath, function.ModulePath)
+}
+
 func callImportAliases(file *ast.File, modulePath string) map[string]string {
 	aliases := make(map[string]string)
 	for _, importSpec := range file.Imports {
@@ -1609,6 +1634,7 @@ func collectPossibleCallsFromFunctionWithCatalog(function functionInfo, catalog 
 func collectPossibleCallsFromFunctionWithFunctions(function functionInfo, functions []functionInfo, catalog interfaceDispatchCatalog) []PossibleCall {
 	signals := collectCallUncertaintySignals(function)
 	possibleCalls := collectConcreteRuntimePossibleCalls(function, functions)
+	possibleCalls = append(possibleCalls, collectStdlibHTTPHandlerPossibleCalls(function, functions)...)
 	for _, signal := range signals {
 		if !signal.Possible {
 			continue
@@ -1632,6 +1658,174 @@ func collectPossibleCallsFromFunctionWithFunctions(function functionInfo, functi
 
 	sortPossibleCalls(possibleCalls)
 	return dedupePossibleCalls(possibleCalls)
+}
+
+func collectStdlibHTTPHandlerPossibleCalls(function functionInfo, functions []functionInfo) []PossibleCall {
+	if function.Decl.Body == nil || function.TypeInfo == nil {
+		return nil
+	}
+
+	var possibleCalls []PossibleCall
+	ast.Inspect(function.Decl.Body, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+
+		if _, ok := node.(*ast.FuncLit); ok {
+			return false
+		}
+
+		switch typed := node.(type) {
+		case *ast.CallExpr:
+			possibleCalls = append(possibleCalls, stdlibHTTPHandlerPossibleCallsFromCall(function, functions, typed)...)
+		case *ast.CompositeLit:
+			possibleCalls = append(possibleCalls, stdlibHTTPHandlerPossibleCallsFromServerComposite(function, functions, typed)...)
+		}
+
+		return true
+	})
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+func stdlibHTTPHandlerPossibleCallsFromCall(function functionInfo, functions []functionInfo, call *ast.CallExpr) []PossibleCall {
+	if call == nil {
+		return nil
+	}
+
+	switch {
+	case callFunctionObjectIs(function, call.Fun, stdlibHTTPPackagePath, "HandleFunc"):
+		if len(call.Args) < 2 {
+			return nil
+		}
+
+		return stdlibHTTPHandlerFuncPossibleCalls(function, functions, call.Args[1])
+	case callFunctionObjectIs(function, call.Fun, stdlibHTTPPackagePath, "Handle"):
+		if len(call.Args) < 2 {
+			return nil
+		}
+
+		return stdlibHTTPHandlerValuePossibleCalls(function, functions, call.Args[1])
+	default:
+		return nil
+	}
+}
+
+func stdlibHTTPHandlerPossibleCallsFromServerComposite(function functionInfo, functions []functionInfo, literal *ast.CompositeLit) []PossibleCall {
+	if literal == nil || !callTypeIsPackageNamed(function.TypeInfo.TypeOf(literal), stdlibHTTPPackagePath, "Server") {
+		return nil
+	}
+
+	var possibleCalls []PossibleCall
+	for _, element := range literal.Elts {
+		keyValue, ok := element.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+
+		key, ok := keyValue.Key.(*ast.Ident)
+		if !ok || key.Name != "Handler" {
+			continue
+		}
+
+		possibleCalls = append(possibleCalls, stdlibHTTPHandlerValuePossibleCalls(function, functions, keyValue.Value)...)
+	}
+
+	return possibleCalls
+}
+
+func stdlibHTTPHandlerFuncPossibleCalls(function functionInfo, functions []functionInfo, expr ast.Expr) []PossibleCall {
+	if target, ok := stdlibHTTPHandlerFuncConversionArg(function, expr); ok {
+		expr = target
+	}
+
+	match, ok := singleMatchingFunctionInfoForCall(functions, function, expr)
+	if !ok {
+		return nil
+	}
+
+	return []PossibleCall{possibleCallFromFunctionInfo(function, match, PossibleCallReasonStdlibHTTPHandler, expr)}
+}
+
+func stdlibHTTPHandlerValuePossibleCalls(function functionInfo, functions []functionInfo, expr ast.Expr) []PossibleCall {
+	if target, ok := stdlibHTTPHandlerFuncConversionArg(function, expr); ok {
+		return stdlibHTTPHandlerFuncPossibleCalls(function, functions, target)
+	}
+
+	receiverType, ok := stdlibHTTPLocalHandlerReceiverType(function, expr)
+	if !ok {
+		return nil
+	}
+
+	var possibleCalls []PossibleCall
+	for _, candidate := range functions {
+		if candidate.Package != receiverType.Package || candidate.Receiver != receiverType.Receiver || candidate.Name != "ServeHTTP" {
+			continue
+		}
+		if !functionInfoIsStdlibHTTPServeHTTP(candidate) {
+			continue
+		}
+
+		possibleCalls = append(possibleCalls, possibleCallFromFunctionInfo(function, candidate, PossibleCallReasonStdlibHTTPHandler, expr))
+	}
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+type stdlibHTTPHandlerReceiverType struct {
+	Package  string
+	Receiver string
+}
+
+func stdlibHTTPLocalHandlerReceiverType(function functionInfo, expr ast.Expr) (stdlibHTTPHandlerReceiverType, bool) {
+	if function.TypeInfo == nil || expr == nil {
+		return stdlibHTTPHandlerReceiverType{}, false
+	}
+
+	named := callNamedReceiverType(function.TypeInfo.TypeOf(expr))
+	if named == nil || named.Obj() == nil {
+		return stdlibHTTPHandlerReceiverType{}, false
+	}
+
+	packagePath, ok := callObjectLocalPackage(function, named.Obj())
+	if !ok {
+		return stdlibHTTPHandlerReceiverType{}, false
+	}
+
+	return stdlibHTTPHandlerReceiverType{
+		Package:  packagePath,
+		Receiver: named.Obj().Name(),
+	}, true
+}
+
+func stdlibHTTPHandlerFuncConversionArg(function functionInfo, expr ast.Expr) (ast.Expr, bool) {
+	switch typed := expr.(type) {
+	case *ast.ParenExpr:
+		return stdlibHTTPHandlerFuncConversionArg(function, typed.X)
+	case *ast.CallExpr:
+		if len(typed.Args) != 1 || !callTypeNameObjectIs(function, typed.Fun, stdlibHTTPPackagePath, "HandlerFunc") {
+			return nil, false
+		}
+
+		return typed.Args[0], true
+	default:
+		return nil, false
+	}
+}
+
+func possibleCallFromFunctionInfo(function functionInfo, match functionInfo, reason PossibleCallReason, expr ast.Expr) PossibleCall {
+	return PossibleCall{
+		Caller:        function.Target,
+		Callee:        match.Target,
+		Certainty:     CallCertaintyPossible,
+		Reason:        reason,
+		Scope:         CallScopeLocal,
+		Position:      callExpressionPosition(function, expr),
+		Range:         callExpressionRange(function, expr),
+		calleePackage: match.Package,
+	}
 }
 
 func collectPossibleCallersFromFunctions(functions []functionInfo, target callTarget) []PossibleCall {
@@ -2621,6 +2815,69 @@ func callObjectFromPackage(object types.Object, packagePath string) bool {
 	}
 
 	return object.Pkg().Path() == packagePath
+}
+
+func callFunctionObjectIs(function functionInfo, expr ast.Expr, packagePath string, name string) bool {
+	object, ok := callObject(function, expr).(*types.Func)
+	if !ok || object.Name() != name {
+		return false
+	}
+
+	return callObjectFromPackage(object, packagePath)
+}
+
+func callTypeNameObjectIs(function functionInfo, expr ast.Expr, packagePath string, name string) bool {
+	object, ok := callObject(function, expr).(*types.TypeName)
+	if !ok || object.Name() != name {
+		return false
+	}
+
+	return callObjectFromPackage(object, packagePath)
+}
+
+func functionInfoIsStdlibHTTPServeHTTP(function functionInfo) bool {
+	if function.TypeInfo == nil || function.Decl == nil || function.Decl.Name == nil || function.Name != "ServeHTTP" {
+		return false
+	}
+
+	object, ok := function.TypeInfo.Defs[function.Decl.Name].(*types.Func)
+	if !ok || object == nil {
+		return false
+	}
+
+	signature, ok := object.Type().(*types.Signature)
+	if !ok || signature.Params() == nil || signature.Params().Len() != 2 {
+		return false
+	}
+
+	return callTypeIsPackageNamed(signature.Params().At(0).Type(), stdlibHTTPPackagePath, "ResponseWriter") &&
+		callTypeIsPointerToPackageNamed(signature.Params().At(1).Type(), stdlibHTTPPackagePath, "Request")
+}
+
+func callTypeIsPointerToPackageNamed(typ types.Type, packagePath string, name string) bool {
+	if typ == nil {
+		return false
+	}
+
+	pointer, ok := types.Unalias(typ).(*types.Pointer)
+	if !ok {
+		return false
+	}
+
+	return callTypeIsPackageNamed(pointer.Elem(), packagePath, name)
+}
+
+func callTypeIsPackageNamed(typ types.Type, packagePath string, name string) bool {
+	if typ == nil {
+		return false
+	}
+
+	named, ok := types.Unalias(typ).(*types.Named)
+	if !ok || named.Obj() == nil || named.Obj().Pkg() == nil {
+		return false
+	}
+
+	return named.Obj().Name() == name && named.Obj().Pkg().Path() == packagePath
 }
 
 func callTypeIsSignature(typ types.Type) bool {

@@ -12,6 +12,7 @@ type EntryPointKind string
 const (
 	EntryPointKindMain           EntryPointKind = "main"
 	EntryPointKindTest           EntryPointKind = "test"
+	EntryPointKindStdlibHTTP     EntryPointKind = "stdlib-http-handler"
 	EntryPointKindExported       EntryPointKind = "exported"
 	EntryPointKindNoLocalCallers EntryPointKind = "no-local-callers"
 )
@@ -83,7 +84,8 @@ func FindEntryPointsWithOptions(root string, target string, options CallOptions)
 	graph := buildEntryPointCallGraph(graphFunctions)
 	reverseGraph := reverseCallGraph(graph)
 	reachable := reachableCallerKeys(reverseGraph, functionNode(targetFunction).Key)
-	entryPoints := collectEntryPointsFromReachableFunctions(graphFunctions, reverseGraph, reachable)
+	httpHandlerKeys := stdlibHTTPHandlerEntryPointKeys(graphFunctions)
+	entryPoints := collectEntryPointsFromReachableFunctions(graphFunctions, reverseGraph, reachable, httpHandlerKeys)
 
 	return EntryPointsResult{
 		Target:       normalizedTarget.String(),
@@ -104,7 +106,8 @@ func buildEntryPointCallGraph(functions []functionInfo) map[string][]callGraphEd
 				continue
 			}
 			if possibleCall.Reason != PossibleCallReasonGoroutine &&
-				possibleCall.Reason != PossibleCallReasonFunctionLiteral {
+				possibleCall.Reason != PossibleCallReasonFunctionLiteral &&
+				possibleCall.Reason != PossibleCallReasonStdlibHTTPHandler {
 				continue
 			}
 
@@ -132,6 +135,31 @@ func buildEntryPointCallGraph(functions []functionInfo) map[string][]callGraphEd
 	}
 
 	return graph
+}
+
+func stdlibHTTPHandlerEntryPointKeys(functions []functionInfo) map[string]struct{} {
+	keys := make(map[string]struct{})
+	for _, function := range functions {
+		for _, possibleCall := range collectStdlibHTTPHandlerPossibleCalls(function, functions) {
+			if possibleCall.Scope != CallScopeLocal || possibleCall.calleePackage == "" || possibleCall.Callee == "" {
+				continue
+			}
+
+			target := callTarget{Package: possibleCall.calleePackage}
+			target.Receiver, target.Name = relationshipSplitDisplayName(possibleCall.Callee)
+			if target.Name == "" {
+				continue
+			}
+
+			match, ok := findMatchingFunctionInfo(functions, target)
+			if !ok {
+				continue
+			}
+			keys[functionNode(match).Key] = struct{}{}
+		}
+	}
+
+	return keys
 }
 
 func findMatchingFunctionInfo(functions []functionInfo, target callTarget) (functionInfo, bool) {
@@ -188,7 +216,7 @@ func reachableCallerKeys(reverseGraph map[string][]callGraphEdge, targetKey stri
 	return reachable
 }
 
-func collectEntryPointsFromReachableFunctions(functions []functionInfo, reverseGraph map[string][]callGraphEdge, reachable map[string]struct{}) []EntryPoint {
+func collectEntryPointsFromReachableFunctions(functions []functionInfo, reverseGraph map[string][]callGraphEdge, reachable map[string]struct{}, httpHandlerKeys map[string]struct{}) []EntryPoint {
 	var entryPoints []EntryPoint
 	for _, function := range functions {
 		node := functionNode(function)
@@ -196,7 +224,7 @@ func collectEntryPointsFromReachableFunctions(functions []functionInfo, reverseG
 			continue
 		}
 
-		kind, ok := functionEntryPointKind(function, reverseGraph, node.Key)
+		kind, ok := functionEntryPointKind(function, reverseGraph, node.Key, httpHandlerKeys)
 		if !ok {
 			continue
 		}
@@ -215,12 +243,14 @@ func collectEntryPointsFromReachableFunctions(functions []functionInfo, reverseG
 	return entryPoints
 }
 
-func functionEntryPointKind(function functionInfo, reverseGraph map[string][]callGraphEdge, key string) (EntryPointKind, bool) {
+func functionEntryPointKind(function functionInfo, reverseGraph map[string][]callGraphEdge, key string, httpHandlerKeys map[string]struct{}) (EntryPointKind, bool) {
 	switch {
 	case functionIsMain(function):
 		return EntryPointKindMain, true
 	case functionIsTestEntryPoint(function):
 		return EntryPointKindTest, true
+	case functionIsStdlibHTTPHandler(httpHandlerKeys, key):
+		return EntryPointKindStdlibHTTP, true
 	case functionIsExported(function):
 		return EntryPointKindExported, true
 	case !functionHasLocalCallers(reverseGraph, key):
@@ -249,6 +279,15 @@ func isGoTestEntryPointName(name string) bool {
 
 func functionIsExported(function functionInfo) bool {
 	return function.Name != "" && ast.IsExported(function.Name)
+}
+
+func functionIsStdlibHTTPHandler(httpHandlerKeys map[string]struct{}, key string) bool {
+	if len(httpHandlerKeys) == 0 {
+		return false
+	}
+
+	_, ok := httpHandlerKeys[key]
+	return ok
 }
 
 func functionHasLocalCallers(reverseGraph map[string][]callGraphEdge, key string) bool {
@@ -299,11 +338,13 @@ func entryPointKindPriority(kind EntryPointKind) int {
 		return 0
 	case EntryPointKindTest:
 		return 1
-	case EntryPointKindExported:
+	case EntryPointKindStdlibHTTP:
 		return 2
-	case EntryPointKindNoLocalCallers:
+	case EntryPointKindExported:
 		return 3
-	default:
+	case EntryPointKindNoLocalCallers:
 		return 4
+	default:
+		return 5
 	}
 }

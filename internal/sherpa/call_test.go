@@ -720,6 +720,192 @@ func Target() {}
 	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:6")
 }
 
+func TestFindCalleesReportsHTTPHandleFuncPossibleCallToFunctionHandler(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+func Register() {
+	http.HandleFunc("/target", Target)
+}
+
+func Target(w http.ResponseWriter, r *http.Request) {}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Register->Target:stdlib-http-handler:possible:local:service.go:6"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsHTTPHandleFuncPossibleCallToMethodHandler(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+type Server struct{}
+
+func (Server) Target(w http.ResponseWriter, r *http.Request) {}
+
+func Register(server Server) {
+	http.HandleFunc("/target", server.Target)
+}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Register->Server.Target:stdlib-http-handler:possible:local:service.go:10"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsHTTPHandlePossibleCallToServeHTTP(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+type Handler struct{}
+
+func (Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
+
+func Register() {
+	http.Handle("/target", Handler{})
+}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Register->Handler.ServeHTTP:stdlib-http-handler:possible:local:service.go:10"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsHTTPServerHandlerPossibleCallToServeHTTP(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+type Handler struct{}
+
+func (Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
+
+func Register(handler Handler) {
+	_ = http.Server{Handler: handler}
+}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Register->Handler.ServeHTTP:stdlib-http-handler:possible:local:service.go:10"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesReportsHTTPHandlerFuncConversionPossibleCall(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+func Register() {
+	http.Handle("/target", http.HandlerFunc(Target))
+}
+
+func Target(w http.ResponseWriter, r *http.Request) {}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Register->Target:stdlib-http-handler:possible:local:service.go:6"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+}
+
+func TestFindCalleesDoesNotInferCustomHTTPRouter(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+type Router struct{}
+
+func (Router) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {}
+
+func Register(router Router) {
+	router.HandleFunc("/target", Target)
+}
+
+func Target(w http.ResponseWriter, r *http.Request) {}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible calls for custom router, got %#v", result.PossibleCalls)
+	}
+}
+
+func TestFindCalleesDoesNotGuessAmbiguousHTTPHandlerInterfaceValue(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+import "net/http"
+
+func Register(handler http.Handler) {
+	http.Handle("/target", handler)
+}
+`)
+
+	result, err := FindCallees(tmp, "Register")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.PossibleCalls) != 0 {
+		t.Fatalf("expected no possible calls for interface handler value, got %#v", result.PossibleCalls)
+	}
+}
+
 func TestFindCallPathsReportsDynamicCallLimitations(t *testing.T) {
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
@@ -961,6 +1147,40 @@ func target() {}
 
 	got := callTestEntryPointLabels(result.EntryPoints)
 	want := []string{"no-local-callers:.:start"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestFindEntryPointsClassifiesStdlibHTTPHandler(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "main.go"), `package main
+
+import "net/http"
+
+func main() {
+	register()
+}
+
+func register() {
+	http.HandleFunc("/target", target)
+}
+
+func target(w http.ResponseWriter, r *http.Request) {}
+`)
+
+	result, err := FindEntryPoints(tmp, "target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := callTestEntryPointLabels(result.EntryPoints)
+	want := []string{
+		"main:.:main",
+		"stdlib-http-handler:.:target",
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}

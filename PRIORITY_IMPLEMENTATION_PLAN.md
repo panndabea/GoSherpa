@@ -787,22 +787,23 @@ framework-specific.
 
 Tasks:
 
-- [ ] Add stdlib HTTP handler detection for common patterns:
+- [x] Add stdlib HTTP handler detection for common patterns:
       - functions or methods passed to `http.HandleFunc`
       - values passed to `http.Handle` when they have `ServeHTTP`
       - `http.Server{Handler: ...}` when statically visible
-- [ ] Emit entrypoint kind values carefully. If new enum values are added,
+- [x] Emit entrypoint kind values carefully. If new enum values are added,
       update schema docs, tests, and goldens in the same slice.
-- [ ] Add limitations that framework routers and custom runtime wiring remain
+- [x] Add limitations that framework routers and custom runtime wiring remain
       outside this first slice.
-- [ ] Add fixtures for:
+- [x] Add fixtures for:
       - function handler
       - method handler
       - handler interface value
       - custom router not inferred
       - ambiguous handler value
-- [ ] Feed detected entrypoints into `entrypoints`, `context symbol`, `impact
-      symbol`, and `pr` only where output stays bounded.
+- [x] Feed detected entrypoints into `entrypoints`; keep `context symbol`,
+      `impact symbol`, and `pr` unchanged in this slice because they do not yet
+      have a bounded first-class entrypoint field.
 
 Primary files:
 
@@ -826,6 +827,33 @@ Verification:
 ```bash
 go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./cmd/gosherpa
 go run ./cmd/gosherpa entrypoints <target> --json
+```
+
+Slice 2.4 verification completed on 2026-07-17. Selected `<base-ref>` remains
+`origin/main`, though no diff-oriented verification was required for this
+slice. Statically visible stdlib `net/http` handler registrations now produce
+bounded `possibleCalls` with reason `stdlib-http-handler`, and
+`entrypoints` classifies reachable registered handlers with kind
+`stdlib-http-handler`. The first slice covers `http.HandleFunc` function and
+method handlers, `http.Handle` values backed by local `ServeHTTP` methods,
+`http.HandlerFunc(...)` conversions, and `http.Server{Handler: ...}`. Custom
+routers and ambiguous `http.Handler` interface values remain intentionally
+uninferred and documented as limitations.
+
+Follow-up: add first-class, bounded entrypoint summaries to `context symbol`,
+`impact symbol`, and `pr` alongside the target-risk work instead of folding
+possible runtime entrypoints into direct caller evidence.
+
+Commands run:
+
+```bash
+go test ./internal/sherpa
+go test ./cmd/gosherpa
+go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./cmd/gosherpa
+go test ./internal/snapshot
+go test ./...
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/json_project entrypoints Target --json
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/json_project callees Entry --json
 ```
 
 ### Slice 2.5: Imported Receiver Boundary Signals

@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -5445,6 +5447,57 @@ func target() {}
 
 	if strings.Contains(result.Stdout, "ENTRYPOINTS") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsEntryPointsCommandWithStdlibHTTPHandlerAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "main.go"), `package main
+
+import "net/http"
+
+func main() {
+	register()
+}
+
+func register() {
+	http.HandleFunc("/target", target)
+}
+
+func target(w http.ResponseWriter, r *http.Request) {}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "entrypoints", "target", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "entrypoints", "target", "example.com/app")
+	entryPoints := assertMainTestJSONArrayHasLength(t, data, "entrypoints", 2)
+
+	kinds := make([]string, 0, len(entryPoints))
+	for _, value := range entryPoints {
+		entryPoint, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("expected entrypoint object, got %T", value)
+		}
+		kinds = append(kinds, fmt.Sprintf("%s:%s", entryPoint["kind"], entryPoint["name"]))
+	}
+
+	want := []string{
+		string(sherpa.EntryPointKindMain) + ":main",
+		string(sherpa.EntryPointKindStdlibHTTP) + ":target",
+	}
+	if !reflect.DeepEqual(kinds, want) {
+		t.Fatalf("expected entrypoint kinds %v, got %v", want, kinds)
 	}
 }
 

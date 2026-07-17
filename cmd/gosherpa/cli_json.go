@@ -1054,8 +1054,8 @@ func callPathLimitations(analysisMode string) []string {
 func entrypointLimitations(analysisMode string) []string {
 	limitations := callLimitations(analysisMode)
 	limitations = append(limitations,
-		"Entry point classification is heuristic: main functions, test functions, exported functions, and functions with no local callers.",
-		"Framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.",
+		"Entry point classification is heuristic: main functions, test functions, selected stdlib net/http handlers, exported functions, and functions with no local callers.",
+		"Framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.",
 	)
 
 	return limitations

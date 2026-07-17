@@ -41,7 +41,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, and function literal calls; `callers --json` and `callees --json` also expose separate `possibleCalls` arrays for bounded possible runtime call signals without changing direct call counts
 - Typechecked interface-dispatch possible calls resolve selector calls on interface-typed values to known local implementer methods when the candidate set is bounded; unknown, broad, or unsupported dispatch remains a limitation instead of a direct call edge
 - Runtime possible calls now name visible local targets for direct goroutine starts, goroutine function literals, immediately invoked function literals, and function literals passed to simple local call sites; reassigned, struct-field, or escaping function values remain conservative limitations or dynamic possible calls
-- Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, exported functions, and functions with no local callers
+- Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, statically visible stdlib `net/http` handlers, exported functions, and functions with no local callers
 - Package-aware standalone call graph commands for package-qualified targets
 - Type alias symbol discovery, including alias signatures and typechecked `context symbol` / `impact symbol` coverage
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
@@ -99,7 +99,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Interface method usage reports statically visible selector usage for interface-typed values when typechecked package loading succeeds; dynamic dispatch, reflection, and runtime wiring can hide additional usage.
 - Test discovery uses direct references, same-package tests, file-contained symbols, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or every imported-package receiver call; caller, callee, and path outputs surface detected dynamic-call uncertainty patterns when visible in the loaded syntax/type data.
-- Entrypoint analysis is heuristic; framework-specific entrypoints such as HTTP routers and CLI command handlers are not inferred yet.
+- Entrypoint analysis is heuristic; statically visible stdlib `net/http` handler registrations are inferred, but framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.
 - Context export currently supports symbol, file, package, and diff targets.
 - Nested modules below a module root are treated as separate analysis roots and
   are skipped by root-level file walking, symbol lookup, references, callers,
