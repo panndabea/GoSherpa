@@ -139,6 +139,29 @@ site. Current values are `local`, `external`, `builtin`, and `dynamic`.
 `callers` entries omit `scope` because callers are repository-local by
 construction.
 
+Possible call entries are separate from direct callers and callees:
+
+```json
+{
+  "caller": "Run",
+  "callee": "callback",
+  "certainty": "possible",
+  "reason": "function-value",
+  "scope": "dynamic",
+  "position": {
+    "file": "service.go",
+    "line": 5,
+    "column": 2
+  }
+}
+```
+
+`certainty` is currently `possible` for this array. It does not change direct
+caller or callee counts. `reason` values are stable categories such as
+`interface-dispatch`, `goroutine`, `function-literal`, `function-value`,
+`stdlib-http-handler`, and `imported-receiver`. `scope` continues to describe
+callee locality, not certainty.
+
 Related tests:
 
 ```json
@@ -428,7 +451,8 @@ Data:
   "analysisMode": "typechecked",
   "confidence": "medium",
   "limitations": [],
-  "callers": []
+  "callers": [],
+  "possibleCalls": []
 }
 ```
 
@@ -438,6 +462,9 @@ Data:
 - `confidence`: deterministic trust label.
 - `limitations`: call-graph blind spots and scope boundaries.
 - `callers`: array of caller entries. The array is present even when empty.
+- `possibleCalls`: array of conservative possible call entries that match the
+  requested target when GoSherpa can name a bounded candidate. It is separate
+  from `callers` and is present even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 
@@ -455,7 +482,8 @@ Data:
   "analysisMode": "typechecked",
   "confidence": "medium",
   "limitations": [],
-  "callees": []
+  "callees": [],
+  "possibleCalls": []
 }
 ```
 
@@ -467,6 +495,10 @@ Data:
 - `callees`: array of callee entries. Each entry includes `scope` when known so
   local project calls can be separated from external, builtin, or dynamic calls.
   The array is present even when empty.
+- `possibleCalls`: array of conservative possible outgoing call entries for
+  runtime-aware signals such as interface dispatch, goroutine starts, function
+  literals, and function values. It is separate from `callees` and is present
+  even when empty.
 
 `data.warnings` is absent; use envelope `warnings`.
 

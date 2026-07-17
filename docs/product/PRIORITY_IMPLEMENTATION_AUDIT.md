@@ -446,3 +446,34 @@ Observed JSON modes:
 - `context diff`, `impact diff`, `tests affected`, and `pr` reported
   `snapshot+git-diff+typechecked+ast` for the bundle-level mode with
   `origin/main`.
+
+## Slice 2.1 Implementation Update
+
+Date: 2026-07-17
+
+Selected `<base-ref>` remains `origin/main`, though no diff-oriented
+verification was required for this slice.
+
+Slice 2.1 added a public possible-call model without changing direct call
+semantics:
+
+- `callers --json` and `callees --json` now include an additive
+  `possibleCalls` array.
+- Possible-call entries include `caller`, optional `callee`, `certainty:
+  possible`, `reason`, `scope`, `position`, and `range` when available.
+- The first stable reason categories are `interface-dispatch`, `goroutine`,
+  `function-literal`, `function-value`, `stdlib-http-handler`, and
+  `imported-receiver`.
+- Current emitted possible calls come from existing bounded uncertainty signals
+  for interface dispatch, goroutine starts, function literals, and function
+  values. Reflection remains a limitation only.
+- Direct `callers`, `callees`, `path`, and `paths` output remain separate from
+  possible edges; `scope` still describes callee locality, not certainty.
+
+Verification commands:
+
+```bash
+go test ./internal/sherpa ./cmd/gosherpa
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
+go test ./...
+```

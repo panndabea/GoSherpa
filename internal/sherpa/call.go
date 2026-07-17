@@ -23,6 +23,34 @@ type Callee struct {
 	Range    *SourceRange `json:"range,omitempty"`
 }
 
+type CallCertainty string
+
+const (
+	CallCertaintyDirect   CallCertainty = "direct"
+	CallCertaintyPossible CallCertainty = "possible"
+)
+
+type PossibleCallReason string
+
+const (
+	PossibleCallReasonInterfaceDispatch PossibleCallReason = "interface-dispatch"
+	PossibleCallReasonGoroutine         PossibleCallReason = "goroutine"
+	PossibleCallReasonFunctionLiteral   PossibleCallReason = "function-literal"
+	PossibleCallReasonFunctionValue     PossibleCallReason = "function-value"
+	PossibleCallReasonStdlibHTTPHandler PossibleCallReason = "stdlib-http-handler"
+	PossibleCallReasonImportedReceiver  PossibleCallReason = "imported-receiver"
+)
+
+type PossibleCall struct {
+	Caller    string             `json:"caller"`
+	Callee    string             `json:"callee,omitempty"`
+	Certainty CallCertainty      `json:"certainty"`
+	Reason    PossibleCallReason `json:"reason"`
+	Scope     CallScope          `json:"scope,omitempty"`
+	Position  Position           `json:"position"`
+	Range     *SourceRange       `json:"range,omitempty"`
+}
+
 const (
 	CallAnalysisModeTypechecked = "typechecked"
 	CallAnalysisModeASTFallback = "ast-fallback"
@@ -38,11 +66,12 @@ const (
 )
 
 type CalleesResult struct {
-	Target       string   `json:"target"`
-	AnalysisMode string   `json:"analysisMode"`
-	Warnings     []string `json:"warnings"`
-	Limitations  []string `json:"limitations"`
-	Callees      []Callee `json:"callees"`
+	Target        string         `json:"target"`
+	AnalysisMode  string         `json:"analysisMode"`
+	Warnings      []string       `json:"warnings"`
+	Limitations   []string       `json:"limitations"`
+	Callees       []Callee       `json:"callees"`
+	PossibleCalls []PossibleCall `json:"possibleCalls"`
 }
 
 type Caller struct {
@@ -52,11 +81,12 @@ type Caller struct {
 }
 
 type CallersResult struct {
-	Target       string   `json:"target"`
-	AnalysisMode string   `json:"analysisMode"`
-	Warnings     []string `json:"warnings"`
-	Limitations  []string `json:"limitations"`
-	Callers      []Caller `json:"callers"`
+	Target        string         `json:"target"`
+	AnalysisMode  string         `json:"analysisMode"`
+	Warnings      []string       `json:"warnings"`
+	Limitations   []string       `json:"limitations"`
+	Callers       []Caller       `json:"callers"`
+	PossibleCalls []PossibleCall `json:"possibleCalls"`
 }
 
 type CallOptions struct {
@@ -160,7 +190,9 @@ const (
 
 type callUncertaintySignal struct {
 	Kind     callUncertaintyKind
+	Callee   string
 	Position Position
+	Range    *SourceRange
 }
 
 var loadSemanticCallRepository = semantics.LoadRepository
@@ -228,14 +260,16 @@ func findCalleesInFunctions(functions []functionInfo, target callTarget, analysi
 	}
 
 	callees := collectCalleesFromFunction(function)
+	possibleCalls := collectPossibleCallsFromFunction(function)
 	limitations := collectDynamicCallLimitations([]functionInfo{function})
 
 	return CalleesResult{
-		Target:       target.String(),
-		AnalysisMode: analysisMode,
-		Warnings:     nonNilStrings(warnings),
-		Limitations:  nonNilStrings(limitations),
-		Callees:      callees,
+		Target:        target.String(),
+		AnalysisMode:  analysisMode,
+		Warnings:      nonNilStrings(warnings),
+		Limitations:   nonNilStrings(limitations),
+		Callees:       callees,
+		PossibleCalls: possibleCalls,
 	}, nil
 }
 
@@ -325,14 +359,16 @@ func findCallersInFunctionsWithContext(context *SemanticContext, root string, fu
 	}
 
 	callers := collectCallersFromFunctions(callerFunctions, functionCallTarget(function))
+	possibleCalls := collectPossibleCallersFromFunctions(callerFunctions, functionCallTarget(function))
 	limitations := collectDynamicCallLimitations(callerFunctions)
 
 	return CallersResult{
-		Target:       target.String(),
-		AnalysisMode: analysisMode,
-		Warnings:     nonNilStrings(warnings),
-		Limitations:  nonNilStrings(limitations),
-		Callers:      callers,
+		Target:        target.String(),
+		AnalysisMode:  analysisMode,
+		Warnings:      nonNilStrings(warnings),
+		Limitations:   nonNilStrings(limitations),
+		Callers:       callers,
+		PossibleCalls: possibleCalls,
 	}, nil
 }
 
@@ -1546,6 +1582,46 @@ func collectCalleesFromFunction(function functionInfo) []Callee {
 	return callees
 }
 
+func collectPossibleCallsFromFunction(function functionInfo) []PossibleCall {
+	signals := collectCallUncertaintySignals(function)
+	possibleCalls := make([]PossibleCall, 0, len(signals))
+	for _, signal := range signals {
+		reason, ok := possibleCallReasonForUncertainty(signal.Kind)
+		if !ok {
+			continue
+		}
+
+		possibleCalls = append(possibleCalls, PossibleCall{
+			Caller:    function.Target,
+			Callee:    signal.Callee,
+			Certainty: CallCertaintyPossible,
+			Reason:    reason,
+			Scope:     CallScopeDynamic,
+			Position:  signal.Position,
+			Range:     signal.Range,
+		})
+	}
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
+func collectPossibleCallersFromFunctions(functions []functionInfo, target callTarget) []PossibleCall {
+	var possibleCalls []PossibleCall
+	for _, function := range functions {
+		for _, possibleCall := range collectPossibleCallsFromFunction(function) {
+			if !possibleCallMatchesTarget(possibleCall, target) {
+				continue
+			}
+
+			possibleCalls = append(possibleCalls, possibleCall)
+		}
+	}
+
+	sortPossibleCalls(possibleCalls)
+	return dedupePossibleCalls(possibleCalls)
+}
+
 func collectCallReferencesFromFunction(function functionInfo) []callReference {
 	if function.Decl.Body == nil {
 		return nil
@@ -1874,9 +1950,12 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 			return false
 		case *ast.GoStmt:
 			if typed.Call != nil {
+				expr := resolveStaticCallValue(function, staticValues, typed.Call.Fun)
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyGoroutine,
+					Callee:   callUncertaintyCalleeName(function, expr),
 					Position: callExpressionPosition(function, typed.Call.Fun),
+					Range:    callExpressionRange(function, typed.Call.Fun),
 				})
 			}
 			return true
@@ -1884,26 +1963,34 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 			if _, ok := typed.Fun.(*ast.FuncLit); ok {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionLiteral,
+					Callee:   "function literal",
 					Position: callExpressionPosition(function, typed.Fun),
+					Range:    callExpressionRange(function, typed.Fun),
 				})
 			}
 			expr := resolveStaticCallValue(function, staticValues, typed.Fun)
 			if callUsesInterfaceDispatch(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyInterfaceDispatch,
+					Callee:   callUncertaintyCalleeName(function, expr),
 					Position: callExpressionPosition(function, typed.Fun),
+					Range:    callExpressionRange(function, typed.Fun),
 				})
 			}
 			if callUsesFunctionValue(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyFunctionValue,
+					Callee:   callUncertaintyCalleeName(function, expr),
 					Position: callExpressionPosition(function, typed.Fun),
+					Range:    callExpressionRange(function, typed.Fun),
 				})
 			}
 			if callUsesReflection(function, expr) {
 				signals = append(signals, callUncertaintySignal{
 					Kind:     callUncertaintyReflection,
+					Callee:   callUncertaintyCalleeName(function, expr),
 					Position: callExpressionPosition(function, typed.Fun),
+					Range:    callExpressionRange(function, typed.Fun),
 				})
 			}
 		}
@@ -1912,6 +1999,30 @@ func collectCallUncertaintySignals(function functionInfo) []callUncertaintySigna
 	})
 
 	return signals
+}
+
+func possibleCallReasonForUncertainty(kind callUncertaintyKind) (PossibleCallReason, bool) {
+	switch kind {
+	case callUncertaintyInterfaceDispatch:
+		return PossibleCallReasonInterfaceDispatch, true
+	case callUncertaintyFunctionValue:
+		return PossibleCallReasonFunctionValue, true
+	case callUncertaintyGoroutine:
+		return PossibleCallReasonGoroutine, true
+	case callUncertaintyFunctionLiteral:
+		return PossibleCallReasonFunctionLiteral, true
+	default:
+		return "", false
+	}
+}
+
+func callUncertaintyCalleeName(function functionInfo, expr ast.Expr) string {
+	name, ok := callReferenceName(function, expr)
+	if !ok {
+		return ""
+	}
+
+	return name
 }
 
 func callUsesInterfaceDispatch(function functionInfo, expr ast.Expr) bool {
@@ -2067,6 +2178,14 @@ func callExpressionPosition(function functionInfo, expr ast.Expr) Position {
 	})
 }
 
+func callExpressionRange(function functionInfo, expr ast.Expr) *SourceRange {
+	if function.FileSet == nil || expr == nil {
+		return nil
+	}
+
+	return sourceRangeRelativeToRoot(function.Root, function.FileSet, expr.Pos(), expr.End())
+}
+
 func uniqueCallLimitationPositions(positions []Position) []Position {
 	seen := make(map[string]struct{})
 	var result []Position
@@ -2209,6 +2328,82 @@ func sortCallers(callers []Caller) {
 
 		return callers[i].Name < callers[j].Name
 	})
+}
+
+func sortPossibleCalls(possibleCalls []PossibleCall) {
+	sort.Slice(possibleCalls, func(i int, j int) bool {
+		if possibleCalls[i].Position.File != possibleCalls[j].Position.File {
+			return possibleCalls[i].Position.File < possibleCalls[j].Position.File
+		}
+
+		if possibleCalls[i].Position.Line != possibleCalls[j].Position.Line {
+			return possibleCalls[i].Position.Line < possibleCalls[j].Position.Line
+		}
+
+		if possibleCalls[i].Position.Column != possibleCalls[j].Position.Column {
+			return possibleCalls[i].Position.Column < possibleCalls[j].Position.Column
+		}
+
+		if possibleCalls[i].Caller != possibleCalls[j].Caller {
+			return possibleCalls[i].Caller < possibleCalls[j].Caller
+		}
+
+		if possibleCalls[i].Callee != possibleCalls[j].Callee {
+			return possibleCalls[i].Callee < possibleCalls[j].Callee
+		}
+
+		return possibleCalls[i].Reason < possibleCalls[j].Reason
+	})
+}
+
+func dedupePossibleCalls(possibleCalls []PossibleCall) []PossibleCall {
+	if len(possibleCalls) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(possibleCalls))
+	result := make([]PossibleCall, 0, len(possibleCalls))
+	for _, possibleCall := range possibleCalls {
+		key := possibleCallKey(possibleCall)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		result = append(result, possibleCall)
+	}
+
+	return result
+}
+
+func possibleCallMatchesTarget(possibleCall PossibleCall, target callTarget) bool {
+	return callMatchesTarget(possibleCall.Callee, target.Symbol())
+}
+
+func possibleCallKey(possibleCall PossibleCall) string {
+	return strings.Join([]string{
+		possibleCall.Caller,
+		possibleCall.Callee,
+		string(possibleCall.Certainty),
+		string(possibleCall.Reason),
+		string(possibleCall.Scope),
+		callLimitationPositionString(possibleCall.Position),
+		strconv.Itoa(possibleCall.Position.Column),
+		callRangeKey(possibleCall.Range),
+	}, "\x00")
+}
+
+func callRangeKey(sourceRange *SourceRange) string {
+	if sourceRange == nil {
+		return ""
+	}
+
+	return strings.Join([]string{
+		callLimitationPositionString(sourceRange.Start),
+		strconv.Itoa(sourceRange.Start.Column),
+		callLimitationPositionString(sourceRange.End),
+		strconv.Itoa(sourceRange.End.Column),
+	}, "\x00")
 }
 
 func collectCallersFromFunctions(functions []functionInfo, target callTarget) []Caller {

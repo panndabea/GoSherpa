@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "command": "callees",
+  "target": "Entry",
+  "root": "<ROOT>",
+  "modulePath": "example.com/possible",
+  "warnings": [],
+  "data": {
+    "analysisMode": "typechecked",
+    "confidence": "medium",
+    "limitations": [
+      "Call analysis used typechecked package loading where available.",
+      "Call graph results are repository-local.",
+      "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+      "Imported-package receiver calls may be incomplete.",
+      "Function value calls may hide concrete call edges at service.go:5.",
+      "Goroutine starts may make execution paths incomplete at service.go:4."
+    ],
+    "callees": [
+      {
+        "name": "Target",
+        "scope": "local",
+        "position": {
+          "file": "service.go",
+          "line": 4,
+          "column": 5
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 4,
+            "column": 5
+          },
+          "end": {
+            "file": "service.go",
+            "line": 4,
+            "column": 11
+          }
+        }
+      },
+      {
+        "name": "callback",
+        "scope": "dynamic",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 5,
+            "column": 10
+          }
+        }
+      }
+    ],
+    "possibleCalls": [
+      {
+        "caller": "Entry",
+        "callee": "Target",
+        "certainty": "possible",
+        "reason": "goroutine",
+        "scope": "dynamic",
+        "position": {
+          "file": "service.go",
+          "line": 4,
+          "column": 5
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 4,
+            "column": 5
+          },
+          "end": {
+            "file": "service.go",
+            "line": 4,
+            "column": 11
+          }
+        }
+      },
+      {
+        "caller": "Entry",
+        "callee": "callback",
+        "certainty": "possible",
+        "reason": "function-value",
+        "scope": "dynamic",
+        "position": {
+          "file": "service.go",
+          "line": 5,
+          "column": 2
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 5,
+            "column": 2
+          },
+          "end": {
+            "file": "service.go",
+            "line": 5,
+            "column": 10
+          }
+        }
+      }
+    ]
+  }
+}

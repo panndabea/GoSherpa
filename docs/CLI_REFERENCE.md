@@ -257,6 +257,11 @@ Found 4 references
 ./gosherpa paths main collectCalleesFromFunction --limit 3 --max-depth 6 --json
 ```
 
+`callers --json` and `callees --json` keep direct caller/callee arrays separate
+from additive `possibleCalls` entries. Possible calls are conservative runtime
+signals such as interface dispatch, goroutine starts, function literals, and
+function values; they do not change direct call counts.
+
 `tests <target>` supports `--scope direct|related|all` for symbol, package, or
 file targets. It intentionally does not accept `--base`, `--tags`, or
 `--use-snapshot`. `tests affected --base <ref>` is diff-oriented, supports

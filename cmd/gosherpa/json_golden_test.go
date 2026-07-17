@@ -144,6 +144,30 @@ func TestMainJSONGoldenFiles(t *testing.T) {
 	}
 }
 
+func TestMainPossibleCallJSONGoldenFile(t *testing.T) {
+	fixtureRoot := filepath.Join("testdata", "possible_calls_project")
+	result := runMainTest(t, []string{"gosherpa", "--root", fixtureRoot, "callees", "Entry", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	actual := canonicalGoldenActualJSON(t, result.Stdout, fixtureRoot)
+	expectedPath := filepath.Join("testdata", "golden-json", "callees-possible.json")
+	expectedBytes, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := canonicalGoldenJSON(t, expectedBytes)
+
+	if actual != expected {
+		t.Fatalf("golden JSON mismatch for callees-possible\nexpected:\n%s\nactual:\n%s", expected, actual)
+	}
+}
+
 func TestMainInterfaceJSONGoldenFiles(t *testing.T) {
 	fixtureRoot := filepath.Join("testdata", "interface_project")
 	tests := []struct {

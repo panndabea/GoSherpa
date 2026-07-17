@@ -180,17 +180,19 @@ type interfacesJSONData struct {
 }
 
 type callersJSONData struct {
-	AnalysisMode string          `json:"analysisMode"`
-	Confidence   string          `json:"confidence"`
-	Limitations  []string        `json:"limitations"`
-	Callers      []sherpa.Caller `json:"callers"`
+	AnalysisMode  string                `json:"analysisMode"`
+	Confidence    string                `json:"confidence"`
+	Limitations   []string              `json:"limitations"`
+	Callers       []sherpa.Caller       `json:"callers"`
+	PossibleCalls []sherpa.PossibleCall `json:"possibleCalls"`
 }
 
 type calleesJSONData struct {
-	AnalysisMode string          `json:"analysisMode"`
-	Confidence   string          `json:"confidence"`
-	Limitations  []string        `json:"limitations"`
-	Callees      []sherpa.Callee `json:"callees"`
+	AnalysisMode  string                `json:"analysisMode"`
+	Confidence    string                `json:"confidence"`
+	Limitations   []string              `json:"limitations"`
+	Callees       []sherpa.Callee       `json:"callees"`
+	PossibleCalls []sherpa.PossibleCall `json:"possibleCalls"`
 }
 
 type callPathsJSONData struct {
@@ -664,6 +666,7 @@ func interfacesJSONDataFromResult(result impactengine.InterfacesResult) interfac
 
 func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 	result.Callers = nonNilSlice(result.Callers)
+	result.PossibleCalls = nonNilSlice(result.PossibleCalls)
 	result.Warnings = nonNilSlice(result.Warnings)
 	result.Limitations = nonNilSlice(result.Limitations)
 
@@ -672,15 +675,17 @@ func callersJSONResult(result sherpa.CallersResult) sherpa.CallersResult {
 
 func callersJSONDataFromResult(result sherpa.CallersResult) callersJSONData {
 	return callersJSONData{
-		AnalysisMode: result.AnalysisMode,
-		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
-		Limitations:  appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
-		Callers:      result.Callers,
+		AnalysisMode:  result.AnalysisMode,
+		Confidence:    jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:   appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
+		Callers:       result.Callers,
+		PossibleCalls: result.PossibleCalls,
 	}
 }
 
 func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
 	result.Callees = nonNilSlice(result.Callees)
+	result.PossibleCalls = nonNilSlice(result.PossibleCalls)
 	result.Warnings = nonNilSlice(result.Warnings)
 	result.Limitations = nonNilSlice(result.Limitations)
 
@@ -689,10 +694,11 @@ func calleesJSONResult(result sherpa.CalleesResult) sherpa.CalleesResult {
 
 func calleesJSONDataFromResult(result sherpa.CalleesResult) calleesJSONData {
 	return calleesJSONData{
-		AnalysisMode: result.AnalysisMode,
-		Confidence:   jsonConfidence(result.Warnings, result.AnalysisMode),
-		Limitations:  appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
-		Callees:      result.Callees,
+		AnalysisMode:  result.AnalysisMode,
+		Confidence:    jsonConfidence(result.Warnings, result.AnalysisMode),
+		Limitations:   appendLimitations(callLimitations(result.AnalysisMode), result.Limitations),
+		Callees:       result.Callees,
+		PossibleCalls: result.PossibleCalls,
 	}
 }
 

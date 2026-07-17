@@ -42,7 +42,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"analysisMode": sherpa.CallAnalysisModeTypechecked,
 				"confidence":   agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"callers", "limitations"},
+			wantArrays: []string{"callers", "possibleCalls", "limitations"},
 		},
 		{
 			name:    "callees",
@@ -53,7 +53,7 @@ func TestMainAgentJSONSchemaContracts(t *testing.T) {
 				"analysisMode": sherpa.CallAnalysisModeTypechecked,
 				"confidence":   agentcontext.ConfidenceMedium,
 			},
-			wantArrays: []string{"callees", "limitations"},
+			wantArrays: []string{"callees", "possibleCalls", "limitations"},
 		},
 		{
 			name:    "entrypoints",

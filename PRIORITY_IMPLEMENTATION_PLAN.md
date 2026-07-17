@@ -608,25 +608,25 @@ Goal: create a stable representation for possible call edges.
 
 Tasks:
 
-- [ ] Extend call result models with possible call edges in a backwards
+- [x] Extend call result models with possible call edges in a backwards
       compatible way, or add a clearly documented adjacent field.
-- [ ] Keep possible edges separate from existing `callees[].scope` values.
+- [x] Keep possible edges separate from existing `callees[].scope` values.
       `scope` should continue to mean locality; possible/direct should mean
       certainty or relationship kind.
-- [ ] Include reason categories such as:
+- [x] Include reason categories such as:
       - `interface-dispatch`
       - `goroutine`
       - `function-literal`
       - `function-value`
       - `stdlib-http-handler`
       - `imported-receiver`
-- [ ] Include source positions and ranges for the call site when available.
-- [ ] Keep direct `callers`, `callees`, `path`, and `paths` output stable unless
+- [x] Include source positions and ranges for the call site when available.
+- [x] Keep direct `callers`, `callees`, `path`, and `paths` output stable unless
       a command explicitly includes possible edges.
-- [ ] Decide whether possible edges are always emitted in JSON or gated by a
+- [x] Decide whether possible edges are always emitted in JSON or gated by a
       flag. Prefer additive JSON fields over new flags if output remains
       bounded.
-- [ ] Add schema tests and golden JSON fixtures for one representative command.
+- [x] Add schema tests and golden JSON fixtures for one representative command.
 
 Primary files:
 
@@ -647,6 +647,24 @@ Verification:
 
 ```bash
 go test ./internal/sherpa ./cmd/gosherpa
+```
+
+Slice 2.1 verification completed on 2026-07-17. Selected `<base-ref>` remains
+`origin/main`, though no diff-oriented verification was required for this
+slice. Possible calls are emitted as additive `possibleCalls` arrays for
+`callers --json` and `callees --json`; direct caller/callee arrays and call path
+output remain unchanged. Possible edges carry `certainty: possible`, a stable
+reason category, callee locality in `scope`, and source position/range when
+available. Initial emitted reasons are derived from existing bounded
+uncertainty signals for interface dispatch, goroutine starts, function
+literals, and function values; reflection remains a limitation only.
+
+Commands run:
+
+```bash
+go test ./internal/sherpa ./cmd/gosherpa
+go run ./cmd/gosherpa --root cmd/gosherpa/testdata/possible_calls_project callees Entry --json
+go test ./...
 ```
 
 ### Slice 2.2: Interface Dispatch Possible Edges

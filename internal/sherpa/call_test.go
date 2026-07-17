@@ -258,6 +258,80 @@ func Run(processor Processor, callback func()) {
 	assertContainsCallLimitation(t, result.Limitations, "Function literal", "service.go:12")
 }
 
+func TestFindCalleesReportsPossibleCallsSeparatelyFromDirectCallees(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type Processor interface { Process() }
+
+func Run(processor Processor, callback func()) {
+	processor.Process()
+	callback()
+	go Target()
+	func() {}()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallees(tmp, "Run")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	directNames := callTestCalleeNames(result.Callees)
+	for _, want := range []string{"Processor.Process", "callback", "Target"} {
+		assertContainsString(t, directNames, want)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{
+		"Run->Processor.Process:interface-dispatch:possible:dynamic:service.go:6",
+		"Run->callback:function-value:possible:dynamic:service.go:7",
+		"Run->Target:goroutine:possible:dynamic:service.go:8",
+		"Run->function literal:function-literal:possible:dynamic:service.go:9",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected possible calls %v, got %v", want, got)
+	}
+	for _, possibleCall := range result.PossibleCalls {
+		if possibleCall.Range == nil {
+			t.Fatalf("expected possible call range, got %#v", possibleCall)
+		}
+	}
+}
+
+func TestFindCallersReportsTargetMatchingPossibleCalls(t *testing.T) {
+	tmp := t.TempDir()
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run(callback func()) {
+	go Target()
+	callback()
+}
+
+func Target() {}
+`)
+
+	result, err := FindCallers(tmp, "Target")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	names := callTestCallerNames(result.Callers)
+	if !reflect.DeepEqual(names, []string{"Run"}) {
+		t.Fatalf("expected direct caller Run, got %v", names)
+	}
+
+	got := callTestPossibleCallSummaries(result.PossibleCalls)
+	want := []string{"Run->Target:goroutine:possible:dynamic:service.go:4"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected target-matching possible call %v, got %v", want, got)
+	}
+}
+
 func TestFindCallPathsReportsDynamicCallLimitations(t *testing.T) {
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
@@ -2264,6 +2338,24 @@ func callTestCalleeScopes(callees []Callee) map[string]CallScope {
 	}
 
 	return scopes
+}
+
+func callTestPossibleCallSummaries(possibleCalls []PossibleCall) []string {
+	summaries := make([]string, 0, len(possibleCalls))
+	for _, possibleCall := range possibleCalls {
+		summaries = append(summaries, fmt.Sprintf(
+			"%s->%s:%s:%s:%s:%s:%d",
+			possibleCall.Caller,
+			possibleCall.Callee,
+			possibleCall.Reason,
+			possibleCall.Certainty,
+			possibleCall.Scope,
+			possibleCall.Position.File,
+			possibleCall.Position.Line,
+		))
+	}
+
+	return summaries
 }
 
 func assertContainsCallLimitation(t *testing.T, limitations []string, substrings ...string) {
