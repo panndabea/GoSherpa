@@ -17,6 +17,8 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
+	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context diff, impact diff, tests affected, and pr"
+
 	analysisModeAST                     = agentcontext.AnalysisModeAST
 	analysisModeDiff                    = agentcontext.AnalysisModeDiff
 	analysisModeDiffTypechecked         = agentcontext.AnalysisModeDiffTypechecked
@@ -153,7 +155,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation) {
-		fmt.Fprintln(stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr")
+		fmt.Fprintln(stderr, "error:", snapshotSupportMessage)
 		return exitUsage
 	}
 

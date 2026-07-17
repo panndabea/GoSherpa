@@ -212,6 +212,12 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 		{"analyze", "--use-snapshot"},
 		{"--use-snapshot", "symbols"},
 		{"search", "target", "--use-snapshot"},
+		{"refs", "target", "--use-snapshot"},
+		{"callers", "target", "--use-snapshot"},
+		{"callees", "target", "--use-snapshot"},
+		{"implementers", "target", "--use-snapshot"},
+		{"interface", "target", "--use-snapshot"},
+		{"interfaces", "target", "--use-snapshot"},
 		{"context", "diff", "--base", "HEAD", "--use-snapshot"},
 		{"impact", "diff", "--base", "HEAD", "--use-snapshot"},
 		{"tests", "affected", "--base", "HEAD", "--use-snapshot"},
@@ -954,12 +960,12 @@ func TestMainPrintsCommandHelp(t *testing.T) {
 		{
 			name: "flag after command",
 			args: []string{"gosherpa", "callers", "--help"},
-			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n",
+			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context] [--use-snapshot]\n",
 		},
 		{
 			name: "help command",
 			args: []string{"gosherpa", "help", "callers"},
-			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n",
+			want: "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context] [--use-snapshot]\n",
 		},
 		{
 			name: "subcommand flag",
@@ -2525,13 +2531,13 @@ func TestMainRejectsTestsFlagForOtherCommands(t *testing.T) {
 }
 
 func TestMainRejectsUseSnapshotFlagForOtherCommands(t *testing.T) {
-	result := runMainTest(t, []string{"gosherpa", "refs", "Target", "--use-snapshot"})
+	result := runMainTest(t, []string{"gosherpa", "risk", "--use-snapshot"})
 
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr") {
+	if !strings.Contains(result.Stderr, "error: "+snapshotSupportMessage) {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2547,7 +2553,7 @@ func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr") {
+	if !strings.Contains(result.Stderr, "error: "+snapshotSupportMessage) {
 		t.Fatalf("expected snapshot flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2586,7 +2592,7 @@ func TestMainRejectsDiffOnlyFlagsForPlainTestsCommand(t *testing.T) {
 		{
 			name: "use snapshot",
 			args: []string{"gosherpa", "tests", "Target", "--use-snapshot"},
-			want: "error: --use-snapshot is only supported by analyze, symbols, symbol, search, packages, context diff, impact diff, tests affected, and pr",
+			want: "error: " + snapshotSupportMessage,
 		},
 	}
 
@@ -4889,7 +4895,7 @@ func Target() {}
 func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callers"})
 
-	want := "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context]\n"
+	want := "usage: gosherpa [--root <path>] callers <function-or-method> [--tests] [--context] [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -4906,7 +4912,7 @@ func TestMainPrintsCallersUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainPrintsImplementersUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "implementers"})
 
-	want := "usage: gosherpa [--root <path>] implementers <interface>\n"
+	want := "usage: gosherpa [--root <path>] implementers <interface> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -4980,10 +4986,32 @@ func TestMainRunsImplementersCommandAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainRunsImplementersCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "implementers", "./internal/auth.Authenticator", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "implementers", "./internal/auth.Authenticator", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "implementers", 1)
+}
+
 func TestMainPrintsInterfaceUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "interface"})
 
-	want := "usage: gosherpa [--root <path>] interface <interface>\n"
+	want := "usage: gosherpa [--root <path>] interface <interface> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -5070,10 +5098,37 @@ func TestMainRunsInterfaceCommandAsJSON(t *testing.T) {
 	}
 }
 
+func TestMainRunsInterfaceCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interface", "./internal/auth.Authenticator", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "interface", "./internal/auth.Authenticator", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	if data["referenceAnalysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot reference analysis mode, got %v", data["referenceAnalysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "methods", 1)
+	assertMainTestJSONArrayHasLength(t, data, "implementers", 1)
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+}
+
 func TestMainPrintsInterfacesUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "interfaces"})
 
-	want := "usage: gosherpa [--root <path>] interfaces <type>\n"
+	want := "usage: gosherpa [--root <path>] interfaces <type> [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -5145,6 +5200,28 @@ func TestMainRunsInterfacesCommandAsJSON(t *testing.T) {
 	if strings.Contains(result.Stdout, "INTERFACES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
+}
+
+func TestMainRunsInterfacesCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := writeMainInterfaceProject(t)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "interfaces", "./internal/jwt.JWTAuthenticator", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "interfaces", "./internal/jwt.JWTAuthenticator", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "interfaces", 1)
 }
 
 func TestMainPrintsEntryPointsUsageWhenArgumentIsMissing(t *testing.T) {
@@ -5660,10 +5737,42 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCallersCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callers", "Step", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callers", "Step", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "callers", 1)
+}
+
 func TestMainPrintsCalleesUsageWhenArgumentIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "callees"})
 
-	want := "usage: gosherpa [--root <path>] callees <function-or-method> [--context]\n"
+	want := "usage: gosherpa [--root <path>] callees <function-or-method> [--context] [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -5787,6 +5896,38 @@ func Step() {}
 	}
 }
 
+func TestMainRunsCalleesCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Run() {
+	Step()
+}
+
+func Step() {}
+`)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "callees", "Run", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "callees", "Run", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "callees", 1)
+}
+
 func TestMainRunsCalleesCommandReportsDynamicLimitationsAsJSON(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -5823,7 +5964,7 @@ func TestMainPrintsRefsUsageWithoutValidatingRoot(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	result := runMainTest(t, []string{"gosherpa", "--root", missingRoot, "refs"})
 
-	want := "usage: gosherpa [--root <path>] refs <name> [--kind <kind>] [--context]\n"
+	want := "usage: gosherpa [--root <path>] refs <name> [--kind <kind>] [--context] [--use-snapshot]\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -6615,6 +6756,86 @@ func Run() {
 	if strings.Contains(result.Stdout, "REFERENCES") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
+}
+
+func TestMainRunsRefsCommandFromSnapshotAsJSON(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "internal", "service", "service.go"), `package service
+
+func ParseFile() {
+}
+
+func Run() {
+	ParseFile()
+}
+`)
+	writeMainSnapshot(t, tmp)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "refs", "ParseFile", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "refs", "ParseFile", "example.com/app")
+	if data["analysisMode"] != analysisModeSnapshotTypechecked {
+		t.Fatalf("expected snapshot relationship analysis mode, got %v", data["analysisMode"])
+	}
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
+}
+
+func TestMainRefsFallsBackWhenRelationshipSnapshotIsStale(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+`)
+	writeMainSnapshot(t, tmp)
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func Target() {}
+
+func Added() {
+	Target()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "refs", "Target", "--use-snapshot", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	if payload["schemaVersion"] != float64(jsonSchemaVersion) ||
+		payload["command"] != "refs" ||
+		payload["target"] != "Target" ||
+		payload["root"] != filepath.Clean(tmp) ||
+		payload["modulePath"] != "example.com/app" {
+		t.Fatalf("unexpected JSON envelope: %#v", payload)
+	}
+	data := assertMainTestJSONObject(t, payload, "data")
+	if data["analysisMode"] != sherpa.ReferenceAnalysisModeTypechecked {
+		t.Fatalf("expected live typechecked fallback, got %v", data["analysisMode"])
+	}
+	warnings := assertMainTestJSONArrayHasLength(t, payload, "warnings", 1)
+	if warning, ok := warnings[0].(string); !ok || !strings.Contains(warning, "Snapshot is stale") {
+		t.Fatalf("expected stale snapshot warning, got %#v", warnings)
+	}
+	assertMainTestJSONArrayHasLength(t, data, "references", 2)
 }
 
 func TestMainRunsRefsCommandWithBuildTags(t *testing.T) {

@@ -265,9 +265,16 @@ Call analysis mode values:
   available.
 - `ast-fallback`: GoSherpa fell back to AST-only call analysis because
   typechecked loading was unavailable.
+- `snapshot+typechecked`: a valid relationship snapshot supplied call,
+  reference, or interface records that were built from typechecked package
+  loading.
+- `snapshot+ast-fallback`: a valid relationship snapshot supplied call,
+  reference, or interface records that were built from AST fallback data.
+- `snapshot`: a valid snapshot supplied bounded relationship data, but no more
+  specific relationship subanalysis mode was recorded.
 
 Reference, standalone interface analysis, and interface subanalysis in context
-or report-based impact bundles use the same `typechecked` and `ast-fallback`
+or report-based impact bundles use the same live and snapshot relationship
 labels. Broader explain, context, impact, test, and path commands currently use:
 
 - `ast`: syntax plus local type information and repository-local heuristics.
@@ -424,7 +431,8 @@ Data:
 ```
 
 - `analysisMode`: call analysis trust mode, either `typechecked` or
-  `ast-fallback`.
+  `ast-fallback`; with `--use-snapshot`, it can also be `snapshot`,
+  `snapshot+typechecked`, or `snapshot+ast-fallback`.
 - `confidence`: deterministic trust label.
 - `limitations`: call-graph blind spots and scope boundaries.
 - `callers`: array of caller entries. The array is present even when empty.
@@ -450,7 +458,8 @@ Data:
 ```
 
 - `analysisMode`: call analysis trust mode, either `typechecked` or
-  `ast-fallback`.
+  `ast-fallback`; with `--use-snapshot`, it can also be `snapshot`,
+  `snapshot+typechecked`, or `snapshot+ast-fallback`.
 - `confidence`: deterministic trust label.
 - `limitations`: call-graph blind spots and scope boundaries.
 - `callees`: array of callee entries. Each entry includes `scope` when known so
@@ -505,7 +514,8 @@ Data:
 ```
 
 - `analysisMode`: reference analysis trust mode, either `typechecked` or
-  `ast-fallback`.
+  `ast-fallback`; with `--use-snapshot`, it can also be `snapshot`,
+  `snapshot+typechecked`, or `snapshot+ast-fallback`.
 - `confidence`: deterministic trust label.
 - `limitations`: reference-analysis blind spots and scope boundaries.
 - `references`: array of reference entries. The array is present even when
@@ -744,21 +754,23 @@ returns only the summary above so relationship detail does not become an
 unbounded command response.
 
 Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`,
-test-inclusive `packages --tests`, and diff-oriented commands `context diff`,
-`impact diff`, `tests affected`, and `pr` can opt in to snapshot reuse with
-`--use-snapshot`. Inventory command data objects include `analysisMode`, and
-when a valid snapshot is used they report `"analysisMode": "snapshot"`;
+test-inclusive `packages --tests`, relationship commands `refs`, `callers`,
+`callees`, `implementers`, `interface`, and `interfaces`, and diff-oriented
+commands `context diff`, `impact diff`, `tests affected`, and `pr` can opt in
+to snapshot reuse with `--use-snapshot`. Inventory command data objects include
+`analysisMode`, and when a valid snapshot is used they report
+`"analysisMode": "snapshot"`;
 `analyze` reports
 `"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness
 remain live-analysis signals. Diff-oriented commands report
 `"snapshot+git-diff+typechecked+ast"` or `"snapshot+git-diff+ast"` because
 current changed-symbol inventory can come from the snapshot while impact
-relationships remain live-analysis signals. Missing, stale, or invalid
-snapshots fall back to live repository analysis and report the reason in the
-shared envelope `warnings`. Deeper semantic, context, impact, and call-graph
-queries still analyze repository data directly in this slice; use `doctor` to
-check whether the snapshot is missing, valid, stale, invalid, or missing
-relationship-capable metadata.
+relationships remain live-analysis signals. Relationship commands report
+`"snapshot+typechecked"`, `"snapshot+ast-fallback"`, or `"snapshot"` when
+persisted relationship records are reused. Missing, stale, or invalid snapshots
+fall back to live repository analysis and report the reason in the shared
+envelope `warnings`; use `doctor` to check whether the snapshot is missing,
+valid, stale, invalid, or missing relationship-capable metadata.
 
 ## Impact And Test Data
 
@@ -829,8 +841,9 @@ agents can open changed symbols directly.
 `implementers`, `interface`, `interfaces`, `path`, and `paths` data objects
 include the common metadata fields:
 
-- `analysisMode`: `typechecked` or `ast-fallback` for interface commands;
-  currently `ast` for path commands.
+- `analysisMode`: `typechecked` or `ast-fallback` for interface commands,
+  `snapshot`, `snapshot+typechecked`, or `snapshot+ast-fallback` when interface
+  relationship snapshots are reused, and currently `ast` for path commands.
 - `confidence`: deterministic trust label.
 - `limitations`: command-specific interface or path-analysis blind spots.
 

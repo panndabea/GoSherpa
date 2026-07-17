@@ -125,13 +125,14 @@ var commandSpecs = []commandSpec{
 		Snapshot: true,
 	},
 	{
-		Name:    "refs",
-		Usage:   []string{refsUsageLine},
-		Handler: runRefsCommand,
-		JSON:    true,
-		Kind:    true,
-		Context: true,
-		Tags:    true,
+		Name:     "refs",
+		Usage:    []string{refsUsageLine},
+		Handler:  runRefsCommand,
+		JSON:     true,
+		Kind:     true,
+		Context:  true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
 		Name:         "impact",
@@ -176,25 +177,28 @@ var commandSpecs = []commandSpec{
 		Snapshot: true,
 	},
 	{
-		Name:    "implementers",
-		Usage:   []string{implementersUsageLine},
-		Handler: runImplementersCommand,
-		JSON:    true,
-		Tags:    true,
+		Name:     "implementers",
+		Usage:    []string{implementersUsageLine},
+		Handler:  runImplementersCommand,
+		JSON:     true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
-		Name:    "interface",
-		Usage:   []string{interfaceUsageLine},
-		Handler: runInterfaceCommand,
-		JSON:    true,
-		Tags:    true,
+		Name:     "interface",
+		Usage:    []string{interfaceUsageLine},
+		Handler:  runInterfaceCommand,
+		JSON:     true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
-		Name:    "interfaces",
-		Usage:   []string{interfacesUsageLine},
-		Handler: runInterfacesCommand,
-		JSON:    true,
-		Tags:    true,
+		Name:     "interfaces",
+		Usage:    []string{interfacesUsageLine},
+		Handler:  runInterfacesCommand,
+		JSON:     true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
 		Name:     "path",
@@ -221,21 +225,23 @@ var commandSpecs = []commandSpec{
 		Tags:    true,
 	},
 	{
-		Name:    "callers",
-		Usage:   []string{callersUsageLine},
-		Handler: runCallersCommand,
-		JSON:    true,
-		Tests:   true,
-		Context: true,
-		Tags:    true,
+		Name:     "callers",
+		Usage:    []string{callersUsageLine},
+		Handler:  runCallersCommand,
+		JSON:     true,
+		Tests:    true,
+		Context:  true,
+		Snapshot: true,
+		Tags:     true,
 	},
 	{
-		Name:    "callees",
-		Usage:   []string{calleesUsageLine},
-		Handler: runCalleesCommand,
-		JSON:    true,
-		Context: true,
-		Tags:    true,
+		Name:     "callees",
+		Usage:    []string{calleesUsageLine},
+		Handler:  runCalleesCommand,
+		JSON:     true,
+		Context:  true,
+		Snapshot: true,
+		Tags:     true,
 	},
 }
 
@@ -258,7 +264,7 @@ const (
 	symbolsUsageLine        = "symbols [--kind <kind>] [--package <package>] [--tests] [--use-snapshot]"
 	symbolUsageLine         = "symbol <target> [--context] [--use-snapshot]"
 	searchUsageLine         = "search <terms> [--kind <kind>] [--package <package>] [--tests] [--limit <n>] [--use-snapshot]"
-	refsUsageLine           = "refs <name> [--kind <kind>] [--context]"
+	refsUsageLine           = "refs <name> [--kind <kind>] [--context] [--use-snapshot]"
 	impactDefaultUsageLine  = "impact <symbol-or-package>"
 	impactFileUsageLine     = "impact file <file>"
 	impactPackageUsageLine  = "impact package <package>"
@@ -270,15 +276,15 @@ const (
 	depsPackageUsageLine    = "deps <package>"
 	depsAllUsageLine        = "deps --all"
 	packagesUsageLine       = "packages [--tests] [--use-snapshot]"
-	implementersUsageLine   = "implementers <interface>"
-	interfaceUsageLine      = "interface <interface>"
-	interfacesUsageLine     = "interfaces <type>"
+	implementersUsageLine   = "implementers <interface> [--use-snapshot]"
+	interfaceUsageLine      = "interface <interface> [--use-snapshot]"
+	interfacesUsageLine     = "interfaces <type> [--use-snapshot]"
 	pathUsageLine           = "path <from> <to>"
 	pathDetailedUsageLine   = "path <from> <to> [--limit <n>] [--max-depth <n>]"
 	pathsUsageLine          = "paths <from> <to> [--limit <n>] [--max-depth <n>]"
 	entrypointsUsageLine    = "entrypoints <function-or-method> [--tests]"
-	callersUsageLine        = "callers <function-or-method> [--tests] [--context]"
-	calleesUsageLine        = "callees <function-or-method> [--context]"
+	callersUsageLine        = "callers <function-or-method> [--tests] [--context] [--use-snapshot]"
+	calleesUsageLine        = "callees <function-or-method> [--context] [--use-snapshot]"
 )
 
 var (

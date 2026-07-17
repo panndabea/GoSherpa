@@ -52,9 +52,10 @@ commands treat those files like other compiler-visible Go files.
 
 Use `gosherpa snapshot` to create a reusable inventory and relationship-capable
 snapshot file. A valid snapshot can currently be reused by `analyze`,
-`symbols`, `symbol`, `search`, `packages --tests`, and by diff-oriented current
-changed-symbol inventory in `context diff`, `impact diff`, `tests affected`,
-and `pr` with `--use-snapshot`. Missing, stale, invalid, or
+`symbols`, `symbol`, `search`, `packages --tests`, `refs`, `callers`,
+`callees`, `implementers`, `interface`, `interfaces`, and by diff-oriented
+current changed-symbol inventory in `context diff`, `impact diff`,
+`tests affected`, and `pr` with `--use-snapshot`. Missing, stale, invalid, or
 relationship-incompatible snapshots fall back to live repository analysis and
 report a warning.
 
@@ -64,6 +65,9 @@ report a warning.
 ./gosherpa symbols --use-snapshot
 ./gosherpa search parse --use-snapshot --json
 ./gosherpa packages --tests --use-snapshot
+./gosherpa refs ParseFile --use-snapshot --json
+./gosherpa callers ParseFile --use-snapshot --json
+./gosherpa callees ParseFile --use-snapshot --json
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot --json
 ./gosherpa pr --base HEAD --use-snapshot --json
@@ -99,7 +103,7 @@ symbol completion can come later.
 | Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, freshness, and relationship metadata |
 | Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
-| Snapshot-backed inventory | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory and diff changed-symbol inventory where available, with live-analysis fallback warnings |
+| Snapshot-backed analysis | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory, selected relationship commands, and diff changed-symbol inventory where available, with live-analysis fallback warnings |
 | Test-aware explanation | `gosherpa explain ParseFile --tests` | Includes test-file callers in the symbol profile on demand |
 | Reference search | `gosherpa refs ParseFile --kind call` | Finds Go-aware definitions and references, with optional kind filtering |
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
@@ -188,6 +192,7 @@ Found 4 references
 ./gosherpa explain ParseFile --json
 ./gosherpa refs ParseFile
 ./gosherpa refs ParseFile --kind call
+./gosherpa refs ParseFile --use-snapshot
 ./gosherpa refs ParseFile --json
 ./gosherpa impact ParseFile
 ./gosherpa impact ParseFile --json
@@ -219,17 +224,22 @@ Found 4 references
 ./gosherpa deps ./internal/sherpa --json
 ./gosherpa deps --all --json
 ./gosherpa implementers ./internal/auth.Authenticator
+./gosherpa implementers ./internal/auth.Authenticator --use-snapshot
 ./gosherpa implementers ./internal/auth.Authenticator --json
 ./gosherpa interface ./internal/auth.Authenticator
+./gosherpa interface ./internal/auth.Authenticator --use-snapshot
 ./gosherpa interface ./internal/auth.Authenticator --json
 ./gosherpa interfaces ./internal/jwt.JWTAuthenticator
+./gosherpa interfaces ./internal/jwt.JWTAuthenticator --use-snapshot
 ./gosherpa interfaces ./internal/jwt.JWTAuthenticator --json
 ./gosherpa callees ParseFile
 ./gosherpa callees ./internal/sherpa.ParseFile
+./gosherpa callees ParseFile --use-snapshot
 ./gosherpa callees ParseFile --json
 ./gosherpa callers ParseFile
 ./gosherpa callers ParseFile --tests
 ./gosherpa callers ./internal/sherpa.ParseFile
+./gosherpa callers ParseFile --use-snapshot
 ./gosherpa callers ParseFile --json
 ./gosherpa entrypoints ParseFile
 ./gosherpa entrypoints ParseFile --tests
@@ -291,7 +301,10 @@ typechecked package loading. `context diff` and `pr` include
 `readingOrder` when positions are known. With `--use-snapshot` on `context diff`,
 `impact diff`, `tests affected`, or `pr`, a valid snapshot is reused for current
 changed-symbol inventory and reports
-`snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`.
+`snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`. With
+`--use-snapshot` on `refs`, `callers`, `callees`, `implementers`, `interface`,
+or `interfaces`, valid relationship records report `snapshot+typechecked` or
+`snapshot+ast-fallback` depending on how the snapshot was built.
 
 `snapshot --json` returns a bounded summary of the persisted snapshot:
 `formatVersion`, environment and freshness inputs, `fileCount`,

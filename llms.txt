@@ -81,8 +81,11 @@ files.
 - `gosherpa impact symbol <symbol> --json`
 - `gosherpa pr --base HEAD --json`
 - `gosherpa refs <symbol> --json`
+- `gosherpa refs <symbol> --use-snapshot --json`
 - `gosherpa callers <symbol> --json`
+- `gosherpa callers <symbol> --use-snapshot --json`
 - `gosherpa callees <symbol> --json`
+- `gosherpa callees <symbol> --use-snapshot --json`
 - `gosherpa entrypoints <function-or-method> --json`
 - `gosherpa path <from> <to> --json`
 - `gosherpa paths <from> <to> --json`
@@ -90,7 +93,10 @@ files.
 - `gosherpa deps <package> --json`
 - `gosherpa deps --all --json`
 - `gosherpa implementers <interface> --json`
+- `gosherpa implementers <interface> --use-snapshot --json`
+- `gosherpa interface <interface> --use-snapshot --json`
 - `gosherpa interfaces <type> --json`
+- `gosherpa interfaces <type> --use-snapshot --json`
 - `gosherpa tests <symbol-or-package-or-file> --json`
 - `gosherpa tests affected --base HEAD --json`
 
@@ -125,8 +131,10 @@ Current analysis is intentionally conservative:
   changed statements.
 - Test discovery is useful but incomplete for dynamic table-driven test names
   and framework-specific behavior.
-- Snapshot creation and freshness diagnostics exist, but query commands still
-  analyze repository data directly instead of reusing snapshots.
+- Snapshot creation and freshness diagnostics exist. Inventory commands,
+  selected standalone relationship commands, and current changed-symbol
+  inventory in diff-oriented workflows can reuse valid snapshots; broader
+  context and impact relationship subanalysis still runs live.
 
 ## Canonical Links
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	"github.com/panndabea/GoSherpa/internal/symbolindex"
@@ -134,6 +135,11 @@ func Build(root string, options BuildOptions) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
+	relationships, err := buildRelationships(rootPath, options, symbols)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
 	snapshot := Snapshot{
 		FormatVersion: FormatVersion,
 		CreatedAt:     time.Now().UTC().Format(time.RFC3339),
@@ -147,11 +153,120 @@ func Build(root string, options BuildOptions) (Snapshot, error) {
 		Files:         files,
 		Packages:      nonNilSlice(packages),
 		Symbols:       nonNilSlice(symbols),
-		Relationships: symbolindex.NewRelationshipIndex(),
+		Relationships: relationships,
 	}
 	snapshot.Fingerprint = fingerprintSnapshotInputs(snapshot)
 
 	return normalizeSnapshotForWrite(snapshot), nil
+}
+
+func buildRelationships(root string, options BuildOptions, symbols []sherpa.Symbol) (symbolindex.RelationshipIndex, error) {
+	relationships := symbolindex.NewRelationshipIndex()
+	symbolTargets := relationshipSymbolTargets(symbols)
+
+	references, _, _, err := sherpa.BuildReferenceRelationshipsWithOptions(root, sherpa.ReferenceOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return relationships, err
+	}
+	for _, reference := range references {
+		if !relationshipTargetInSymbolInventory(reference.Target, symbolTargets) {
+			continue
+		}
+		relationships.References = append(relationships.References, symbolindex.ReferenceRecord{
+			Kind:          symbolindex.RelationshipKindReference,
+			Package:       reference.Package,
+			File:          reference.File,
+			Source:        relationshipSymbolIdentity(reference.Source),
+			Target:        relationshipSymbolIdentity(reference.Target),
+			ReferenceKind: reference.Kind,
+			Certainty:     symbolindex.RelationshipCertaintyDirect,
+			AnalysisMode:  reference.AnalysisMode,
+			Position:      reference.Position,
+			Range:         reference.Range,
+			Limitations:   nonNilSlice(reference.Limitations),
+		})
+	}
+
+	callEdges, _, _, err := sherpa.BuildCallRelationshipsWithOptions(root, sherpa.CallOptions{
+		IncludeTests: true,
+		BuildTags:    options.BuildTags,
+	})
+	if err != nil {
+		return relationships, err
+	}
+	for _, edge := range callEdges {
+		relationships.CallEdges = append(relationships.CallEdges, symbolindex.CallEdgeRecord{
+			Kind:         symbolindex.RelationshipKindCall,
+			Package:      edge.Package,
+			File:         edge.File,
+			Source:       relationshipSymbolIdentity(edge.Source),
+			Target:       relationshipSymbolIdentity(edge.Target),
+			CallScope:    edge.Scope,
+			Certainty:    symbolindex.RelationshipCertaintyDirect,
+			AnalysisMode: edge.AnalysisMode,
+			Position:     edge.Position,
+			Range:        edge.Range,
+			Limitations:  nonNilSlice(edge.Limitations),
+		})
+	}
+
+	interfaceRelationships, _, _, err := impactengine.BuildInterfaceRelationshipsWithOptions(root, impactengine.InterfaceOptions{
+		BuildTags: options.BuildTags,
+	})
+	if err != nil {
+		return relationships, err
+	}
+	for _, relationship := range interfaceRelationships {
+		kind := symbolindex.RelationshipKindInterfaceImplementation
+		if relationship.Kind == impactengine.InterfaceRelationshipKindSatisfied {
+			kind = symbolindex.RelationshipKindSatisfiedInterface
+		}
+		relationships.InterfaceImplementations = append(relationships.InterfaceImplementations, symbolindex.InterfaceImplementationRecord{
+			Kind:           kind,
+			Package:        relationship.Package,
+			File:           relationship.File,
+			Interface:      relationshipSymbolIdentity(relationship.Interface),
+			Implementation: relationshipSymbolIdentity(relationship.Implementation),
+			Certainty:      symbolindex.RelationshipCertaintyDirect,
+			AnalysisMode:   relationship.AnalysisMode,
+			Position:       relationship.Position,
+			Limitations:    nonNilSlice(relationship.Limitations),
+		})
+	}
+
+	return symbolindex.NormalizeRelationshipIndex(root, relationships), nil
+}
+
+func relationshipSymbolTargets(symbols []sherpa.Symbol) map[string]struct{} {
+	targets := make(map[string]struct{}, len(symbols))
+	for _, symbol := range symbols {
+		targets[relationshipTargetKey(symbol.Package, symbol.Receiver, symbol.Name)] = struct{}{}
+	}
+
+	return targets
+}
+
+func relationshipTargetInSymbolInventory(identity sherpa.RelationshipSymbolIdentity, targets map[string]struct{}) bool {
+	_, ok := targets[relationshipTargetKey(identity.Package, identity.Receiver, identity.Name)]
+	return ok
+}
+
+func relationshipTargetKey(packagePath string, receiver string, name string) string {
+	return strings.Join([]string{packagePath, receiver, name}, "\x00")
+}
+
+func relationshipSymbolIdentity(identity sherpa.RelationshipSymbolIdentity) symbolindex.SymbolIdentity {
+	return symbolindex.SymbolIdentity{
+		Package:       identity.Package,
+		PackageName:   identity.PackageName,
+		Name:          identity.Name,
+		Receiver:      identity.Receiver,
+		QualifiedName: identity.QualifiedName,
+		Kind:          identity.Kind,
+		Position:      identity.Position,
+	}
 }
 
 func Write(root string, snapshot Snapshot) (string, error) {

@@ -909,7 +909,8 @@ func jsonConfidence(warnings []string, analysisModes ...string) string {
 	}
 
 	for _, mode := range analysisModes {
-		if mode == sherpa.CallAnalysisModeASTFallback ||
+		if strings.Contains(mode, "ast-fallback") ||
+			mode == sherpa.CallAnalysisModeASTFallback ||
 			mode == sherpa.ReferenceAnalysisModeASTFallback ||
 			mode == impactengine.InterfaceAnalysisModeASTFallback {
 			return confidenceLow
@@ -964,6 +965,12 @@ func referenceLimitations(analysisMode string) []string {
 
 func referenceAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
+	case analysisModeSnapshotTypechecked:
+		return "Reference analysis reused a valid relationship snapshot built from typechecked package loading."
+	case analysisModeSnapshotASTFallback:
+		return "Reference analysis reused a valid relationship snapshot built from AST fallback data."
+	case analysisModeSnapshot:
+		return "Reference analysis reused a valid relationship snapshot."
 	case sherpa.ReferenceAnalysisModeTypechecked:
 		return "Reference analysis used typechecked package loading where available."
 	case sherpa.ReferenceAnalysisModeASTFallback:
@@ -984,6 +991,12 @@ func callLimitations(analysisMode string) []string {
 
 func callAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
+	case analysisModeSnapshotTypechecked:
+		return "Call analysis reused a valid relationship snapshot built from typechecked package loading."
+	case analysisModeSnapshotASTFallback:
+		return "Call analysis reused a valid relationship snapshot built from AST fallback data."
+	case analysisModeSnapshot:
+		return "Call analysis reused a valid relationship snapshot."
 	case sherpa.CallAnalysisModeTypechecked:
 		return "Call analysis used typechecked package loading where available."
 	case sherpa.CallAnalysisModeASTFallback:
@@ -1162,6 +1175,12 @@ func testAnalysisLimitation(analysisMode string) string {
 
 func interfaceAnalysisLimitation(analysisMode string) string {
 	switch analysisMode {
+	case analysisModeSnapshotTypechecked:
+		return "Interface analysis reused a valid relationship snapshot built from typechecked package loading."
+	case analysisModeSnapshotASTFallback:
+		return "Interface analysis reused a valid relationship snapshot built from AST fallback data."
+	case analysisModeSnapshot:
+		return "Interface analysis reused a valid relationship snapshot."
 	case impactengine.InterfaceAnalysisModeTypechecked:
 		return "Interface analysis used typechecked method sets from repository-local packages."
 	case impactengine.InterfaceAnalysisModeASTFallback:
@@ -1173,6 +1192,23 @@ func interfaceAnalysisLimitation(analysisMode string) string {
 
 func interfaceLimitations(analysisMode string) []string {
 	switch analysisMode {
+	case analysisModeSnapshotTypechecked:
+		return []string{
+			"Interface analysis reused a valid relationship snapshot built from typechecked package loading.",
+			"External implementations outside the repository are not reported.",
+			"Build tags follow the selected --tags options.",
+		}
+	case analysisModeSnapshotASTFallback:
+		return []string{
+			"Interface analysis reused a valid relationship snapshot built from AST fallback data.",
+			"Embedded local interfaces are expanded, but alias, build-tag, and generic edge cases may be incomplete.",
+			"External implementations outside the repository are not reported.",
+		}
+	case analysisModeSnapshot:
+		return []string{
+			"Interface analysis reused a valid relationship snapshot.",
+			"External implementations outside the repository are not reported.",
+		}
 	case impactengine.InterfaceAnalysisModeTypechecked:
 		return []string{
 			"Interface analysis used typechecked method sets from repository-local packages.",

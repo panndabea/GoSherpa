@@ -239,11 +239,12 @@ relationship data, not only inventory.
 
 Why this comes first:
 
-Agents ask several related questions in sequence. Today the first snapshot
-slice can reuse inventory and current changed-symbol inventory, but deeper
-relationship, impact, call graph, interface, and test analysis still run live.
-Persisted or reusable relationship data is the largest speed and consistency
-lever before adding broader integration surfaces.
+Agents ask several related questions in sequence. The first snapshot slices can
+reuse inventory, selected standalone relationship records, and current
+changed-symbol inventory, but must-use context, impact, affected-test, and PR
+relationship subanalysis still need broader relationship reuse. Persisted or
+reusable relationship data is the largest speed and consistency lever before
+adding broader integration surfaces.
 
 ### Slice 1.1: Relationship Index Contract
 
@@ -398,41 +399,39 @@ Goal: make high-value query paths consume valid relationship snapshots.
 
 Tasks:
 
-- [ ] Add internal loaders that can choose between:
+- [x] Add internal loaders that can choose between:
       - valid relationship snapshot data
       - shared in-memory semantic context
       - live AST/typechecked fallback
-- [ ] Start with opt-in `--use-snapshot`; do not make automatic snapshot reuse
+- [x] Start with opt-in `--use-snapshot`; do not make automatic snapshot reuse
       the default in this slice.
-- [ ] Reuse relationship snapshot data for these commands when safe:
+- [x] Reuse relationship snapshot data for these commands when safe:
       - `refs`
       - `callers`
       - `callees`
-      - `path` only after snapshot compatibility inputs, especially build tags,
-        can be expressed or intentionally fixed to default tags
-      - `paths` only after snapshot compatibility inputs, especially build tags,
-        can be expressed or intentionally fixed to default tags
       - `implementers`
       - `interfaces`
-      - `interface`
-      - `tests <target>` only if a compatible test-reference index exists and
-        the plain `tests` CLI contract is intentionally changed
-- [ ] When enabling `--use-snapshot` for a command that does not support it
+      - `interface` with persisted methods, references, and implementers; method
+        usage records remain live-only follow-up data
+- [x] Leave `path`, `paths`, and plain `tests <target>` unsupported until
+      snapshot compatibility inputs and test-reference semantics are covered by
+      a dedicated slice.
+- [x] When enabling `--use-snapshot` for a command that does not support it
       today, update usage, validation, completion, CLI tests, and docs in the
       same slice. Unsupported combinations must continue to fail intentionally
       until the slice lands.
-- [ ] Do not enable `--use-snapshot` for a command whose current flags cannot
+- [x] Do not enable `--use-snapshot` for a command whose current flags cannot
       express the snapshot compatibility inputs it needs. Either add and test
       those flags in the same slice, or leave the command unsupported.
-- [ ] Preserve package-qualified ambiguity diagnostics. Snapshot data must not
+- [x] Preserve package-qualified ambiguity diagnostics. Snapshot data must not
       guess on ambiguous unqualified targets.
-- [ ] Ensure analysis modes clearly show snapshot involvement, for example
+- [x] Ensure analysis modes clearly show snapshot involvement, for example
       `snapshot+typechecked` or another documented stable value. Add shared
       constants and schema docs instead of ad hoc strings.
-- [ ] Ensure human warnings do not become noisy when snapshot fallback occurs.
-- [ ] Add CLI tests proving stale snapshots fall back to live analysis with
+- [x] Ensure human warnings do not become noisy when snapshot fallback occurs.
+- [x] Add CLI tests proving stale snapshots fall back to live analysis with
       warnings.
-- [ ] Update JSON schemas and golden fixtures only for intentionally changed
+- [x] Update JSON schemas and golden fixtures only for intentionally changed
       output fields.
 
 Primary files:
@@ -465,6 +464,21 @@ go test ./internal/sherpa ./internal/impact ./cmd/gosherpa
 go run ./cmd/gosherpa snapshot
 go run ./cmd/gosherpa refs ./internal/sherpa.ParseFile --use-snapshot --json
 go run ./cmd/gosherpa callers ./internal/sherpa.ParseFile --use-snapshot --json
+```
+
+Slice 1.3 verification completed on 2026-07-17. Selected `<base-ref>` remains
+`origin/main`, though no diff-oriented verification was required for this
+slice. Snapshot creation now persists first-slice reference, direct-call, and
+interface relationship records; `refs`, `callers`, `callees`, `implementers`,
+`interface`, and `interfaces` accept opt-in `--use-snapshot` and fall back to
+live analysis with warnings when snapshots are missing, stale, invalid, or do
+not contain the needed relationship data. `path`, `paths`, and plain
+`tests <target>` remain intentionally unsupported for `--use-snapshot`.
+
+Commands run:
+
+```bash
+go test ./internal/sherpa ./internal/impact ./internal/snapshot ./cmd/gosherpa
 ```
 
 ### Slice 1.4: Reuse In Context, Impact, Affected Tests, And PR

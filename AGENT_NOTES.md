@@ -96,7 +96,7 @@ before broad inventory commands like unfiltered `symbols`.
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
-| Inspect interface relationships | `gosherpa interface <interface> --json`; use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
+| Inspect interface relationships | `gosherpa interface <interface> --json`; add `--use-snapshot` when a fresh snapshot exists. Use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
 | Analyze changed files | `gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` and `gosherpa impact diff --base HEAD --json` |
 | Plan tests for a symbol, package, or file | `gosherpa tests <target> --json`; for files use `gosherpa tests internal/service/service.go --json` |
 | Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
@@ -190,9 +190,12 @@ Current analysis is intentionally conservative:
   changed statements.
 - Test discovery is useful but incomplete for dynamic table-driven test names
   and framework-specific behavior.
-- Snapshot creation and freshness diagnostics exist. Inventory commands and
-  current changed-symbol inventory in `context diff` can reuse valid snapshots;
-  deeper relationship analysis still runs live.
+- Snapshot creation and freshness diagnostics exist. Inventory commands,
+  selected standalone relationship commands (`refs`, `callers`, `callees`,
+  `implementers`, `interface`, and `interfaces`), and current changed-symbol
+  inventory in diff-oriented workflows can reuse valid snapshots; context and
+  impact relationship subanalysis still runs live until the next snapshot-reuse
+  slice.
 - GoSherpa is not a runtime profiler, security scanner, linter, formatter, or
   automatic refactoring engine.
 

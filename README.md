@@ -62,6 +62,8 @@ go build -o gosherpa ./cmd/gosherpa
 ./gosherpa snapshot
 ./gosherpa analyze --use-snapshot
 ./gosherpa symbols --use-snapshot
+./gosherpa refs ParseFile --use-snapshot --json
+./gosherpa callers ParseFile --use-snapshot --json
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa completion zsh
 ./gosherpa entrypoints ParseFile
@@ -88,7 +90,7 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa help callers` | Usage for a command without running analysis |
 | `gosherpa analyze .` | Repository overview with packages, symbols, hotspots, tests, readiness, and next commands |
 | `gosherpa doctor` | Analysis readiness, Go environment, warnings, and confidence |
-| `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot |
+| `gosherpa snapshot` | Writes a versioned `.gosherpa/snapshot.json` repository inventory and relationship snapshot |
 | `gosherpa completion zsh` | Prints shell completion scripts for zsh, bash, or fish |
 | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory when available |
 | `gosherpa symbols --use-snapshot` | Reuses a valid snapshot for symbol inventory queries, with live-analysis fallback warnings |
@@ -97,8 +99,11 @@ Use `--root` to run GoSherpa from another working directory:
 | `gosherpa search parse file` | Ranked partial symbol matches |
 | `gosherpa explain ParseFile` | Purpose, risk, relationships, reading order, and test signals |
 | `gosherpa refs ParseFile --kind call` | Go-aware references filtered by kind |
+| `gosherpa refs ParseFile --use-snapshot` | Reuses valid persisted reference relationships, with live-analysis fallback warnings |
 | `gosherpa callers ParseFile` | Direct callers of a function or method |
+| `gosherpa callers ParseFile --use-snapshot` | Reuses valid persisted direct call relationships |
 | `gosherpa interface ./internal/auth.Authenticator` | Interface methods, implementers, type references, and visible interface method usage |
+| `gosherpa interface ./internal/auth.Authenticator --use-snapshot` | Reuses valid persisted interface and reference relationships for a bounded interface profile |
 | `gosherpa entrypoints ParseFile` | Public, runtime, test, and no-local-caller functions that can reach a target |
 | `gosherpa tests internal/sherpa/parse.go` | Related tests and commands for a changed file |
 | `gosherpa impact diff --base HEAD --use-snapshot` | Changed files, affected packages, and suggested tests, with valid snapshot reuse for current changed-symbol inventory |

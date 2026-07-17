@@ -214,6 +214,52 @@ go run ./cmd/gosherpa snapshot --json
 go run ./cmd/gosherpa doctor --json
 ```
 
+## Slice 1.3 Implementation Update
+
+Date: 2026-07-17
+
+Slice 1.3 implemented opt-in snapshot reuse for selected standalone
+relationship commands.
+
+New snapshot behavior:
+
+- `snapshot` format v2 now persists first-slice reference, direct call, and
+  interface relationship records instead of only bounded relationship metadata.
+- Relationship metadata counts now include persisted `reference`, `call`,
+  `interface-implementation`, and `satisfied-interface` records when those
+  relationships are present.
+- Snapshot relationship records are still not dumped by public
+  `snapshot --json`; public output remains bounded metadata.
+
+New CLI support:
+
+- `refs <target> --use-snapshot`
+- `callers <target> --use-snapshot`
+- `callees <target> --use-snapshot`
+- `implementers <interface> --use-snapshot`
+- `interface <interface> --use-snapshot`
+- `interfaces <type> --use-snapshot`
+
+Relationship snapshot outputs use `snapshot+typechecked`,
+`snapshot+ast-fallback`, or `snapshot` as their analysis mode, depending on the
+persisted relationship data. Missing, stale, invalid, or relationship-empty
+snapshots fall back to live analysis with envelope or human-output warnings.
+Ambiguous unqualified targets continue to return typed ambiguity diagnostics
+instead of guessing from snapshot records.
+
+Still intentionally unsupported in this slice:
+
+- `path --use-snapshot`
+- `paths --use-snapshot`
+- plain `tests <target> --use-snapshot`
+- non-diff `context` and `impact` subcommands
+
+Verification commands:
+
+```bash
+go test ./internal/sherpa ./internal/impact ./internal/snapshot ./cmd/gosherpa
+```
+
 ## Accepted Relationship Labels
 
 The first relationship index should separate relationship kind, edge certainty,

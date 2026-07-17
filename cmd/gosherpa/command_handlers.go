@@ -498,10 +498,7 @@ func runRefsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer
 
 	name := invocation.CommandArgs[0]
 
-	report, err := sherpa.FindReferenceReportWithOptions(root, name, sherpa.ReferenceOptions{
-		Kind:      invocation.ReferenceKind,
-		BuildTags: invocation.BuildTags,
-	})
+	report, err := loadReferenceReportForCommand(root, invocation, name)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "refs", name, stderr, err)
 	}
@@ -826,17 +823,7 @@ func runImplementersCommand(invocation cliInvocation, stdout io.Writer, stderr i
 
 	target := invocation.CommandArgs[0]
 
-	options := impactengine.InterfaceOptions{
-		BuildTags: invocation.BuildTags,
-	}
-	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
-		BuildTags: invocation.BuildTags,
-	})
-	if err != nil {
-		return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
-	}
-
-	result, err := impactengine.FindImplementersWithContext(semanticContext, target, options)
+	result, err := loadImplementersForCommand(root, invocation, target)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "implementers", target, stderr, err)
 	}
@@ -869,17 +856,7 @@ func runInterfaceCommand(invocation cliInvocation, stdout io.Writer, stderr io.W
 
 	target := invocation.CommandArgs[0]
 
-	options := impactengine.InterfaceOptions{
-		BuildTags: invocation.BuildTags,
-	}
-	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
-		BuildTags: invocation.BuildTags,
-	})
-	if err != nil {
-		return writeCommandError(invocation.JSON, root, "interface", target, stderr, err)
-	}
-
-	result, err := impactengine.InspectInterfaceWithContext(semanticContext, target, options)
+	result, err := loadInterfaceForCommand(root, invocation, target)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "interface", target, stderr, err)
 	}
@@ -912,17 +889,7 @@ func runInterfacesCommand(invocation cliInvocation, stdout io.Writer, stderr io.
 
 	target := invocation.CommandArgs[0]
 
-	options := impactengine.InterfaceOptions{
-		BuildTags: invocation.BuildTags,
-	}
-	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
-		BuildTags: invocation.BuildTags,
-	})
-	if err != nil {
-		return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
-	}
-
-	result, err := impactengine.FindInterfacesWithContext(semanticContext, target, options)
+	result, err := loadInterfacesForCommand(root, invocation, target)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "interfaces", target, stderr, err)
 	}
@@ -1038,10 +1005,7 @@ func runCallersCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 
 	target := invocation.CommandArgs[0]
 
-	result, err := sherpa.FindCallersWithOptions(root, target, sherpa.CallOptions{
-		IncludeTests: invocation.IncludeTests,
-		BuildTags:    invocation.BuildTags,
-	})
+	result, err := loadCallersForCommand(root, invocation, target)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "callers", target, stderr, err)
 	}
@@ -1084,9 +1048,7 @@ func runCalleesCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 
 	target := invocation.CommandArgs[0]
 
-	result, err := sherpa.FindCalleesWithOptions(root, target, sherpa.CallOptions{
-		BuildTags: invocation.BuildTags,
-	})
+	result, err := loadCalleesForCommand(root, invocation, target)
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "callees", target, stderr, err)
 	}
