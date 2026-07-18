@@ -30,4 +30,5 @@ keeps the main README, license, and agent guide easy to find.
 
 ## Releases
 
+- [GoSherpa v0.8.0](releases/RELEASE_NOTES_V08.md)
 - [GoSherpa Impact Engine v0.1](releases/RELEASE_NOTES_V01.md)

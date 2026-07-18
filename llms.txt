@@ -148,8 +148,9 @@ top-level `agent context` workflow also reports per-section omissions in
 
 ## Current Maturity
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track is complete, and current
-work continues the Symbol Intelligence track.
+GoSherpa v0.8.0 is a pre-1.0 agent-first CLI release. The Impact Engine v0.1
+track is complete, Symbol Intelligence is part of the baseline, and current
+work hardens the agent-first workflow.
 
 Current analysis is intentionally conservative:
 

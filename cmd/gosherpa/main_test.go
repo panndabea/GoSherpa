@@ -1054,7 +1054,7 @@ func TestMainRunsVersionCommand(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	for _, want := range []string{"GoSherpa dev\n", "go: go"} {
+	for _, want := range []string{"GoSherpa v0.8.0\n", "go: go"} {
 		if !strings.Contains(result.Stdout, want) {
 			t.Fatalf("expected stdout to contain %s, got:\n%s", want, result.Stdout)
 		}
@@ -1072,7 +1072,7 @@ func TestMainRunsVersionFlag(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", result.Stderr)
 	}
 
-	if !strings.Contains(result.Stdout, "GoSherpa dev\n") {
+	if !strings.Contains(result.Stdout, "GoSherpa v0.8.0\n") {
 		t.Fatalf("expected stdout to contain version, got:\n%s", result.Stdout)
 	}
 }
@@ -1119,8 +1119,8 @@ func assertMainTestVersionJSON(t *testing.T, result mainTestRunResult) {
 	}
 
 	data := assertMainTestJSONObject(t, payload, "data")
-	if data["version"] != "dev" {
-		t.Fatalf("expected version dev, got %v", data["version"])
+	if data["version"] != "v0.8.0" {
+		t.Fatalf("expected version v0.8.0, got %v", data["version"])
 	}
 	goVersion, ok := data["goVersion"].(string)
 	if !ok || !strings.HasPrefix(goVersion, "go") {

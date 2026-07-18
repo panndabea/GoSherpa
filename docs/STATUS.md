@@ -1,9 +1,9 @@
 # GoSherpa Status
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track from
-[PRD_V01.md](product/PRD_V01.md) is complete, Symbol Intelligence from
-[PRD_V02.md](product/PRD_V02.md) is part of the baseline, and current work
-focuses on the agent-first intelligence platform direction from
+GoSherpa v0.8.0 is a pre-1.0 agent-first CLI release. The Impact Engine v0.1
+track from [PRD_V01.md](product/PRD_V01.md) is complete, Symbol Intelligence
+from [PRD_V02.md](product/PRD_V02.md) is part of the baseline, and current work
+focuses on hardening the agent-first intelligence platform direction from
 [PRD_V03.md](product/PRD_V03.md).
 
 Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), or start from the [docs index](README.md).
@@ -126,7 +126,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; standalone relationship commands `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`, plus `context symbol` and `impact symbol`, can reuse valid relationship records; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory and selected relationship subanalyses. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
 - `agent context --base <ref> --use-snapshot` can reuse valid snapshot-backed diff context and relationship summaries while keeping focused symbol, file, and package drill-down in the existing `context` commands.
 
-## Known MVP Limitations
+## Known Pre-1.0 Limitations
 
 - Reference search uses `go/packages`-backed typechecked loading when available and falls back to AST/per-package type information; caller, callee, path, and interface impact analysis remain conservative and mostly local.
 - Test files are skipped by reference, callee, path, default caller, and default entrypoint analysis; `callers --tests`, `entrypoints --tests`, and `explain --tests` include test-file callers on demand.
@@ -170,4 +170,5 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 
 ## Release Notes
 
+- [GoSherpa v0.8.0](releases/RELEASE_NOTES_V08.md)
 - [GoSherpa Impact Engine v0.1](releases/RELEASE_NOTES_V01.md)

@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-var version = "dev"
+var version = "v0.8.0"
 
 type versionJSONData struct {
 	Version   string `json:"version"`

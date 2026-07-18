@@ -231,9 +231,11 @@ and package-qualified examples.
 - Do not claim complete call graph, runtime, security, or semantic certainty
   unless the output explicitly supports it.
 
-## Known MVP Limitations
+## Known Pre-1.0 Limitations
 
-GoSherpa is an early MVP. APIs, commands, and JSON schemas may change.
+GoSherpa v0.8.0 is a pre-1.0 agent-first CLI release. APIs, commands, and JSON
+schemas should be treated as stable enough for practical use, but not yet as a
+v1 compatibility promise.
 
 Current analysis is intentionally conservative:
 

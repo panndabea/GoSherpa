@@ -1644,14 +1644,26 @@ Included:
 - `cycles`
 - fan-in and fan-out summaries
 
-### v0.8: Interactive UX
+### v0.8.0: Agent-First CLI Release
 
-Theme: make exploration comfortable.
+Theme: make GoSherpa practical as a daily pre-1.0 repository intelligence CLI.
 
 Included:
 
-- optional TUI
+- `agent context` as the primary diff-first agent workflow
+- focused symbol, file, package, and diff context exports
+- typechecked relationship analysis with visible conservative fallbacks
+- relationship-capable snapshots with opt-in reuse
+- structured affected-test planning and PR summaries
+- target-risk, confidence, limitations, and truncation metadata in
+  agent-facing output
+- repository-shape readiness for workspaces, nested modules, build tags,
+  generated files, local replacements, and partial package-load diagnostics
 - shell completion
+
+Deferred:
+
+- optional TUI
 - editor integration hooks
 
 ### v1.0: Stable Human Product

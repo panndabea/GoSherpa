@@ -191,12 +191,13 @@ contracts.
 
 ## Status
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track is implemented, and
-current work focuses on making the agent workflow reliable across ordinary Go
-repositories while keeping focused symbol, context, impact, test, and entrypoint
-answers sharp.
+GoSherpa v0.8.0 is a pre-1.0 agent-first CLI release. The original Impact
+Engine v0.1 track is implemented, Symbol Intelligence is part of the baseline,
+and the current product surface centers on bounded repository context, impact,
+test planning, PR summaries, snapshots, and honest uncertainty for ordinary Go
+repositories.
 
-Read the [implementation status](docs/STATUS.md), [release notes](docs/releases/RELEASE_NOTES_V01.md),
+Read the [implementation status](docs/STATUS.md), [v0.8.0 release notes](docs/releases/RELEASE_NOTES_V08.md),
 or [feature roadmap](docs/product/FEATURE_ROADMAP.md) for the current product
 state.
 
