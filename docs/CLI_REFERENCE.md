@@ -62,9 +62,14 @@ sections. `load-error` means package metadata or loading failed; `type-error`
 means GoSherpa received package data but typechecking reported errors.
 
 Generated Go files are included when they are repository-local and visible to
-the selected module or workspace. `gosherpa doctor` counts files with the
-standard `// Code generated ... DO NOT EDIT.` header; relationship and context
-commands treat those files like other compiler-visible Go files.
+the selected module or workspace. `gosherpa doctor` and
+`gosherpa agent context` count files with the standard
+`// Code generated ... DO NOT EDIT.` header and report major generated
+packages by root-relative package directory, file count, byte size, and largest
+file. Relationship and context commands treat generated files like other
+compiler-visible Go files. The agent workflow summarizes large generated file
+reading-order entries after hand-written files when those generated entries
+would otherwise dominate the first reading pass.
 
 Use `gosherpa snapshot` to create a reusable inventory and relationship-capable
 snapshot file. A valid snapshot can currently be reused by `analyze`,

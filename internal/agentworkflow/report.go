@@ -55,17 +55,18 @@ type Report struct {
 }
 
 type ReadinessSummary struct {
-	Status               string                  `json:"status"`
-	AnalysisMode         string                  `json:"analysisMode"`
-	Confidence           string                  `json:"confidence"`
-	RepositoryLayout     sherpa.RepositoryLayout `json:"repositoryLayout"`
-	PackageLoad          PackageLoadSummary      `json:"packageLoad"`
-	GoWork               GoWorkSummary           `json:"goWork"`
-	GeneratedFiles       int                     `json:"generatedFiles"`
-	NestedModules        []string                `json:"nestedModules"`
-	SkippedNestedModules []string                `json:"skippedNestedModules"`
-	RepoShapeWarnings    []string                `json:"repoShapeWarnings"`
-	Limitations          []string                `json:"limitations"`
+	Status               string                           `json:"status"`
+	AnalysisMode         string                           `json:"analysisMode"`
+	Confidence           string                           `json:"confidence"`
+	RepositoryLayout     sherpa.RepositoryLayout          `json:"repositoryLayout"`
+	PackageLoad          PackageLoadSummary               `json:"packageLoad"`
+	GoWork               GoWorkSummary                    `json:"goWork"`
+	GeneratedFiles       int                              `json:"generatedFiles"`
+	GeneratedPackages    []sherpa.GeneratedPackageSummary `json:"generatedPackages"`
+	NestedModules        []string                         `json:"nestedModules"`
+	SkippedNestedModules []string                         `json:"skippedNestedModules"`
+	RepoShapeWarnings    []string                         `json:"repoShapeWarnings"`
+	Limitations          []string                         `json:"limitations"`
 }
 
 type PackageLoadSummary struct {
@@ -194,10 +195,11 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 		Limits:            workflowLimits(contextReport.Limits, options.Limits.MaxBytes),
 		Truncated:         contextReport.Truncated,
 		Warnings:          uniqueStringsInOrder(append(append(readiness.PackageLoad.Warnings, readiness.RepoShapeWarnings...), contextReport.Warnings...)),
-		SectionModes:      sectionModes(readiness, snapshotSummary, contextReport),
 		SectionTruncation: sectionTruncationFromTruncation(contextReport.Truncated),
 		SuggestedCommands: suggestedCommands(base, snapshotSummary, contextReport.ChangedSymbolDetails),
 	}
+	report = applyGeneratedFilePolicy(root, report)
+	report.SectionModes = sectionModes(report.Readiness, snapshotSummary, contextReport)
 	report.Limitations = workflowLimitations(report, contextReport)
 	report.Confidence = workflowConfidence(report, contextReport)
 	report = applyAgentByteLimit(report, options.Limits.MaxBytes)
@@ -218,12 +220,13 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 			Scope:    layout.GoWork.Scope,
 		},
 		GeneratedFiles:       layout.GeneratedFiles,
+		GeneratedPackages:    layout.GeneratedPackages,
 		NestedModules:        layout.NestedModules,
 		SkippedNestedModules: layout.SkippedNestedModules,
 		Limitations: []string{
 			"Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
 			"Package loading follows the current Go environment and provided --tags values.",
-			"Generated files are analyzed when visible to package loading; generated-file policy is informational in this workflow.",
+			"Generated files are analyzed when visible to package loading; major generated packages are summarized for repository-shape triage.",
 		},
 	}
 
@@ -534,6 +537,7 @@ func workflowLimitations(report Report, contextReport agentcontext.DiffReport) [
 		"Affected-test planning is included by default; --tests is not part of this command contract.",
 		"Snapshot reuse is opt-in and never creates snapshots automatically.",
 	}
+	limitations = append(limitations, report.Limitations...)
 	limitations = append(limitations, contextReport.Limitations...)
 	limitations = append(limitations, report.PossibleRuntimeRelationships.Limitations...)
 	return uniqueStringsInOrder(limitations)
@@ -592,6 +596,7 @@ func normalizeReadiness(readiness ReadinessSummary) ReadinessSummary {
 	readiness.PackageLoad.AffectedSections = nonNilSlice(readiness.PackageLoad.AffectedSections)
 	readiness.PackageLoad.Warnings = nonNilSlice(uniqueStringsInOrder(readiness.PackageLoad.Warnings))
 	readiness.PackageLoad.Diagnostics = nonNilSlice(semantics.PackageLoadDiagnosticsWithSections(readiness.PackageLoad.Diagnostics, readiness.PackageLoad.AffectedSections))
+	readiness.GeneratedPackages = nonNilSlice(sherpa.NormalizeGeneratedPackageSummaries(readiness.GeneratedPackages))
 	readiness.NestedModules = nonNilSlice(readiness.NestedModules)
 	readiness.SkippedNestedModules = nonNilSlice(readiness.SkippedNestedModules)
 	readiness.RepoShapeWarnings = nonNilSlice(uniqueStringsInOrder(readiness.RepoShapeWarnings))

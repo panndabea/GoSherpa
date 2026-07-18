@@ -1,5 +1,60 @@
 # Priority Implementation Audit
 
+## Real-World Repository Robustness Slice 2.3 Update
+
+Date: 2026-07-18
+
+Selected `<base-ref>` for diff-oriented verification: `HEAD`.
+`git rev-parse --verify HEAD` resolved to
+`48479227159562076eb001e9280a9900646ad610`.
+
+Slice 2.3 centralized generated-file detection in `internal/sherpa` using the
+standard `// Code generated ... DO NOT EDIT.` marker. Repository layout now
+reports deterministic generated-file counts and bounded major generated package
+summaries with root-relative package directory, package name, file count, total
+bytes, and largest generated file evidence.
+
+Behavior added:
+
+- `doctor.data.repository.generatedPackages` and
+  `agent context.data.readiness.repositoryLayout.generatedPackages` expose the
+  shared layout summary.
+- `agent context.data.readiness.generatedPackages` repeats the bounded summary
+  directly in readiness for agent triage.
+- Large generated file steps in `agent context.data.readingOrder` are grouped
+  after hand-written file steps when they would otherwise dominate the first
+  reading pass.
+- Compiler-visible generated files remain included in semantic analysis; no
+  exclusion flag was added.
+
+Verification commands run during implementation:
+
+```bash
+git rev-parse --verify HEAD
+go test ./internal/sherpa ./internal/agentworkflow ./cmd/gosherpa
+go test ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa agent context --base HEAD --max-files 5 --max-symbols 5 --max-tests 5 --max-bytes 12000 --json
+```
+
+Results:
+
+- `internal/sherpa`, `internal/agentworkflow`, and `cmd/gosherpa` passed after
+  the additive JSON golden update.
+- Full `go test ./...` passed.
+- `doctor --json` passed with `generatedFiles: 0`,
+  `generatedPackages: []`, and the existing skipped nested fixture-module
+  warning.
+- `agent context --base HEAD ... --json` passed with matching readiness
+  generated-file fields, bounded changed-file output, and expected
+  `sectionTruncation` from the requested limits.
+- Generated definitions, references, interface usage, and tests remain covered
+  by `TestMainIncludesGeneratedGoFilesConsistently`.
+- New focused tests cover generated header detection, deterministic major
+  package summaries, and large generated reading-order summarization in the
+  agent workflow.
+
 ## Real-World Repository Robustness Slice 2.1 Update
 
 Date: 2026-07-18

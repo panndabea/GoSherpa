@@ -638,17 +638,17 @@ Goal: make generated code behavior explicit and useful.
 
 Tasks:
 
-- [ ] Centralize generated-file detection using the standard
+- [x] Centralize generated-file detection using the standard
       `// Code generated ... DO NOT EDIT.` convention.
-- [ ] Add generated-file counts and major generated packages to `doctor` and
+- [x] Add generated-file counts and major generated packages to `doctor` and
       the agent workflow.
-- [ ] Include compiler-visible generated files in semantic analysis, but
+- [x] Include compiler-visible generated files in semantic analysis, but
       summarize and deprioritize large generated files in reading order when
       they would dominate the agent workflow output.
-- [ ] Do not exclude compiler-visible generated files from semantic analysis
+- [x] Do not exclude compiler-visible generated files from semantic analysis
       unless a slice intentionally adds and documents a flag.
-- [ ] Add fixtures for generated definitions, references, and tests.
-- [ ] Ensure limitations explain when generated code dominates a result.
+- [x] Add fixtures for generated definitions, references, and tests.
+- [x] Ensure limitations explain when generated code dominates a result.
 
 Primary files:
 

@@ -503,14 +503,19 @@ symbol/file/package positional targets, `--tests`, `--scope`,
 `--max-references`, and `--source-radius`.
 
 - `readiness`: bounded repository-readiness summary with package-load status,
-  go.work detection, generated-file count, nested modules, skipped nested
-  modules, repo-shape warnings, confidence, limitations, and
+  go.work detection, generated-file count, major generated packages, nested
+  modules, skipped nested modules, repo-shape warnings, confidence, limitations, and
   `repositoryLayout`. `repositoryLayout` mirrors the doctor repository-layout
   shape so agents can see the selected module/workspace boundary without
   running a second command. `readiness.packageLoad` includes normalized
   `buildTags`, `affectedSections`, warning strings, and structured
   `diagnostics` with package, file/position when known, `kind`, reason,
   message, and affected analysis sections.
+  `readiness.generatedPackages` and
+  `readiness.repositoryLayout.generatedPackages` are bounded arrays of
+  `{package, packageName, files, sizeBytes, largestFile,
+  largestFileSizeBytes}` entries sorted by generated-file count, byte size, and
+  package path.
 - `snapshot`: requested/used status, freshness, path, message, relationship
   metadata, stale reasons, and refresh command when useful. The command never
   creates snapshots automatically.
@@ -785,6 +790,7 @@ Data:
     "goFiles": 12,
     "testFiles": 4,
     "generatedFiles": 0,
+    "generatedPackages": [],
     "nestedModules": [],
     "skippedNestedModules": [],
     "workspaceModules": [],
@@ -837,9 +843,11 @@ Data:
   has `go.mod`, selected manifest, analysis boundary (`module`, `workspace`,
   or `module-with-parent-workspace`), file counts, `go.work` detection,
   workspace modules, skipped workspace modules outside `--root`, nested
-  modules, skipped nested modules, and local `replace` directives. Skipped
-  nested modules and external workspace modules are reported as envelope
-  warnings when they affect the selected analysis boundary.
+  modules, skipped nested modules, local `replace` directives, and
+  `generatedPackages` summaries using `{package, packageName, files,
+  sizeBytes, largestFile, largestFileSizeBytes}`. Skipped nested modules and
+  external workspace modules are reported as envelope warnings when they affect
+  the selected analysis boundary.
 - `buildTags`: normalized build tags supplied through `--tags`.
 - `packageLoad`: status of typechecked package loading. `status` is `ok`,
   `warnings`, or `failed`. It includes normalized `buildTags`,

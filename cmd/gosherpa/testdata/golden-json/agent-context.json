@@ -34,6 +34,7 @@
         "detected": false
       },
       "generatedFiles": 0,
+      "generatedPackages": [],
       "nestedModules": [],
       "repoShapeWarnings": [],
       "repositoryLayout": {
@@ -48,6 +49,7 @@
         "goFiles": 3,
         "testFiles": 1,
         "generatedFiles": 0,
+        "generatedPackages": [],
         "nestedModules": [],
         "skippedNestedModules": [],
         "workspaceModules": [],
@@ -58,7 +60,7 @@
       "limitations": [
         "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
         "Package loading follows the current Go environment and provided --tags values.",
-        "Generated files are analyzed when visible to package loading; generated-file policy is informational in this workflow."
+        "Generated files are analyzed when visible to package loading; major generated packages are summarized for repository-shape triage."
       ]
     },
     "snapshot": {
@@ -329,7 +331,7 @@
         "limitations": [
           "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
           "Package loading follows the current Go environment and provided --tags values.",
-          "Generated files are analyzed when visible to package loading; generated-file policy is informational in this workflow."
+          "Generated files are analyzed when visible to package loading; major generated packages are summarized for repository-shape triage."
         ]
       },
       {

@@ -31,7 +31,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa agent context --base <ref>` workflow with readiness, snapshot status, changed targets, target risk, possible runtime relationship summary, interface summary, affected tests, section modes, suggested commands, short human output, JSON output, and composed `--max-bytes` budgeting with per-section truncation metadata
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, structured package-load diagnostics, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
-- Shared repository layout summary for `doctor` and `agent context` that reports the selected analysis boundary, root or parent `go.work`, workspace modules, skipped nested modules, skipped workspace modules outside `--root`, local replace directives, file counts, and generated-file counts
+- Shared repository layout summary for `doctor` and `agent context` that reports the selected analysis boundary, root or parent `go.work`, workspace modules, skipped nested modules, skipped workspace modules outside `--root`, local replace directives, file counts, generated-file counts, and major generated packages
 - `doctor` and `agent context` expose normalized build tags plus structured package-load diagnostics that distinguish load, parse, and type errors with package, file/position when known, reason, message, and affected analysis sections; existing envelope warnings remain the compatibility surface for warning text
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
 - Static shell completion script generation with `gosherpa completion zsh|bash|fish`
@@ -123,9 +123,13 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   boundary remain separate analysis roots; external replacements may affect
   typechecking but are not walked as repository packages.
 - Repository-local generated Go files are included when they are visible to the
-  selected module or workspace. `doctor` detects the standard
-  `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
-  context commands analyze generated files like other compiler-visible Go files.
+  selected module or workspace. `doctor` and `agent context` detect the
+  standard `// Code generated ... DO NOT EDIT.` header for reporting generated
+  counts and major generated packages; relationship and context commands
+  analyze generated files like other compiler-visible Go files. The agent
+  workflow summarizes large generated file reading-order entries after
+  hand-written files when generated files would otherwise dominate the first
+  reading pass.
 - Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, inventory reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, relationship reuse for `refs`, `callers`, `callees`, `implementers`, `interface`, `interfaces`, `context symbol`, `impact symbol`, selected diff-oriented relationship subanalysis in `context diff`, `impact diff`, `tests affected`, `pr`, and the first `agent context` workflow; unsupported portions fall back to live analysis with warnings.
 - The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records now back selected standalone and must-use workflow relationship queries while unsupported relationship shapes remain live-only.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.

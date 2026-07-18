@@ -29,6 +29,9 @@ func TestAnalyzeRepositoryLayoutSingleModule(t *testing.T) {
 	if layout.GoFiles != 3 || layout.TestFiles != 1 || layout.GeneratedFiles != 1 {
 		t.Fatalf("unexpected file counts: %#v", layout)
 	}
+	if len(layout.GeneratedPackages) != 1 || layout.GeneratedPackages[0].Package != "." || layout.GeneratedPackages[0].PackageName != "app" {
+		t.Fatalf("unexpected generated package summary: %#v", layout.GeneratedPackages)
+	}
 	if layout.WorkspaceModules == nil || layout.LocalReplacements == nil || layout.SkippedNestedModules == nil {
 		t.Fatalf("expected non-nil layout arrays: %#v", layout)
 	}

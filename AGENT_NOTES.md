@@ -154,7 +154,8 @@ Read these fields before acting:
 - `data.confidence`: a compact trust signal for the result.
 - `data.readiness.repositoryLayout` on `agent context`, and
   `data.repository` on `doctor`: selected module/workspace boundary, skipped
-  nested modules, external workspace modules, and local replacements.
+  nested modules, external workspace modules, local replacements, generated
+  file counts, and major generated packages.
 - `data.readiness.packageLoad.diagnostics` on `agent context`, and
   `data.packageLoad.diagnostics` on `doctor`: package-load diagnostics with
   package, file/position when known, `load-error` vs `type-error`, reason, and
@@ -194,6 +195,10 @@ and package-qualified examples.
   boundary problem and `type-error` as partial typechecked data with lower
   confidence; inspect the affected sections before trusting references, calls,
   interfaces, or test recommendations.
+- When generated packages are reported, remember that compiler-visible
+  generated files are still analyzed. In `agent context`, large generated file
+  reading-order entries may be summarized after hand-written files so the first
+  pass stays focused.
 - Do not claim complete call graph, runtime, security, or semantic certainty
   unless the output explicitly supports it.
 

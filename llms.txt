@@ -59,11 +59,14 @@ Read `warnings`, `data.confidence`, `data.targetRisk`, `data.limitations`,
 analysis-mode fields, repository layout fields, and any truncation metadata
 before acting. `doctor.data.repository` and
 `agent context.data.readiness.repositoryLayout` report module/workspace
-boundaries, skipped nested modules, external workspace modules, and local
-replace directives. `doctor.data.packageLoad.diagnostics` and
+boundaries, skipped nested modules, external workspace modules, local replace
+directives, generated-file counts, and major generated packages.
+`doctor.data.packageLoad.diagnostics` and
 `agent context.data.readiness.packageLoad.diagnostics` distinguish
 `load-error`, `parse-error`, and `type-error` package-loading problems with
 package, file/position when known, reason, and affected analysis sections.
+Compiler-visible generated Go files stay in analysis; `agent context` may
+summarize large generated file reading-order entries after hand-written files.
 Treat GoSherpa output as grounded context that guides source reading; it does
 not replace inspecting the relevant files.
 

@@ -11,20 +11,21 @@ import (
 )
 
 type RepositoryLayout struct {
-	Root                    string             `json:"root"`
-	ModulePath              string             `json:"modulePath"`
-	Manifest                string             `json:"manifest,omitempty"`
-	GoModPath               string             `json:"goModPath,omitempty"`
-	GoWork                  GoWorkLayout       `json:"goWork"`
-	AnalysisBoundary        string             `json:"analysisBoundary"`
-	GoFiles                 int                `json:"goFiles"`
-	TestFiles               int                `json:"testFiles"`
-	GeneratedFiles          int                `json:"generatedFiles"`
-	NestedModules           []string           `json:"nestedModules"`
-	SkippedNestedModules    []string           `json:"skippedNestedModules"`
-	WorkspaceModules        []WorkspaceModule  `json:"workspaceModules"`
-	SkippedWorkspaceModules []string           `json:"skippedWorkspaceModules"`
-	LocalReplacements       []LocalReplacement `json:"localReplacements"`
+	Root                    string                    `json:"root"`
+	ModulePath              string                    `json:"modulePath"`
+	Manifest                string                    `json:"manifest,omitempty"`
+	GoModPath               string                    `json:"goModPath,omitempty"`
+	GoWork                  GoWorkLayout              `json:"goWork"`
+	AnalysisBoundary        string                    `json:"analysisBoundary"`
+	GoFiles                 int                       `json:"goFiles"`
+	TestFiles               int                       `json:"testFiles"`
+	GeneratedFiles          int                       `json:"generatedFiles"`
+	GeneratedPackages       []GeneratedPackageSummary `json:"generatedPackages"`
+	NestedModules           []string                  `json:"nestedModules"`
+	SkippedNestedModules    []string                  `json:"skippedNestedModules"`
+	WorkspaceModules        []WorkspaceModule         `json:"workspaceModules"`
+	SkippedWorkspaceModules []string                  `json:"skippedWorkspaceModules"`
+	LocalReplacements       []LocalReplacement        `json:"localReplacements"`
 }
 
 type GoWorkLayout struct {
@@ -87,6 +88,7 @@ func AnalyzeRepositoryLayout(root string) (RepositoryLayout, []string) {
 		layout.GoFiles = len(goFiles)
 		layout.TestFiles = CountTestGoFiles(goFiles)
 		layout.GeneratedFiles = CountGeneratedGoFiles(goFiles)
+		layout.GeneratedPackages = MajorGeneratedGoPackages(rootPath, goFiles, 5)
 	}
 
 	nestedModules, nestedWarnings := DiscoverNestedModules(rootPath)
@@ -119,6 +121,7 @@ func NormalizeRepositoryLayout(layout RepositoryLayout) RepositoryLayout {
 	layout.Root = filepath.Clean(layout.Root)
 	layout.NestedModules = nonNilStrings(uniqueSorted(layout.NestedModules))
 	layout.SkippedNestedModules = nonNilStrings(uniqueSorted(layout.SkippedNestedModules))
+	layout.GeneratedPackages = NormalizeGeneratedPackageSummaries(layout.GeneratedPackages)
 	layout.WorkspaceModules = normalizeWorkspaceModules(layout.WorkspaceModules)
 	layout.SkippedWorkspaceModules = nonNilStrings(uniqueSorted(layout.SkippedWorkspaceModules))
 	layout.LocalReplacements = normalizeLocalReplacements(layout.LocalReplacements)
@@ -136,32 +139,6 @@ func CountTestGoFiles(files []string) int {
 		}
 	}
 	return count
-}
-
-func CountGeneratedGoFiles(files []string) int {
-	count := 0
-	for _, file := range files {
-		if IsGeneratedGoFile(file) {
-			count++
-		}
-	}
-	return count
-}
-
-func IsGeneratedGoFile(file string) bool {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return false
-	}
-
-	lines := strings.SplitN(string(data), "\n", 12)
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "// Code generated ") && strings.HasSuffix(trimmed, " DO NOT EDIT.") {
-			return true
-		}
-	}
-	return false
 }
 
 func DiscoverNestedModules(root string) ([]string, []string) {
@@ -424,6 +401,37 @@ func normalizeLocalReplacements(replacements []LocalReplacement) []LocalReplacem
 		return []LocalReplacement{}
 	}
 	return replacements
+}
+
+func NormalizeGeneratedPackageSummaries(packages []GeneratedPackageSummary) []GeneratedPackageSummary {
+	packages = append([]GeneratedPackageSummary{}, packages...)
+	for i := range packages {
+		packages[i].Package = cleanSlashPath(packages[i].Package)
+		packages[i].PackageName = strings.TrimSpace(packages[i].PackageName)
+		packages[i].LargestFile = filepath.ToSlash(strings.TrimSpace(packages[i].LargestFile))
+		if packages[i].Files < 0 {
+			packages[i].Files = 0
+		}
+		if packages[i].SizeBytes < 0 {
+			packages[i].SizeBytes = 0
+		}
+		if packages[i].LargestFileSizeBytes < 0 {
+			packages[i].LargestFileSizeBytes = 0
+		}
+	}
+	sort.Slice(packages, func(i int, j int) bool {
+		if packages[i].Files != packages[j].Files {
+			return packages[i].Files > packages[j].Files
+		}
+		if packages[i].SizeBytes != packages[j].SizeBytes {
+			return packages[i].SizeBytes > packages[j].SizeBytes
+		}
+		return packages[i].Package < packages[j].Package
+	})
+	if len(packages) == 0 {
+		return []GeneratedPackageSummary{}
+	}
+	return packages
 }
 
 func cleanSlashPath(value string) string {

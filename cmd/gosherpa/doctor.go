@@ -151,6 +151,7 @@ func normalizeDoctorReport(report doctorReport) doctorReport {
 	report.Repository.Root = filepath.Clean(report.Repository.Root)
 	report.Repository.NestedModules = nonNilSlice(report.Repository.NestedModules)
 	report.Repository.SkippedNestedModules = nonNilSlice(report.Repository.SkippedNestedModules)
+	report.Repository.GeneratedPackages = nonNilSlice(sherpa.NormalizeGeneratedPackageSummaries(report.Repository.GeneratedPackages))
 	report.Repository.WorkspaceModules = nonNilSlice(report.Repository.WorkspaceModules)
 	report.Repository.SkippedWorkspaceModules = nonNilSlice(report.Repository.SkippedWorkspaceModules)
 	report.Repository.LocalReplacements = nonNilSlice(report.Repository.LocalReplacements)
@@ -226,7 +227,7 @@ func doctorLimitations() []string {
 	return []string{
 		"Doctor checks repository readiness; it does not prove every downstream analysis is complete.",
 		"Package loading follows the current Go environment and any provided --tags values.",
-		"Generated files are included when Go package loading includes them; generated-file policy is currently informational.",
+		"Generated files are included when Go package loading includes them; major generated packages identify generated-code hotspots for triage.",
 		"Snapshots store repository inventory, freshness metadata, bounded relationship metadata, and selected reusable relationship records; reuse remains opt-in per command.",
 	}
 }
@@ -287,6 +288,7 @@ func formatDoctorReport(report doctorReport) string {
 	fmt.Fprintf(&builder, "  Go files: %d\n", report.Repository.GoFiles)
 	fmt.Fprintf(&builder, "  Test files: %d\n", report.Repository.TestFiles)
 	fmt.Fprintf(&builder, "  Generated files: %d\n", report.Repository.GeneratedFiles)
+	writeDoctorGeneratedPackages(&builder, report.Repository.GeneratedPackages)
 	writeDoctorValues(&builder, "  Nested modules", report.Repository.NestedModules)
 	writeDoctorValues(&builder, "  Skipped nested modules", report.Repository.SkippedNestedModules)
 	writeDoctorValues(&builder, "  Skipped workspace modules", report.Repository.SkippedWorkspaceModules)
@@ -341,6 +343,23 @@ func formatDoctorReport(report doctorReport) string {
 	}
 
 	return builder.String()
+}
+
+func writeDoctorGeneratedPackages(builder *strings.Builder, packages []sherpa.GeneratedPackageSummary) {
+	if len(packages) == 0 {
+		builder.WriteString("  Generated packages: none\n")
+		return
+	}
+
+	builder.WriteString("  Generated packages:\n")
+	for _, pkg := range packages {
+		name := valueOrNone(pkg.PackageName)
+		fmt.Fprintf(builder, "    %s (%s): %d files, %d bytes", pkg.Package, name, pkg.Files, pkg.SizeBytes)
+		if strings.TrimSpace(pkg.LargestFile) != "" {
+			fmt.Fprintf(builder, ", largest %s (%d bytes)", pkg.LargestFile, pkg.LargestFileSizeBytes)
+		}
+		builder.WriteString("\n")
+	}
 }
 
 func writeDoctorPackageLoadDiagnostics(builder *strings.Builder, diagnostics []semantics.PackageLoadDiagnostic) {
