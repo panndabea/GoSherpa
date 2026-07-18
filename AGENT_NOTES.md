@@ -152,6 +152,9 @@ Read these fields before acting:
 
 - `warnings`: successful-output warnings from the shared envelope.
 - `data.confidence`: a compact trust signal for the result.
+- `data.readiness.repositoryLayout` on `agent context`, and
+  `data.repository` on `doctor`: selected module/workspace boundary, skipped
+  nested modules, external workspace modules, and local replacements.
 - `data.targetRisk`: deterministic impact-breadth evidence for the current
   target or diff; inspect its reasons, signals, and limitations before treating
   it as a planning input.
@@ -180,6 +183,9 @@ and package-qualified examples.
   packages.
 - Use reported confidence, target-risk reasons/signals, warnings, analysis
   modes, and limitations in your reasoning.
+- When `doctor` or `agent context` reports skipped nested modules, external
+  workspace modules, or local replacements, inspect those roots separately with
+  `--root` if the task touches that boundary.
 - Do not claim complete call graph, runtime, security, or semantic certainty
   unless the output explicitly supports it.
 
@@ -208,6 +214,10 @@ Current analysis is intentionally conservative:
   inventory plus selected relationship subanalysis in diff-oriented workflows,
   `context symbol`, `impact symbol`, and `agent context` can reuse valid
   snapshots. Unsupported portions fall back to live analysis with warnings.
+- Nested modules and workspace modules outside the selected `--root` are
+  reported as repository layout boundaries, not silently folded into the
+  current analysis. Local `replace` directives are visible as layout evidence;
+  replacement roots may still need separate inspection.
 - GoSherpa is not a runtime profiler, security scanner, linter, formatter, or
   automatic refactoring engine.
 

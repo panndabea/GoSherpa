@@ -46,6 +46,13 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ```
 
+`gosherpa doctor` and `gosherpa agent context` report the selected repository
+layout: module or workspace boundary, visible `go.work`, workspace modules,
+skipped nested modules, workspace modules outside `--root`, local `replace`
+directives, and file counts. Nested modules and external workspace modules are
+separate analysis roots; inspect them with their own `--root` when they are
+part of the change.
+
 Generated Go files are included when they are repository-local and visible to
 the selected module or workspace. `gosherpa doctor` counts files with the
 standard `// Code generated ... DO NOT EDIT.` header; relationship and context
@@ -106,7 +113,7 @@ symbol completion can come later.
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Diff context | `gosherpa context diff --base HEAD` | Exports changed files, changed symbols, typechecked changed-symbol impact when available, affected packages/tests, target risk, reading order, confidence, and limitations |
-| Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, workspace, snapshot status, confidence, and warnings |
+| Analysis readiness | `gosherpa doctor` | Reports module, Go environment, package loading, build tags, repository layout, workspace boundaries, snapshot status, confidence, and warnings |
 | Repository snapshot | `gosherpa snapshot` | Writes `.gosherpa/snapshot.json` with versioned file, package, symbol, build-tag, git-state, freshness, and relationship metadata |
 | Shell completion | `gosherpa completion zsh` | Prints completion scripts for zsh, bash, or fish |
 | Snapshot-backed analysis | `gosherpa analyze --use-snapshot` | Reuses a valid snapshot for repository overview inventory, selected relationship commands, and diff changed-symbol inventory where available, with live-analysis fallback warnings |

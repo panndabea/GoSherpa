@@ -2,8 +2,6 @@ package agentworkflow
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -56,15 +54,17 @@ type Report struct {
 }
 
 type ReadinessSummary struct {
-	Status            string             `json:"status"`
-	AnalysisMode      string             `json:"analysisMode"`
-	Confidence        string             `json:"confidence"`
-	PackageLoad       PackageLoadSummary `json:"packageLoad"`
-	GoWork            GoWorkSummary      `json:"goWork"`
-	GeneratedFiles    int                `json:"generatedFiles"`
-	NestedModules     []string           `json:"nestedModules"`
-	RepoShapeWarnings []string           `json:"repoShapeWarnings"`
-	Limitations       []string           `json:"limitations"`
+	Status               string                  `json:"status"`
+	AnalysisMode         string                  `json:"analysisMode"`
+	Confidence           string                  `json:"confidence"`
+	RepositoryLayout     sherpa.RepositoryLayout `json:"repositoryLayout"`
+	PackageLoad          PackageLoadSummary      `json:"packageLoad"`
+	GoWork               GoWorkSummary           `json:"goWork"`
+	GeneratedFiles       int                     `json:"generatedFiles"`
+	NestedModules        []string                `json:"nestedModules"`
+	SkippedNestedModules []string                `json:"skippedNestedModules"`
+	RepoShapeWarnings    []string                `json:"repoShapeWarnings"`
+	Limitations          []string                `json:"limitations"`
 }
 
 type PackageLoadSummary struct {
@@ -79,6 +79,7 @@ type PackageLoadSummary struct {
 type GoWorkSummary struct {
 	Detected bool   `json:"detected"`
 	Path     string `json:"path,omitempty"`
+	Scope    string `json:"scope,omitempty"`
 }
 
 type SnapshotSummary struct {
@@ -187,7 +188,7 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 		AnalysisMode:      contextReport.AnalysisMode,
 		Limits:            workflowLimits(contextReport.Limits, options.Limits.MaxBytes),
 		Truncated:         contextReport.Truncated,
-		Warnings:          uniqueStringsInOrder(append(readiness.PackageLoad.Warnings, contextReport.Warnings...)),
+		Warnings:          uniqueStringsInOrder(append(append(readiness.PackageLoad.Warnings, readiness.RepoShapeWarnings...), contextReport.Warnings...)),
 		SectionModes:      sectionModes(readiness, snapshotSummary, contextReport),
 		SectionTruncation: sectionTruncationFromTruncation(contextReport.Truncated),
 		SuggestedCommands: suggestedCommands(base, snapshotSummary, contextReport.ChangedSymbolDetails),
@@ -200,11 +201,20 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 }
 
 func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
+	layout, layoutWarnings := sherpa.AnalyzeRepositoryLayout(root)
 	readiness := ReadinessSummary{
-		Status:       "ready",
-		AnalysisMode: "typechecked",
-		Confidence:   agentcontext.ConfidenceMedium,
-		GoWork:       inspectGoWork(root),
+		Status:           "ready",
+		AnalysisMode:     "typechecked",
+		Confidence:       agentcontext.ConfidenceMedium,
+		RepositoryLayout: layout,
+		GoWork: GoWorkSummary{
+			Detected: layout.GoWork.Detected,
+			Path:     layout.GoWork.Path,
+			Scope:    layout.GoWork.Scope,
+		},
+		GeneratedFiles:       layout.GeneratedFiles,
+		NestedModules:        layout.NestedModules,
+		SkippedNestedModules: layout.SkippedNestedModules,
 		Limitations: []string{
 			"Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
 			"Package loading follows the current Go environment and provided --tags values.",
@@ -212,14 +222,7 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 		},
 	}
 
-	goFiles, err := sherpa.FindGoFiles(root)
-	if err != nil {
-		readiness.PackageLoad.Warnings = append(readiness.PackageLoad.Warnings, fmt.Sprintf("go file scan failed: %v", err))
-	} else {
-		readiness.GeneratedFiles = countGeneratedFiles(root, goFiles)
-	}
-	readiness.NestedModules = findNestedModules(root)
-	readiness.RepoShapeWarnings = repoShapeWarnings(readiness)
+	readiness.RepoShapeWarnings = repoShapeWarnings(readiness, layoutWarnings)
 
 	repo, err := semantics.LoadRepository(root, semantics.LoadOptions{BuildTags: buildTags})
 	if err != nil {
@@ -258,76 +261,27 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 	return normalizeReadiness(readiness)
 }
 
-func inspectGoWork(root string) GoWorkSummary {
-	path := filepath.Join(root, "go.work")
-	if info, err := os.Stat(path); err == nil && !info.IsDir() {
-		return GoWorkSummary{Detected: true, Path: "go.work"}
-	}
-	return GoWorkSummary{}
-}
-
-func countGeneratedFiles(root string, files []string) int {
-	count := 0
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			continue
-		}
-		if strings.Contains(firstFileLine(string(data)), "Code generated") && strings.Contains(firstFileLine(string(data)), "DO NOT EDIT") {
-			count++
-		}
-	}
-	return count
-}
-
-func firstFileLine(data string) string {
-	if index := strings.IndexByte(data, '\n'); index >= 0 {
-		return data[:index]
-	}
-	return data
-}
-
-func findNestedModules(root string) []string {
-	var modules []string
-	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !entry.IsDir() {
-			return nil
-		}
-		name := entry.Name()
-		switch name {
-		case ".git", ".gosherpa", "vendor":
-			return filepath.SkipDir
-		}
-		if path == root {
-			return nil
-		}
-		if info, err := os.Stat(filepath.Join(path, "go.mod")); err == nil && !info.IsDir() {
-			if rel, relErr := filepath.Rel(root, path); relErr == nil {
-				modules = append(modules, filepath.ToSlash(rel))
-			}
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	sort.Strings(modules)
-	return modules
-}
-
-func repoShapeWarnings(readiness ReadinessSummary) []string {
-	var warnings []string
+func repoShapeWarnings(readiness ReadinessSummary, layoutWarnings []string) []string {
+	warnings := append([]string{}, layoutWarnings...)
 	if readiness.GoWork.Detected {
 		warnings = append(warnings, "go.work detected; package loading follows workspace module resolution.")
 	}
-	if len(readiness.NestedModules) > 0 {
-		warnings = append(warnings, fmt.Sprintf("nested modules detected: %s", strings.Join(readiness.NestedModules, ", ")))
+	if len(readiness.SkippedNestedModules) > 0 && !hasWarningPrefix(warnings, "nested modules skipped by the selected analysis boundary:") {
+		warnings = append(warnings, fmt.Sprintf("nested modules skipped by the selected analysis boundary: %s", strings.Join(readiness.SkippedNestedModules, ", ")))
 	}
 	if readiness.GeneratedFiles > 0 {
 		warnings = append(warnings, fmt.Sprintf("generated Go files detected: %d", readiness.GeneratedFiles))
 	}
 	return uniqueStringsInOrder(warnings)
+}
+
+func hasWarningPrefix(warnings []string, prefix string) bool {
+	for _, warning := range warnings {
+		if strings.HasPrefix(warning, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func summarizeSnapshot(inspect snapshotstore.InspectResult, requested bool, used bool) SnapshotSummary {
@@ -601,8 +555,10 @@ func normalizeReport(report Report) Report {
 }
 
 func normalizeReadiness(readiness ReadinessSummary) ReadinessSummary {
+	readiness.RepositoryLayout = sherpa.NormalizeRepositoryLayout(readiness.RepositoryLayout)
 	readiness.PackageLoad.Warnings = nonNilSlice(uniqueStringsInOrder(readiness.PackageLoad.Warnings))
 	readiness.NestedModules = nonNilSlice(readiness.NestedModules)
+	readiness.SkippedNestedModules = nonNilSlice(readiness.SkippedNestedModules)
 	readiness.RepoShapeWarnings = nonNilSlice(uniqueStringsInOrder(readiness.RepoShapeWarnings))
 	readiness.Limitations = nonNilSlice(readiness.Limitations)
 	if strings.TrimSpace(readiness.Status) == "" {

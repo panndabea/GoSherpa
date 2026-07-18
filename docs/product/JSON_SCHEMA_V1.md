@@ -502,8 +502,11 @@ symbol/file/package positional targets, `--tests`, `--scope`,
 `--max-references`, and `--source-radius`.
 
 - `readiness`: bounded repository-readiness summary with package-load status,
-  go.work detection, generated-file count, nested modules, repo-shape warnings,
-  confidence, and limitations.
+  go.work detection, generated-file count, nested modules, skipped nested
+  modules, repo-shape warnings, confidence, limitations, and
+  `repositoryLayout`. `repositoryLayout` mirrors the doctor repository-layout
+  shape so agents can see the selected module/workspace boundary without
+  running a second command.
 - `snapshot`: requested/used status, freshness, path, message, relationship
   metadata, stale reasons, and refresh command when useful. The command never
   creates snapshots automatically.
@@ -769,14 +772,20 @@ Data:
   "repository": {
     "root": "/repo",
     "modulePath": "example.com/app",
+    "manifest": "go.mod",
     "goModPath": "go.mod",
     "goWork": {
       "detected": false
     },
+    "analysisBoundary": "module",
     "goFiles": 12,
     "testFiles": 4,
     "generatedFiles": 0,
-    "nestedModules": []
+    "nestedModules": [],
+    "skippedNestedModules": [],
+    "workspaceModules": [],
+    "skippedWorkspaceModules": [],
+    "localReplacements": []
   },
   "buildTags": [],
   "packageLoad": {
@@ -817,8 +826,13 @@ Data:
 ```
 
 - `environment`: Go runtime and platform used by the GoSherpa binary.
-- `repository`: resolved module root, module path, file counts, `go.work`
-  detection, and nested-module hints.
+- `repository`: resolved module or workspace root, module path when the root
+  has `go.mod`, selected manifest, analysis boundary (`module`, `workspace`,
+  or `module-with-parent-workspace`), file counts, `go.work` detection,
+  workspace modules, skipped workspace modules outside `--root`, nested
+  modules, skipped nested modules, and local `replace` directives. Skipped
+  nested modules and external workspace modules are reported as envelope
+  warnings when they affect the selected analysis boundary.
 - `buildTags`: normalized build tags supplied through `--tags`.
 - `packageLoad`: status of typechecked package loading. `status` is `ok`,
   `warnings`, or `failed`.

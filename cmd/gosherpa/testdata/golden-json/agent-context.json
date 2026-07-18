@@ -26,6 +26,25 @@
       "generatedFiles": 0,
       "nestedModules": [],
       "repoShapeWarnings": [],
+      "repositoryLayout": {
+        "root": "<ROOT>",
+        "modulePath": "example.com/golden",
+        "manifest": "go.mod",
+        "goModPath": "go.mod",
+        "goWork": {
+          "detected": false
+        },
+        "analysisBoundary": "module",
+        "goFiles": 3,
+        "testFiles": 1,
+        "generatedFiles": 0,
+        "nestedModules": [],
+        "skippedNestedModules": [],
+        "workspaceModules": [],
+        "skippedWorkspaceModules": [],
+        "localReplacements": []
+      },
+      "skippedNestedModules": [],
       "limitations": [
         "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
         "Package loading follows the current Go environment and provided --tags values.",

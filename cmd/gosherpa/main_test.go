@@ -1256,6 +1256,50 @@ use .
 	}
 }
 
+func TestMainRunsDoctorCommandWithRepositoryLayoutSummary(t *testing.T) {
+	tmp := writeMainImpactReportProject(t)
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), `module example.com/app
+
+go 1.24
+
+replace example.com/lib => ./lib
+`)
+	writeMainTestFile(t, filepath.Join(tmp, "nested", "go.mod"), "module example.com/nested\n\ngo 1.24\n")
+	writeMainTestFile(t, filepath.Join(tmp, "nested", "nested.go"), "package nested\n")
+	writeMainTestFile(t, filepath.Join(tmp, "lib", "go.mod"), "module example.com/lib\n\ngo 1.24\n")
+	writeMainTestFile(t, filepath.Join(tmp, "lib", "lib.go"), "package lib\n")
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	warnings := assertMainTestJSONArray(t, payload, "warnings")
+	if len(warnings) == 0 {
+		t.Fatalf("expected repository layout warnings in envelope")
+	}
+	payload["warnings"] = []any{}
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "doctor", ".", "example.com/app")
+	repository := assertMainTestJSONObject(t, data, "repository")
+	if repository["analysisBoundary"] != "module" {
+		t.Fatalf("expected module analysis boundary, got %v", repository["analysisBoundary"])
+	}
+	skipped := assertMainTestJSONArrayHasLength(t, repository, "skippedNestedModules", 2)
+	if skipped[0] != "lib" || skipped[1] != "nested" {
+		t.Fatalf("expected sorted skipped nested modules, got %v", skipped)
+	}
+	replacements := assertMainTestJSONArrayHasLength(t, repository, "localReplacements", 1)
+	replacement := replacements[0].(map[string]any)
+	if replacement["modulePath"] != "example.com/lib" || replacement["path"] != "lib" || replacement["insideRoot"] != true {
+		t.Fatalf("unexpected local replacement summary: %#v", replacement)
+	}
+}
+
 func TestMainPrintsDoctorUsageWhenArgumentIsUnexpected(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "doctor", "extra"})
 

@@ -56,9 +56,12 @@ envelope with `schemaVersion`, `command`, `target`, `root`, `modulePath`,
 `warnings`, and `data`.
 
 Read `warnings`, `data.confidence`, `data.targetRisk`, `data.limitations`,
-analysis-mode fields, and any truncation metadata before acting. Treat
-GoSherpa output as grounded context that guides source reading; it does not
-replace inspecting the relevant files.
+analysis-mode fields, repository layout fields, and any truncation metadata
+before acting. `doctor.data.repository` and
+`agent context.data.readiness.repositoryLayout` report module/workspace
+boundaries, skipped nested modules, external workspace modules, and local
+replace directives. Treat GoSherpa output as grounded context that guides
+source reading; it does not replace inspecting the relevant files.
 
 ## Main CLI Commands
 
@@ -140,6 +143,9 @@ Current analysis is intentionally conservative:
   inventory plus selected relationship subanalysis in diff-oriented workflows,
   `context symbol`, `impact symbol`, and `agent context` can reuse valid
   snapshots; unsupported portions fall back to live analysis with warnings.
+- Nested modules, workspace modules outside the selected `--root`, and local
+  replacements are reported as repository layout boundaries. Inspect those
+  roots separately with `--root` when the task crosses them.
 
 ## Canonical Links
 

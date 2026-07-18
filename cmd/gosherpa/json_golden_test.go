@@ -419,9 +419,33 @@ func canonicalGoldenActualJSON(t *testing.T, output string, fixtureRoot string) 
 		t.Fatalf("expected root %s, got %v", absoluteRoot, payload["root"])
 	}
 
-	payload["root"] = "<ROOT>"
+	payload = replaceGoldenRoot(payload, absoluteRoot).(map[string]any)
 
 	return canonicalGoldenJSONValue(t, payload)
+}
+
+func replaceGoldenRoot(value any, root string) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		replaced := make(map[string]any, len(typed))
+		for key, child := range typed {
+			replaced[key] = replaceGoldenRoot(child, root)
+		}
+		return replaced
+	case []any:
+		replaced := make([]any, len(typed))
+		for index, child := range typed {
+			replaced[index] = replaceGoldenRoot(child, root)
+		}
+		return replaced
+	case string:
+		if typed == root {
+			return "<ROOT>"
+		}
+		return typed
+	default:
+		return value
+	}
 }
 
 func canonicalGoldenJSON(t *testing.T, data []byte) string {

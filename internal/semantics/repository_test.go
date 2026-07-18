@@ -143,6 +143,40 @@ func (c *Client) Start() {}
 	assertSemanticTestContains(t, got, "./service")
 }
 
+func TestLoadRepositoryDoesNotIncludeNestedLocalReplaceAsRootPackage(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), `module example.com/root
+
+go 1.24
+
+require example.com/lib v0.0.0
+
+replace example.com/lib => ./lib
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "root.go"), `package root
+
+import "example.com/lib"
+
+func Run() int {
+	return lib.Value
+}
+`)
+	writeSemanticTestFile(t, filepath.Join(tmp, "lib", "go.mod"), "module example.com/lib\n\ngo 1.24\n")
+	writeSemanticTestFile(t, filepath.Join(tmp, "lib", "lib.go"), "package lib\n\nconst Value = 1\n")
+
+	repo, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := semanticTestPackagePaths(repo)
+	assertSemanticTestContains(t, got, ".")
+	if semanticTestContains(got, "./lib") {
+		t.Fatalf("expected local replace module to stay outside root package inventory, got %#v", got)
+	}
+}
+
 func TestLoadRepositoryReportsPackageWarnings(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -632,6 +666,15 @@ func assertSemanticTestContains(t *testing.T, values []string, want string) {
 	}
 
 	t.Fatalf("expected %q in %v", want, values)
+}
+
+func semanticTestContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func semanticTestCompiledFileExists(repo Repository, name string) bool {

@@ -1,13 +1,9 @@
 package sherpa
 
 import (
-	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
-
-	"golang.org/x/mod/modfile"
 )
 
 func WorkspacePackagePathForImportPath(root string, importPath string) (string, bool) {
@@ -48,46 +44,14 @@ func WorkspacePackagePathForImportPath(root string, importPath string) (string, 
 }
 
 func workspaceModuleDirs(root string) []string {
-	workPath := filepath.Join(root, "go.work")
-	contents, err := os.ReadFile(workPath)
-	if err != nil {
-		return nil
-	}
-
-	workFile, err := modfile.ParseWork(workPath, contents, nil)
-	if err != nil {
-		return nil
-	}
-
-	seen := make(map[string]struct{})
-	for _, use := range workFile.Use {
-		if use == nil {
+	records, _ := workspaceModuleRecords(root, filepath.Join(root, "go.work"))
+	dirs := make([]string, 0, len(records))
+	for _, record := range records {
+		if !record.Summary.InsideRoot {
 			continue
 		}
-
-		value := strings.TrimSpace(use.Path)
-		if value == "" {
-			continue
-		}
-
-		moduleDir := value
-		if !filepath.IsAbs(moduleDir) {
-			moduleDir = filepath.Join(root, filepath.FromSlash(moduleDir))
-		}
-		moduleDir = filepath.Clean(moduleDir)
-		if !workspacePathInsideRoot(root, moduleDir) {
-			continue
-		}
-
-		seen[moduleDir] = struct{}{}
+		dirs = append(dirs, record.Dir)
 	}
-
-	dirs := make([]string, 0, len(seen))
-	for dir := range seen {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
-
 	return dirs
 }
 

@@ -44,6 +44,12 @@ func TestAnalyzeContextBuildsDiffFirstAgentWorkflow(t *testing.T) {
 	if report.Readiness.PackageLoad.Status != "ok" {
 		t.Fatalf("expected package load ok, got %#v", report.Readiness.PackageLoad)
 	}
+	if report.Readiness.RepositoryLayout.AnalysisBoundary != "module" {
+		t.Fatalf("expected module repository layout, got %#v", report.Readiness.RepositoryLayout)
+	}
+	if report.Readiness.SkippedNestedModules == nil {
+		t.Fatalf("expected non-nil skipped nested module array, got %#v", report.Readiness)
+	}
 	if report.Snapshot.Requested || report.Snapshot.Used {
 		t.Fatalf("snapshot should not be requested or used, got %#v", report.Snapshot)
 	}
@@ -255,6 +261,28 @@ func TestAnalyzeContextReportsSnapshotStates(t *testing.T) {
 			t.Fatalf("expected refresh command, got %#v", report.Snapshot)
 		}
 	})
+}
+
+func TestAnalyzeContextReportsRepositoryLayoutWarnings(t *testing.T) {
+	root := writeCommittedAgentWorkflowProject(t)
+	writeAgentWorkflowFile(t, filepath.Join(root, "nested", "go.mod"), "module example.com/nested\n\ngo 1.24.4\n")
+	writeAgentWorkflowFile(t, filepath.Join(root, "nested", "nested.go"), "package nested\n")
+	appendAgentWorkflowAddedFunction(t, root)
+
+	report, err := AnalyzeContext(root, "HEAD", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeContext returned error: %v", err)
+	}
+
+	if len(report.Readiness.RepositoryLayout.SkippedNestedModules) != 1 || report.Readiness.RepositoryLayout.SkippedNestedModules[0] != "nested" {
+		t.Fatalf("expected skipped nested module in repository layout, got %#v", report.Readiness.RepositoryLayout)
+	}
+	if !agentWorkflowContains(report.Readiness.RepoShapeWarnings, "nested modules skipped by the selected analysis boundary: nested; inspect them with --root <path> when needed") {
+		t.Fatalf("expected skipped nested module readiness warning, got %#v", report.Readiness.RepoShapeWarnings)
+	}
+	if len(report.Warnings) == 0 {
+		t.Fatalf("expected repository layout warning in envelope warnings")
+	}
 }
 
 func writeAgentWorkflowProject(t *testing.T) string {

@@ -1,5 +1,59 @@
 # Priority Implementation Audit
 
+## Real-World Repository Robustness Slice 2.1 Update
+
+Date: 2026-07-18
+
+Selected `<base-ref>` for the diff-oriented verification command: `HEAD`.
+
+`git rev-parse --verify HEAD` resolved to
+`35747a3083af66b45d80abeae02e377c7b534b72`.
+
+Slice 2.1 implemented a shared repository layout summary in
+`internal/sherpa`. `doctor` now exposes that layout as `data.repository`, and
+`agent context` exposes the same bounded shape at
+`data.readiness.repositoryLayout` while retaining its previous short readiness
+fields. The layout records the selected analysis boundary, root or parent
+`go.work`, workspace modules, skipped workspace modules outside `--root`,
+nested modules, skipped nested modules, local `replace` directives, and file
+counts.
+
+Behavior recorded for this repository after the slice:
+
+- `doctor --json` reports `analysisBoundary: "module"`.
+- The root file walk covers 127 Go files, including 50 test files and no
+  generated files.
+- The fixture modules under `cmd/gosherpa/testdata/interface_project`,
+  `cmd/gosherpa/testdata/json_project`, and
+  `cmd/gosherpa/testdata/possible_calls_project` are now reported as skipped
+  nested modules with guidance to inspect them using separate `--root` values.
+- Package loading still succeeds with 11 repository-local packages and
+  `analysisMode: "typechecked"`.
+- The existing snapshot was stale because the working tree changed; this slice
+  did not refresh it because snapshot reuse was not the verification target.
+
+Verification commands run:
+
+```bash
+git rev-parse --verify HEAD
+go test ./internal/sherpa ./internal/semantics ./internal/agentworkflow ./cmd/gosherpa
+go test ./internal/agentworkflow
+go test ./...
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa agent context --base HEAD --max-files 5 --max-symbols 5 --max-tests 5 --max-bytes 12000 --json
+```
+
+Results:
+
+- Focused tests passed for `internal/sherpa`, `internal/semantics`,
+  `internal/agentworkflow`, and `cmd/gosherpa`.
+- Full `go test ./...` passed.
+- `doctor --json` passed with one expected envelope warning for skipped nested
+  fixture modules and a stale-snapshot suggestion.
+- `agent context --base HEAD ... --json` passed with one repository-layout
+  warning, `readiness.confidence: "low"` due to that warning, and explicit
+  `sectionTruncation` from the requested byte and item limits.
+
 ## Agent Workflow Phase 0 And Slice 1.1/1.2 Update
 
 Date: 2026-07-17

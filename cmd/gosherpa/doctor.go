@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -38,22 +37,8 @@ type doctorEnvironment struct {
 	GOARCH    string `json:"goarch"`
 }
 
-type doctorRepository struct {
-	Root           string       `json:"root"`
-	ModulePath     string       `json:"modulePath"`
-	GoModPath      string       `json:"goModPath"`
-	GoWork         doctorGoWork `json:"goWork"`
-	GoFiles        int          `json:"goFiles"`
-	TestFiles      int          `json:"testFiles"`
-	GeneratedFiles int          `json:"generatedFiles"`
-	NestedModules  []string     `json:"nestedModules"`
-}
-
-type doctorGoWork struct {
-	Detected bool   `json:"detected"`
-	Path     string `json:"path,omitempty"`
-	Scope    string `json:"scope,omitempty"`
-}
+type doctorRepository = sherpa.RepositoryLayout
+type doctorGoWork = sherpa.GoWorkLayout
 
 type doctorPackageLoad struct {
 	Status       string                 `json:"status"`
@@ -97,32 +82,25 @@ func analyzeDoctor(root string, buildTags []string) doctorReport {
 			GOARCH:    runtime.GOARCH,
 		},
 		Repository: doctorRepository{
-			Root:      filepath.Clean(root),
-			GoModPath: "go.mod",
+			Root: filepath.Clean(root),
 		},
 		BuildTags: normalizedTags,
 		Snapshot:  inspectDoctorSnapshot(root, normalizedTags),
 	}
 
+	layout, layoutWarnings := sherpa.AnalyzeRepositoryLayout(root)
+	if strings.TrimSpace(layout.Root) != "" {
+		report.Repository = layout
+	}
+	report.Warnings = append(report.Warnings, layoutWarnings...)
+
 	modulePath, err := sherpa.ModulePath(root)
 	if err != nil {
 		report.Warnings = append(report.Warnings, fmt.Sprintf("module path unavailable: %v", err))
 	}
-	report.Repository.ModulePath = modulePath
-
-	goFiles, err := sherpa.FindGoFiles(root)
-	if err != nil {
-		report.Warnings = append(report.Warnings, fmt.Sprintf("go file scan failed: %v", err))
-	} else {
-		report.Repository.GoFiles = len(goFiles)
-		report.Repository.TestFiles = countTestFiles(goFiles)
-		report.Repository.GeneratedFiles = countGeneratedFiles(goFiles)
+	if strings.TrimSpace(modulePath) != "" {
+		report.Repository.ModulePath = modulePath
 	}
-
-	report.Repository.GoWork = detectGoWork(root)
-	nestedModules, nestedWarnings := findNestedModules(root)
-	report.Repository.NestedModules = nestedModules
-	report.Warnings = append(report.Warnings, nestedWarnings...)
 
 	repo, err := semantics.LoadRepository(root, semantics.LoadOptions{
 		BuildTags: normalizedTags,
@@ -163,6 +141,10 @@ func normalizeDoctorReport(report doctorReport) doctorReport {
 	}
 	report.Repository.Root = filepath.Clean(report.Repository.Root)
 	report.Repository.NestedModules = nonNilSlice(report.Repository.NestedModules)
+	report.Repository.SkippedNestedModules = nonNilSlice(report.Repository.SkippedNestedModules)
+	report.Repository.WorkspaceModules = nonNilSlice(report.Repository.WorkspaceModules)
+	report.Repository.SkippedWorkspaceModules = nonNilSlice(report.Repository.SkippedWorkspaceModules)
+	report.Repository.LocalReplacements = nonNilSlice(report.Repository.LocalReplacements)
 	report.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(report.BuildTags))
 	report.Snapshot.StaleReasons = nonNilSlice(report.Snapshot.StaleReasons)
 	report.PackageLoad.Packages = nonNilSlice(report.PackageLoad.Packages)
@@ -234,8 +216,14 @@ func doctorSuggestions(report doctorReport) []string {
 	if report.Repository.GoWork.Detected {
 		suggestions = append(suggestions, "A go.work file is visible to this module; package loading may follow workspace module resolution.")
 	}
-	if len(report.Repository.NestedModules) > 0 {
+	if len(report.Repository.SkippedNestedModules) > 0 {
 		suggestions = append(suggestions, "Nested modules were found; inspect them with separate --root values when needed.")
+	}
+	if len(report.Repository.SkippedWorkspaceModules) > 0 {
+		suggestions = append(suggestions, "Some go.work modules are outside --root; inspect them with their own --root when they are part of the change.")
+	}
+	if len(report.Repository.LocalReplacements) > 0 {
+		suggestions = append(suggestions, "Local replace directives can affect typechecking; inspect replacement roots separately when changes cross that boundary.")
 	}
 	switch report.Snapshot.Status {
 	case snapshotstore.StatusMissing:
@@ -268,6 +256,9 @@ func formatDoctorReport(report doctorReport) string {
 	fmt.Fprintf(&builder, "  Test files: %d\n", report.Repository.TestFiles)
 	fmt.Fprintf(&builder, "  Generated files: %d\n", report.Repository.GeneratedFiles)
 	writeDoctorValues(&builder, "  Nested modules", report.Repository.NestedModules)
+	writeDoctorValues(&builder, "  Skipped nested modules", report.Repository.SkippedNestedModules)
+	writeDoctorValues(&builder, "  Skipped workspace modules", report.Repository.SkippedWorkspaceModules)
+	writeDoctorLocalReplacements(&builder, report.Repository.LocalReplacements)
 	builder.WriteString("\n")
 
 	builder.WriteString("BUILD TAGS\n")
@@ -329,6 +320,23 @@ func writeDoctorValues(builder *strings.Builder, label string, values []string) 
 	writeDoctorIndentedValuesWithIndent(builder, values, "    ")
 }
 
+func writeDoctorLocalReplacements(builder *strings.Builder, replacements []sherpa.LocalReplacement) {
+	if len(replacements) == 0 {
+		builder.WriteString("  Local replacements: none\n")
+		return
+	}
+
+	builder.WriteString("  Local replacements:\n")
+	for _, replacement := range replacements {
+		path := valueOrNone(replacement.Path)
+		scope := "outside root"
+		if replacement.InsideRoot {
+			scope = "inside root"
+		}
+		fmt.Fprintf(builder, "    %s => %s (%s, owner: %s)\n", replacement.ModulePath, path, scope, replacement.Owner)
+	}
+}
+
 func writeDoctorSection(builder *strings.Builder, title string, values []string) {
 	builder.WriteString(title)
 	builder.WriteString("\n")
@@ -370,116 +378,6 @@ func formatGoWork(goWork doctorGoWork) string {
 	return fmt.Sprintf("%s (%s)", goWork.Path, goWork.Scope)
 }
 
-func countTestFiles(files []string) int {
-	count := 0
-	for _, file := range files {
-		if strings.HasSuffix(filepath.ToSlash(file), "_test.go") {
-			count++
-		}
-	}
-
-	return count
-}
-
-func countGeneratedFiles(files []string) int {
-	count := 0
-	for _, file := range files {
-		if generatedGoFile(file) {
-			count++
-		}
-	}
-
-	return count
-}
-
-func generatedGoFile(file string) bool {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return false
-	}
-
-	lines := strings.SplitN(string(data), "\n", 12)
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "// Code generated ") && strings.HasSuffix(trimmed, " DO NOT EDIT.") {
-			return true
-		}
-	}
-
-	return false
-}
-
-func detectGoWork(root string) doctorGoWork {
-	root = filepath.Clean(root)
-	for dir := root; ; dir = filepath.Dir(dir) {
-		path := filepath.Join(dir, "go.work")
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			scope := "parent"
-			if dir == root {
-				scope = "root"
-			}
-			return doctorGoWork{
-				Detected: true,
-				Path:     doctorDisplayPath(root, path),
-				Scope:    scope,
-			}
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-	}
-
-	return doctorGoWork{}
-}
-
-func findNestedModules(root string) ([]string, []string) {
-	var modules []string
-	var warnings []string
-	root = filepath.Clean(root)
-
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			warnings = append(warnings, fmt.Sprintf("nested module scan skipped %s: %v", doctorDisplayPath(root, path), walkErr))
-			return nil
-		}
-		if path == root {
-			return nil
-		}
-		if entry.IsDir() && doctorShouldSkipDir(entry.Name()) {
-			return filepath.SkipDir
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if entry.Name() != "go.mod" {
-			return nil
-		}
-		if filepath.Clean(path) == filepath.Join(root, "go.mod") {
-			return nil
-		}
-
-		modules = append(modules, filepath.ToSlash(filepath.Dir(doctorDisplayPath(root, path))))
-		return nil
-	})
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("nested module scan failed: %v", err))
-	}
-
-	sort.Strings(modules)
-	return modules, uniqueStringsInOrder(warnings)
-}
-
-func doctorShouldSkipDir(name string) bool {
-	switch name {
-	case ".git", ".gosherpa", "vendor":
-		return true
-	default:
-		return false
-	}
-}
-
 func inspectDoctorSnapshot(root string, buildTags []string) doctorSnapshotStatus {
 	result := snapshotstore.Inspect(root, snapshotstore.BuildOptions{
 		BuildTags: buildTags,
@@ -500,13 +398,4 @@ func inspectDoctorSnapshot(root string, buildTags []string) doctorSnapshotStatus
 		RelationshipMetadata: result.RelationshipMetadata,
 		StaleReasons:         result.StaleReasons,
 	}
-}
-
-func doctorDisplayPath(root string, path string) string {
-	relative, err := filepath.Rel(root, path)
-	if err == nil && relative != "." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && relative != ".." {
-		return filepath.ToSlash(relative)
-	}
-
-	return filepath.Clean(path)
 }

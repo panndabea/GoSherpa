@@ -556,18 +556,18 @@ Goal: make `go.work`, nested modules, and module boundaries explicit.
 
 Tasks:
 
-- [ ] Audit current behavior for:
+- [x] Audit current behavior for:
       - root with `go.mod`
       - root with `go.work`
       - nested modules below a module root
       - workspace modules outside the selected root
       - local `replace` modules
-- [ ] Add a repository layout summary used by `doctor` and the agent workflow.
-- [ ] Report skipped nested modules and explain how to inspect them with
+- [x] Add a repository layout summary used by `doctor` and the agent workflow.
+- [x] Report skipped nested modules and explain how to inspect them with
       `--root`.
-- [ ] Ensure file walking, symbol lookup, references, context, impact, and
+- [x] Ensure file walking, symbol lookup, references, context, impact, and
       tests agree on module boundaries.
-- [ ] Add fixtures for single module, workspace, nested module, and local
+- [x] Add fixtures for single module, workspace, nested module, and local
       replace-module cases.
 
 Primary files:

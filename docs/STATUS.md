@@ -31,6 +31,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa agent context --base <ref>` workflow with readiness, snapshot status, changed targets, target risk, possible runtime relationship summary, interface summary, affected tests, section modes, suggested commands, short human output, JSON output, and composed `--max-bytes` budgeting with per-section truncation metadata
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
+- Shared repository layout summary for `doctor` and `agent context` that reports the selected analysis boundary, root or parent `go.work`, workspace modules, skipped nested modules, skipped workspace modules outside `--root`, local replace directives, file counts, and generated-file counts
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
 - Static shell completion script generation with `gosherpa completion zsh|bash|fish`
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
@@ -109,7 +110,17 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Nested modules below a module root are treated as separate analysis roots and
   are skipped by root-level file walking, symbol lookup, references, callers,
   context, impact, and test discovery unless they are included through an
-  explicit `go.work` workspace or inspected with their own `--root`.
+  explicit `go.work` workspace or inspected with their own `--root`. `doctor`
+  and `agent context` report skipped nested modules and suggest separate
+  `--root` inspection.
+- `go.work` modules outside the selected `--root` can affect workspace module
+  resolution, but they are not scanned as repository packages for that
+  invocation. Use a separate `--root` for external workspace modules that are
+  part of the change.
+- Local `replace` directives are reported as repository layout evidence.
+  Replacement modules under the root but outside the selected module/workspace
+  boundary remain separate analysis roots; external replacements may affect
+  typechecking but are not walked as repository packages.
 - Repository-local generated Go files are included when they are visible to the
   selected module or workspace. `doctor` detects the standard
   `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
