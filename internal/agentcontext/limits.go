@@ -41,6 +41,8 @@ type Truncation struct {
 	ChangedSymbolDetails    int `json:"changedSymbolDetails,omitempty"`
 	AffectedInterfaces      int `json:"affectedInterfaces,omitempty"`
 	AffectedImplementations int `json:"affectedImplementations,omitempty"`
+	EntryPointCounts        int `json:"entryPointCounts,omitempty"`
+	EntryPointExamples      int `json:"entryPointExamples,omitempty"`
 	ReadingOrder            int `json:"readingOrder,omitempty"`
 	ByteBudgetOverage       int `json:"byteBudgetOverage,omitempty"`
 }
@@ -138,6 +140,8 @@ func truncationActive(truncation Truncation) bool {
 		truncation.ChangedSymbolDetails > 0 ||
 		truncation.AffectedInterfaces > 0 ||
 		truncation.AffectedImplementations > 0 ||
+		truncation.EntryPointCounts > 0 ||
+		truncation.EntryPointExamples > 0 ||
 		truncation.ReadingOrder > 0 ||
 		truncation.ByteBudgetOverage > 0
 }
@@ -198,6 +202,8 @@ func truncationMessages(truncation *Truncation) []string {
 	appendMessage("changed symbol details", truncation.ChangedSymbolDetails)
 	appendMessage("affected interfaces", truncation.AffectedInterfaces)
 	appendMessage("affected implementations", truncation.AffectedImplementations)
+	appendMessage("entrypoint counts", truncation.EntryPointCounts)
+	appendMessage("entrypoint examples", truncation.EntryPointExamples)
 	appendMessage("reading order", truncation.ReadingOrder)
 	if truncation.ByteBudgetOverage > 0 {
 		messages = append(messages, fmt.Sprintf("byte budget overage: %d bytes", truncation.ByteBudgetOverage))

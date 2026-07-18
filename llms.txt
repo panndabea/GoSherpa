@@ -157,6 +157,12 @@ Current analysis is intentionally conservative:
 - Caller, callee, path, entrypoint, and interface impact analysis may miss
   dynamic dispatch, reflection, reassigned or escaping function values,
   generated-file, build-tag, and some generic edge cases.
+- Entrypoint JSON records and `entrypointSummary` use `certainty: direct` for
+  repository-local static call reachability and `certainty: possible` for
+  public/runtime heuristics or bounded possible wiring such as goroutines,
+  function literals, and stdlib `net/http` registration. This evidence remains
+  separate from direct caller arrays and does not currently alter target-risk
+  scoring.
 - Diff impact is hunk-based and does not infer every semantic consequence of
   changed statements.
 - Test discovery is useful but incomplete for dynamic table-driven test names

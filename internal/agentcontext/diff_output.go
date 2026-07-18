@@ -32,6 +32,8 @@ func FormatDiff(report DiffReport) string {
 	builder.WriteString("\n")
 	writeValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
 	builder.WriteString("\n")
+	writeEntryPointSummary(&builder, report.EntryPointSummary)
+	builder.WriteString("\n")
 	writeAffectedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
 	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)

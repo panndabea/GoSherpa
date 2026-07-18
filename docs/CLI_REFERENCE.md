@@ -323,6 +323,16 @@ known local implementer methods. Unknown or broad interface dispatch remains a
 limitation rather than a guessed edge. Visible local targets in direct
 goroutine starts, goroutine function literals, immediately invoked function
 literals, and function literals passed to simple local call sites are reported
+with explicit possible-call certainty.
+
+`entrypoints --json` records `kind`, `reason`, `reachableTarget`, `certainty`,
+source `position`, optional `range`, and per-entry limitations. `certainty:
+direct` means repository-local static calls reach the target. `certainty:
+possible` means the entrypoint is a public/runtime heuristic or the path uses
+bounded possible wiring such as goroutines, function literals, or stdlib
+`net/http` registration. Framework-specific routers, custom routers, custom
+runtime wiring, reflection, escaping function values, and dependency internals
+remain limitations.
 as possible calls with source ranges; reassigned or escaping function values
 remain conservative.
 
@@ -404,10 +414,13 @@ full structural `RiskReport` from `gosherpa risk`.
 `agent context --json` uses `command: "agent context"` and `target` set to the
 base ref. Its `data` object is a composed summary with readiness, snapshot
 status, cost counts, changed targets, reading order, target risk, possible runtime
-relationship summaries, interface summary, test plan, suggested commands,
-section modes, confidence, limitations, limits, and truncation metadata. It is
-not a dump of the full `context diff`, `impact diff`, `tests affected`, and
-`pr` reports.
+relationship summaries, interface summary, entrypoint summary, test plan,
+suggested commands, section modes, confidence, limitations, limits, and
+truncation metadata. It is not a dump of the full `context diff`,
+`impact diff`, `tests affected`, and `pr` reports. Focused `context symbol`,
+`context diff`, `impact symbol`, `impact diff`, and `pr` JSON can also include
+bounded `entrypointSummary` objects. Entry-point evidence is not mixed into
+direct caller arrays and does not currently change target-risk scoring.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,

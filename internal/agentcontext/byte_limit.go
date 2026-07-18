@@ -32,6 +32,12 @@ func applySymbolByteLimit(report Report, maxBytes int) Report {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
 		},
 		func() bool {
+			return trimEntryPointExample(report.EntryPointSummary, &truncation.EntryPointExamples)
+		},
+		func() bool {
+			return trimEntryPointCount(report.EntryPointSummary, &truncation.EntryPointCounts)
+		},
+		func() bool {
 			return trimLast(&report.References, &truncation.References)
 		},
 		func() bool {
@@ -108,6 +114,25 @@ func applyFileByteLimit(report FileReport, maxBytes int) FileReport {
 
 	report.Truncated = reportTruncation(truncation)
 	return report
+}
+
+func trimEntryPointExample(summary *sherpa.EntryPointSummary, counter *int) bool {
+	if summary == nil || len(summary.Examples) == 0 {
+		return false
+	}
+	summary.Examples = append([]sherpa.EntryPoint{}, summary.Examples[:len(summary.Examples)-1]...)
+	summary.Truncated++
+	(*counter)++
+	return true
+}
+
+func trimEntryPointCount(summary *sherpa.EntryPointSummary, counter *int) bool {
+	if summary == nil || len(summary.Counts) == 0 {
+		return false
+	}
+	summary.Counts = append([]sherpa.EntryPointCount{}, summary.Counts[:len(summary.Counts)-1]...)
+	(*counter)++
+	return true
 }
 
 func applyPackageByteLimit(report PackageReport, maxBytes int) PackageReport {
@@ -188,6 +213,12 @@ func applyDiffByteLimit(report DiffReport, maxBytes int) DiffReport {
 		},
 		func() bool {
 			return trimLast(&report.AffectedInterfaces, &truncation.AffectedInterfaces)
+		},
+		func() bool {
+			return trimEntryPointExample(report.EntryPointSummary, &truncation.EntryPointExamples)
+		},
+		func() bool {
+			return trimEntryPointCount(report.EntryPointSummary, &truncation.EntryPointCounts)
 		},
 		func() bool {
 			return trimLastPreserving(&report.TestCommands, 1, &truncation.TestCommands)

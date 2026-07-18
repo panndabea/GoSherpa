@@ -75,6 +75,10 @@ func formatImpactReport(title string, report ImpactReport, includeChangedFiles b
 	builder.WriteString("\n")
 	writeReportValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
 	builder.WriteString("\n")
+	if report.EntryPointSummary != nil {
+		writeReportEntryPointSummary(&builder, report.EntryPointSummary)
+		builder.WriteString("\n")
+	}
 	writeReportRelatedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
 	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
@@ -127,6 +131,33 @@ func writeReportValues(builder *strings.Builder, title string, values []string) 
 		builder.WriteString("  ")
 		builder.WriteString(value)
 		builder.WriteString("\n")
+	}
+}
+
+func writeReportEntryPointSummary(builder *strings.Builder, summary *sherpa.EntryPointSummary) {
+	builder.WriteString("ENTRYPOINTS\n")
+	if summary == nil {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	normalized := sherpa.NormalizeEntryPointSummary(*summary)
+	if len(normalized.Counts) == 0 && len(normalized.Examples) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	if normalized.AnalysisMode != "" {
+		fmt.Fprintf(builder, "  Analysis: %s\n", normalized.AnalysisMode)
+	}
+	for _, count := range normalized.Counts {
+		fmt.Fprintf(builder, "  %s/%s: %d\n", count.Kind, count.Certainty, count.Count)
+	}
+	for _, entryPoint := range normalized.Examples {
+		fmt.Fprintf(builder, "  %-17s %-36s %s:%d (%s)\n", entryPoint.Kind, entryPoint.Name, entryPoint.Position.File, entryPoint.Position.Line, entryPoint.Certainty)
+	}
+	if normalized.Truncated > 0 {
+		fmt.Fprintf(builder, "  %d entrypoint examples omitted\n", normalized.Truncated)
 	}
 }
 

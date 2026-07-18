@@ -153,6 +153,24 @@ func TestAnalyzeContextAppliesComposedByteLimit(t *testing.T) {
 	}
 }
 
+func TestSectionTruncationFromTruncationIncludesEntrypoints(t *testing.T) {
+	entries := sectionTruncationFromTruncation(&agentcontext.Truncation{
+		EntryPointCounts:   2,
+		EntryPointExamples: 3,
+	})
+
+	seen := map[string]int{}
+	for _, entry := range entries {
+		seen[entry.Section+"/"+entry.Field] = entry.Omitted
+	}
+	if seen["entrypoints/counts"] != 2 {
+		t.Fatalf("expected entrypoint count truncation, got %#v", entries)
+	}
+	if seen["entrypoints/examples"] != 3 {
+		t.Fatalf("expected entrypoint example truncation, got %#v", entries)
+	}
+}
+
 func TestAnalyzeContextKeepsEmptyDiffArraysNonNil(t *testing.T) {
 	root := writeAgentWorkflowProject(t)
 	runAgentWorkflowGit(t, root, "init")

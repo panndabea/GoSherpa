@@ -344,6 +344,56 @@
         "Interface summary is bounded to affected interface and implementation names, not full interface profiles."
       ]
     },
+    "entrypointSummary": {
+      "analysisMode": "typechecked",
+      "confidence": "medium",
+      "counts": [
+        {
+          "kind": "exported",
+          "certainty": "possible",
+          "count": 1
+        }
+      ],
+      "examples": [
+        {
+          "name": "Added",
+          "package": ".",
+          "kind": "exported",
+          "reason": "An exported function is treated as a public entrypoint.",
+          "reachableTarget": "Added",
+          "certainty": "possible",
+          "position": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "range": {
+            "start": {
+              "file": "service.go",
+              "line": 20,
+              "column": 1
+            },
+            "end": {
+              "file": "service.go",
+              "line": 20,
+              "column": 11
+            }
+          },
+          "limitations": [
+            "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+            "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+            "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+          ]
+        }
+      ],
+      "limitations": [
+        "Entrypoint analysis used typechecked package loading where available, with static repository-local call graph evidence.",
+        "Entrypoint summaries are bounded reachability evidence; direct caller evidence remains separate.",
+        "Framework-specific routers, custom routers, custom runtime wiring, reflection, reassigned or escaping function values, and dependency internals are not inferred.",
+        "Possible runtime wiring keeps certainty labels explicit and is not merged with direct calls.",
+        "Test entrypoints are excluded unless --tests is requested."
+      ]
+    },
     "testPlan": {
       "direct": [],
       "related": [
@@ -451,6 +501,18 @@
         ]
       },
       {
+        "section": "entrypoints",
+        "analysisMode": "typechecked",
+        "confidence": "medium",
+        "limitations": [
+          "Entrypoint analysis used typechecked package loading where available, with static repository-local call graph evidence.",
+          "Entrypoint summaries are bounded reachability evidence; direct caller evidence remains separate.",
+          "Framework-specific routers, custom routers, custom runtime wiring, reflection, reassigned or escaping function values, and dependency internals are not inferred.",
+          "Possible runtime wiring keeps certainty labels explicit and is not merged with direct calls.",
+          "Test entrypoints are excluded unless --tests is requested."
+        ]
+      },
+      {
         "section": "tests",
         "analysisMode": "typechecked+ast",
         "confidence": "medium",
@@ -488,7 +550,12 @@
       "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
       "Possible runtime relationships are separate from direct call edges and keep certainty labels explicit.",
       "Possible runtime relationships are conservative static signals; reflection and hidden framework wiring can still be missed.",
-      "Examples require --use-snapshot with a valid relationship-capable snapshot in this first agent workflow slice."
+      "Examples require --use-snapshot with a valid relationship-capable snapshot in this first agent workflow slice.",
+      "Entrypoint analysis used typechecked package loading where available, with static repository-local call graph evidence.",
+      "Entrypoint summaries are bounded reachability evidence; direct caller evidence remains separate.",
+      "Framework-specific routers, custom routers, custom runtime wiring, reflection, reassigned or escaping function values, and dependency internals are not inferred.",
+      "Possible runtime wiring keeps certainty labels explicit and is not merged with direct calls.",
+      "Test entrypoints are excluded unless --tests is requested."
     ],
     "limits": {
       "maxFiles": 60,

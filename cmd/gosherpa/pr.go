@@ -25,6 +25,7 @@ type prReport struct {
 	AffectedInterfaces      []string                     `json:"affectedInterfaces"`
 	AffectedImplementations []string                     `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                       `json:"interfaceAnalysisMode,omitempty"`
+	EntryPointSummary       *sherpa.EntryPointSummary    `json:"entrypointSummary,omitempty"`
 	Risk                    explainengine.RiskSummary    `json:"risk"`
 	TargetRisk              sherpa.TargetRiskSummary     `json:"targetRisk"`
 	RepositoryRisk          sherpa.RiskReport            `json:"repositoryRisk"`
@@ -75,6 +76,7 @@ func analyzePR(root string, base string, options prAnalyzeOptions) (prReport, er
 		AffectedInterfaces:      impactReport.AffectedInterfaces,
 		AffectedImplementations: impactReport.AffectedImplementations,
 		InterfaceAnalysisMode:   strings.TrimSpace(impactReport.InterfaceAnalysisMode),
+		EntryPointSummary:       impactReport.EntryPointSummary,
 		TargetRisk:              impactReport.TargetRisk,
 		AffectedTests:           impactReport.AffectedTests,
 		TestAnalysisMode:        strings.TrimSpace(impactReport.TestAnalysisMode),
@@ -103,6 +105,10 @@ func normalizePRReport(report prReport) prReport {
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.Risk.Reasons = nonNilSlice(report.Risk.Reasons)
 	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.RepositoryRisk = riskJSONResult(report.RepositoryRisk)
@@ -230,6 +236,8 @@ func formatPRReport(report prReport) string {
 	builder.WriteString("\n")
 	writePRValues(&builder, "AFFECTED IMPLEMENTATIONS", report.AffectedImplementations)
 	builder.WriteString("\n")
+	writePREntryPointSummary(&builder, report.EntryPointSummary)
+	builder.WriteString("\n")
 	writePRAffectedTests(&builder, report.AffectedTests)
 	builder.WriteString("\n")
 	sherpa.WriteTestPlan(&builder, report.TestPlan, report.TestCommands)
@@ -295,6 +303,33 @@ func writePRValues(builder *strings.Builder, title string, values []string) {
 		builder.WriteString("  ")
 		builder.WriteString(value)
 		builder.WriteString("\n")
+	}
+}
+
+func writePREntryPointSummary(builder *strings.Builder, summary *sherpa.EntryPointSummary) {
+	builder.WriteString("ENTRYPOINTS\n")
+	if summary == nil {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	normalized := sherpa.NormalizeEntryPointSummary(*summary)
+	if len(normalized.Counts) == 0 && len(normalized.Examples) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+
+	if normalized.AnalysisMode != "" {
+		fmt.Fprintf(builder, "  Analysis: %s\n", normalized.AnalysisMode)
+	}
+	for _, count := range normalized.Counts {
+		fmt.Fprintf(builder, "  %s/%s: %d\n", count.Kind, count.Certainty, count.Count)
+	}
+	for _, entryPoint := range normalized.Examples {
+		fmt.Fprintf(builder, "  %-17s %-36s %s:%d (%s)\n", entryPoint.Kind, entryPoint.Name, entryPoint.Position.File, entryPoint.Position.Line, entryPoint.Certainty)
+	}
+	if normalized.Truncated > 0 {
+		fmt.Fprintf(builder, "  %d entrypoint examples omitted\n", normalized.Truncated)
 	}
 }
 

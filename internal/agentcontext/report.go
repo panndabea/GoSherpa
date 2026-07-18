@@ -45,6 +45,7 @@ type Report struct {
 	AffectedInterfaces      []string                       `json:"affectedInterfaces"`
 	AffectedImplementations []string                       `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                         `json:"interfaceAnalysisMode,omitempty"`
+	EntryPointSummary       *sherpa.EntryPointSummary      `json:"entrypointSummary,omitempty"`
 	RelatedTests            []sherpa.RelatedTest           `json:"relatedTests"`
 	TestAnalysisMode        string                         `json:"testAnalysisMode,omitempty"`
 	TestCommands            []string                       `json:"testCommands"`
@@ -117,11 +118,32 @@ func AnalyzeSymbol(root string, target string, options AnalyzeOptions) (Report, 
 		Limits:                  reportLimits(limits),
 		Warnings:                warnings,
 	}
+	report.EntryPointSummary, warnings = symbolEntryPointSummary(root, explainReport.Target, options, warnings)
+	report.Warnings = warnings
 	report.Limitations = limitations(options.IncludeTests, report.AnalysisMode, report.ReferenceAnalysisMode, report.CallAnalysisMode, report.InterfaceAnalysisMode, report.TestAnalysisMode)
 	report.Confidence = confidence(report)
 	report = applySymbolLimits(report, limits)
 
 	return normalizeReport(report), nil
+}
+
+func symbolEntryPointSummary(root string, target string, options AnalyzeOptions, warnings []string) (*sherpa.EntryPointSummary, []string) {
+	summary, entryPointWarnings, err := sherpa.SummarizeEntryPointsForTargets(root, []string{target}, sherpa.CallOptions{
+		IncludeTests: options.IncludeTests,
+		BuildTags:    options.BuildTags,
+	}, sherpa.EntryPointSummaryOptions{})
+	warnings = append(warnings, entryPointWarnings...)
+	if err != nil {
+		warnings = append(warnings, "entrypoint summary unavailable: "+err.Error())
+		summary = sherpa.NormalizeEntryPointSummary(sherpa.EntryPointSummary{
+			AnalysisMode: sherpa.CallAnalysisModeASTFallback,
+			Confidence:   sherpa.EntryPointSummaryConfidenceLow,
+			Limitations:  sherpa.EntryPointSummaryLimitations(options.IncludeTests, sherpa.CallAnalysisModeASTFallback),
+		})
+	}
+
+	summary = sherpa.NormalizeEntryPointSummary(summary)
+	return &summary, uniqueStrings(warnings)
 }
 
 func contextSymbolAnalysisMode(symbolAnalysisMode string) string {
@@ -354,6 +376,10 @@ func normalizeReport(report Report) Report {
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)

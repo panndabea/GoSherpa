@@ -38,7 +38,7 @@ output, human-readable tables by default, and JSON when you want automation.
 | Which interfaces and implementers are involved? | `gosherpa interface <interface>`, `gosherpa implementers <interface>` |
 | Which tests are related? | `gosherpa tests <target>`, `gosherpa tests affected --base <ref>` |
 | What might this change affect? | `gosherpa context diff --base <ref>`, `gosherpa impact diff --base <ref>` |
-| What should an agent read before editing? | `gosherpa context symbol|file|package|diff ... --json` |
+| What should an agent read before editing? | `gosherpa agent context --base <ref> --use-snapshot --json` |
 
 ## Quickstart
 
@@ -67,6 +67,7 @@ go build -o gosherpa ./cmd/gosherpa
 ./gosherpa snapshot
 ./gosherpa analyze --use-snapshot
 ./gosherpa context symbol ParseFile --use-snapshot --json
+./gosherpa agent context --base HEAD --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot
 ./gosherpa pr --base HEAD --use-snapshot --json
 ```
@@ -155,7 +156,7 @@ reused by:
 - `analyze`, `symbols`, `symbol`, `search`, and `packages --tests`
 - `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`
 - `context symbol` and `impact symbol`
-- `context diff`, `impact diff`, `tests affected`, and `pr` for current
+- `agent context`, `context diff`, `impact diff`, `tests affected`, and `pr` for current
   changed-symbol inventory and selected relationship subanalysis
 
 If a snapshot is missing, stale, invalid, or does not contain the relationship
@@ -168,6 +169,7 @@ Agents should prefer bounded, task-specific context over broad inventory dumps:
 
 ```bash
 gosherpa doctor --json
+gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa tests affected --base HEAD --use-snapshot --json

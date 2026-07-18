@@ -66,6 +66,56 @@
     "affectedInterfaces": [],
     "affectedImplementations": [],
     "interfaceAnalysisMode": "typechecked",
+    "entrypointSummary": {
+      "analysisMode": "typechecked",
+      "confidence": "medium",
+      "counts": [
+        {
+          "kind": "exported",
+          "certainty": "possible",
+          "count": 1
+        }
+      ],
+      "examples": [
+        {
+          "name": "Added",
+          "package": ".",
+          "kind": "exported",
+          "reason": "An exported function is treated as a public entrypoint.",
+          "reachableTarget": "Added",
+          "certainty": "possible",
+          "position": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "range": {
+            "start": {
+              "file": "service.go",
+              "line": 20,
+              "column": 1
+            },
+            "end": {
+              "file": "service.go",
+              "line": 20,
+              "column": 11
+            }
+          },
+          "limitations": [
+            "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+            "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+            "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+          ]
+        }
+      ],
+      "limitations": [
+        "Entrypoint analysis used typechecked package loading where available, with static repository-local call graph evidence.",
+        "Entrypoint summaries are bounded reachability evidence; direct caller evidence remains separate.",
+        "Framework-specific routers, custom routers, custom runtime wiring, reflection, reassigned or escaping function values, and dependency internals are not inferred.",
+        "Possible runtime wiring keeps certainty labels explicit and is not merged with direct calls.",
+        "Test entrypoints are excluded unless --tests is requested."
+      ]
+    },
     "affectedTests": [
       {
         "name": "TestTarget",

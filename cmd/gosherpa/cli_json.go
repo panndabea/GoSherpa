@@ -102,6 +102,7 @@ type impactDiffJSONData struct {
 	AffectedInterfaces      []string                   `json:"affectedInterfaces"`
 	AffectedImplementations []string                   `json:"affectedImplementations"`
 	InterfaceAnalysisMode   string                     `json:"interfaceAnalysisMode,omitempty"`
+	EntryPointSummary       *sherpa.EntryPointSummary  `json:"entrypointSummary,omitempty"`
 	AffectedTests           []impactengine.RelatedTest `json:"affectedTests"`
 	TestAnalysisMode        string                     `json:"testAnalysisMode,omitempty"`
 	TestCommands            []string                   `json:"testCommands"`
@@ -394,6 +395,10 @@ func impactDiffJSONResult(report impactengine.ImpactReport) impactengine.ImpactR
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
@@ -421,6 +426,7 @@ func impactDiffJSONDataFromReport(report impactengine.ImpactReport, analysisMode
 		AffectedInterfaces:      report.AffectedInterfaces,
 		AffectedImplementations: report.AffectedImplementations,
 		InterfaceAnalysisMode:   report.InterfaceAnalysisMode,
+		EntryPointSummary:       report.EntryPointSummary,
 		AffectedTests:           report.AffectedTests,
 		TestAnalysisMode:        report.TestAnalysisMode,
 		TestCommands:            report.TestCommands,
@@ -740,7 +746,7 @@ func callPathsJSONDataFromResult(result sherpa.CallPathsResult) callPathsJSONDat
 }
 
 func entrypointsJSONResult(result sherpa.EntryPointsResult) sherpa.EntryPointsResult {
-	result.EntryPoints = nonNilSlice(result.EntryPoints)
+	result.EntryPoints = sherpa.NormalizeEntryPoints(result.EntryPoints)
 	result.Warnings = nonNilSlice(result.Warnings)
 
 	return result
@@ -764,6 +770,10 @@ func contextSymbolJSONResult(report agentcontext.Report) agentcontext.Report {
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.RelatedTests = nonNilSlice(report.RelatedTests)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
@@ -834,6 +844,10 @@ func contextDiffJSONResult(report agentcontext.DiffReport) agentcontext.DiffRepo
 	report.AffectedInterfaces = nonNilSlice(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilSlice(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.AffectedTests = nonNilSlice(report.AffectedTests)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestCommands = nonNilSlice(report.TestCommands)
@@ -1061,7 +1075,7 @@ func entrypointLimitations(analysisMode string) []string {
 	limitations := callLimitations(analysisMode)
 	limitations = append(limitations,
 		"Entry point classification is heuristic: main functions, test functions, selected stdlib net/http handlers, exported functions, and functions with no local callers.",
-		"Framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.",
+		"Framework-specific routers, custom routers, custom runtime wiring, and CLI command handlers are not inferred yet.",
 	)
 
 	return limitations

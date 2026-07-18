@@ -91,6 +91,21 @@ func applyAgentByteLimit(report Report, maxBytes int) Report {
 			return true
 		},
 		func() bool {
+			if !trimLastAgent(&report.EntryPointSummary.Examples) {
+				return false
+			}
+			report.EntryPointSummary.Truncated++
+			report.SectionTruncation = addSectionTruncation(report.SectionTruncation, "entrypoints", "examples", 1)
+			return true
+		},
+		func() bool {
+			if !trimLastAgent(&report.EntryPointSummary.Counts) {
+				return false
+			}
+			report.SectionTruncation = addSectionTruncation(report.SectionTruncation, "entrypoints", "counts", 1)
+			return true
+		},
+		func() bool {
 			if !trimLastPreservingAgent(&report.Cost.Limitations, 1) {
 				return false
 			}
@@ -276,6 +291,8 @@ func sectionTruncationFromTruncation(truncation *agentcontext.Truncation) []Sect
 	add("context", "changedPackages", truncation.ChangedPackages)
 	add("context", "changedSymbolDetails", truncation.ChangedSymbolDetails)
 	add("context", "readingOrder", truncation.ReadingOrder)
+	add("entrypoints", "counts", truncation.EntryPointCounts)
+	add("entrypoints", "examples", truncation.EntryPointExamples)
 	add("impact", "affectedPackages", truncation.AffectedPackages)
 	add("impact", "affectedSymbols", truncation.AffectedSymbols)
 	add("interfaces", "affectedInterfaces", truncation.AffectedInterfaces)

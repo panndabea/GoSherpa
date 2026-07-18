@@ -22,16 +22,20 @@ func FormatEntryPoints(result EntryPointsResult) string {
 	writeCallAnalysis(&builder, result.AnalysisMode)
 	builder.WriteString("\n")
 
-	for _, entryPoint := range result.EntryPoints {
+	for _, entryPoint := range NormalizeEntryPoints(result.EntryPoints) {
 		fmt.Fprintf(
 			&builder,
-			"  %-17s %-36s %-20s %s:%d\n",
+			"  %-17s %-9s %-36s %-20s %s:%d\n",
 			entryPoint.Kind,
+			entryPoint.Certainty,
 			entryPoint.Name,
 			entryPoint.Package,
 			entryPoint.Position.File,
 			entryPoint.Position.Line,
 		)
+		if strings.TrimSpace(entryPoint.Reason) != "" {
+			fmt.Fprintf(&builder, "    %s\n", entryPoint.Reason)
+		}
 	}
 
 	builder.WriteString("\n")

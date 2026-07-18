@@ -43,6 +43,7 @@ type Report struct {
 	TargetRisk                   sherpa.TargetRiskSummary     `json:"targetRisk"`
 	PossibleRuntimeRelationships PossibleRuntimeSummary       `json:"possibleRuntimeRelationships"`
 	InterfaceSummary             InterfaceSummary             `json:"interfaceSummary"`
+	EntryPointSummary            sherpa.EntryPointSummary     `json:"entrypointSummary"`
 	TestPlan                     sherpa.TestPlan              `json:"testPlan"`
 	TestCommands                 []string                     `json:"testCommands"`
 	SuggestedCommands            []string                     `json:"suggestedCommands"`
@@ -206,6 +207,7 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 			AffectedImplementations: contextReport.AffectedImplementations,
 			Limitations:             interfaceSummaryLimitations(contextReport.InterfaceAnalysisMode),
 		},
+		EntryPointSummary: entryPointSummaryFromContext(contextReport),
 		TestPlan:          contextReport.TestPlan,
 		TestCommands:      contextReport.TestCommands,
 		AnalysisMode:      contextReport.AnalysisMode,
@@ -480,9 +482,43 @@ func sectionModes(readiness ReadinessSummary, snapshot SnapshotSummary, contextR
 		{Section: "context", AnalysisMode: contextReport.AnalysisMode, Confidence: contextReport.Confidence, Limitations: contextReport.Limitations},
 		{Section: "impact", AnalysisMode: contextReport.AnalysisMode, Confidence: contextReport.Confidence, Limitations: impactSectionLimitations(contextReport)},
 		{Section: "interfaces", AnalysisMode: interfaceMode, Confidence: contextReport.Confidence, Limitations: interfaceSummaryLimitations(contextReport.InterfaceAnalysisMode)},
+		{Section: "entrypoints", AnalysisMode: entryPointSectionMode(contextReport), Confidence: entryPointSectionConfidence(contextReport), Limitations: entryPointSectionLimitations(contextReport)},
 		{Section: "tests", AnalysisMode: testMode, Confidence: contextReport.Confidence, Limitations: testSectionLimitations(contextReport)},
 		{Section: "pr", AnalysisMode: contextReport.AnalysisMode, Confidence: contextReport.Confidence, Limitations: []string{"PR summary is represented as bounded suggested commands and verification-oriented test recommendations, not the full pr report."}},
 	}
+}
+
+func entryPointSummaryFromContext(contextReport agentcontext.DiffReport) sherpa.EntryPointSummary {
+	if contextReport.EntryPointSummary == nil {
+		return sherpa.NormalizeEntryPointSummary(sherpa.EntryPointSummary{
+			AnalysisMode: contextReport.CallAnalysisMode,
+			Confidence:   sherpa.EntryPointSummaryConfidenceLow,
+			Limitations:  sherpa.EntryPointSummaryLimitations(false, contextReport.CallAnalysisMode),
+		})
+	}
+
+	return sherpa.NormalizeEntryPointSummary(*contextReport.EntryPointSummary)
+}
+
+func entryPointSectionMode(contextReport agentcontext.DiffReport) string {
+	if contextReport.EntryPointSummary != nil {
+		return sherpa.NormalizeEntryPointSummary(*contextReport.EntryPointSummary).AnalysisMode
+	}
+	if strings.TrimSpace(contextReport.CallAnalysisMode) != "" {
+		return contextReport.CallAnalysisMode
+	}
+	return contextReport.AnalysisMode
+}
+
+func entryPointSectionConfidence(contextReport agentcontext.DiffReport) string {
+	if contextReport.EntryPointSummary != nil {
+		return sherpa.NormalizeEntryPointSummary(*contextReport.EntryPointSummary).Confidence
+	}
+	return agentcontext.ConfidenceLow
+}
+
+func entryPointSectionLimitations(contextReport agentcontext.DiffReport) []string {
+	return entryPointSummaryFromContext(contextReport).Limitations
 }
 
 func snapshotSectionLimitations(snapshot SnapshotSummary) []string {
@@ -556,6 +592,7 @@ func workflowLimitations(report Report, contextReport agentcontext.DiffReport) [
 	limitations = append(limitations, report.Limitations...)
 	limitations = append(limitations, contextReport.Limitations...)
 	limitations = append(limitations, report.PossibleRuntimeRelationships.Limitations...)
+	limitations = append(limitations, report.EntryPointSummary.Limitations...)
 	return uniqueStringsInOrder(limitations)
 }
 
@@ -586,6 +623,7 @@ func normalizeReport(report Report) Report {
 	report.InterfaceSummary.AffectedInterfaces = nonNilSlice(report.InterfaceSummary.AffectedInterfaces)
 	report.InterfaceSummary.AffectedImplementations = nonNilSlice(report.InterfaceSummary.AffectedImplementations)
 	report.InterfaceSummary.Limitations = nonNilSlice(report.InterfaceSummary.Limitations)
+	report.EntryPointSummary = sherpa.NormalizeEntryPointSummary(report.EntryPointSummary)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)
 	report.TestCommands = nonNilSlice(report.TestCommands)
 	report.SuggestedCommands = nonNilSlice(report.SuggestedCommands)

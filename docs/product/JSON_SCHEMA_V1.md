@@ -514,6 +514,13 @@ Data:
     "affectedImplementations": [],
     "limitations": []
   },
+  "entrypointSummary": {
+    "analysisMode": "typechecked",
+    "confidence": "medium",
+    "counts": [],
+    "examples": [],
+    "limitations": []
+  },
   "testPlan": {
     "direct": [],
     "related": [],
@@ -576,11 +583,15 @@ symbol/file/package positional targets, `--tests`, `--scope`,
   non-nil and limitations explain the missing examples.
 - `interfaceSummary`: bounded affected interface and implementation names, not
   a full interface profile.
+- `entrypointSummary`: bounded runtime-reachability hints for changed symbols.
+  `counts` groups entries by `kind` and `certainty`; `examples` include
+  source locations, `reachableTarget`, `reason`, certainty, and limitations.
+  Direct caller evidence remains separate from entrypoint evidence.
 - `suggestedCommands`: deterministic next commands for focused drill-down or
   verification.
 - `sectionModes`: deterministic array of `{section, analysisMode, confidence,
   limitations}` entries for readiness, snapshot, context, impact, interfaces,
-  tests, and PR-oriented follow-up.
+  entrypoints, tests, and PR-oriented follow-up.
 - `sectionTruncation`: deterministic array of `{section, field, omitted}`
   entries showing which workflow sections were reduced by item limits or the
   composed byte budget.
@@ -680,7 +691,23 @@ Data:
   "analysisMode": "typechecked",
   "confidence": "medium",
   "limitations": [],
-  "entrypoints": []
+  "entrypoints": [
+    {
+      "name": "Entry",
+      "package": ".",
+      "kind": "exported",
+      "reason": "An exported function is treated as a public entrypoint.",
+      "reachableTarget": "Target",
+      "certainty": "possible",
+      "position": {
+        "file": "service.go",
+        "line": 1,
+        "column": 1
+      },
+      "range": {},
+      "limitations": []
+    }
+  ]
 }
 ```
 
@@ -695,6 +722,13 @@ Data:
   statically visible `net/http` handler registrations such as `http.HandleFunc`,
   `http.Handle` values with local `ServeHTTP` methods, and
   `http.Server{Handler: ...}`.
+  Entries include `reason`, `certainty`, source `position`, optional `range`,
+  `reachableTarget` when the inspected target is known, and per-record
+  `limitations`. `certainty: "direct"` means the entrypoint reaches the target
+  through repository-local static calls. `certainty: "possible"` means the
+  entrypoint is a public/runtime heuristic or the path uses bounded possible
+  runtime wiring such as goroutines, function literals, or stdlib HTTP handler
+  registration.
 
 `data.warnings` is absent; use envelope `warnings`.
 
@@ -1131,6 +1165,31 @@ normalized target, position, optional range, optional deleted status, and
 optional per-symbol `targetRisk` when a bounded changed-symbol impact analysis
 was available, so agents can open changed symbols directly and compare local
 symbol risk with aggregate diff risk.
+
+`context symbol`, `context diff`, `impact symbol`, `impact diff`, `pr`, and
+`agent context` may include an additive `entrypointSummary` object:
+
+```json
+{
+  "analysisMode": "typechecked",
+  "confidence": "medium",
+  "counts": [
+    {
+      "kind": "exported",
+      "certainty": "possible",
+      "count": 1
+    }
+  ],
+  "examples": [],
+  "limitations": []
+}
+```
+
+`entrypointSummary.examples` use the same entrypoint entry shape as the
+standalone `entrypoints` command. The summary is bounded, keeps possible
+runtime evidence separate from direct callers, and does not currently change
+`targetRisk`; target risk remains driven by affected packages, references,
+interfaces, tests, warnings, and snapshot fallback evidence.
 
 `pr` keeps the diff-oriented `risk` object, includes `targetRisk` for the
 specific diff blast-radius summary, and additionally includes `repositoryRisk`,

@@ -59,7 +59,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Dynamic call uncertainty limitations for caller, callee, and call-path outputs, including interface dispatch, function values, reflection, goroutine starts, function literal calls, and imported receiver boundaries; `callers --json` and `callees --json` also expose separate `possibleCalls` arrays for bounded possible runtime call signals without changing direct call counts
 - Typechecked interface-dispatch possible calls resolve selector calls on interface-typed values to known local implementer methods when the candidate set is bounded; unknown, broad, or unsupported dispatch remains a limitation instead of a direct call edge
 - Runtime possible calls now name visible local targets for direct goroutine starts, goroutine function literals, immediately invoked function literals, and function literals passed to simple local call sites; reassigned, struct-field, or escaping function values remain conservative limitations or dynamic possible calls
-- Initial `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, statically visible stdlib `net/http` handlers, exported functions, and functions with no local callers
+- `gosherpa entrypoints <target>` analysis for `main.main`, test functions with `--tests`, statically visible stdlib `net/http` handlers, exported functions, and functions with no local callers. JSON entries include reason, reachable target, certainty, source range, and limitations.
+- Bounded `entrypointSummary` evidence in `context symbol`, `context diff`, `impact symbol`, `impact diff`, `pr`, and `agent context`, with counts by kind/certainty and top source-located examples.
 - Package-aware standalone call graph commands for package-qualified targets
 - Type alias symbol discovery, including alias signatures and typechecked `context symbol` / `impact symbol` coverage
 - Receiver-variable method calls in standalone call graph commands, resolved with package-level type information
@@ -131,8 +132,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Interface implementer impact canonicalizes local/external import paths in method signatures and resolves local embedded interfaces, but generated-file, build-tag, and generic edge cases may remain incomplete.
 - Interface method usage reports statically visible selector usage for interface-typed values when typechecked package loading succeeds; dynamic dispatch, reflection, and runtime wiring can hide additional usage.
 - Test discovery uses direct references, same-package tests, file-contained symbols, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
-- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or dependency internals; caller and callee JSON outputs surface bounded imported receiver calls as external `possibleCalls` when typechecked selector data can name the receiver method.
-- Entrypoint analysis is heuristic; statically visible stdlib `net/http` handler registrations are inferred, but framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.
+- Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, custom routers, or dependency internals; caller and callee JSON outputs surface bounded imported receiver calls as external `possibleCalls` when typechecked selector data can name the receiver method.
+- Entrypoint analysis is heuristic; statically visible stdlib `net/http` handler registrations are inferred, but framework-specific routers, custom routers, custom runtime wiring, and CLI command handlers are not inferred yet. Entrypoint summaries keep possible runtime evidence separate from direct caller evidence and do not currently change target-risk scoring.
 - Context export currently supports symbol, file, package, and diff targets. The top-level `agent context` workflow is diff-first only and rejects symbol/file/package positional targets until later plans define those modes.
 - Nested modules below a module root are treated as separate analysis roots and
   are skipped by root-level file walking, symbol lookup, references, callers,
@@ -160,7 +161,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Repeated large-repo workflows should refresh snapshots with `gosherpa snapshot --json` before relying on snapshot inventory counts, after build-tag changes, and whenever `doctor`, `agent context`, or envelope warnings report missing, stale, invalid, or relationship-limited snapshots.
 - The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records now back selected standalone and must-use workflow relationship queries while unsupported relationship shapes remain live-only.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
-- `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.
+- `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, `pr`, and `agent context` commands for deeper relationship and entrypoint-summary analysis.
 - Unqualified standalone call targets can be ambiguous across packages; GoSherpa reports candidates and suggests package-qualified targets such as `./internal/auth.Target`.
 
 ## Release Notes

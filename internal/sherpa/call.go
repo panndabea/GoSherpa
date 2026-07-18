@@ -165,10 +165,12 @@ type callGraphNode struct {
 }
 
 type callGraphEdge struct {
-	Caller   callGraphNode
-	Callee   callGraphNode
-	Position Position
-	Range    *SourceRange
+	Caller    callGraphNode
+	Callee    callGraphNode
+	Certainty CallCertainty
+	Reason    PossibleCallReason
+	Position  Position
+	Range     *SourceRange
 }
 
 type testFunctionGroupKey struct {
@@ -1138,10 +1140,11 @@ func buildCallGraph(functions []functionInfo) map[string][]callGraphEdge {
 			matches := matchingFunctionInfosForCall(functions, function, reference.Expr)
 			for _, match := range matches {
 				graph[caller.Key] = append(graph[caller.Key], callGraphEdge{
-					Caller:   caller,
-					Callee:   functionNode(match),
-					Position: reference.Position,
-					Range:    reference.Range,
+					Caller:    caller,
+					Callee:    functionNode(match),
+					Certainty: CallCertaintyDirect,
+					Position:  reference.Position,
+					Range:     reference.Range,
 				})
 			}
 		}
@@ -1187,6 +1190,10 @@ func sortCallGraphEdges(edges []callGraphEdge) {
 
 		if edges[i].Position.Line != edges[j].Position.Line {
 			return edges[i].Position.Line < edges[j].Position.Line
+		}
+
+		if edges[i].Certainty != edges[j].Certainty {
+			return entryPointCertaintyPriority(edges[i].Certainty) < entryPointCertaintyPriority(edges[j].Certainty)
 		}
 
 		if edges[i].Callee.Target != edges[j].Callee.Target {

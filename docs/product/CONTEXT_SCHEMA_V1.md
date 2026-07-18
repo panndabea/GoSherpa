@@ -54,6 +54,10 @@ Every context result includes:
 - `interfaceAnalysisMode`: optional trust label for affected interface and
   implementation signals when interface subanalysis ran (`typechecked` or
   `ast-fallback`).
+- `entrypointSummary`: optional bounded entrypoint-reachability summary on
+  `context symbol` and `context diff`. It includes `analysisMode`,
+  `confidence`, `counts` grouped by entrypoint `kind` and `certainty`,
+  bounded `examples`, and `limitations`.
 - `testAnalysisMode`: optional trust label for related-test and test-plan
   signals (`typechecked+ast` or `ast`).
 - `confidence`: deterministic confidence label.
@@ -105,10 +109,19 @@ Example:
   "truncated": {
     "references": 7,
     "sourceLines": 4,
+    "entryPointExamples": 2,
     "readingOrder": 2
   }
 }
 ```
+
+Entrypoint examples keep direct caller evidence separate from runtime
+reachability hints. `certainty: "direct"` means the entrypoint reaches the
+target through repository-local static calls. `certainty: "possible"` means the
+entrypoint is a public/runtime heuristic or uses bounded possible wiring such
+as goroutines, function literals, or stdlib `net/http` registrations. Custom
+routers, reflection, escaping function values, and dependency internals remain
+limitations rather than guessed paths.
 
 ## Size Controls
 

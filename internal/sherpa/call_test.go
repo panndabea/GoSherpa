@@ -1289,6 +1289,12 @@ func target() {}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
+	if result.EntryPoints[0].Certainty != CallCertaintyPossible {
+		t.Fatalf("expected possible goroutine reachability, got %#v", result.EntryPoints[0])
+	}
+	if !strings.Contains(result.EntryPoints[0].Reason, "possible") {
+		t.Fatalf("expected possible reachability reason, got %#v", result.EntryPoints[0])
+	}
 }
 
 func TestFindEntryPointsClassifiesStdlibHTTPHandler(t *testing.T) {
@@ -1323,6 +1329,70 @@ func target(w http.ResponseWriter, r *http.Request) {}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
+	for _, entryPoint := range result.EntryPoints {
+		if entryPoint.Kind == EntryPointKindStdlibHTTP {
+			if entryPoint.Certainty != CallCertaintyPossible {
+				t.Fatalf("expected possible HTTP handler entrypoint, got %#v", entryPoint)
+			}
+			if !strings.Contains(entryPoint.Reason, "net/http") {
+				t.Fatalf("expected net/http reason, got %#v", entryPoint)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected stdlib HTTP handler entrypoint, got %#v", result.EntryPoints)
+}
+
+func TestSummarizeEntryPointsForTargetsSkipsNonFunctionTargets(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+type TokenLookup map[string]string
+
+func Target() {}
+`)
+
+	summary, warnings, err := SummarizeEntryPointsForTargets(tmp, []string{"TokenLookup", "Target"}, CallOptions{}, EntryPointSummaryOptions{Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings for non-function summary target, got %#v", warnings)
+	}
+	if len(summary.Counts) != 1 || summary.Counts[0].Kind != EntryPointKindExported {
+		t.Fatalf("expected exported Target summary, got %#v", summary)
+	}
+	if len(summary.Examples) != 1 || summary.Examples[0].ReachableTarget != "Target" {
+		t.Fatalf("expected Target entrypoint example, got %#v", summary.Examples)
+	}
+}
+
+func TestSummarizeEntryPointsDocumentsUnsupportedCustomRouting(t *testing.T) {
+	tmp := t.TempDir()
+
+	writeFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeFile(t, filepath.Join(tmp, "service.go"), `package service
+
+func register() {
+	routes := map[string]func(){
+		"/target": target,
+	}
+	_ = routes
+}
+
+func target() {}
+`)
+
+	summary, warnings, err := SummarizeEntryPointsForTargets(tmp, []string{"target"}, CallOptions{}, EntryPointSummaryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %#v", warnings)
+	}
+	assertContainsCallLimitation(t, summary.Limitations, "custom routers")
 }
 
 func TestCollectCalleesFromFunctionReturnsEmptyForNilBody(t *testing.T) {

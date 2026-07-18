@@ -35,23 +35,26 @@ type AnalyzerOptions struct {
 type RelatedTest = sherpa.RelatedTest
 type TestPlan = sherpa.TestPlan
 
+const maxImpactEntryPointSummaryTargets = 12
+
 type ImpactReport struct {
-	ChangedFiles            []string                 `json:"changedFiles"`
-	ChangedPackages         []string                 `json:"changedPackages"`
-	AffectedPackages        []string                 `json:"affectedPackages"`
-	AffectedSymbols         []string                 `json:"affectedSymbols"`
-	ChangedSymbolDetails    []ChangedSymbol          `json:"changedSymbolDetails,omitempty"`
-	TargetRisk              sherpa.TargetRiskSummary `json:"targetRisk"`
-	ReferenceAnalysisMode   string                   `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string                   `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string                 `json:"affectedInterfaces"`
-	AffectedImplementations []string                 `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string                   `json:"interfaceAnalysisMode,omitempty"`
-	AffectedTests           []RelatedTest            `json:"affectedTests"`
-	TestAnalysisMode        string                   `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string                 `json:"testCommands"`
-	TestPlan                TestPlan                 `json:"testPlan"`
-	Warnings                []string                 `json:"warnings"`
+	ChangedFiles            []string                  `json:"changedFiles"`
+	ChangedPackages         []string                  `json:"changedPackages"`
+	AffectedPackages        []string                  `json:"affectedPackages"`
+	AffectedSymbols         []string                  `json:"affectedSymbols"`
+	ChangedSymbolDetails    []ChangedSymbol           `json:"changedSymbolDetails,omitempty"`
+	TargetRisk              sherpa.TargetRiskSummary  `json:"targetRisk"`
+	ReferenceAnalysisMode   string                    `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                    `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string                  `json:"affectedInterfaces"`
+	AffectedImplementations []string                  `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                    `json:"interfaceAnalysisMode,omitempty"`
+	EntryPointSummary       *sherpa.EntryPointSummary `json:"entrypointSummary,omitempty"`
+	AffectedTests           []RelatedTest             `json:"affectedTests"`
+	TestAnalysisMode        string                    `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                  `json:"testCommands"`
+	TestPlan                TestPlan                  `json:"testPlan"`
+	Warnings                []string                  `json:"warnings"`
 }
 
 type changedSymbolImpact struct {
@@ -235,6 +238,7 @@ func (a Analyzer) analyzeDiffWithContext(semanticContext *sherpa.SemanticContext
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
 	fallbackPackages := diffFallbackPackages(report.ChangedFiles, report.AffectedPackages)
 	report.AffectedTests, report.TestPlan, report.TestCommands, report.TestAnalysisMode, report.Warnings = affectedTestsForPackagesWithContext(semanticContext, a.Root, report.ChangedPackages, report.AffectedPackages, fallbackPackages, changedSymbols, symbolImpact.Tests, contractPackages, report.Warnings)
+	report.EntryPointSummary, report.Warnings = a.entryPointSummaryForTargets(changedSymbolEntryPointTargets(report.ChangedSymbolDetails), report.Warnings)
 	report.TargetRisk = diffTargetRisk(report)
 
 	return normalizeReport(report), nil
@@ -428,6 +432,7 @@ func (a Analyzer) analyzeSymbol(target string, context *sherpa.SemanticContext) 
 	contractPackages := contractPackagesForSignals(signals)
 	report.AffectedPackages = uniqueSortedStrings(append(report.AffectedPackages, contractPackages...))
 	report = a.enrichSymbolContractTestsWithContext(context, report, result, contractPackages, contractTargetsByPackage(signals))
+	report.EntryPointSummary, report.Warnings = a.entryPointSummaryForTargets([]string{result.Target}, report.Warnings)
 	report.TargetRisk = impactReportTargetRisk(report)
 
 	return normalizeReport(report), nil
@@ -471,6 +476,57 @@ func reportFromImpactResult(result sherpa.ImpactResult) ImpactReport {
 		TestPlan:              result.TestPlan,
 		Warnings:              result.Warnings,
 	}
+}
+
+func (a Analyzer) entryPointSummaryForTargets(targets []string, warnings []string) (*sherpa.EntryPointSummary, []string) {
+	targets = nonEmptyStrings(targets...)
+	if len(targets) == 0 {
+		return nil, warnings
+	}
+	targets, omittedTargets := limitEntryPointSummaryTargets(targets)
+
+	summary, entryPointWarnings, err := sherpa.SummarizeEntryPointsForTargets(a.Root, targets, sherpa.CallOptions{
+		BuildTags: a.BuildTags,
+	}, sherpa.EntryPointSummaryOptions{})
+	warnings = append(warnings, entryPointWarnings...)
+	if err != nil {
+		warnings = append(warnings, "entrypoint summary unavailable: "+err.Error())
+		summary = sherpa.NormalizeEntryPointSummary(sherpa.EntryPointSummary{
+			AnalysisMode: sherpa.CallAnalysisModeASTFallback,
+			Confidence:   sherpa.EntryPointSummaryConfidenceLow,
+			Limitations:  sherpa.EntryPointSummaryLimitations(false, sherpa.CallAnalysisModeASTFallback),
+		})
+	}
+
+	summary = sherpa.NormalizeEntryPointSummary(summary)
+	if omittedTargets > 0 {
+		summary.Limitations = uniqueSortedStrings(append(summary.Limitations, fmt.Sprintf("Entrypoint summary target analysis is capped at %d changed symbols; %d changed symbol target(s) were omitted.", maxImpactEntryPointSummaryTargets, omittedTargets)))
+		summary = sherpa.NormalizeEntryPointSummary(summary)
+	}
+	return &summary, uniqueSortedStrings(warnings)
+}
+
+func limitEntryPointSummaryTargets(targets []string) ([]string, int) {
+	targets = uniqueSortedStrings(targets)
+	if len(targets) <= maxImpactEntryPointSummaryTargets {
+		return targets, 0
+	}
+
+	return append([]string{}, targets[:maxImpactEntryPointSummaryTargets]...), len(targets) - maxImpactEntryPointSummaryTargets
+}
+
+func changedSymbolEntryPointTargets(symbols []ChangedSymbol) []string {
+	var targets []string
+	for _, symbol := range symbols {
+		if symbol.Deleted {
+			continue
+		}
+		if strings.TrimSpace(symbol.Target) != "" {
+			targets = append(targets, symbol.Target)
+		}
+	}
+
+	return targets
 }
 
 func impactReportTargetRisk(report ImpactReport) sherpa.TargetRiskSummary {
@@ -1379,6 +1435,10 @@ func normalizeReport(report ImpactReport) ImpactReport {
 	report.AffectedInterfaces = nonNilStrings(report.AffectedInterfaces)
 	report.AffectedImplementations = nonNilStrings(report.AffectedImplementations)
 	report.InterfaceAnalysisMode = strings.TrimSpace(report.InterfaceAnalysisMode)
+	if report.EntryPointSummary != nil {
+		summary := sherpa.NormalizeEntryPointSummary(*report.EntryPointSummary)
+		report.EntryPointSummary = &summary
+	}
 	report.TestCommands = nonNilStrings(report.TestCommands)
 	report.TestAnalysisMode = strings.TrimSpace(report.TestAnalysisMode)
 	report.TestPlan = sherpa.NormalizeTestPlan(report.TestPlan)

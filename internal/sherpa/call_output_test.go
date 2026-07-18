@@ -503,11 +503,11 @@ func TestFormatEntryPoints(t *testing.T) {
 Target: Target
 Analysis: typechecked
 
-  %-17s %-36s %-20s cmd/app/main.go:5
-  %-17s %-36s %-20s internal/service/service.go:3
+  %-17s %-9s %-36s %-20s cmd/app/main.go:5
+  %-17s %-9s %-36s %-20s internal/service/service.go:3
 
 Found 2 entrypoints
-`, EntryPointKindMain, "main", "./cmd/app", EntryPointKindExported, "Entry", "./internal/service")
+`, EntryPointKindMain, CallCertaintyDirect, "main", "./cmd/app", EntryPointKindExported, CallCertaintyDirect, "Entry", "./internal/service")
 
 	if got != want {
 		t.Fatalf("expected:\n%s\ngot:\n%s", want, got)

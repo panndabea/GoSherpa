@@ -14,13 +14,16 @@
       "Dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
       "Imported-package receiver methods are external boundary signals; dependency internals are not analyzed.",
       "Entry point classification is heuristic: main functions, test functions, selected stdlib net/http handlers, exported functions, and functions with no local callers.",
-      "Framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet."
+      "Framework-specific routers, custom routers, custom runtime wiring, and CLI command handlers are not inferred yet."
     ],
     "entrypoints": [
       {
         "name": "Entry",
         "package": ".",
         "kind": "exported",
+        "reason": "An exported function is treated as a public entrypoint.",
+        "reachableTarget": "Target",
+        "certainty": "possible",
         "position": {
           "file": "service.go",
           "line": 5,
@@ -37,12 +40,20 @@
             "line": 5,
             "column": 11
           }
-        }
+        },
+        "limitations": [
+          "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+          "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+          "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+        ]
       },
       {
         "name": "First",
         "package": ".",
         "kind": "exported",
+        "reason": "An exported function is treated as a public entrypoint.",
+        "reachableTarget": "Target",
+        "certainty": "possible",
         "position": {
           "file": "service.go",
           "line": 10,
@@ -59,12 +70,20 @@
             "line": 10,
             "column": 11
           }
-        }
+        },
+        "limitations": [
+          "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+          "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+          "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+        ]
       },
       {
         "name": "Second",
         "package": ".",
         "kind": "exported",
+        "reason": "An exported function is treated as a public entrypoint.",
+        "reachableTarget": "Target",
+        "certainty": "possible",
         "position": {
           "file": "service.go",
           "line": 14,
@@ -81,12 +100,20 @@
             "line": 14,
             "column": 12
           }
-        }
+        },
+        "limitations": [
+          "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+          "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+          "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+        ]
       },
       {
         "name": "Target",
         "package": ".",
         "kind": "exported",
+        "reason": "An exported function is treated as a public entrypoint.",
+        "reachableTarget": "Target",
+        "certainty": "possible",
         "position": {
           "file": "service.go",
           "line": 18,
@@ -103,12 +130,20 @@
             "line": 18,
             "column": 12
           }
-        }
+        },
+        "limitations": [
+          "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+          "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+          "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+        ]
       },
       {
         "name": "Run",
         "package": "./cmd/app",
         "kind": "exported",
+        "reason": "An exported function is treated as a public entrypoint.",
+        "reachableTarget": "Target",
+        "certainty": "possible",
         "position": {
           "file": "cmd/app/main.go",
           "line": 5,
@@ -125,7 +160,12 @@
             "line": 5,
             "column": 9
           }
-        }
+        },
+        "limitations": [
+          "Entrypoint reachability is repository-local and static; reflection, custom routers, dynamic function values, and dependency internals can be missed.",
+          "Possible entrypoint evidence is a planning signal, not proof that runtime traffic reaches the target.",
+          "Public and no-local-caller entrypoint kinds are external-invocation heuristics."
+        ]
       }
     ]
   }

@@ -97,7 +97,7 @@ before broad inventory commands like unfiltered `symbols`.
 | Get focused pre-edit context | `gosherpa context symbol <target> --use-snapshot --max-* --json` when a fresh snapshot exists; otherwise `gosherpa context symbol|file|package|diff ... --max-* ... --json` |
 | Find references | `gosherpa refs <target> --json` |
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
-| Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json` |
+| Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json`; `context symbol`, `context diff`, `impact symbol`, `impact diff`, `pr`, and `agent context` may include `entrypointSummary` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa interface <interface> --json`; add `--use-snapshot` when a fresh snapshot exists. Use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
 | Analyze changed files | `gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json`; use focused `context diff`, `impact diff`, and `pr` commands for drill-down |
@@ -240,8 +240,13 @@ Current analysis is intentionally conservative:
   falls back to AST/per-package analysis when needed.
 - Caller, callee, path, entrypoint, and interface impact analysis may miss
   dynamic dispatch, reflection, reassigned or escaping function values,
-  goroutine starts, function literals, build-tag edge cases, aliases, and some
-  generic cases.
+  custom routers, build-tag edge cases, aliases, and some generic cases.
+- Entrypoint records and `entrypointSummary` keep certainty explicit:
+  `direct` means repository-local static calls reach the target; `possible`
+  means a public/runtime heuristic or bounded possible wiring such as
+  goroutines, function literals, or stdlib `net/http` registration. This
+  evidence is separate from direct caller arrays and does not currently change
+  target-risk scoring.
 - Test files are excluded from several analyses by default; use command flags
   such as `--tests` where available.
 - Diff impact is hunk-based and does not infer every semantic consequence of

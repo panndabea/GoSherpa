@@ -912,20 +912,20 @@ Goal: represent program entrypoints and runtime wiring as reusable evidence.
 
 Tasks:
 
-- [ ] Centralize entrypoint records for:
+- [x] Centralize entrypoint records for:
       - `main.main`
       - tests with `--tests`
       - exported functions
       - no-local-caller functions
       - stdlib `net/http` handlers already supported
       - visible goroutine origins already supported
-- [ ] Include kind, reason, source range, reachable target when known,
+- [x] Include kind, reason, source range, reachable target when known,
       certainty, and limitations.
-- [ ] Keep framework-specific routers out of scope unless a bounded pattern is
+- [x] Keep framework-specific routers out of scope unless a bounded pattern is
       explicitly accepted.
-- [ ] Add fixtures for command packages, HTTP handlers, tests, workers, and
+- [x] Add fixtures for command packages, HTTP handlers, tests, workers, and
       unsupported custom routing.
-- [ ] Define and implement the bounded entrypoint summary used by context,
+- [x] Define and implement the bounded entrypoint summary used by context,
       impact, PR, and the agent workflow: counts by kind, top reachable
       examples, certainty labels, source locations, and limitations.
 
@@ -952,22 +952,35 @@ go test ./internal/sherpa ./internal/agentworkflow ./internal/agentcontext ./int
 go run ./cmd/gosherpa entrypoints ./internal/sherpa.PlanTests --json
 ```
 
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `75f92848901056843985b02589c3e7be142672ac`.
+- Added centralized entrypoint evidence records with reason, certainty,
+  reachable target, source ranges, and limitations.
+- Added focused worker/goroutine, stdlib HTTP, test-entrypoint, command-package,
+  and non-function/custom-wiring limitation coverage in the existing call and
+  golden fixtures.
+- Ran
+  `go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./internal/agentworkflow ./cmd/gosherpa`.
+
 ### Slice 3.4: Entrypoints In Context, Impact, PR, And Agent Workflow
 
 Goal: show how inspected or changed code is reached.
 
 Tasks:
 
-- [ ] Add bounded entrypoint summaries to `context symbol`, `impact symbol`,
+- [x] Add bounded entrypoint summaries to `context symbol`, `impact symbol`,
       `context diff`, `impact diff`, `pr`, and the agent workflow where
       relevant.
-- [ ] Keep entrypoint evidence separate from direct caller evidence.
-- [ ] Include possible runtime paths only when certainty labels and limitations
+- [x] Keep entrypoint evidence separate from direct caller evidence.
+- [x] Include possible runtime paths only when certainty labels and limitations
       are clear.
-- [ ] Update target risk scoring only if entrypoint evidence materially changes
+- [x] Update target risk scoring only if entrypoint evidence materially changes
       blast-radius judgment; document the rule.
-- [ ] Add human output that is concise enough not to crowd out tests and risk.
-- [ ] Update golden JSON fixtures and schema docs.
+- [x] Add human output that is concise enough not to crowd out tests and risk.
+- [x] Update golden JSON fixtures and schema docs.
 
 Primary files:
 
@@ -993,20 +1006,35 @@ go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot 
 go run ./cmd/gosherpa agent context --base <base-ref> --use-snapshot --json
 ```
 
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `75f92848901056843985b02589c3e7be142672ac`.
+- Added `entrypointSummary` to `context symbol`, `context diff`,
+  `impact symbol`, `impact diff`, `pr`, and `agent context`; direct callers
+  and entrypoint evidence remain separate.
+- Target-risk scoring was intentionally unchanged because entrypoint evidence
+  improves reachability planning but does not by itself prove broader blast
+  radius than affected packages, references, interfaces, tests, warnings, or
+  snapshot fallback.
+- Ran
+  `go test ./internal/sherpa ./internal/agentcontext ./internal/impact ./internal/agentworkflow ./cmd/gosherpa`.
+
 ### Slice 3.5: Test And Entrypoint Documentation Pass
 
 Goal: keep users and agents calibrated.
 
 Tasks:
 
-- [ ] Update `docs/CLI_REFERENCE.md`, `docs/STATUS.md`,
+- [x] Update `docs/CLI_REFERENCE.md`, `docs/STATUS.md`,
       `docs/product/JSON_SCHEMA_V1.md`, `docs/product/CONTEXT_SCHEMA_V1.md`,
       `AGENT_NOTES.md`, and `llms.txt`.
-- [ ] Document the difference between direct tests, related tests, contract
+- [x] Document the difference between direct tests, related tests, contract
       tests, caller-package tests, integration-like tests, and fallbacks.
-- [ ] Document entrypoint certainty and unsupported runtime wiring.
-- [ ] Ensure examples use `<base-ref>` unless recording a verified local ref.
-- [ ] Run schema and golden tests.
+- [x] Document entrypoint certainty and unsupported runtime wiring.
+- [x] Ensure examples use `<base-ref>` unless recording a verified local ref.
+- [x] Run schema and golden tests.
 
 Primary files:
 
@@ -1027,6 +1055,17 @@ go test ./cmd/gosherpa
 go test ./...
 ```
 
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `75f92848901056843985b02589c3e7be142672ac`.
+- Updated CLI, status, JSON schema, context schema, agent notes, and llms
+  guidance for entrypoint certainty, bounded `entrypointSummary`, unsupported
+  custom routers/runtime wiring, and unchanged target-risk scoring.
+- Ran `GOCACHE=/private/tmp/gosherpa-gocache go test ./cmd/gosherpa`.
+- Ran `GOCACHE=/private/tmp/gosherpa-gocache go test ./...`.
+
 Phase 3 is done when:
 
 - Test recommendations are stronger, grouped, and evidence-backed.
@@ -1039,15 +1078,15 @@ Goal: prove the three tracks work together as one product workflow.
 
 Tasks:
 
-- [ ] Select and record `<base-ref>`.
-- [ ] Run `git rev-parse --verify <base-ref>` and record the resolved commit.
-- [ ] Refresh or create a snapshot:
+- [x] Select and record `<base-ref>`.
+- [x] Run `git rev-parse --verify <base-ref>` and record the resolved commit.
+- [x] Refresh or create a snapshot:
 
       ```bash
       go run ./cmd/gosherpa snapshot --json
       ```
 
-- [ ] Run:
+- [x] Run:
 
       ```bash
       git rev-parse --verify <base-ref>
@@ -1062,7 +1101,7 @@ Tasks:
       go run ./cmd/gosherpa entrypoints ./internal/sherpa.PlanTests --json
       ```
 
-- [ ] Verify the outputs answer:
+- [x] Verify the outputs answer:
       - what changed or what is inspected
       - where relevant code lives
       - who calls it and what it calls
@@ -1073,10 +1112,10 @@ Tasks:
       - how wide the change appears
       - what uncertainty remains
       - which command or test should run next
-- [ ] Update `docs/STATUS.md` with completed readiness improvements.
-- [ ] Update `docs/product/MUST_USE_READINESS.md` if readiness estimate or
+- [x] Update `docs/STATUS.md` with completed readiness improvements.
+- [x] Update `docs/product/MUST_USE_READINESS.md` if readiness estimate or
       priority order changes.
-- [ ] Update `README.md`, `AGENT_NOTES.md`, and `llms.txt` if workflows or
+- [x] Update `README.md`, `AGENT_NOTES.md`, and `llms.txt` if workflows or
       agent guidance materially change.
 
 Exit criteria:
@@ -1085,6 +1124,35 @@ Exit criteria:
 - Real-world repo-shape warnings are useful and specific.
 - Test and entrypoint evidence improves next-action planning.
 - Human output and JSON output remain stable enough for daily use.
+
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `75f92848901056843985b02589c3e7be142672ac`.
+- Refreshed `.gosherpa/snapshot.json` with
+  `GOCACHE=/private/tmp/gosherpa-gocache go run ./cmd/gosherpa snapshot --json`;
+  the snapshot command reported status `valid`, created at
+  `2026-07-18T11:16:58Z`, with 136 files, 12 packages, 2833 symbols, and
+  36985 relationship records.
+- Ran `GOCACHE=/private/tmp/gosherpa-gocache go test ./...`.
+- Ran the final workflow smoke set:
+  `doctor --json`, `agent context --base HEAD --use-snapshot --json`,
+  `context diff --base HEAD --use-snapshot --json`,
+  `impact diff --base HEAD --use-snapshot --json`,
+  `tests affected --base HEAD --use-snapshot --json`,
+  `pr --base HEAD --use-snapshot --json`,
+  `context symbol ./internal/sherpa.PlanTests --use-snapshot --json`, and
+  `entrypoints ./internal/sherpa.PlanTests --json`.
+- Verified the diff workflows used
+  `snapshot+git-diff+typechecked+ast` where applicable; `agent context`
+  reported a valid, fresh, reused snapshot. The standalone and embedded
+  entrypoint outputs include certainty, reason, reachable target, source
+  locations, and explicit limitations. Large agent/context outputs preserve
+  byte-budget truncation metadata for entrypoint counts and examples.
+- `doctor --json` completed with the expected nested-module warning for the
+  CLI testdata modules. `docs/product/MUST_USE_READINESS.md` did not need a
+  readiness estimate or priority-order change in this pass.
 
 ## Out Of Scope Until This Plan Is Done
 

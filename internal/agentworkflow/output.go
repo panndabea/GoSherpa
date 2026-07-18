@@ -54,6 +54,8 @@ func Format(report Report) string {
 	builder.WriteString("\n")
 	writeValues(&builder, "AFFECTED SYMBOLS", report.AffectedSymbols)
 	builder.WriteString("\n")
+	writeEntryPoints(&builder, report.EntryPointSummary)
+	builder.WriteString("\n")
 
 	builder.WriteString("TESTS\n")
 	if len(report.TestCommands) == 0 {
@@ -72,6 +74,24 @@ func Format(report Report) string {
 	writeValues(&builder, "NEXT COMMANDS", report.SuggestedCommands)
 
 	return builder.String()
+}
+
+func writeEntryPoints(builder *strings.Builder, summary sherpa.EntryPointSummary) {
+	summary = sherpa.NormalizeEntryPointSummary(summary)
+	builder.WriteString("ENTRYPOINTS\n")
+	if len(summary.Counts) == 0 && len(summary.Examples) == 0 {
+		builder.WriteString("  none\n")
+		return
+	}
+	for _, count := range summary.Counts {
+		fmt.Fprintf(builder, "  %s/%s: %d\n", count.Kind, count.Certainty, count.Count)
+	}
+	for _, entryPoint := range summary.Examples {
+		fmt.Fprintf(builder, "  %-17s %-36s %s:%d (%s)\n", entryPoint.Kind, entryPoint.Name, entryPoint.Position.File, entryPoint.Position.Line, entryPoint.Certainty)
+	}
+	if summary.Truncated > 0 {
+		fmt.Fprintf(builder, "  %d entrypoint examples omitted\n", summary.Truncated)
+	}
 }
 
 func writeValues(builder *strings.Builder, title string, values []string) {
