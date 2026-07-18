@@ -459,6 +459,23 @@ Data:
   "buildTags": [],
   "readiness": {},
   "snapshot": {},
+  "cost": {
+    "packageCount": 0,
+    "goFileCount": 0,
+    "testFileCount": 0,
+    "generatedFileCount": 0,
+    "symbolCount": 0,
+    "relationshipCount": 0,
+    "relationshipCounts": [],
+    "skippedModuleCount": 0,
+    "skippedNestedModuleCount": 0,
+    "skippedWorkspaceCount": 0,
+    "localReplacementCount": 0,
+    "packageLoadWarningCount": 0,
+    "snapshotStatus": "missing",
+    "snapshotCountsAvailable": false,
+    "limitations": []
+  },
   "changedFiles": [],
   "changedPackages": [],
   "affectedPackages": [],
@@ -519,6 +536,16 @@ symbol/file/package positional targets, `--tests`, `--scope`,
 - `snapshot`: requested/used status, freshness, path, message, relationship
   metadata, stale reasons, and refresh command when useful. The command never
   creates snapshots automatically.
+- `cost`: compact counts that explain large-repository analysis size and reuse
+  expectations: package, Go file, test file, generated-file, skipped-module,
+  local-replacement, package-load-warning, changed-target, affected-target,
+  symbol, and relationship counts. `relationshipCounts` uses the same stable
+  relationship-kind count shape as snapshot metadata. Full symbol and
+  relationship inventory counts come from readable snapshot metadata; when no
+  snapshot is available, `snapshotCountsAvailable` is false and those inventory
+  counts remain zero with limitations explaining the gap. Stale snapshots may
+  still expose stored inventory counts, but limitations tell users to refresh
+  before relying on them for current repository size.
 - `changedFiles`, `changedPackages`, `affectedPackages`, `affectedSymbols`,
   `changedSymbolDetails`, `readingOrder`, `targetRisk`, `testPlan`, and
   `testCommands`: bounded fields adapted from the existing diff context and
@@ -831,6 +858,23 @@ Data:
     },
     "staleReasons": []
   },
+  "cost": {
+    "packageCount": 3,
+    "goFileCount": 12,
+    "testFileCount": 4,
+    "generatedFileCount": 0,
+    "symbolCount": 0,
+    "relationshipCount": 0,
+    "relationshipCounts": [],
+    "skippedModuleCount": 0,
+    "skippedNestedModuleCount": 0,
+    "skippedWorkspaceCount": 0,
+    "localReplacementCount": 0,
+    "packageLoadWarningCount": 0,
+    "snapshotStatus": "missing",
+    "snapshotCountsAvailable": false,
+    "limitations": []
+  },
   "analysisMode": "typechecked",
   "confidence": "medium",
   "limitations": [],
@@ -860,6 +904,12 @@ Data:
   `valid`, `stale`, or `invalid`; valid and stale snapshots include version,
   creation, count, fingerprint, stale-reason metadata, and bounded
   `relationshipMetadata`.
+- `cost`: compact repository-size and reuse counts for large-repo triage:
+  packages, Go files, test files, generated files, skipped modules, local
+  replacements, package-load warnings, symbol inventory, and relationship
+  inventory. Symbol and relationship inventory counts come from readable
+  snapshot metadata, so `snapshotCountsAvailable` is false when no usable
+  snapshot metadata is available.
 - `analysisMode`: readiness mode, currently `typechecked` or `unavailable`.
 - `confidence`: `low` when warnings are emitted, otherwise `medium`.
 - `limitations`: boundaries of the readiness check.

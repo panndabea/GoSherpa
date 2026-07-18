@@ -160,6 +160,12 @@ Read these fields before acting:
   `data.packageLoad.diagnostics` on `doctor`: package-load diagnostics with
   package, file/position when known, `load-error` vs `type-error`, reason, and
   affected analysis sections.
+- `data.cost` on `agent context` and `doctor`: package, Go file, test file,
+  generated-file, skipped-module, local-replacement, package-warning, symbol,
+  and relationship counts that explain analysis size. Treat symbol and
+  relationship inventory counts as snapshot-backed; if
+  `snapshotCountsAvailable` is false or the snapshot is stale, refresh before
+  relying on them for current repository size.
 - `data.targetRisk`: deterministic impact-breadth evidence for the current
   target or diff; inspect its reasons, signals, and limitations before treating
   it as a planning input.
@@ -181,6 +187,9 @@ and package-qualified examples.
   callees, tests, and impact output before editing.
 - Limit broad outputs with `--max-*` or `--limit` flags before feeding them into
   an agent context window.
+- Refresh snapshots with `gosherpa snapshot --json` before repeated large-repo
+  `agent context --use-snapshot` runs, after changing `--tags`, or when
+  snapshot warnings say data is missing, stale, invalid, or relationship-limited.
 - For `agent context --max-bytes`, inspect both `data.truncated` and
   `data.sectionTruncation`; the former is aggregate metadata, while the latter
   identifies the workflow sections shortened by item or byte budgets.

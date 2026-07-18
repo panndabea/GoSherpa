@@ -19,36 +19,39 @@ type DiffAnalyzeOptions struct {
 }
 
 type DiffReport struct {
-	Target                  string                       `json:"target"`
-	Base                    string                       `json:"base"`
-	Purpose                 string                       `json:"purpose"`
-	Risk                    explainengine.RiskSummary    `json:"risk"`
-	TargetRisk              sherpa.TargetRiskSummary     `json:"targetRisk"`
-	ChangedFiles            []string                     `json:"changedFiles"`
-	ChangedPackages         []string                     `json:"changedPackages"`
-	AffectedPackages        []string                     `json:"affectedPackages"`
-	AffectedSymbols         []string                     `json:"affectedSymbols"`
-	ChangedSymbolDetails    []impactengine.ChangedSymbol `json:"changedSymbolDetails"`
-	ReferenceAnalysisMode   string                       `json:"referenceAnalysisMode,omitempty"`
-	CallAnalysisMode        string                       `json:"callAnalysisMode,omitempty"`
-	AffectedInterfaces      []string                     `json:"affectedInterfaces"`
-	AffectedImplementations []string                     `json:"affectedImplementations"`
-	InterfaceAnalysisMode   string                       `json:"interfaceAnalysisMode,omitempty"`
-	AffectedTests           []impactengine.RelatedTest   `json:"affectedTests"`
-	TestAnalysisMode        string                       `json:"testAnalysisMode,omitempty"`
-	TestCommands            []string                     `json:"testCommands"`
-	TestPlan                sherpa.TestPlan              `json:"testPlan"`
-	ReadingOrder            []explainengine.ReadingStep  `json:"readingOrder"`
-	AnalysisMode            string                       `json:"analysisMode"`
-	Confidence              string                       `json:"confidence"`
-	Limits                  *LimitOptions                `json:"limits,omitempty"`
-	Truncated               *Truncation                  `json:"truncated,omitempty"`
-	Limitations             []string                     `json:"limitations"`
-	Warnings                []string                     `json:"-"`
+	Target                  string                        `json:"target"`
+	Base                    string                        `json:"base"`
+	Purpose                 string                        `json:"purpose"`
+	Risk                    explainengine.RiskSummary     `json:"risk"`
+	TargetRisk              sherpa.TargetRiskSummary      `json:"targetRisk"`
+	ChangedFiles            []string                      `json:"changedFiles"`
+	ChangedPackages         []string                      `json:"changedPackages"`
+	AffectedPackages        []string                      `json:"affectedPackages"`
+	AffectedSymbols         []string                      `json:"affectedSymbols"`
+	ChangedSymbolDetails    []impactengine.ChangedSymbol  `json:"changedSymbolDetails"`
+	ReferenceAnalysisMode   string                        `json:"referenceAnalysisMode,omitempty"`
+	CallAnalysisMode        string                        `json:"callAnalysisMode,omitempty"`
+	AffectedInterfaces      []string                      `json:"affectedInterfaces"`
+	AffectedImplementations []string                      `json:"affectedImplementations"`
+	InterfaceAnalysisMode   string                        `json:"interfaceAnalysisMode,omitempty"`
+	AffectedTests           []impactengine.RelatedTest    `json:"affectedTests"`
+	TestAnalysisMode        string                        `json:"testAnalysisMode,omitempty"`
+	TestCommands            []string                      `json:"testCommands"`
+	TestPlan                sherpa.TestPlan               `json:"testPlan"`
+	ReadingOrder            []explainengine.ReadingStep   `json:"readingOrder"`
+	AnalysisMode            string                        `json:"analysisMode"`
+	Confidence              string                        `json:"confidence"`
+	Limits                  *LimitOptions                 `json:"limits,omitempty"`
+	Truncated               *Truncation                   `json:"truncated,omitempty"`
+	Limitations             []string                      `json:"limitations"`
+	SnapshotUsed            bool                          `json:"-"`
+	SnapshotInspect         snapshotstore.InspectResult   `json:"-"`
+	SnapshotRelationships   symbolindex.RelationshipIndex `json:"-"`
+	Warnings                []string                      `json:"-"`
 }
 
 func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffReport, error) {
-	snapshotData, snapshotUsed, snapshotWarnings := loadDiffSnapshotData(root, options)
+	snapshotData, snapshotUsed, snapshotWarnings, snapshotInspect := loadDiffSnapshotData(root, options)
 	semanticContext, err := sherpa.NewSemanticContext(root, sherpa.SemanticContextOptions{
 		BuildTags: options.BuildTags,
 	})
@@ -90,6 +93,9 @@ func AnalyzeDiff(root string, base string, options DiffAnalyzeOptions) (DiffRepo
 		AnalysisMode:            diffAnalysisMode(impactReport, snapshotUsed),
 		Limits:                  reportLimits(limits),
 		Warnings:                append(snapshotWarnings, impactReport.Warnings...),
+		SnapshotUsed:            snapshotUsed,
+		SnapshotInspect:         snapshotInspect,
+		SnapshotRelationships:   snapshotData.Relationships,
 	}
 	report.Purpose = diffPurpose(report)
 	report.Risk = diffRiskSummary(report)
@@ -107,9 +113,9 @@ type loadedDiffSnapshotData struct {
 	Relationships    symbolindex.RelationshipIndex
 }
 
-func loadDiffSnapshotData(root string, options DiffAnalyzeOptions) (loadedDiffSnapshotData, bool, []string) {
+func loadDiffSnapshotData(root string, options DiffAnalyzeOptions) (loadedDiffSnapshotData, bool, []string, snapshotstore.InspectResult) {
 	if !options.UseSnapshot {
-		return loadedDiffSnapshotData{}, false, nil
+		return loadedDiffSnapshotData{}, false, nil, snapshotstore.InspectResult{}
 	}
 
 	stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{
@@ -117,16 +123,17 @@ func loadDiffSnapshotData(root string, options DiffAnalyzeOptions) (loadedDiffSn
 	})
 	if inspect.Status == snapshotstore.StatusValid {
 		data := loadedDiffSnapshotData{
-			Symbols: append([]sherpa.Symbol{}, stored.Symbols...),
+			Symbols:       append([]sherpa.Symbol{}, stored.Symbols...),
+			Relationships: stored.Relationships,
 		}
 		if diffRelationshipSnapshotHasReusableData(stored.Relationships) {
 			data.UseRelationships = true
 			data.Relationships = stored.Relationships
 		}
-		return data, true, nil
+		return data, true, nil, inspect
 	}
 
-	return loadedDiffSnapshotData{}, false, []string{diffSnapshotFallbackWarning(inspect)}
+	return loadedDiffSnapshotData{}, false, []string{diffSnapshotFallbackWarning(inspect)}, inspect
 }
 
 func diffRelationshipSnapshotHasReusableData(relationships symbolindex.RelationshipIndex) bool {

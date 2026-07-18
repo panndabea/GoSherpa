@@ -1502,6 +1502,15 @@ func TestAnalyzeDiffUsesValidSnapshotForCurrentChangedSymbols(t *testing.T) {
 	if len(report.ChangedSymbolDetails) != 1 || report.ChangedSymbolDetails[0].Name != "Added" {
 		t.Fatalf("expected Added changed symbol from snapshot, got %#v", report.ChangedSymbolDetails)
 	}
+	if !report.SnapshotUsed {
+		t.Fatalf("expected internal snapshot reuse flag")
+	}
+	if report.SnapshotInspect.Status != snapshotstore.StatusValid {
+		t.Fatalf("expected valid internal snapshot inspect, got %#v", report.SnapshotInspect)
+	}
+	if !report.SnapshotInspect.RelationshipMetadata.Capable {
+		t.Fatalf("expected relationship-capable internal snapshot inspect, got %#v", report.SnapshotInspect.RelationshipMetadata)
+	}
 	if !agentContextLimitationsContain(report.Limitations, "reused a valid snapshot") {
 		t.Fatalf("expected snapshot limitation, got %#v", report.Limitations)
 	}
@@ -1538,6 +1547,12 @@ func TestAnalyzeDiffFallsBackWhenSnapshotIsStale(t *testing.T) {
 	}
 	if len(report.Warnings) == 0 || !strings.Contains(strings.Join(report.Warnings, "\n"), "snapshot not used: Snapshot is stale") {
 		t.Fatalf("expected stale snapshot warning, got %#v", report.Warnings)
+	}
+	if report.SnapshotUsed {
+		t.Fatalf("stale snapshot should not be marked used")
+	}
+	if report.SnapshotInspect.Status != snapshotstore.StatusStale {
+		t.Fatalf("expected stale internal snapshot inspect, got %#v", report.SnapshotInspect)
 	}
 	if report.Confidence != ConfidenceLow {
 		t.Fatalf("confidence = %q, want %s", report.Confidence, ConfidenceLow)

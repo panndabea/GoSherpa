@@ -49,9 +49,12 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 `gosherpa doctor` and `gosherpa agent context` report the selected repository
 layout: module or workspace boundary, visible `go.work`, workspace modules,
 skipped nested modules, workspace modules outside `--root`, local `replace`
-directives, file counts, build tags, and package-load diagnostics. Nested
-modules and external workspace modules are separate analysis roots; inspect
-them with their own `--root` when they are part of the change.
+directives, file counts, build tags, package-load diagnostics, and a compact
+`cost` summary. The cost summary exposes package, file, generated-file,
+skipped-module, package-warning, symbol, and relationship counts so large-repo
+outputs explain their analysis size without timing-sensitive heuristics.
+Nested modules and external workspace modules are separate analysis roots;
+inspect them with their own `--root` when they are part of the change.
 
 Package-load warnings still live in the shared JSON envelope. For machine
 readable triage, `doctor.data.packageLoad.diagnostics` and
@@ -79,7 +82,10 @@ snapshot file. A valid snapshot can currently be reused by `analyze`,
 selected relationship subanalysis in `context diff`, `impact diff`,
 `tests affected`, `pr`, and `agent context` with `--use-snapshot`. Missing,
 stale, invalid, or relationship-incompatible snapshots fall back to live
-repository analysis and report a warning.
+repository analysis and report a warning. Refresh snapshots with
+`gosherpa snapshot --json` before repeated large-repo agent workflows, after
+changing build tags, or when `doctor`, `agent context`, or the envelope
+warnings report stale, missing, invalid, or relationship-limited snapshot data.
 
 ```bash
 ./gosherpa snapshot
@@ -366,7 +372,7 @@ full structural `RiskReport` from `gosherpa risk`.
 
 `agent context --json` uses `command: "agent context"` and `target` set to the
 base ref. Its `data` object is a composed summary with readiness, snapshot
-status, changed targets, reading order, target risk, possible runtime
+status, cost counts, changed targets, reading order, target risk, possible runtime
 relationship summaries, interface summary, test plan, suggested commands,
 section modes, confidence, limitations, limits, and truncation metadata. It is
 not a dump of the full `context diff`, `impact diff`, `tests affected`, and

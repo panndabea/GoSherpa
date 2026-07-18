@@ -8,6 +8,7 @@ import (
 	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
 	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
+	"github.com/panndabea/GoSherpa/internal/repostats"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
@@ -32,6 +33,7 @@ type Report struct {
 	BuildTags                    []string                     `json:"buildTags"`
 	Readiness                    ReadinessSummary             `json:"readiness"`
 	Snapshot                     SnapshotSummary              `json:"snapshot"`
+	Cost                         repostats.CostSummary        `json:"cost"`
 	ChangedFiles                 []string                     `json:"changedFiles"`
 	ChangedPackages              []string                     `json:"changedPackages"`
 	AffectedPackages             []string                     `json:"affectedPackages"`
@@ -153,7 +155,6 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 
 	buildTags := semantics.NormalizeBuildTags(options.BuildTags)
 	readiness := analyzeReadiness(root, buildTags)
-	snapshotInspect := snapshotstore.Inspect(root, snapshotstore.BuildOptions{BuildTags: buildTags})
 
 	contextReport, err := agentcontext.AnalyzeDiff(root, base, agentcontext.DiffAnalyzeOptions{
 		BuildTags:   buildTags,
@@ -164,9 +165,24 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 		return Report{}, err
 	}
 
-	snapshotUsed := strings.HasPrefix(contextReport.AnalysisMode, "snapshot+")
+	snapshotUsed := contextReport.SnapshotUsed || strings.HasPrefix(contextReport.AnalysisMode, "snapshot+")
+	snapshotInspect := contextReport.SnapshotInspect
+	if strings.TrimSpace(snapshotInspect.Status) == "" {
+		snapshotInspect = snapshotstore.Inspect(root, snapshotstore.BuildOptions{BuildTags: buildTags})
+	}
 	snapshotSummary := summarizeSnapshot(snapshotInspect, options.UseSnapshot, snapshotUsed)
-	possibleRuntime := possibleRuntimeSummary(root, buildTags, options.UseSnapshot && snapshotUsed)
+	possibleRuntime := possibleRuntimeSummary(contextReport.SnapshotRelationships, options.UseSnapshot && snapshotUsed, snapshotInspect.Status)
+	cost := repostats.SummarizeCost(repostats.CostInput{
+		Layout:                  readiness.RepositoryLayout,
+		PackageCount:            readiness.PackageLoad.PackageCount,
+		PackageLoadWarningCount: readiness.PackageLoad.WarningCount,
+		Snapshot:                snapshotInspect,
+		ChangedFileCount:        len(contextReport.ChangedFiles),
+		ChangedPackageCount:     len(contextReport.ChangedPackages),
+		AffectedPackageCount:    len(contextReport.AffectedPackages),
+		AffectedSymbolCount:     len(contextReport.AffectedSymbols),
+		TestCommandCount:        len(contextReport.TestCommands),
+	})
 
 	report := Report{
 		Target:                       base,
@@ -175,6 +191,7 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 		BuildTags:                    buildTags,
 		Readiness:                    readiness,
 		Snapshot:                     snapshotSummary,
+		Cost:                         cost,
 		ChangedFiles:                 contextReport.ChangedFiles,
 		ChangedPackages:              contextReport.ChangedPackages,
 		AffectedPackages:             contextReport.AffectedPackages,
@@ -343,7 +360,7 @@ func summarizeSnapshot(inspect snapshotstore.InspectResult, requested bool, used
 	return normalizeSnapshotSummary(summary)
 }
 
-func possibleRuntimeSummary(root string, buildTags []string, useSnapshot bool) PossibleRuntimeSummary {
+func possibleRuntimeSummary(relationships symbolindex.RelationshipIndex, useSnapshot bool, snapshotStatus string) PossibleRuntimeSummary {
 	summary := PossibleRuntimeSummary{
 		Limitations: []string{
 			"Possible runtime relationships are separate from direct call edges and keep certainty labels explicit.",
@@ -355,14 +372,13 @@ func possibleRuntimeSummary(root string, buildTags []string, useSnapshot bool) P
 		return normalizePossibleRuntimeSummary(summary)
 	}
 
-	stored, inspect := snapshotstore.LoadReusable(root, snapshotstore.BuildOptions{BuildTags: buildTags})
-	if inspect.Status != snapshotstore.StatusValid {
+	if snapshotStatus != snapshotstore.StatusValid {
 		summary.Limitations = append(summary.Limitations, "The snapshot was not valid, so possible runtime examples were not reused.")
 		return normalizePossibleRuntimeSummary(summary)
 	}
 
 	counts := make(map[string]PossibleRuntimeCount)
-	for _, record := range stored.Relationships.PossibleCallEdges {
+	for _, record := range relationships.PossibleCallEdges {
 		reason := valueOrUnknown(record.Reason)
 		scope := valueOrUnknown(string(record.CallScope))
 		certainty := valueOrUnknown(string(record.Certainty))
@@ -566,6 +582,7 @@ func normalizeReport(report Report) Report {
 	report.ReadingOrder = nonNilSlice(report.ReadingOrder)
 	report.TargetRisk = sherpa.NormalizeTargetRiskSummary(report.TargetRisk)
 	report.PossibleRuntimeRelationships = normalizePossibleRuntimeSummary(report.PossibleRuntimeRelationships)
+	report.Cost = repostats.NormalizeCostSummary(report.Cost)
 	report.InterfaceSummary.AffectedInterfaces = nonNilSlice(report.InterfaceSummary.AffectedInterfaces)
 	report.InterfaceSummary.AffectedImplementations = nonNilSlice(report.InterfaceSummary.AffectedImplementations)
 	report.InterfaceSummary.Limitations = nonNilSlice(report.InterfaceSummary.Limitations)

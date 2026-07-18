@@ -32,6 +32,20 @@ func Format(report Report) string {
 	fmt.Fprintf(&builder, "Target risk: %s (%s)\n", report.TargetRisk.Level, report.TargetRisk.Scope)
 	builder.WriteString("\n")
 
+	builder.WriteString("COST\n")
+	fmt.Fprintf(&builder, "  packages: %d\n", report.Cost.PackageCount)
+	fmt.Fprintf(&builder, "  files: %d Go, %d tests, %d generated\n", report.Cost.GoFileCount, report.Cost.TestFileCount, report.Cost.GeneratedFileCount)
+	if report.Cost.SnapshotCountsAvailable {
+		fmt.Fprintf(&builder, "  symbols: %d\n", report.Cost.SymbolCount)
+		fmt.Fprintf(&builder, "  relationships: %d\n", report.Cost.RelationshipCount)
+	} else {
+		builder.WriteString("  symbols: unavailable without snapshot inventory\n")
+		builder.WriteString("  relationships: unavailable without snapshot inventory\n")
+	}
+	fmt.Fprintf(&builder, "  skipped modules: %d\n", report.Cost.SkippedModuleCount)
+	fmt.Fprintf(&builder, "  package warnings: %d\n", report.Cost.PackageLoadWarningCount)
+	builder.WriteString("\n")
+
 	writeValues(&builder, "CHANGED FILES", report.ChangedFiles)
 	builder.WriteString("\n")
 	writeValues(&builder, "CHANGED PACKAGES", report.ChangedPackages)

@@ -678,14 +678,14 @@ Goal: keep daily commands fast enough and predictable in larger repositories.
 
 Tasks:
 
-- [ ] Add benchmark-style tests or regression checks for repeated query paths
+- [x] Add benchmark-style tests or regression checks for repeated query paths
       where wall-clock assertions are not brittle.
-- [ ] Track counts that explain cost: packages, files, symbols, relationships,
+- [x] Track counts that explain cost: packages, files, symbols, relationships,
       generated files, skipped modules, and package-load warnings.
-- [ ] Ensure snapshot-backed agent workflow avoids repeated expensive loads.
-- [ ] Add deterministic ordering and deduplication tests for any newly shared
+- [x] Ensure snapshot-backed agent workflow avoids repeated expensive loads.
+- [x] Add deterministic ordering and deduplication tests for any newly shared
       repo-shape summaries.
-- [ ] Document when users should refresh snapshots.
+- [x] Document when users should refresh snapshots.
 
 Primary files:
 
@@ -708,6 +708,21 @@ Verification:
 go test ./internal/semantics ./internal/snapshot ./internal/agentworkflow ./internal/agentcontext ./cmd/gosherpa
 go test ./...
 ```
+
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `92798c4c4ab0b1c55648e7f7d066b7db123e3365`.
+- Ran
+  `go test ./internal/semantics ./internal/snapshot ./internal/repostats ./internal/agentworkflow ./internal/agentcontext ./cmd/gosherpa`.
+- Ran `go test ./...`.
+- Ran `go run ./cmd/gosherpa doctor --json`.
+- Ran
+  `go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json`.
+  This intentionally verified stale-snapshot fallback and refresh guidance
+  against the existing local snapshot; no snapshot was refreshed during this
+  slice.
 
 ### Slice 2.5: Robustness Documentation And Fixtures Pass
 

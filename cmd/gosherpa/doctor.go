@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/panndabea/GoSherpa/internal/repostats"
 	"github.com/panndabea/GoSherpa/internal/semantics"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 	snapshotstore "github.com/panndabea/GoSherpa/internal/snapshot"
@@ -18,17 +19,18 @@ const (
 )
 
 type doctorReport struct {
-	Target       string               `json:"target"`
-	Environment  doctorEnvironment    `json:"environment"`
-	Repository   doctorRepository     `json:"repository"`
-	BuildTags    []string             `json:"buildTags"`
-	PackageLoad  doctorPackageLoad    `json:"packageLoad"`
-	Snapshot     doctorSnapshotStatus `json:"snapshot"`
-	AnalysisMode string               `json:"analysisMode"`
-	Confidence   string               `json:"confidence"`
-	Limitations  []string             `json:"limitations"`
-	Suggestions  []string             `json:"suggestions"`
-	Warnings     []string             `json:"-"`
+	Target       string                `json:"target"`
+	Environment  doctorEnvironment     `json:"environment"`
+	Repository   doctorRepository      `json:"repository"`
+	BuildTags    []string              `json:"buildTags"`
+	PackageLoad  doctorPackageLoad     `json:"packageLoad"`
+	Snapshot     doctorSnapshotStatus  `json:"snapshot"`
+	Cost         repostats.CostSummary `json:"cost"`
+	AnalysisMode string                `json:"analysisMode"`
+	Confidence   string                `json:"confidence"`
+	Limitations  []string              `json:"limitations"`
+	Suggestions  []string              `json:"suggestions"`
+	Warnings     []string              `json:"-"`
 }
 
 type doctorEnvironment struct {
@@ -137,6 +139,18 @@ func analyzeDoctor(root string, buildTags []string) doctorReport {
 	}
 
 	report.Warnings = uniqueStringsInOrder(report.Warnings)
+	report.Cost = repostats.SummarizeCost(repostats.CostInput{
+		Layout:                  report.Repository,
+		PackageCount:            report.PackageLoad.PackageCount,
+		PackageLoadWarningCount: report.PackageLoad.WarningCount,
+		Snapshot: snapshotstore.InspectResult{
+			Status:               report.Snapshot.Status,
+			FileCount:            report.Snapshot.FileCount,
+			PackageCount:         report.Snapshot.PackageCount,
+			SymbolCount:          report.Snapshot.SymbolCount,
+			RelationshipMetadata: report.Snapshot.RelationshipMetadata,
+		},
+	})
 	report.Confidence = jsonConfidence(report.Warnings, report.AnalysisMode)
 	report.Limitations = doctorLimitations()
 	report.Suggestions = doctorSuggestions(report)
@@ -161,6 +175,7 @@ func normalizeDoctorReport(report doctorReport) doctorReport {
 	report.PackageLoad.AffectedSections = nonNilSlice(report.PackageLoad.AffectedSections)
 	report.PackageLoad.Packages = nonNilSlice(report.PackageLoad.Packages)
 	report.PackageLoad.Diagnostics = nonNilSlice(semantics.PackageLoadDiagnosticsWithSections(report.PackageLoad.Diagnostics, report.PackageLoad.AffectedSections))
+	report.Cost = repostats.NormalizeCostSummary(report.Cost)
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Suggestions = nonNilSlice(report.Suggestions)
 	report.Warnings = nonNilSlice(uniqueStringsInOrder(report.Warnings))
@@ -308,6 +323,20 @@ func formatDoctorReport(report doctorReport) string {
 	if strings.TrimSpace(report.PackageLoad.Message) != "" {
 		fmt.Fprintf(&builder, "  Message: %s\n", report.PackageLoad.Message)
 	}
+	builder.WriteString("\n")
+
+	builder.WriteString("COST\n")
+	fmt.Fprintf(&builder, "  Packages: %d\n", report.Cost.PackageCount)
+	fmt.Fprintf(&builder, "  Files: %d Go, %d tests, %d generated\n", report.Cost.GoFileCount, report.Cost.TestFileCount, report.Cost.GeneratedFileCount)
+	if report.Cost.SnapshotCountsAvailable {
+		fmt.Fprintf(&builder, "  Symbols: %d\n", report.Cost.SymbolCount)
+		fmt.Fprintf(&builder, "  Relationships: %d\n", report.Cost.RelationshipCount)
+	} else {
+		builder.WriteString("  Symbols: unavailable without snapshot inventory\n")
+		builder.WriteString("  Relationships: unavailable without snapshot inventory\n")
+	}
+	fmt.Fprintf(&builder, "  Skipped modules: %d\n", report.Cost.SkippedModuleCount)
+	fmt.Fprintf(&builder, "  Package warnings: %d\n", report.Cost.PackageLoadWarningCount)
 	builder.WriteString("\n")
 
 	builder.WriteString("SNAPSHOT\n")

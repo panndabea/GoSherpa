@@ -992,3 +992,52 @@ Observed results:
 - `impact symbol ./internal/sherpa.PlanTests --use-snapshot --json` reported
   `snapshot+typechecked` and `targetRisk: high/exported-api`.
 - No final smoke command emitted envelope warnings.
+
+## Current Plan Slice 2.4 Update
+
+Date: 2026-07-18
+
+Selected `<base-ref>`: `HEAD`, resolved to
+`92798c4c4ab0b1c55648e7f7d066b7db123e3365`.
+
+Slice 2.4 added large-repository performance guardrails without wall-clock
+assertions:
+
+- Added shared `internal/repostats` cost summaries for `doctor` and
+  `agent context`.
+- `doctor.data.cost` and `agent context.data.cost` now report package, Go file,
+  test file, generated-file, skipped-module, local-replacement,
+  package-load-warning, changed-target, affected-target, symbol, and
+  relationship counts.
+- Symbol and relationship inventory counts come from readable snapshot
+  metadata; missing, stale, and invalid snapshot states are reflected in
+  limitations and refresh guidance instead of forcing extra live inventory
+  work.
+- `agentcontext.DiffReport` carries internal `json:"-"` snapshot reuse
+  metadata so `agent context` can summarize possible runtime relationships from
+  the already loaded diff snapshot data instead of loading the snapshot again
+  for that section.
+- Added deterministic tests for `repostats` normalization and agent-context
+  snapshot reuse metadata; existing semantics cache tests remain the
+  non-timing guardrail for repeated package-load paths.
+- Updated CLI docs, schema docs, status, agent notes, and `llms.txt` to explain
+  `data.cost` and when to refresh snapshots.
+
+Verification commands:
+
+```bash
+git rev-parse --verify HEAD
+go test ./internal/semantics ./internal/snapshot ./internal/repostats ./internal/agentworkflow ./internal/agentcontext ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
+```
+
+Observed results:
+
+- `doctor --json` reported a stale local snapshot, retained stored symbol and
+  relationship inventory counts in `data.cost`, and suggested
+  `gosherpa snapshot`.
+- `agent context --base HEAD --use-snapshot --max-bytes 12000 --json`
+  intentionally verified stale-snapshot fallback and refresh guidance without
+  refreshing the local snapshot during this slice.

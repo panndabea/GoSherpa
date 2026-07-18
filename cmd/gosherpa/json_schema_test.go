@@ -531,7 +531,7 @@ func TestMainAgentContextJSONSchemaContract(t *testing.T) {
 			t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
 		}
 	}
-	for _, field := range []string{"readiness", "snapshot", "targetRisk", "possibleRuntimeRelationships", "interfaceSummary", "testPlan"} {
+	for _, field := range []string{"readiness", "snapshot", "cost", "targetRisk", "possibleRuntimeRelationships", "interfaceSummary", "testPlan"} {
 		if _, ok := data[field].(map[string]any); !ok {
 			t.Fatalf("expected data.%s to be a JSON object, got %T", field, data[field])
 		}
@@ -549,6 +549,15 @@ func TestMainAgentContextJSONSchemaContract(t *testing.T) {
 	snapshot := assertMainTestJSONObject(t, data, "snapshot")
 	if snapshot["requested"] != false || snapshot["used"] != false {
 		t.Fatalf("expected snapshot to be unrequested and unused, got %#v", snapshot)
+	}
+	cost := assertMainTestJSONObject(t, data, "cost")
+	for _, field := range []string{"relationshipCounts", "limitations"} {
+		if _, ok := cost[field].([]any); !ok {
+			t.Fatalf("expected data.cost.%s to be an array, got %T", field, cost[field])
+		}
+	}
+	if cost["packageCount"].(float64) <= 0 || cost["goFileCount"].(float64) <= 0 {
+		t.Fatalf("expected positive cost package/file counts, got %#v", cost)
 	}
 	possibleRuntime := assertMainTestJSONObject(t, data, "possibleRuntimeRelationships")
 	for _, field := range []string{"counts", "examples", "limitations"} {

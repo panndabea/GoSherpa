@@ -65,6 +65,11 @@ directives, generated-file counts, and major generated packages.
 `agent context.data.readiness.packageLoad.diagnostics` distinguish
 `load-error`, `parse-error`, and `type-error` package-loading problems with
 package, file/position when known, reason, and affected analysis sections.
+`doctor.data.cost` and `agent context.data.cost` expose package, file,
+generated-file, skipped-module, package-warning, symbol, and relationship
+counts that explain analysis size; symbol and relationship inventory counts are
+snapshot-backed and should be refreshed when the snapshot is missing, stale, or
+invalid.
 Compiler-visible generated Go files stay in analysis; `agent context` may
 summarize large generated file reading-order entries after hand-written files.
 Treat GoSherpa output as grounded context that guides source reading; it does

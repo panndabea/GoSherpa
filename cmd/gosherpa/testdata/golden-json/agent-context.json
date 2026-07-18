@@ -116,6 +116,69 @@
       "staleReasons": [],
       "refreshCommand": "gosherpa snapshot --json"
     },
+    "cost": {
+      "packageCount": 2,
+      "goFileCount": 3,
+      "testFileCount": 1,
+      "generatedFileCount": 0,
+      "symbolCount": 0,
+      "relationshipCount": 0,
+      "relationshipCounts": [
+        {
+          "kind": "symbol-definition",
+          "count": 0
+        },
+        {
+          "kind": "reference",
+          "count": 0
+        },
+        {
+          "kind": "call",
+          "count": 0
+        },
+        {
+          "kind": "possible-call",
+          "count": 0
+        },
+        {
+          "kind": "interface-implementation",
+          "count": 0
+        },
+        {
+          "kind": "satisfied-interface",
+          "count": 0
+        },
+        {
+          "kind": "test-reference",
+          "count": 0
+        },
+        {
+          "kind": "test-plan-seed",
+          "count": 0
+        },
+        {
+          "kind": "package-relationship",
+          "count": 0
+        }
+      ],
+      "skippedModuleCount": 0,
+      "skippedNestedModuleCount": 0,
+      "skippedWorkspaceCount": 0,
+      "localReplacementCount": 0,
+      "packageLoadWarningCount": 0,
+      "changedFileCount": 1,
+      "changedPackageCount": 1,
+      "affectedPackageCount": 2,
+      "affectedSymbolCount": 1,
+      "testCommandCount": 2,
+      "snapshotStatus": "missing",
+      "snapshotCountsAvailable": false,
+      "limitations": [
+        "Cost counts describe analysis size and reuse hints; they are not wall-clock timings.",
+        "Package and file counts follow the selected --root, go.work, nested-module, and build-tag boundaries.",
+        "Full symbol and relationship inventory counts require an existing readable snapshot."
+      ]
+    },
     "changedFiles": [
       "service.go"
     ],

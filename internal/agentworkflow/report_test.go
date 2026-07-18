@@ -54,6 +54,12 @@ func TestAnalyzeContextBuildsDiffFirstAgentWorkflow(t *testing.T) {
 	if report.Snapshot.Requested || report.Snapshot.Used {
 		t.Fatalf("snapshot should not be requested or used, got %#v", report.Snapshot)
 	}
+	if report.Cost.PackageCount != 1 || report.Cost.GoFileCount != 2 || report.Cost.TestFileCount != 1 {
+		t.Fatalf("expected repository cost counts, got %#v", report.Cost)
+	}
+	if report.Cost.SnapshotCountsAvailable {
+		t.Fatalf("did not expect snapshot inventory counts without a snapshot, got %#v", report.Cost)
+	}
 	if len(report.ChangedFiles) != 1 || report.ChangedFiles[0] != "service.go" {
 		t.Fatalf("expected changed service.go, got %#v", report.ChangedFiles)
 	}
@@ -215,6 +221,12 @@ func TestAnalyzeContextReportsSnapshotStates(t *testing.T) {
 		}
 		if report.Snapshot.RefreshCommand != "" {
 			t.Fatalf("did not expect refresh command for valid snapshot, got %#v", report.Snapshot)
+		}
+		if !report.Cost.SnapshotCountsAvailable || report.Cost.SymbolCount == 0 || report.Cost.RelationshipCount == 0 {
+			t.Fatalf("expected snapshot-backed cost counts, got %#v", report.Cost)
+		}
+		if report.Cost.RelationshipCounts == nil {
+			t.Fatalf("expected non-nil relationship counts")
 		}
 	})
 

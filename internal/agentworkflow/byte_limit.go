@@ -84,6 +84,20 @@ func applyAgentByteLimit(report Report, maxBytes int) Report {
 			return true
 		},
 		func() bool {
+			if !trimLastAgent(&report.Cost.RelationshipCounts) {
+				return false
+			}
+			report.SectionTruncation = addSectionTruncation(report.SectionTruncation, "cost", "relationshipCounts", 1)
+			return true
+		},
+		func() bool {
+			if !trimLastPreservingAgent(&report.Cost.Limitations, 1) {
+				return false
+			}
+			report.SectionTruncation = addSectionTruncation(report.SectionTruncation, "cost", "limitations", 1)
+			return true
+		},
+		func() bool {
 			if !trimLastAgent(&report.InterfaceSummary.AffectedImplementations) {
 				return false
 			}
