@@ -170,6 +170,9 @@ func formatZshCompletion() string {
 	builder.WriteString("_gosherpa() {\n")
 	writeZshArray(&builder, "commands", zshCommandEntries())
 	writeZshArray(&builder, "shells", zshShellEntries())
+	writeZshArray(&builder, "agent_subcommands", []string{
+		"context:diff-first agent workflow context",
+	})
 	writeZshArray(&builder, "context_subcommands", []string{
 		"symbol:context for one symbol",
 		"file:context for one file",
@@ -226,6 +229,14 @@ func formatZshCompletion() string {
 	builder.WriteString("    return\n")
 	builder.WriteString("  fi\n\n")
 	builder.WriteString("  case \"$command\" in\n")
+	builder.WriteString("    agent)\n")
+	builder.WriteString("      if [[ \"${words[CURRENT-1]}\" == \"agent\" ]]; then\n")
+	builder.WriteString("        _describe -t agent-subcommands 'agent workflow' agent_subcommands\n")
+	builder.WriteString("        return\n")
+	builder.WriteString("      fi\n")
+	builder.WriteString("      _values 'agent context options' \\\n")
+	builder.WriteString(zshFlagValueLines(completionFlagsForCommandName("agent"), "        "))
+	builder.WriteString("      ;;\n")
 	builder.WriteString("    completion)\n")
 	builder.WriteString("      _describe -t shells 'shell' shells\n")
 	builder.WriteString("      ;;\n")
@@ -255,7 +266,7 @@ func formatZshCompletion() string {
 
 	for _, spec := range commandSpecs {
 		switch spec.Name {
-		case "completion", "context", "impact", "tests":
+		case "agent", "completion", "context", "impact", "tests":
 			continue
 		}
 		flags := completionFlagsForSpec(spec)
@@ -316,6 +327,11 @@ func formatBashCompletion() string {
 	builder.WriteString("    return\n")
 	builder.WriteString("  fi\n\n")
 	builder.WriteString("  case \"$command\" in\n")
+	builder.WriteString("    agent)\n")
+	builder.WriteString("      if ! __gosherpa_seen_any \"context\"; then\n")
+	builder.WriteString("        COMPREPLY=( $(compgen -W \"context\" -- \"$cur\") )\n")
+	builder.WriteString("      fi\n")
+	builder.WriteString("      ;;\n")
 	builder.WriteString("    completion)\n")
 	builder.WriteString("      COMPREPLY=( $(compgen -W \"zsh bash fish\" -- \"$cur\") )\n")
 	builder.WriteString("      ;;\n")
@@ -434,6 +450,7 @@ func formatFishCompletion() string {
 		Description string
 	}{
 		{"context", "symbol", "context for one symbol"},
+		{"agent", "context", "diff-first agent workflow context"},
 		{"context", "file", "context for one file"},
 		{"context", "package", "context for one package"},
 		{"context", "diff", "context for a git diff"},
@@ -515,6 +532,9 @@ func completionFlagsForSpec(spec commandSpec) []completionFlag {
 	}
 	if spec.ContextLimits {
 		names = append(names, "--max-files", "--max-references", "--max-symbols", "--max-tests", "--max-bytes", "--source-radius")
+	}
+	if spec.AgentContextLimits {
+		names = append(names, "--max-files", "--max-symbols", "--max-tests", "--max-bytes")
 	}
 	if spec.Name == "tests" {
 		names = append(names, "--scope")

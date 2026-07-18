@@ -444,7 +444,7 @@
       "packageLoadCount": 2,
       "snapshotStatus": "missing",
       "suggestions": [
-        "Run gosherpa context diff --base <ref> or gosherpa context symbol <target> for focused code intelligence.",
+        "Run gosherpa agent context --base <ref> or gosherpa context symbol <target> for focused code intelligence.",
         "Use --tags <list> when inspecting build-tagged code.",
         "Run gosherpa snapshot to create a reusable repository inventory snapshot."
       ]

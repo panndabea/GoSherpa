@@ -196,29 +196,29 @@ changing behavior.
 
 Tasks:
 
-- [ ] Run the baseline verification commands above.
-- [ ] Append a new dated section to
+- [x] Run the baseline verification commands above.
+- [x] Append a new dated section to
       `docs/product/PRIORITY_IMPLEMENTATION_AUDIT.md`; preserve its historical
       relationship-reuse/possible-call/target-risk entries as completed
       evidence, not as the active phase map.
-- [ ] Record current runtime, warnings, analysis modes, target risk summaries,
+- [x] Record current runtime, warnings, analysis modes, target risk summaries,
       and snapshot status in `docs/product/PRIORITY_IMPLEMENTATION_AUDIT.md`.
-- [ ] Record the current CLI flag matrix from `command_registry.go`,
+- [x] Record the current CLI flag matrix from `command_registry.go`,
       `cli_flags.go`, `main.go`, and `completion.go`, including the exact
       validation messages that must change for `agent context`.
-- [ ] Confirm the locked command shape:
+- [x] Confirm the locked command shape:
       `gosherpa agent context --base <base-ref>`.
-- [ ] Confirm that the first public command is diff-first only. It must not
+- [x] Confirm that the first public command is diff-first only. It must not
       accept symbol, file, package, or free-form task targets in this plan.
-- [ ] Document the first JSON shape for the composed agent workflow output from
+- [x] Document the first JSON shape for the composed agent workflow output from
       the locked contract below.
-- [ ] Record which fields are embedded from existing report models and which
+- [x] Record which fields are embedded from existing report models and which
       are summarized to keep output bounded.
-- [ ] Record real-world repository fixture needs for workspaces, nested
+- [x] Record real-world repository fixture needs for workspaces, nested
       modules, build tags, generated files, local replacements, and partial
       package failures.
-- [ ] Record the first test and entrypoint fixture matrix.
-- [ ] Update or annotate `docs/product/MUST_USE_READINESS.md` and
+- [x] Record the first test and entrypoint fixture matrix.
+- [x] Update or annotate `docs/product/MUST_USE_READINESS.md` and
       `docs/product/AGENT_PRIORITY_LIST.md` so they no longer contradict this
       plan's active priority order.
 
@@ -269,11 +269,10 @@ go run ./cmd/gosherpa doctor --json
 The first agent workflow command is:
 
 ```bash
-gosherpa agent context --base <base-ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--json]
+gosherpa agent context --base <base-ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--json]
 ```
 
-Global `--root <path>` must work. Slice 1.3 adds `--max-bytes <n>` once the
-byte-budget behavior is implemented. The first public command must reject
+Global `--root <path>` must work. The first public command must reject
 symbol/file/package positional targets, `--max-references`, `--source-radius`,
 `--scope`, `--tests`, and any other inherited flag whose semantics are not
 explicitly defined here. Affected-test planning is part of the agent workflow by
@@ -312,7 +311,8 @@ Initial JSON `data` fields:
 - `sectionModes`: deterministic array of `{section, analysisMode, confidence,
   limitations}` entries for readiness, context, impact, tests, snapshot, and PR
   subanalysis where applicable
-- `analysisMode`, `confidence`, `limitations`, `limits`, and `truncated`
+- `analysisMode`, `confidence`, `limitations`, `limits`, `truncated`, and
+  `sectionTruncation`
 
 Do not embed full `context diff`, `impact diff`, `tests affected`, and `pr`
 reports wholesale. The agent workflow is a composed summary with links back to
@@ -337,9 +337,9 @@ adding a public command.
 
 Tasks:
 
-- [ ] Add `internal/agentworkflow` with the report model, normalizers, ordering
+- [x] Add `internal/agentworkflow` with the report model, normalizers, ordering
       helpers, and focused unit tests. Keep `cmd/gosherpa` as a thin CLI layer.
-- [ ] Include bounded sections for:
+- [x] Include bounded sections for:
       - readiness summary
       - snapshot status and reuse status
       - changed files, packages, and symbols
@@ -351,16 +351,16 @@ Tasks:
       - structured test plan
       - suggested next commands
       - warnings, limitations, confidence, and truncation metadata
-- [ ] Reuse existing report types where stable, but avoid dumping multiple full
+- [x] Reuse existing report types where stable, but avoid dumping multiple full
       reports into one oversized JSON object.
-- [ ] Define stable summary adapters for any reused `context diff`,
+- [x] Define stable summary adapters for any reused `context diff`,
       `impact diff`, `tests affected`, `pr`, and `doctor` data.
-- [ ] Ensure non-nil arrays and deterministic ordering.
-- [ ] Define how subanalysis modes are represented when different sections use
+- [x] Ensure non-nil arrays and deterministic ordering.
+- [x] Define how subanalysis modes are represented when different sections use
       snapshot, typechecked, AST, or live fallback data.
-- [ ] Keep the model additive to JSON schema v1; do not introduce a breaking
+- [x] Keep the model additive to JSON schema v1; do not introduce a breaking
       schema-version change for the first command.
-- [ ] Add focused model tests before CLI exposure.
+- [x] Add focused model tests before CLI exposure.
 
 Primary files:
 
@@ -396,27 +396,27 @@ gosherpa agent context --base <base-ref> --use-snapshot --json
 
 Tasks:
 
-- [ ] Add the selected command and subcommand to the command registry.
-- [ ] Implement `agent` as a top-level command with a required `context`
+- [x] Add the selected command and subcommand to the command registry.
+- [x] Implement `agent` as a top-level command with a required `context`
       subcommand and no other `agent` subcommands in this plan.
-- [ ] Add usage, validation, completion, and help output for `agent context`.
-- [ ] Support exactly `--base`, `--use-snapshot`, `--max-files`,
+- [x] Add usage, validation, completion, and help output for `agent context`.
+- [x] Support exactly `--base`, `--use-snapshot`, `--max-files`,
       `--max-symbols`, `--max-tests`, `--tags`, and `--json` in this slice,
       plus global `--root`.
-- [ ] Reject `agent context` without `--base` and reject symbol/file/package
+- [x] Reject `agent context` without `--base` and reject symbol/file/package
       positional targets, `--max-references`, `--source-radius`, `--scope`, and
-      `--tests`. Also reject `--max-bytes` until Slice 1.3 implements
-      byte-budget behavior.
-- [ ] Update validation error text for `--base`, `--use-snapshot`, `--tags`,
+      `--tests`. Slice 1.2 initially rejected `--max-bytes`; Slice 1.3 now
+      enables the byte-budget behavior.
+- [x] Update validation error text for `--base`, `--use-snapshot`, `--tags`,
       and allowed context-limit flags so `agent context` is listed accurately.
-- [ ] Compose existing readiness, context, impact, affected-test, and PR
+- [x] Compose existing readiness, context, impact, affected-test, and PR
       logic through Go APIs instead of shelling out. Extract reusable helpers
       only where needed; do not move unrelated CLI behavior in this slice.
-- [ ] Keep human output short: a readiness line, a risk line, key changed
+- [x] Keep human output short: a readiness line, a risk line, key changed
       targets, recommended tests, warnings, and next commands.
-- [ ] Ensure JSON output uses the shared envelope.
-- [ ] Add golden JSON coverage and CLI validation tests.
-- [ ] Update `docs/CLI_REFERENCE.md`, `AGENT_NOTES.md`, `llms.txt`, and
+- [x] Ensure JSON output uses the shared envelope.
+- [x] Add golden JSON coverage and CLI validation tests.
+- [x] Update `docs/CLI_REFERENCE.md`, `AGENT_NOTES.md`, `llms.txt`, and
       schema docs.
 
 Primary files:
@@ -457,17 +457,17 @@ windows.
 
 Tasks:
 
-- [ ] Enable `--max-bytes` for `agent context` and apply it to the composed
+- [x] Enable `--max-bytes` for `agent context` and apply it to the composed
       JSON `data` payload, not the shared envelope, without producing invalid
       JSON.
-- [ ] Add per-section truncation metadata.
-- [ ] Make the reading order budget-aware.
-- [ ] Add summary-first output for large diffs.
-- [ ] Ensure huge generated files, broad reference sets, and large test plans
+- [x] Add per-section truncation metadata.
+- [x] Make the reading order budget-aware.
+- [x] Add summary-first output for large diffs.
+- [x] Ensure huge generated files, broad reference sets, and large test plans
       degrade into summaries with limitations.
-- [ ] Keep a minimum valid report shell under tight budgets and report any
+- [x] Keep a minimum valid report shell under tight budgets and report any
       remaining `byteBudgetOverage`.
-- [ ] Add fixtures or tests for truncation and large-section behavior.
+- [x] Add fixtures or tests for truncation and large-section behavior.
 
 Primary files:
 
@@ -498,14 +498,14 @@ Goal: make valid snapshot reuse easy without hiding freshness problems.
 
 Tasks:
 
-- [ ] Do not auto-create snapshots in this plan. The agent workflow may only
+- [x] Do not auto-create snapshots in this plan. The agent workflow may only
       suggest `gosherpa snapshot --json` or report that a valid snapshot was
       used.
-- [ ] Add a concise stale/missing snapshot recommendation to the agent command.
-- [ ] Ensure `doctor`, `snapshot`, and the agent workflow use consistent
+- [x] Add a concise stale/missing snapshot recommendation to the agent command.
+- [x] Ensure `doctor`, `snapshot`, and the agent workflow use consistent
       freshness wording.
-- [ ] Add tests for missing, stale, invalid, and valid snapshot behavior.
-- [ ] Document the recommended daily loop:
+- [x] Add tests for missing, stale, invalid, and valid snapshot behavior.
+- [x] Document the recommended daily loop:
       `snapshot`, `agent context`, focused `context symbol`, `tests affected`.
 
 Primary files:

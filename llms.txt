@@ -31,8 +31,8 @@ diff context:
 
 ```bash
 gosherpa doctor
-gosherpa impact diff --base HEAD --json
-gosherpa context diff --base HEAD --use-snapshot --json
+gosherpa snapshot --json
+gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
 ```
 
 For focused work, use package-qualified targets when names are ambiguous, for
@@ -67,6 +67,7 @@ replace inspecting the relevant files.
 - `gosherpa risk --json`
 - `gosherpa doctor --json`
 - `gosherpa snapshot --json`
+- `gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json`
 - `gosherpa symbols --json`
 - `gosherpa symbol <target> --json`
 - `gosherpa search <terms> --json`
@@ -105,6 +106,7 @@ replace inspecting the relevant files.
 Context commands are optimized for bounded pre-edit agent context:
 
 ```bash
+gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
 gosherpa context symbol ParseFile --use-snapshot --json
 gosherpa context file internal/sherpa/impact.go --json
 gosherpa context package ./internal/sherpa --json
@@ -113,7 +115,9 @@ gosherpa context diff --base HEAD --use-snapshot --json
 
 Supported size controls include `--max-files`, `--max-references`,
 `--max-symbols`, `--max-tests`, `--source-radius`, and `--max-bytes` depending
-on the context kind. Omitted entries are reported in `data.truncated`.
+on the context kind. Omitted entries are reported in `data.truncated`; the
+top-level `agent context` workflow also reports per-section omissions in
+`data.sectionTruncation`.
 
 ## Current Maturity
 
@@ -133,8 +137,9 @@ Current analysis is intentionally conservative:
   and framework-specific behavior.
 - Snapshot creation and freshness diagnostics exist. Inventory commands,
   selected standalone relationship commands, and current changed-symbol
-  inventory in diff-oriented workflows can reuse valid snapshots; broader
-  context and impact relationship subanalysis still runs live.
+  inventory plus selected relationship subanalysis in diff-oriented workflows,
+  `context symbol`, `impact symbol`, and `agent context` can reuse valid
+  snapshots; unsupported portions fall back to live analysis with warnings.
 
 ## Canonical Links
 

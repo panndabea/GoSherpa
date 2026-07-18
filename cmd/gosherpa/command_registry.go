@@ -5,26 +5,37 @@ import "io"
 type commandHandler func(cliInvocation, io.Writer, io.Writer) int
 
 type commandSpec struct {
-	Name          string
-	Usage         []string
-	Handler       commandHandler
-	JSON          bool
-	Limit         bool
-	MaxDepth      bool
-	Package       bool
-	Kind          bool
-	Tests         bool
-	All           bool
-	Context       bool
-	ContextLimits bool
-	Snapshot      bool
-	SnapshotWhen  func(cliInvocation) bool
-	Tags          bool
-	TagsWhen      func(cliInvocation) bool
-	BaseWhen      func(cliInvocation) bool
+	Name               string
+	Usage              []string
+	Handler            commandHandler
+	JSON               bool
+	Limit              bool
+	MaxDepth           bool
+	Package            bool
+	Kind               bool
+	Tests              bool
+	All                bool
+	Context            bool
+	ContextLimits      bool
+	AgentContextLimits bool
+	Snapshot           bool
+	SnapshotWhen       func(cliInvocation) bool
+	Tags               bool
+	TagsWhen           func(cliInvocation) bool
+	BaseWhen           func(cliInvocation) bool
 }
 
 var commandSpecs = []commandSpec{
+	{
+		Name:               "agent",
+		Usage:              agentUsageLines,
+		Handler:            runAgentCommand,
+		JSON:               true,
+		AgentContextLimits: true,
+		SnapshotWhen:       isAgentContextInvocation,
+		TagsWhen:           isAgentContextInvocation,
+		BaseWhen:           isAgentContextInvocation,
+	},
 	{
 		Name:     "analyze",
 		Usage:    []string{analyzeUsageLine},
@@ -248,6 +259,7 @@ var commandSpecs = []commandSpec{
 var commandSpecIndex = indexCommandSpecs(commandSpecs)
 
 const (
+	agentContextUsageLine   = "agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
 	analyzeUsageLine        = "analyze [path] [--tests] [--use-snapshot]"
 	architectureUsageLine   = "architecture [--tests]"
 	riskUsageLine           = "risk [--tests]"
@@ -288,6 +300,9 @@ const (
 )
 
 var (
+	agentUsageLines = []string{
+		agentContextUsageLine,
+	}
 	contextUsageLines = []string{
 		contextSymbolUsageLine,
 		contextFileUsageLine,

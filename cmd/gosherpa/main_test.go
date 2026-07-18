@@ -222,6 +222,7 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 		{"interfaces", "target", "--use-snapshot"},
 		{"context", "symbol", "target", "--use-snapshot"},
 		{"context", "diff", "--base", "HEAD", "--use-snapshot"},
+		{"agent", "context", "--base", "HEAD", "--use-snapshot"},
 		{"impact", "symbol", "target", "--use-snapshot"},
 		{"impact", "diff", "--base", "HEAD", "--use-snapshot"},
 		{"tests", "affected", "--base", "HEAD", "--use-snapshot"},
@@ -385,6 +386,12 @@ func TestParseCLIArgsAcceptsBaseFlagForDiffCommands(t *testing.T) {
 			args:        []string{"pr", "--base", "HEAD"},
 			command:     "pr",
 			commandArgs: nil,
+		},
+		{
+			name:        "agent context",
+			args:        []string{"agent", "context", "--base", "HEAD"},
+			command:     "agent",
+			commandArgs: []string{"context"},
 		},
 	}
 
@@ -704,6 +711,15 @@ func TestPrintUsageIncludesRisk(t *testing.T) {
 	}
 }
 
+func TestPrintUsageIncludesAgent(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]") {
+		t.Fatalf("expected usage to contain agent context command, got:\n%s", output.String())
+	}
+}
+
 func TestPrintUsageIncludesPathCommands(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
@@ -975,6 +991,11 @@ func TestMainPrintsCommandHelp(t *testing.T) {
 			name: "subcommand flag",
 			args: []string{"gosherpa", "context", "diff", "--help"},
 			want: "usage: gosherpa [--root <path>] context diff --base <ref> [--tests] [--use-snapshot] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n",
+		},
+		{
+			name: "agent subcommand help command",
+			args: []string{"gosherpa", "help", "agent", "context"},
+			want: "usage: gosherpa [--root <path>] agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n",
 		},
 		{
 			name: "subcommand help command",
@@ -2509,7 +2530,7 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --base is only supported by context diff, impact diff, tests affected, and pr") {
+	if !strings.Contains(result.Stderr, "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context") {
 		t.Fatalf("expected base flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2578,7 +2599,7 @@ func TestMainRejectsTagsFlagForPlainTestsCommand(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, and snapshot") {
+	if !strings.Contains(result.Stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context") {
 		t.Fatalf("expected tags flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2596,7 +2617,7 @@ func TestMainRejectsDiffOnlyFlagsForPlainTestsCommand(t *testing.T) {
 		{
 			name: "base",
 			args: []string{"gosherpa", "tests", "Target", "--base", "HEAD"},
-			want: "error: --base is only supported by context diff, impact diff, tests affected, and pr",
+			want: "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context",
 		},
 		{
 			name: "use snapshot",
@@ -3613,6 +3634,97 @@ func TestMainRejectsUnsupportedContextLimitOption(t *testing.T) {
 				t.Fatalf("expected empty stdout, got %q", result.Stdout)
 			}
 		})
+	}
+}
+
+func TestMainValidatesAgentContextShapeAndFlags(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing base",
+			args: []string{"agent", "context"},
+			want: "usage: gosherpa [--root <path>] agent context --base <ref>",
+		},
+		{
+			name: "reject positional target",
+			args: []string{"agent", "context", "Target", "--base", "HEAD"},
+			want: "usage: gosherpa [--root <path>] agent context --base <ref>",
+		},
+		{
+			name: "reject tests",
+			args: []string{"agent", "context", "--base", "HEAD", "--tests"},
+			want: "error: --tests is only supported by analyze, architecture, risk, symbols, search, packages, entrypoints, callers, explain, and context",
+		},
+		{
+			name: "reject max references",
+			args: []string{"agent", "context", "--base", "HEAD", "--max-references", "1"},
+			want: "unsupported agent context option: --max-references",
+		},
+		{
+			name: "reject source radius",
+			args: []string{"agent", "context", "--base", "HEAD", "--source-radius", "1"},
+			want: "unsupported agent context option: --source-radius",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"gosherpa", "--root", tmp}, test.args...)
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+			if !strings.Contains(result.Stderr, test.want) {
+				t.Fatalf("expected error %q, got %q", test.want, result.Stderr)
+			}
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
+	}
+}
+
+func TestMainRunsAgentContextCommandWithMaxBytesAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"agent", "context",
+		"--base", "HEAD",
+		"--max-files", "20",
+		"--max-symbols", "20",
+		"--max-tests", "20",
+		"--max-bytes", "4000",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "agent context", "HEAD", "example.com/app")
+	limits := assertMainTestJSONObject(t, data, "limits")
+	if limits["maxBytes"] != float64(4000) {
+		t.Fatalf("expected maxBytes limit, got %#v", limits)
+	}
+	truncated := assertMainTestJSONObject(t, data, "truncated")
+	if len(truncated) == 0 {
+		t.Fatalf("expected truncation metadata, got %#v", truncated)
+	}
+	sectionTruncation := assertMainTestJSONArray(t, data, "sectionTruncation")
+	if len(sectionTruncation) == 0 {
+		t.Fatalf("expected section truncation metadata")
 	}
 }
 
@@ -7577,6 +7689,8 @@ func TestMainPrintsZshCompletion(t *testing.T) {
 
 	for _, want := range []string{
 		"#compdef gosherpa",
+		"'agent:agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"_describe -t agent-subcommands 'agent workflow' agent_subcommands",
 		"'completion:completion zsh|bash|fish'",
 		"_describe -t context-subcommands 'context target' context_subcommands",
 		"'--use-snapshot[reuse a valid repository snapshot]'",
@@ -7602,6 +7716,8 @@ func TestMainPrintsBashCompletion(t *testing.T) {
 	for _, want := range []string{
 		"_gosherpa()",
 		"complete -F _gosherpa gosherpa",
+		"agent)",
+		"printf '%s\\n' '--root --json --use-snapshot --tags --base --max-files --max-symbols --max-tests --max-bytes'",
 		"completion)",
 		"COMPREPLY=( $(compgen -W \"zsh bash fish\" -- \"$cur\") )",
 		"printf '%s\\n' '--root --json --tests --use-snapshot --tags'",
@@ -7625,6 +7741,8 @@ func TestMainPrintsFishCompletion(t *testing.T) {
 
 	for _, want := range []string{
 		"function __fish_gosherpa_seen_command",
+		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'agent' -d 'agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"complete -c gosherpa -f -n '__fish_seen_subcommand_from agent' -a 'context' -d 'diff-first agent workflow context'",
 		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'completion' -d 'completion zsh|bash|fish'",
 		"complete -c gosherpa -f -n '__fish_seen_subcommand_from completion' -a 'zsh' -d 'zsh completion script'",
 		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface alias function method definition call read write type_usage field_access usage'",

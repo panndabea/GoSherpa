@@ -1,0 +1,396 @@
+{
+  "schemaVersion": 1,
+  "command": "agent context",
+  "target": "HEAD",
+  "root": "<ROOT>",
+  "modulePath": "example.com/golden",
+  "warnings": [],
+  "data": {
+    "target": "HEAD",
+    "base": "HEAD",
+    "purpose": "Agent diff context for HEAD: Diff changes 1 file across 1 Go package. Impact analysis reaches 2 packages, 1 symbol, and 1 affected test.",
+    "readiness": {
+      "status": "ready",
+      "analysisMode": "typechecked",
+      "confidence": "medium",
+      "packageLoad": {
+        "status": "ok",
+        "analysisMode": "typechecked",
+        "packageCount": 2,
+        "warningCount": 0,
+        "warnings": []
+      },
+      "goWork": {
+        "detected": false
+      },
+      "generatedFiles": 0,
+      "nestedModules": [],
+      "repoShapeWarnings": [],
+      "limitations": [
+        "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
+        "Package loading follows the current Go environment and provided --tags values.",
+        "Generated files are analyzed when visible to package loading; generated-file policy is informational in this workflow."
+      ]
+    },
+    "snapshot": {
+      "requested": false,
+      "used": false,
+      "status": "missing",
+      "path": ".gosherpa/snapshot.json",
+      "message": "Snapshot reuse was not requested for this agent workflow.",
+      "fresh": false,
+      "relationshipMetadata": {
+        "present": false,
+        "capable": false,
+        "totalCount": 0,
+        "countsByKind": [
+          {
+            "kind": "symbol-definition",
+            "count": 0
+          },
+          {
+            "kind": "reference",
+            "count": 0
+          },
+          {
+            "kind": "call",
+            "count": 0
+          },
+          {
+            "kind": "possible-call",
+            "count": 0
+          },
+          {
+            "kind": "interface-implementation",
+            "count": 0
+          },
+          {
+            "kind": "satisfied-interface",
+            "count": 0
+          },
+          {
+            "kind": "test-reference",
+            "count": 0
+          },
+          {
+            "kind": "test-plan-seed",
+            "count": 0
+          },
+          {
+            "kind": "package-relationship",
+            "count": 0
+          }
+        ]
+      },
+      "staleReasons": [],
+      "refreshCommand": "gosherpa snapshot --json"
+    },
+    "changedFiles": [
+      "service.go"
+    ],
+    "changedPackages": [
+      "."
+    ],
+    "affectedPackages": [
+      ".",
+      "./cmd/app"
+    ],
+    "affectedSymbols": [
+      "Added"
+    ],
+    "changedSymbolDetails": [
+      {
+        "package": ".",
+        "name": "Added",
+        "target": "example.com/golden.Added",
+        "targetRisk": {
+          "level": "medium",
+          "scope": "exported-api",
+          "reasons": [
+            "exported-symbol",
+            "missing-direct-tests",
+            "package-fan-in"
+          ],
+          "signals": {
+            "affectedPackages": 1,
+            "directReferences": 0,
+            "transitiveCallers": 0,
+            "callerPackages": 0,
+            "exportedSymbol": true,
+            "exportedTypeMethod": false,
+            "interfaceContracts": 0,
+            "packageFanIn": 1,
+            "missingDirectTests": true,
+            "fallbackTests": false,
+            "possibleRuntimeCalls": 0,
+            "warnings": 0,
+            "nonGoOrHunkOnlyDiff": false,
+            "snapshotFallback": false
+          },
+          "limitations": [
+            "Possible runtime calls count only bounded static signals and do not include full pointer or reflection analysis.",
+            "Target risk summarizes deterministic impact breadth; it is not a defect prediction."
+          ]
+        },
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      }
+    ],
+    "readingOrder": [
+      {
+        "title": "Changed symbol: example.com/golden.Added",
+        "reason": "Inspect the changed top-level symbol before broader package impact.",
+        "position": {
+          "file": "service.go",
+          "line": 20,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service.go",
+            "line": 20,
+            "column": 1
+          },
+          "end": {
+            "file": "service.go",
+            "line": 20,
+            "column": 16
+          }
+        }
+      },
+      {
+        "title": "Changed file: service.go",
+        "reason": "Start with the files changed by the diff.",
+        "position": {
+          "file": "service.go",
+          "line": 1
+        }
+      },
+      {
+        "title": "Test: TestTarget",
+        "reason": "Check expected behavior and regression coverage.",
+        "position": {
+          "file": "service_test.go",
+          "line": 5,
+          "column": 1
+        },
+        "range": {
+          "start": {
+            "file": "service_test.go",
+            "line": 5,
+            "column": 1
+          },
+          "end": {
+            "file": "service_test.go",
+            "line": 7,
+            "column": 2
+          }
+        }
+      }
+    ],
+    "targetRisk": {
+      "level": "medium",
+      "scope": "cross-package",
+      "reasons": [
+        "affected-packages",
+        "fallback-tests",
+        "missing-direct-tests"
+      ],
+      "signals": {
+        "affectedPackages": 2,
+        "directReferences": 0,
+        "transitiveCallers": 0,
+        "callerPackages": 0,
+        "exportedSymbol": false,
+        "exportedTypeMethod": false,
+        "interfaceContracts": 0,
+        "packageFanIn": 0,
+        "missingDirectTests": true,
+        "fallbackTests": true,
+        "possibleRuntimeCalls": 0,
+        "warnings": 0,
+        "nonGoOrHunkOnlyDiff": false,
+        "snapshotFallback": false
+      },
+      "limitations": [
+        "Diff target risk summarizes deterministic changed and affected package evidence; it is not a defect prediction.",
+        "Hunk-only or non-Go changes may require file-level review because no changed top-level Go symbol was identified.",
+        "Target risk remains separate from confidence and repository structural risk."
+      ]
+    },
+    "possibleRuntimeRelationships": {
+      "counts": [],
+      "examples": [],
+      "limitations": [
+        "Possible runtime relationships are separate from direct call edges and keep certainty labels explicit.",
+        "Possible runtime relationships are conservative static signals; reflection and hidden framework wiring can still be missed.",
+        "Examples require --use-snapshot with a valid relationship-capable snapshot in this first agent workflow slice."
+      ]
+    },
+    "interfaceSummary": {
+      "analysisMode": "typechecked",
+      "affectedInterfaces": [],
+      "affectedImplementations": [],
+      "limitations": [
+        "Interface summary is bounded to affected interface and implementation names, not full interface profiles."
+      ]
+    },
+    "testPlan": {
+      "direct": [],
+      "related": [
+        {
+          "command": "go test .",
+          "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
+          "package": ".",
+          "test": "TestTarget",
+          "tests": [
+            "TestTarget"
+          ],
+          "targets": [
+            "example.com/golden.Added"
+          ]
+        }
+      ],
+      "contracts": [],
+      "callerPackages": [],
+      "fallback": [
+        {
+          "command": "go test ./cmd/app",
+          "reason": "Run package tests for ./cmd/app to compile impacted code from changed symbols example.com/golden.Added and cover tests not matched directly.",
+          "package": "./cmd/app",
+          "targets": [
+            "example.com/golden.Added"
+          ]
+        }
+      ]
+    },
+    "testCommands": [
+      "go test .",
+      "go test ./cmd/app"
+    ],
+    "suggestedCommands": [
+      "gosherpa doctor --json",
+      "gosherpa snapshot --json",
+      "gosherpa context diff --base HEAD --json",
+      "gosherpa impact diff --base HEAD --json",
+      "gosherpa tests affected --base HEAD --json",
+      "gosherpa pr --base HEAD --json",
+      "gosherpa context symbol example.com/golden.Added --json"
+    ],
+    "sectionModes": [
+      {
+        "section": "readiness",
+        "analysisMode": "typechecked",
+        "confidence": "medium",
+        "limitations": [
+          "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
+          "Package loading follows the current Go environment and provided --tags values.",
+          "Generated files are analyzed when visible to package loading; generated-file policy is informational in this workflow."
+        ]
+      },
+      {
+        "section": "snapshot",
+        "analysisMode": "live",
+        "confidence": "medium",
+        "limitations": [
+          "Snapshot reuse was not requested; this workflow used live repository analysis."
+        ]
+      },
+      {
+        "section": "context",
+        "analysisMode": "git-diff+typechecked+ast",
+        "confidence": "medium",
+        "limitations": [
+          "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
+          "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
+          "Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+          "Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+          "Package load or snapshot warnings lower confidence; inspect envelope warnings before relying on semantic impact or tests.",
+          "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
+          "Reference analysis mode: typechecked.",
+          "Call analysis mode: typechecked.",
+          "Interface analysis used typechecked method sets from repository-local packages.",
+          "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests."
+        ]
+      },
+      {
+        "section": "impact",
+        "analysisMode": "git-diff+typechecked+ast",
+        "confidence": "medium",
+        "limitations": [
+          "Impact is summarized from diff context signals and does not embed the full impact diff report.",
+          "Target risk remains separate from confidence and repository structural risk.",
+          "Reference analysis mode: typechecked.",
+          "Call analysis mode: typechecked."
+        ]
+      },
+      {
+        "section": "interfaces",
+        "analysisMode": "typechecked",
+        "confidence": "medium",
+        "limitations": [
+          "Interface summary is bounded to affected interface and implementation names, not full interface profiles."
+        ]
+      },
+      {
+        "section": "tests",
+        "analysisMode": "typechecked+ast",
+        "confidence": "medium",
+        "limitations": [
+          "Affected-test planning is included by default for agent context; --tests is not required.",
+          "Test analysis mode: typechecked+ast."
+        ]
+      },
+      {
+        "section": "pr",
+        "analysisMode": "git-diff+typechecked+ast",
+        "confidence": "medium",
+        "limitations": [
+          "PR summary is represented as bounded suggested commands and verification-oriented test recommendations, not the full pr report."
+        ]
+      }
+    ],
+    "sectionTruncation": [],
+    "analysisMode": "git-diff+typechecked+ast",
+    "confidence": "medium",
+    "limitations": [
+      "Agent context is diff-first and requires a base ref; symbol, file, and package drill-down remain separate context commands.",
+      "The workflow composes bounded summaries and suggested follow-up commands instead of embedding full context, impact, tests, and pr reports.",
+      "Affected-test planning is included by default; --tests is not part of this command contract.",
+      "Snapshot reuse is opt-in and never creates snapshots automatically.",
+      "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
+      "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
+      "Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",
+      "Generated Go files are included when package loading includes them; generated code emitted outside the parsed repository is not inferred.",
+      "Package load or snapshot warnings lower confidence; inspect envelope warnings before relying on semantic impact or tests.",
+      "Test discovery uses direct references, same-package tests, file-contained symbols, and literal t.Run subtest names.",
+      "Reference analysis mode: typechecked.",
+      "Call analysis mode: typechecked.",
+      "Interface analysis used typechecked method sets from repository-local packages.",
+      "Test analysis used typechecked direct-reference detection where available, with AST/package fallback for related tests.",
+      "Possible runtime relationships are separate from direct call edges and keep certainty labels explicit.",
+      "Possible runtime relationships are conservative static signals; reflection and hidden framework wiring can still be missed.",
+      "Examples require --use-snapshot with a valid relationship-capable snapshot in this first agent workflow slice."
+    ],
+    "limits": {
+      "maxFiles": 60,
+      "maxSymbols": 80,
+      "maxTests": 25
+    }
+  }
+}

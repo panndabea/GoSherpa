@@ -82,6 +82,11 @@ Implemented:
 - Initial `gosherpa context diff --base <ref>` export with changed files,
   changed packages, changed symbols, affected packages, affected tests, reading
   order, confidence, limitations, and JSON output.
+- Initial top-level `gosherpa agent context --base <ref>` workflow with
+  readiness, snapshot status, bounded diff context, target risk, possible
+  runtime relationship summary, interface summary, affected tests, section
+  modes, suggested commands, short human output, JSON output, composed
+  `--max-bytes` budgeting, and per-section truncation metadata.
 - Package-aware caller/callee signals for package-qualified `gosherpa explain`
   targets.
 - Direct symbol and package impact analysis.
@@ -189,6 +194,8 @@ Current limitations:
   and `explain --tests`; tests are still skipped by some other analysis paths
   and are not yet first-class.
 - Context export currently supports symbol, file, package, and diff targets.
+  The top-level `agent context` workflow is intentionally diff-first only in
+  the current plan.
 
 ## Roadmap Overview
 

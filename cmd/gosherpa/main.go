@@ -17,7 +17,7 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
-	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, and pr"
+	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, pr, and agent context"
 
 	analysisModeAST                     = agentcontext.AnalysisModeAST
 	analysisModeDiff                    = agentcontext.AnalysisModeDiff
@@ -105,7 +105,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasContextLimit && !supportsContextLimitOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context")
+		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context; --max-files, --max-symbols, --max-tests, and --max-bytes are also supported by agent context")
 		return exitUsage
 	}
 
@@ -125,7 +125,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasBaseOption && !isBaseAwareInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, tests affected, and pr")
+		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context")
 		return exitUsage
 	}
 
@@ -150,7 +150,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
-		fmt.Fprintln(stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, and snapshot")
+		fmt.Fprintln(stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context")
 		return exitUsage
 	}
 
@@ -238,7 +238,7 @@ func supportsKindOption(command string) bool {
 
 func supportsContextLimitOption(command string) bool {
 	spec, ok := commandSpecFor(command)
-	return ok && spec.ContextLimits
+	return ok && (spec.ContextLimits || spec.AgentContextLimits)
 }
 
 func supportsTestsOption(command string) bool {
@@ -287,7 +287,13 @@ func supportsTagsOption(invocation cliInvocation) bool {
 }
 
 func validateContextLimitOptions(invocation cliInvocation) error {
-	if !invocation.HasContextLimit || invocation.Command != "context" || len(invocation.CommandArgs) == 0 {
+	if !invocation.HasContextLimit {
+		return nil
+	}
+	if invocation.Command == "agent" {
+		return validateAgentContextLimitOptions(invocation)
+	}
+	if invocation.Command != "context" || len(invocation.CommandArgs) == 0 {
 		return nil
 	}
 
@@ -327,6 +333,25 @@ func validateContextLimitOptions(invocation cliInvocation) error {
 	return fmt.Errorf("unsupported context option for context %s: %s", invocation.CommandArgs[0], strings.Join(unsupported, ", "))
 }
 
+func validateAgentContextLimitOptions(invocation cliInvocation) error {
+	if !isAgentContextInvocation(invocation) {
+		return nil
+	}
+
+	var unsupported []string
+	if invocation.ContextLimits.MaxReferences > 0 {
+		unsupported = append(unsupported, "--max-references")
+	}
+	if invocation.HasSourceRadius {
+		unsupported = append(unsupported, "--source-radius")
+	}
+	if len(unsupported) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("unsupported agent context option: %s", strings.Join(unsupported, ", "))
+}
+
 func isImpactDiffInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "impact" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "diff"
 }
@@ -345,6 +370,10 @@ func isContextSnapshotInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "context" &&
 		len(invocation.CommandArgs) > 0 &&
 		(invocation.CommandArgs[0] == "symbol" || invocation.CommandArgs[0] == "diff")
+}
+
+func isAgentContextInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "agent" && len(invocation.CommandArgs) > 0 && invocation.CommandArgs[0] == "context"
 }
 
 func isTestsAffectedInvocation(invocation cliInvocation) bool {
@@ -495,6 +524,15 @@ func printHelpForCommand(writer io.Writer, args []string) bool {
 	}
 
 	switch command {
+	case "agent":
+		if len(args) > 1 {
+			switch args[1] {
+			case "context":
+				printAgentContextUsage(writer)
+				return true
+			}
+		}
+		printAgentUsage(writer)
 	case "context":
 		if len(args) > 1 {
 			switch args[1] {

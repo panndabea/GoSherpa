@@ -8,7 +8,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 
 | Next | Goal |
 | --- | --- |
-| Symbol Intelligence | Deepen typechecked relationships, context output, and structured test planning around `gosherpa explain` |
+| Agent Workflow Robustness | Harden `gosherpa agent context --base <base-ref>` across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
 
 ## Implemented
 
@@ -28,6 +28,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
+- Initial `gosherpa agent context --base <ref>` workflow with readiness, snapshot status, changed targets, target risk, possible runtime relationship summary, interface summary, affected tests, section modes, suggested commands, short human output, JSON output, and composed `--max-bytes` budgeting with per-section truncation metadata
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
@@ -90,6 +91,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   including read/write classification for value and field references
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
 - Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; standalone relationship commands `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`, plus `context symbol` and `impact symbol`, can reuse valid relationship records; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory and selected relationship subanalyses. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
+- `agent context --base <ref> --use-snapshot` can reuse valid snapshot-backed diff context and relationship summaries while keeping focused symbol, file, and package drill-down in the existing `context` commands.
 
 ## Known MVP Limitations
 
@@ -103,7 +105,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Test discovery uses direct references, same-package tests, file-contained symbols, and literal `t.Run` subtest names; dynamic table-driven names may be incomplete.
 - Caller, callee, path, and entrypoint analysis still do not resolve dynamic dispatch, reflection, reassigned or escaping function values, or dependency internals; caller and callee JSON outputs surface bounded imported receiver calls as external `possibleCalls` when typechecked selector data can name the receiver method.
 - Entrypoint analysis is heuristic; statically visible stdlib `net/http` handler registrations are inferred, but framework-specific routers, custom runtime wiring, and CLI command handlers are not inferred yet.
-- Context export currently supports symbol, file, package, and diff targets.
+- Context export currently supports symbol, file, package, and diff targets. The top-level `agent context` workflow is diff-first only and rejects symbol/file/package positional targets until later plans define those modes.
 - Nested modules below a module root are treated as separate analysis roots and
   are skipped by root-level file walking, symbol lookup, references, callers,
   context, impact, and test discovery unless they are included through an
@@ -112,7 +114,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   selected module or workspace. `doctor` detects the standard
   `// Code generated ... DO NOT EDIT.` header for reporting; relationship and
   context commands analyze generated files like other compiler-visible Go files.
-- Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, inventory reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, relationship reuse for `refs`, `callers`, `callees`, `implementers`, `interface`, `interfaces`, `context symbol`, `impact symbol`, and selected diff-oriented relationship subanalysis in `context diff`, `impact diff`, `tests affected`, and `pr`; unsupported portions fall back to live analysis with warnings.
+- Snapshot creation and stale/missing/valid diagnostics are implemented with format v2 relationship-capability metadata, bounded `doctor`/`snapshot --json` relationship counts, inventory reuse for `analyze`, `symbols`, `symbol`, `search`, `packages --tests`, relationship reuse for `refs`, `callers`, `callees`, `implementers`, `interface`, `interfaces`, `context symbol`, `impact symbol`, selected diff-oriented relationship subanalysis in `context diff`, `impact diff`, `tests affected`, `pr`, and the first `agent context` workflow; unsupported portions fall back to live analysis with warnings.
 - The shared repository index v0 currently covers package, file, symbol inventory, and an in-memory relationship-index contract. A first in-memory semantic context shares typechecked loads for symbol identity, references, calls, direct test-reference analysis, file/package context inventory, and context interface-impact signals; persisted relationship records now back selected standalone and must-use workflow relationship queries while unsupported relationship shapes remain live-only.
 - Shell completion covers commands, subcommands, and flags; package and symbol completion are not dynamic yet.
 - `gosherpa analyze` hotspots and entrypoint candidates are inventory-based; use focused `context`, `entrypoints`, `impact`, and `tests` commands for deeper relationship analysis.

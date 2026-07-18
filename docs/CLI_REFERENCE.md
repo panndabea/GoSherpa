@@ -20,6 +20,7 @@ go run ./cmd/gosherpa architecture
 go run ./cmd/gosherpa risk
 go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa context symbol ParseFile
+go run ./cmd/gosherpa agent context --base HEAD
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa doctor
 go run ./cmd/gosherpa snapshot
@@ -56,9 +57,9 @@ snapshot file. A valid snapshot can currently be reused by `analyze`,
 `callees`, `implementers`, `interface`, `interfaces`, `context symbol`,
 `impact symbol`, and by diff-oriented current changed-symbol inventory plus
 selected relationship subanalysis in `context diff`, `impact diff`,
-`tests affected`, and `pr` with `--use-snapshot`. Missing, stale, invalid, or
-relationship-incompatible snapshots fall back to live repository analysis and
-report a warning.
+`tests affected`, `pr`, and `agent context` with `--use-snapshot`. Missing,
+stale, invalid, or relationship-incompatible snapshots fall back to live
+repository analysis and report a warning.
 
 ```bash
 ./gosherpa snapshot
@@ -70,6 +71,7 @@ report a warning.
 ./gosherpa callers ParseFile --use-snapshot --json
 ./gosherpa callees ParseFile --use-snapshot --json
 ./gosherpa context symbol ParseFile --use-snapshot --json
+./gosherpa agent context --base HEAD --use-snapshot --json
 ./gosherpa impact symbol ParseFile --use-snapshot --json
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot --json
@@ -99,6 +101,7 @@ symbol completion can come later.
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, target risk, architecture role, reading order, callers/callees, impact signals, and tests |
+| Agent workflow | `gosherpa agent context --base HEAD` | Composes readiness, snapshot status, diff context, target risk, affected tests, section modes, and next commands into one bounded daily-driver answer |
 | Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, target risk, confidence, and limitations |
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
@@ -177,6 +180,9 @@ Found 4 references
 ./gosherpa context symbol ParseFile --use-snapshot --json
 ./gosherpa context symbol ParseFile --json
 ./gosherpa context symbol ParseFile --max-bytes 12000 --json
+./gosherpa agent context --base HEAD
+./gosherpa agent context --base HEAD --use-snapshot --json
+./gosherpa agent context --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ./gosherpa context file internal/sherpa/impact.go
 ./gosherpa context file internal/sherpa/impact.go --json
 ./gosherpa context package ./internal/sherpa
@@ -301,24 +307,28 @@ Context commands support command-specific size controls for agent workflows:
 
 | Command | Supported limits |
 | --- | --- |
+| `agent context` | `--use-snapshot`, `--tags`, `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
 | `context symbol` | `--use-snapshot`, `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context file` | `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context package` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context diff` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
 
-Unsupported context-limit combinations fail as usage errors. The byte budget
-omits large context fields deterministically and keeps JSON valid; any omissions
-are reported in `data.truncated`.
+Unsupported context-limit combinations fail as usage errors. `agent context`
+does not accept `--max-references`, `--source-radius`, `--scope`, or `--tests`.
+The context byte budget omits large context fields deterministically and keeps
+JSON valid; workflow-level omissions are reported in `data.truncated` and
+per-section omissions in `data.sectionTruncation`.
 
 Diff-oriented JSON such as `impact diff`, `tests affected`, `pr`, and
 `context diff` can report `git-diff+typechecked+ast` plus
 `referenceAnalysisMode` and `callAnalysisMode` when changed-symbol impact uses
 typechecked package loading. `context diff` and `pr` include
 `changedSymbolDetails` and put changed-symbol locations first in
-`readingOrder` when positions are known. With `--use-snapshot` on `context diff`,
-`impact diff`, `tests affected`, or `pr`, a valid snapshot is reused for current
-changed-symbol inventory and selected persisted relationship records, reporting
-`snapshot+git-diff+typechecked+ast` or `snapshot+git-diff+ast`. With
+`readingOrder` when positions are known. With `--use-snapshot` on
+`agent context`, `context diff`, `impact diff`, `tests affected`, or `pr`, a
+valid snapshot is reused for current changed-symbol inventory and selected
+persisted relationship records, reporting `snapshot+git-diff+typechecked+ast`
+or `snapshot+git-diff+ast`. With
 `--use-snapshot` on `refs`, `callers`, `callees`, `implementers`, `interface`,
 `interfaces`, `context symbol`, or `impact symbol`, valid relationship records
 report `snapshot+typechecked`, `snapshot+ast-fallback`, or `snapshot`
@@ -333,6 +343,14 @@ symbol, or relationship records.
 `pr --json` keeps the diff-oriented `risk` summary, adds `targetRisk` for the
 specific diff blast-radius judgment, and also includes `repositoryRisk`, the
 full structural `RiskReport` from `gosherpa risk`.
+
+`agent context --json` uses `command: "agent context"` and `target` set to the
+base ref. Its `data` object is a composed summary with readiness, snapshot
+status, changed targets, reading order, target risk, possible runtime
+relationship summaries, interface summary, test plan, suggested commands,
+section modes, confidence, limitations, limits, and truncation metadata. It is
+not a dump of the full `context diff`, `impact diff`, `tests affected`, and
+`pr` reports.
 
 `analyze --json` provides the repository-level entry point for agents and
 scripts: package summaries, symbol counts, important public symbols,

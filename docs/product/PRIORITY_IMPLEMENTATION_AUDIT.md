@@ -1,5 +1,214 @@
 # Priority Implementation Audit
 
+## Agent Workflow Phase 0 And Slice 1.1/1.2 Update
+
+Date: 2026-07-17
+
+This section records the active plan from `PRIORITY_IMPLEMENTATION_PLAN.md`:
+zero-friction agent workflow first, then real-world repository robustness, then
+tests and entrypoint intelligence. The older relationship-reuse,
+possible-call, and target-risk entries below are preserved as completed
+baseline evidence, not as the active phase map.
+
+### Selected Base Ref
+
+Selected `<base-ref>`: `origin/main`
+
+`git rev-parse --verify origin/main` resolved to
+`ab46bbc3abfa372d5ca2e7fdc5f8b78d1383ac06`. Local `main` resolved to the same
+commit at audit time.
+
+### Baseline Verification
+
+Commands run before feature edits:
+
+```bash
+git rev-parse --verify origin/main
+go test ./...
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa context diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa impact diff --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa tests affected --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa pr --base origin/main --use-snapshot --json
+go run ./cmd/gosherpa context symbol ./internal/sherpa.PlanTests --use-snapshot --json
+```
+
+Results:
+
+| Command | Status | Runtime | Envelope warnings | Analysis mode | Confidence |
+| --- | --- | ---: | --- | --- | --- |
+| `go test ./...` | passed | 2.05s, cached | n/a | n/a | n/a |
+| `doctor --json` | passed | 4.99s | none | `typechecked` | `medium` |
+| `snapshot --json` | passed | 23.30s | none | n/a | n/a |
+| `context diff --base origin/main --use-snapshot --json` | passed | 2.31s | none | `snapshot+git-diff+ast` | `medium` |
+| `impact diff --base origin/main --use-snapshot --json` | passed | 2.28s | none | `snapshot+git-diff+ast` | `medium` |
+| `tests affected --base origin/main --use-snapshot --json` | passed | 2.29s | none | `snapshot+git-diff+ast` | `medium` |
+| `pr --base origin/main --use-snapshot --json` | passed | 2.66s | none | `snapshot+git-diff+ast` | `medium` |
+| `context symbol ./internal/sherpa.PlanTests --use-snapshot --json` | passed | 10.54s | none | `typechecked+ast` | `medium` |
+
+`doctor --json` initially reported a stale snapshot with stale reason
+`git state changed`. `snapshot --json` refreshed `.gosherpa/snapshot.json` to a
+valid format v2 snapshot with 122 files, 10 packages, 2581 symbols, and
+relationship metadata marked `present: true` and `capable: true`.
+
+Diff-oriented commands used a valid snapshot after refresh. Because
+`origin/main` equaled `main` at the baseline point, changed files, changed
+packages, affected packages, affected symbols, affected tests, test commands,
+and reading order were empty. The diff target risk was `low` / `local` with
+reason `missing-direct-tests`.
+
+The focused symbol drill-down for `./internal/sherpa.PlanTests` reported:
+
+- `analysisMode: typechecked+ast`
+- `referenceAnalysisMode: snapshot+typechecked`
+- `callAnalysisMode: snapshot+typechecked`
+- `interfaceAnalysisMode: typechecked`
+- `testAnalysisMode: typechecked+ast`
+- `targetRisk.level: high`
+- `targetRisk.scope: exported-api`
+- truncation for source lines, callees, related tests, and test-plan items
+
+### Locked Command Contract
+
+The first public agent workflow command is locked as:
+
+```bash
+gosherpa agent context --base <base-ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>] [--json]
+```
+
+Global `--root <path>` applies through the existing root-selection mechanism.
+The command is diff-first only. It rejects symbol, file, package, or free-form
+positional targets, and it rejects inherited flags whose semantics are not part
+of the first contract: `--tests`, `--scope`, `--max-references`,
+and `--source-radius`.
+
+### CLI Flag Matrix Changes
+
+Before this slice, no top-level `agent` command existed. The implementation
+adds `agent` to `command_registry.go`, `main.go` help/validation,
+`cli_flags.go` parsing compatibility, and `completion.go`.
+
+Validation messages that changed:
+
+```text
+--base is only supported by context diff, impact diff, tests affected, pr, and agent context
+--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, pr, and agent context
+--tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context
+--max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context; --max-files, --max-symbols, --max-tests, and --max-bytes are also supported by agent context
+unsupported agent context option: --max-references
+unsupported agent context option: --source-radius
+```
+
+### First JSON Shape
+
+`agent context --json` uses the shared envelope with
+`command: "agent context"` and `target` set to the selected base ref.
+
+Initial `data` fields:
+
+- `target`, `base`, and `purpose`
+- `readiness`: bounded package-load and repo-shape summary
+- `snapshot`: requested/used status, freshness, relationship metadata, and
+  refresh guidance
+- `changedFiles`, `changedPackages`, `affectedPackages`, `affectedSymbols`,
+  and bounded `changedSymbolDetails`
+- `readingOrder`
+- `targetRisk`
+- `possibleRuntimeRelationships`: counts and bounded examples when a valid
+  relationship snapshot is reused, otherwise explicit limitations
+- `interfaceSummary`
+- `testPlan` and `testCommands`
+- `suggestedCommands`
+- `sectionModes` for readiness, snapshot, context, impact, interfaces, tests,
+  and PR-oriented follow-up
+- `analysisMode`, `confidence`, `limitations`, `limits`, and `truncated`
+- `sectionTruncation`: per-section `{section, field, omitted}` entries when
+  item limits or the composed byte budget reduce the workflow payload
+
+Embedded or directly reused report fields:
+
+- `agentcontext.DiffReport` supplies changed-file, changed-package,
+  changed-symbol, affected-package, target-risk, interface, test, reading-order,
+  analysis-mode, confidence, limit, truncation, limitation, and warning fields.
+- `sherpa.TestPlan` is reused as the grouped test-plan contract.
+- `snapshot.RelationshipMetadata` is reused for bounded snapshot capability
+  reporting.
+- `sherpa.TargetRiskSummary` is reused unchanged.
+
+Summarized fields:
+
+- Doctor-style readiness is summarized to package-load status, repo-shape
+  warnings, generated-file count, nested modules, and go.work detection.
+- PR work is summarized as section mode plus suggested follow-up commands,
+  rather than embedding the full `pr` report and repository structural risk.
+- Possible runtime relationships are summarized by reason/scope/certainty and
+  bounded examples only when a valid snapshot provides certainty labels.
+- Interface data is summarized to affected interface/implementation names, not
+  full interface profiles.
+
+### Fixture Matrix
+
+Real-world repository robustness fixtures needed next:
+
+- `go.work` with multiple modules and root module participation
+- nested modules excluded from root analysis unless inspected with `--root`
+- build-tagged files that appear only with `--tags`
+- generated Go files with standard `Code generated ... DO NOT EDIT` headers
+- local `replace` dependencies that affect imported receiver boundary signals
+- partial package-load failures that keep AST fallback and warnings visible
+- large repository/diff fixtures for Slice 1.3 byte and section truncation
+
+Test and entrypoint fixtures needed next:
+
+- direct changed-symbol tests
+- same-package related tests
+- caller-package tests
+- interface/implementation contract tests
+- package fallback and whole-repository fallback
+- stdlib `net/http` handler entrypoints
+- CLI command-handler style entrypoints
+- goroutine/function-literal possible runtime reachability
+
+### Implementation Verification
+
+Additional commands run after Slice 1.1/1.2 implementation:
+
+```bash
+go test ./internal/agentworkflow
+go test ./cmd/gosherpa
+```
+
+The public command, validation, help, completion, schema guard, and golden JSON
+coverage are implemented for the first diff-first `agent context` slice.
+
+Additional commands run after Slice 1.3 implementation:
+
+```bash
+go test ./internal/agentworkflow
+go test ./cmd/gosherpa
+go test ./...
+go run ./cmd/gosherpa help agent
+go run ./cmd/gosherpa help agent context
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa agent context --base origin/main --use-snapshot --max-files 5 --max-symbols 5 --max-tests 5 --max-bytes 12000 --json
+```
+
+Slice 1.3 enables `agent context --max-bytes <n>` for the composed JSON `data`
+payload, keeps the shared envelope outside the byte budget, records aggregate
+truncation in `data.truncated`, and records per-section omissions in
+`data.sectionTruncation`. Tight budgets keep a minimum valid report shell and
+report `truncated.byteBudgetOverage` if that shell still cannot fit.
+The refreshed verification snapshot was valid format v2 with 127 files,
+11 packages, 2654 symbols, and relationship metadata marked present and
+capable. The final agent-context verification used the snapshot with no
+envelope warnings.
+
+Slice 1.4 keeps snapshot creation explicit, surfaces `gosherpa snapshot --json`
+as the refresh command for missing, stale, and invalid snapshots, reuses the
+same snapshot freshness wording exposed by snapshot inspection, and adds
+agent-workflow tests for missing, valid, stale, and invalid snapshot states.
+
 Date: 2026-07-17
 
 This audit records Phase 0 of `PRIORITY_IMPLEMENTATION_PLAN.md` for the next

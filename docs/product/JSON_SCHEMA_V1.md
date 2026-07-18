@@ -330,7 +330,7 @@ typechecked package loading, or `ast` when that semantic path is unavailable or
 does not include the target symbol. `context file.data.analysisMode` and
 `context package.data.analysisMode` can be `typechecked+ast` when package files
 and symbols come from typechecked package loading. Diff-oriented commands
-(`context diff`, `impact diff`, `tests affected`, and `pr`) use
+(`agent context`, `context diff`, `impact diff`, `tests affected`, and `pr`) use
 `git-diff+typechecked+ast` when changed-symbol, reference, call, or interface
 signals use typechecked package loading, and `git-diff+ast` otherwise. With
 `--use-snapshot` and a valid snapshot on those diff-oriented commands, they
@@ -441,6 +441,99 @@ Data:
 - `suggestions`: deterministic next commands to continue investigation.
 
 `data.warnings` is absent; use envelope `warnings`.
+
+## `agent context` Data
+
+Envelope:
+
+- `command`: `agent context`
+- `target`: selected base ref
+
+Data:
+
+```json
+{
+  "target": "HEAD",
+  "base": "HEAD",
+  "purpose": "Agent diff context for HEAD: ...",
+  "readiness": {},
+  "snapshot": {},
+  "changedFiles": [],
+  "changedPackages": [],
+  "affectedPackages": [],
+  "affectedSymbols": [],
+  "changedSymbolDetails": [],
+  "readingOrder": [],
+  "targetRisk": {},
+  "possibleRuntimeRelationships": {
+    "counts": [],
+    "examples": [],
+    "limitations": []
+  },
+  "interfaceSummary": {
+    "analysisMode": "typechecked",
+    "affectedInterfaces": [],
+    "affectedImplementations": [],
+    "limitations": []
+  },
+  "testPlan": {
+    "direct": [],
+    "related": [],
+    "contracts": [],
+    "callerPackages": [],
+    "fallback": []
+  },
+  "testCommands": [],
+  "suggestedCommands": [],
+  "sectionModes": [],
+  "sectionTruncation": [],
+  "analysisMode": "git-diff+typechecked+ast",
+  "confidence": "medium",
+  "limitations": [],
+  "limits": {},
+  "truncated": {}
+}
+```
+
+The first `agent context` contract is diff-first and requires `--base <ref>`.
+It supports `--use-snapshot`, `--tags`, `--max-files`, `--max-symbols`,
+`--max-tests`, `--max-bytes`, and `--json`, plus global `--root`. It intentionally rejects
+symbol/file/package positional targets, `--tests`, `--scope`,
+`--max-references`, and `--source-radius`.
+
+- `readiness`: bounded repository-readiness summary with package-load status,
+  go.work detection, generated-file count, nested modules, repo-shape warnings,
+  confidence, and limitations.
+- `snapshot`: requested/used status, freshness, path, message, relationship
+  metadata, stale reasons, and refresh command when useful. The command never
+  creates snapshots automatically.
+- `changedFiles`, `changedPackages`, `affectedPackages`, `affectedSymbols`,
+  `changedSymbolDetails`, `readingOrder`, `targetRisk`, `testPlan`, and
+  `testCommands`: bounded fields adapted from the existing diff context and
+  impact/test planning contracts.
+- `possibleRuntimeRelationships`: counts by `reason`, `scope`, and
+  `certainty`, plus bounded examples only when a valid relationship snapshot
+  supplies explicit possible-call records. Without such a snapshot, arrays stay
+  non-nil and limitations explain the missing examples.
+- `interfaceSummary`: bounded affected interface and implementation names, not
+  a full interface profile.
+- `suggestedCommands`: deterministic next commands for focused drill-down or
+  verification.
+- `sectionModes`: deterministic array of `{section, analysisMode, confidence,
+  limitations}` entries for readiness, snapshot, context, impact, interfaces,
+  tests, and PR-oriented follow-up.
+- `sectionTruncation`: deterministic array of `{section, field, omitted}`
+  entries showing which workflow sections were reduced by item limits or the
+  composed byte budget.
+- `analysisMode`, `confidence`, `limitations`, `limits`, and `truncated`:
+  workflow-level trust and bounding metadata. `limits.maxBytes` appears when a
+  composed byte budget was requested. `truncated.byteBudgetOverage` reports any
+  remaining data-payload overage when the minimum valid report shell cannot fit
+  inside the requested budget.
+
+`agent context` is a composed summary, not a JSON dump of full `context diff`,
+`impact diff`, `tests affected`, and `pr` reports. `data.warnings` is absent;
+use envelope `warnings`.
 
 ## `callers` Data
 
@@ -807,9 +900,9 @@ unbounded command response.
 Snapshot creation is explicit. `analyze`, `symbols`, `symbol`, `search`,
 test-inclusive `packages --tests`, relationship commands `refs`, `callers`,
 `callees`, `implementers`, `interface`, and `interfaces`, and diff-oriented
-commands `context diff`, `impact diff`, `tests affected`, and `pr` can opt in
-to snapshot reuse with `--use-snapshot`. Inventory command data objects include
-`analysisMode`, and when a valid snapshot is used they report
+commands `agent context`, `context diff`, `impact diff`, `tests affected`, and
+`pr` can opt in to snapshot reuse with `--use-snapshot`. Inventory command data
+objects include `analysisMode`, and when a valid snapshot is used they report
 `"analysisMode": "snapshot"`;
 `analyze` reports
 `"snapshot+typechecked+ast"` or `"snapshot+ast"` because risk and readiness

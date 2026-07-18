@@ -29,11 +29,27 @@ stable, and boring in the best possible way.
 These are the features that would move GoSherpa from "useful sometimes" to
 "run this early in most Go tasks".
 
-### 1. Agent Context Export
+### 1. Zero-Friction Agent Workflow
 
-Add one command that returns the compact context an agent needs before editing.
+Add one primary command that returns the compact diff-oriented bundle an agent
+needs before editing or preparing a PR.
 
-Implemented first slices:
+Implemented first public slice:
+
+```bash
+gosherpa agent context --base <base-ref>
+gosherpa agent context --base <base-ref> --use-snapshot --json
+```
+
+The command is diff-first only. It composes readiness, snapshot status,
+changed files/packages/symbols, bounded reading order, target risk, affected
+packages, possible runtime relationship summaries when snapshot-backed,
+interface summaries, test plan, suggested commands, section modes, confidence,
+and limitations. It does not accept symbol, file, package, or free-form
+positional targets; focused drill-down remains with the existing context
+commands.
+
+Implemented supporting context slices:
 
 ```bash
 gosherpa context symbol <target>
@@ -56,25 +72,26 @@ impact, affected tests, suggested commands, reading order, confidence, and
 limitations.
 Diff context exports changed files, changed packages, changed symbols, affected
 packages, affected tests, suggested commands, reading order, confidence, and
-limitations.
+limitations. It is now a lower-level focused command used by
+`agent context`, not the primary daily-driver command.
 
 The current context JSON already includes `analysisMode`, `confidence`, and
 `limitations`, with schema docs, entry-count size controls, and `--max-bytes`
 byte-budget control for context exports. The remaining hardening work is
 broader consistency across agent-facing commands.
 
-Command sketches:
+Current daily-driver shape:
 
 ```bash
-gosherpa context symbol ./internal/auth.ValidateToken
-gosherpa context file internal/auth/token.go
-gosherpa context package ./internal/auth
-gosherpa context diff --base main
-gosherpa prompt ./internal/auth.ValidateToken
+gosherpa doctor --json
+gosherpa snapshot --json
+gosherpa agent context --base <base-ref> --use-snapshot --json
+gosherpa context symbol ./internal/auth.ValidateToken --use-snapshot --json
+gosherpa tests affected --base <base-ref> --use-snapshot --json
 ```
 
-The exact command name can change, but the job should be stable: produce a
-small, trustworthy bundle of relevant code intelligence.
+The command name is locked for this plan. Later agent workflow targets may be
+added only after the diff-first workflow is robust.
 
 The output should include:
 
@@ -100,16 +117,49 @@ An agent usually needs enough context to make a safe edit, not every possible
 fact about the repository. A context command would reduce random file opening
 and make GoSherpa the first stop for symbol-level work.
 
-Done when:
+Done for the first slice:
 
 - `--json` output has a documented schema.
 - Human output is readable in a terminal.
-- Output has size controls such as `--max-files`, `--max-references`,
-  `--max-symbols`, `--max-tests`, `--source-radius`, and `--max-bytes`.
-- Ambiguous targets return candidates instead of guessing.
-- The command can run against a symbol, file, package, or git diff.
+- Output has size controls: `--max-files`, `--max-symbols`, `--max-tests`, and
+  `--max-bytes` for the composed payload.
+- `--base` is required.
+- Symbol, file, package, and free-form targets are rejected for this command.
+- Unsupported inherited flags are rejected with explicit validation messages.
 
-### 2. Typechecked Repository Loading
+Still needed:
+
+- More real-world repository fixture coverage.
+
+### 2. Real-World Repository Robustness
+
+Make analysis behavior explicit and reliable across the Go repository shapes
+agents encounter every day.
+
+Focus areas:
+
+- `go.work`
+- nested modules
+- build tags
+- generated files policy
+- local replacements
+- partial package-load failures
+- large monorepo boundaries
+
+Why this helps:
+
+The daily-driver command is only habit-forming if repository readiness warnings
+make incomplete analysis obvious before an agent trusts the answer.
+
+Done when:
+
+- `agent context`, focused context commands, impact, tests, and doctor agree on
+  readiness and fallback wording.
+- Fixtures cover the repository-shape cases above.
+- Partial package failure keeps useful AST fallback while surfacing confidence
+  and limitations.
+
+### 3. Typechecked Repository Loading
 
 Move the highest-risk analysis paths from AST-only heuristics toward Go
 semantics using `go/packages` and the Go type checker.
@@ -151,7 +201,7 @@ Done when:
 - Fixtures cover build tags, `go.work`, aliases, generics, embedded
   interfaces, and cross-package method calls.
 
-### 3. Confidence And Limitations In Every Agent-Facing Result
+### 4. Confidence And Limitations In Every Agent-Facing Result
 
 Expose what GoSherpa knows, what it inferred, and what it could not prove.
 
@@ -184,9 +234,10 @@ Done when:
 - Human output shows warnings without becoming noisy.
 - Confidence is rule-based and deterministic.
 
-### 4. Test Planning That Separates Direct, Related, And Fallback Tests
+### 5. Test Planning And Entrypoint Intelligence
 
-Make test recommendations more structured.
+Make test recommendations and runtime entrypoint hints stronger first-class
+signals in agent workflows.
 
 Suggested output groups:
 
@@ -221,17 +272,17 @@ Done when:
 These features are not as important as correctness, but they determine whether
 GoSherpa stays in the workflow during a long task.
 
-### 5. Incremental Snapshot Or Index
+### 6. Incremental Snapshot Or Index
 
 Add a persistent repository snapshot for repeated queries.
 
-Status: first slice implemented with explicit `gosherpa snapshot` creation,
-versioned `.gosherpa/snapshot.json` output, file freshness metadata, package and
-symbol inventory, build tags, git state, and `doctor` diagnostics for missing,
-valid, stale, and invalid snapshots. Opt-in reuse is available for `analyze`,
-`symbols`, `symbol`, `search`, test-inclusive `packages --tests`, and current
-changed-symbol inventory in `context diff`, `impact diff`, `tests affected`,
-and `pr`; broader automatic query reuse is still future work.
+Status: implemented with explicit `gosherpa snapshot` creation, versioned
+`.gosherpa/snapshot.json` output, freshness metadata, package and symbol
+inventory, build tags, git state, relationship-capability metadata, and
+`doctor` diagnostics for missing, valid, stale, and invalid snapshots. Opt-in
+reuse is available for inventory commands, selected standalone relationship
+commands, `context symbol`, `impact symbol`, diff-oriented workflows, and
+`agent context`.
 
 Command sketches:
 
@@ -256,7 +307,7 @@ Done when:
 - Stale snapshots produce clear diagnostics.
 - The cache format has a version.
 
-### 6. One Pull-Request Intelligence Command
+### 7. One Pull-Request Intelligence Command
 
 Status: first slice implemented as one high-level command for change review.
 
@@ -290,7 +341,7 @@ Done for the first slice:
 - Human output is short enough for a PR comment.
 - JSON output is stable enough for CI and agents.
 
-### 7. Source Snippet Ranges
+### 8. Source Snippet Ranges
 
 Status: implemented for symbols, references, callers, callees, call path steps,
 related tests, and range-backed reading-order entries in JSON output.
@@ -314,7 +365,7 @@ Done for the first slice:
 
 These features turn the CLI into infrastructure other tools can rely on.
 
-### 8. MCP Or Long-Running Server Mode
+### 9. MCP Or Long-Running Server Mode
 
 Expose GoSherpa through a local protocol that avoids repeated process startup
 and makes queries discoverable.
@@ -347,7 +398,7 @@ Done when:
 - Server startup validates the repository root.
 - Long-running mode reuses the snapshot or in-memory index.
 
-### 9. Schema Documentation And Compatibility Policy
+### 10. Schema Documentation And Compatibility Policy
 
 Document the JSON contracts as product surface.
 
@@ -363,7 +414,7 @@ Done when:
 - Breaking fields require a schema version bump.
 - Golden tests cover representative real outputs.
 
-### 10. `gosherpa doctor`
+### 11. `gosherpa doctor`
 
 Add a command that explains analysis readiness.
 
@@ -398,25 +449,22 @@ Done when:
 
 ## Suggested Build Order
 
-1. Harden agent context export for symbols, files, packages, and diffs.
-2. Extend confidence, limitations, and analysis-mode fields beyond context.
-3. Typechecked loading for the most important relationships.
-4. Structured test planning with reasons.
-5. Incremental snapshot.
-6. Harden the PR intelligence command.
-7. Position ranges.
-8. MCP or server mode.
-9. Schema documentation.
-10. `doctor`.
+1. Harden `gosherpa agent context --base <base-ref>` for size, snapshot
+   ergonomics, and real repository shapes.
+2. Broaden real-world repository robustness fixtures.
+3. Promote tests and entrypoints as stronger first-class workflow signals.
+4. Continue semantic accuracy work where it improves those workflows.
+5. Defer MCP, TUI, graph export, and hosted/server surfaces until the daily
+   workflow is reliable.
 
 ## The Real Adoption Threshold
 
 I would start using GoSherpa by default when this workflow is reliable:
 
 ```bash
-gosherpa context diff --base main --json
+gosherpa agent context --base <base-ref> --use-snapshot --json
 gosherpa context symbol <package-qualified-symbol> --json
-gosherpa tests affected --base main --json
+gosherpa tests affected --base <base-ref> --use-snapshot --json
 ```
 
 Those commands need to be fast, deterministic, explicit about uncertainty, and

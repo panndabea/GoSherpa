@@ -213,7 +213,7 @@ func doctorLimitations() []string {
 		"Doctor checks repository readiness; it does not prove every downstream analysis is complete.",
 		"Package loading follows the current Go environment and any provided --tags values.",
 		"Generated files are included when Go package loading includes them; generated-file policy is currently informational.",
-		"Snapshots store repository inventory, freshness metadata, and bounded relationship metadata; relationship query reuse is still opt-in follow-up work.",
+		"Snapshots store repository inventory, freshness metadata, bounded relationship metadata, and selected reusable relationship records; reuse remains opt-in per command.",
 	}
 }
 
@@ -225,7 +225,7 @@ func doctorSuggestions(report doctorReport) []string {
 	case "warnings":
 		suggestions = append(suggestions, "Review package load warnings before relying on semantic references, calls, or interface results.")
 	default:
-		suggestions = append(suggestions, "Run gosherpa context diff --base <ref> or gosherpa context symbol <target> for focused code intelligence.")
+		suggestions = append(suggestions, "Run gosherpa agent context --base <ref> or gosherpa context symbol <target> for focused code intelligence.")
 	}
 
 	if len(report.BuildTags) == 0 {

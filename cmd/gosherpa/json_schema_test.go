@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/panndabea/GoSherpa/internal/agentcontext"
+	agentworkflow "github.com/panndabea/GoSherpa/internal/agentworkflow"
 	explainengine "github.com/panndabea/GoSherpa/internal/explain"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
@@ -483,6 +484,94 @@ func TestMainContextDiffJSONSchemaContract(t *testing.T) {
 	}
 
 	if strings.Contains(result.Stdout, "CONTEXT DIFF") {
+		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainAgentContextJSONSchemaContract(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "agent", "context", "--base", "HEAD", "--json"})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "agent context", "HEAD", "example.com/app")
+
+	wantFields := map[string]string{
+		"analysisMode": agentcontext.AnalysisModeDiffTypechecked,
+		"confidence":   agentcontext.ConfidenceMedium,
+	}
+	for field, want := range wantFields {
+		if data[field] != want {
+			t.Fatalf("expected data.%s %q, got %v", field, want, data[field])
+		}
+	}
+
+	for _, field := range []string{
+		"changedFiles",
+		"changedPackages",
+		"affectedPackages",
+		"affectedSymbols",
+		"changedSymbolDetails",
+		"readingOrder",
+		"testCommands",
+		"suggestedCommands",
+		"sectionModes",
+		"sectionTruncation",
+		"limitations",
+	} {
+		if _, ok := data[field].([]any); !ok {
+			t.Fatalf("expected data.%s to be a JSON array, got %T", field, data[field])
+		}
+	}
+	for _, field := range []string{"readiness", "snapshot", "targetRisk", "possibleRuntimeRelationships", "interfaceSummary", "testPlan"} {
+		if _, ok := data[field].(map[string]any); !ok {
+			t.Fatalf("expected data.%s to be a JSON object, got %T", field, data[field])
+		}
+	}
+	assertMainTestTestPlanContract(t, data, "testPlan")
+
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["requested"] != false || snapshot["used"] != false {
+		t.Fatalf("expected snapshot to be unrequested and unused, got %#v", snapshot)
+	}
+	possibleRuntime := assertMainTestJSONObject(t, data, "possibleRuntimeRelationships")
+	for _, field := range []string{"counts", "examples", "limitations"} {
+		if _, ok := possibleRuntime[field].([]any); !ok {
+			t.Fatalf("expected data.possibleRuntimeRelationships.%s to be an array, got %T", field, possibleRuntime[field])
+		}
+	}
+	sectionModes := assertMainTestJSONArray(t, data, "sectionModes")
+	if len(sectionModes) == 0 {
+		t.Fatal("expected section modes")
+	}
+	var sawSnapshot bool
+	for _, value := range sectionModes {
+		mode, ok := value.(map[string]any)
+		if !ok {
+			t.Fatalf("expected section mode object, got %#v", value)
+		}
+		if mode["section"] == "snapshot" {
+			sawSnapshot = true
+			if mode["analysisMode"] != agentworkflow.AnalysisModeLive {
+				t.Fatalf("expected live snapshot section mode, got %#v", mode)
+			}
+		}
+	}
+	if !sawSnapshot {
+		t.Fatalf("expected snapshot section mode, got %#v", sectionModes)
+	}
+
+	if _, ok := data["warnings"]; ok {
+		t.Fatalf("expected warnings to live on the JSON envelope, got data warnings: %v", data["warnings"])
+	}
+	if strings.Contains(result.Stdout, "AGENT CONTEXT") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
 	}
 }

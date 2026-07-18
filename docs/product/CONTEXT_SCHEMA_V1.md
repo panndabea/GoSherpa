@@ -17,6 +17,11 @@
 Warnings live on the envelope. Context `data` objects do not include a
 `warnings` field.
 
+The top-level `gosherpa agent context --base <ref>` workflow composes diff
+context with readiness, snapshot, test, and PR-oriented summaries. Its JSON
+contract is documented in `JSON_SCHEMA_V1.md`; this file covers the focused
+`gosherpa context symbol|file|package|diff` drill-down commands.
+
 ## Shared Context Fields
 
 Every context result includes:
