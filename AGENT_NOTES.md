@@ -9,10 +9,11 @@ instructions. Read it when GoSherpa itself is useful for the task.
 
 ## What GoSherpa Is
 
-GoSherpa is a CLI tool for analyzing Go repositories and returning focused,
-deterministic code-structure context. It helps answer questions about symbols,
-references, callers, callees, packages, tests, interfaces, entrypoints, call
-paths, and diff impact without relying only on broad text search.
+GoSherpa is an agent-first CLI tool for analyzing Go repositories and returning
+focused, deterministic code-structure context. It helps answer questions about
+symbols, references, callers, callees, packages, tests, interfaces,
+entrypoints, call paths, and diff impact without relying only on broad text
+search.
 
 Use GoSherpa output as grounded context that guides source reading. It should
 not replace reading the relevant files before editing.
@@ -106,10 +107,11 @@ before broad inventory commands like unfiltered `symbols`.
 
 ## Context Commands
 
-Use `gosherpa context` when an agent needs a compact reading bundle before
-editing a known symbol, file, package, or diff. Use `gosherpa agent context`
-first when the task is diff-oriented. Add size controls whenever the repository
-or target may be large:
+Use `gosherpa agent context` first for diff-oriented review, repair, and edit
+tasks. Use `gosherpa context` as the focused drill-down layer when an agent
+needs a compact reading bundle for a known symbol, file, package, or lower-level
+diff question. Add size controls whenever the repository or target may be
+large:
 
 ```bash
 gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json

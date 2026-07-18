@@ -1,9 +1,11 @@
 # GoSherpa Feature Roadmap
 
-GoSherpa should help people understand Go codebases quickly and confidently.
+GoSherpa should help coding agents and people understand Go codebases quickly
+and confidently before they change code.
 
-The primary product is a human-friendly code navigation tool. It should answer
-the questions developers ask before, during, and after a change:
+The primary product is an agent-first repository intelligence layer with an
+excellent human CLI. It should answer the questions a coding agent or developer
+asks before, during, and after a change:
 
 - What is this symbol?
 - Where is it defined?
@@ -14,40 +16,46 @@ the questions developers ask before, during, and after a change:
 - What might break if I change this?
 - Which tests should I run?
 
-Agent-friendly usage should be designed in from the beginning, but it should not
-lead the product. The default experience should remain clear terminal output for
-humans. Machine-readable output can be added as a stable alternate surface once
-the underlying concepts are reliable.
+Agent workflows now lead the product shape. The default daily-driver path is a
+bounded, machine-readable context bundle, while terminal output remains clear
+and useful for people. Human and JSON surfaces should describe the same
+repository intelligence instead of becoming separate products.
 
 ## Product Positioning
 
-GoSherpa is structural code intelligence for Go projects.
+GoSherpa is agent-first structural code intelligence for Go repositories.
 
 It is not an IDE replacement, a static analyzer suite, or a code generation
-framework. It is a fast command-line companion for answering navigation and
-impact questions inside a repository.
+framework. It is a local command-line intelligence layer for answering
+navigation, context, impact, test, and reachability questions inside a Go
+repository.
 
 The Impact Engine direction from [PRD_V01.md](PRD_V01.md) is implemented as the
-v0.1 MVP: a conservative Change Intelligence CLI with diff-based impact
-analysis, package-level affected tests, and interface impact signals. The active
-product direction is Symbol Intelligence from [PRD_V02.md](PRD_V02.md), centered
-on richer symbol profiles, `gosherpa explain`, context export, and semantic
-reference accuracy.
+v0.1 MVP: conservative change intelligence with diff-based impact analysis,
+package-level affected tests, and interface impact signals. The Symbol
+Intelligence direction from [PRD_V02.md](PRD_V02.md) is also part of the current
+baseline through richer symbol profiles, `gosherpa explain`, context export,
+and semantic reference accuracy. The active product direction is the agent-first
+intelligence platform from [PRD_V03.md](PRD_V03.md): one repository-grounded
+analysis layer consumed by `agent context`, focused CLI commands, CI, and future
+integrations.
 
 Core promise:
 
 ```text
-Ask a code-structure question. Get a small, trustworthy answer.
+Give an agent a repository question. Get a small, trustworthy map.
 ```
 
 Design principles:
 
-- Human-readable by default.
+- Agent workflows first; human output remains first-class.
 - Deterministic output.
 - Small commands that compose well.
 - Prefer Go semantics over text matching where correctness matters.
 - Show enough context to support decisions, not so much that output becomes
   noisy.
+- Make uncertainty machine-readable through warnings, confidence, analysis
+  modes, limitations, and truncation metadata.
 - Keep the implementation explainable.
 - Do not require annotations, generated metadata, or project-specific config for
   normal use.
@@ -199,8 +207,8 @@ Current limitations:
 
 ## Roadmap Overview
 
-The roadmap is organized around the order in which a developer naturally moves
-through a change:
+The roadmap is organized around the order in which a coding agent naturally
+moves through a change, with the same answers remaining readable for humans:
 
 1. Find the relevant code.
 2. Understand what it is.
@@ -222,7 +230,7 @@ Recommended phases:
 | 5 | Tests and impact | GoSherpa helps plan safe changes. |
 | 6 | Package and architecture navigation | Developers can inspect repository structure as a system. |
 | 7 | Interactive navigation | Bigger explorations become comfortable. |
-| 8 | Machine-readable surfaces | Agents and scripts can consume the same intelligence reliably. |
+| 8 | Integrations | Agents, scripts, CI, and editors can consume the same intelligence reliably. |
 
 ## Phase 0: CLI and Data Foundations
 

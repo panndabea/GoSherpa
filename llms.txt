@@ -1,8 +1,8 @@
 # GoSherpa
 
-GoSherpa is a CLI tool for structural code intelligence in Go repositories. It
-returns deterministic, repository-grounded context that humans and AI coding
-agents can inspect before changing code.
+GoSherpa is an agent-first CLI tool for structural code intelligence in Go
+repositories. It returns deterministic, repository-grounded context that AI
+coding agents and humans can inspect before changing code.
 
 Use GoSherpa when an agent or developer needs grounded answers about:
 
@@ -27,7 +27,7 @@ Do not use GoSherpa for:
 ## Agent Starting Workflow
 
 For review, repair, or edit tasks in a Go repository, start with readiness and
-diff context:
+the agent-first diff context:
 
 ```bash
 gosherpa doctor
@@ -129,7 +129,8 @@ not replace inspecting the relevant files.
 
 ## Context Commands
 
-Context commands are optimized for bounded pre-edit agent context:
+`gosherpa agent context` is the daily-driver workflow. Focused `context`
+commands are the drill-down layer for known symbols, files, packages, or diffs:
 
 ```bash
 gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json

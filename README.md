@@ -4,8 +4,8 @@
   <h1>GoSherpa</h1>
 
   <p>
-    <strong>Structural code intelligence for Go projects.</strong><br>
-    Explore symbols, references, packages, callers, callees, tests, and diff impact from a calm, deterministic CLI.
+    <strong>Agent-first structural intelligence for Go repositories.</strong><br>
+    Give coding agents and developers bounded, deterministic context before changing Go code.
   </p>
 
   <p>
@@ -17,28 +17,29 @@
 
 ---
 
-> Ask a code-structure question. Get a small, trustworthy answer.
+> Give an agent a repository question. Get a small, trustworthy map.
 
-GoSherpa is a command-line companion for understanding Go repositories before
-you edit them. It helps developers and coding agents answer focused questions
-about where code lives, who uses it, what it calls, which packages and tests are
-nearby, and what a change might affect.
+GoSherpa is an agent-first command-line intelligence layer for Go repositories.
+It helps coding agents and developers answer focused questions before editing:
+where code lives, who uses it, what it calls, which entrypoints may reach it,
+which packages and tests are nearby, and what a change might affect.
 
-It is intentionally boring in the good way: local analysis, deterministic
-output, human-readable tables by default, and JSON when you want automation.
+Agent-first keeps the human CLI first-class. GoSherpa is intentionally boring
+in the good way: local analysis, deterministic output, readable terminal
+tables, and stable JSON envelopes for automation.
 
 ## What You Can Ask
 
 | Question | Start with |
 | --- | --- |
+| What should an agent read before editing? | `gosherpa agent context --base <ref> --use-snapshot --json` |
 | What shape is this repository in? | `gosherpa doctor`, `gosherpa analyze .` |
 | Where is this symbol defined? | `gosherpa search <terms>`, `gosherpa symbol <target>` |
 | Who uses this function or type? | `gosherpa refs <target>`, `gosherpa callers <target>` |
 | What does this function call? | `gosherpa callees <target>`, `gosherpa path <from> <to>` |
 | Which interfaces and implementers are involved? | `gosherpa interface <interface>`, `gosherpa implementers <interface>` |
 | Which tests are related? | `gosherpa tests <target>`, `gosherpa tests affected --base <ref>` |
-| What might this change affect? | `gosherpa context diff --base <ref>`, `gosherpa impact diff --base <ref>` |
-| What should an agent read before editing? | `gosherpa agent context --base <ref> --use-snapshot --json` |
+| What might this change affect? | `gosherpa agent context --base <ref>`, `gosherpa impact diff --base <ref>` |
 
 ## Quickstart
 
@@ -46,8 +47,9 @@ output, human-readable tables by default, and JSON when you want automation.
 git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go run ./cmd/gosherpa version
-go run ./cmd/gosherpa doctor
-go run ./cmd/gosherpa analyze .
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --json
 ```
 
 Try a few focused questions:
@@ -83,10 +85,18 @@ directory:
 
 ```bash
 ./gosherpa --root /path/to/project analyze .
-./gosherpa --root /path/to/project context diff --base HEAD --json
+./gosherpa --root /path/to/project agent context --base HEAD --json
 ```
 
 ## Common Workflows
+
+For the default agent-first pre-edit flow:
+
+```bash
+gosherpa doctor --json
+gosherpa snapshot --json
+gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+```
 
 For repository orientation:
 
@@ -110,7 +120,7 @@ gosherpa callees ./internal/sherpa.ParseFile --json
 For a change or pull request:
 
 ```bash
-gosherpa context diff --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --json
+gosherpa agent context --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --json
 gosherpa impact diff --base HEAD --json
 gosherpa tests affected --base HEAD --json
 gosherpa pr --base HEAD --json
@@ -124,7 +134,7 @@ gosherpa symbols --use-snapshot
 gosherpa refs ParseFile --use-snapshot --json
 gosherpa callers ParseFile --use-snapshot --json
 gosherpa interface ./internal/auth.Authenticator --use-snapshot --json
-gosherpa context diff --base HEAD --use-snapshot --json
+gosherpa agent context --base HEAD --use-snapshot --json
 ```
 
 ## Command Map
@@ -170,7 +180,6 @@ Agents should prefer bounded, task-specific context over broad inventory dumps:
 ```bash
 gosherpa doctor --json
 gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
-gosherpa context diff --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa tests affected --base HEAD --use-snapshot --json
 ```
@@ -183,8 +192,9 @@ contracts.
 ## Status
 
 GoSherpa is an early MVP. The Impact Engine v0.1 track is implemented, and
-current work focuses on deeper symbol intelligence, reusable relationship data,
-runtime-aware possible call signals, and target-aware impact summaries.
+current work focuses on making the agent workflow reliable across ordinary Go
+repositories while keeping focused symbol, context, impact, test, and entrypoint
+answers sharp.
 
 Read the [implementation status](docs/STATUS.md), [release notes](docs/releases/RELEASE_NOTES_V01.md),
 or [feature roadmap](docs/product/FEATURE_ROADMAP.md) for the current product
@@ -194,7 +204,8 @@ state.
 
 | Principle | What it means |
 | --- | --- |
-| Human-readable first | Terminal output should be scannable before it is exhaustive |
+| Agent-first workflow | The daily driver should give coding agents bounded context before edits |
+| Human-readable too | Terminal output should be scannable before it is exhaustive |
 | Deterministic by default | Repeated runs should produce stable, trustworthy answers |
 | Focused commands | Each command should answer one navigation question clearly |
 | Repository-native | GoSherpa uses information already present in the codebase |

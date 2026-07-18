@@ -33,40 +33,42 @@ TEST PLAN
   go test ./internal/sherpa`
     },
     context: {
-      command: "gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --json",
-      output: `$ gosherpa context symbol ParseFile --max-references 20 --max-tests 10 --json
+      command: "gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json",
+      output: `$ gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
 
 {
   "schemaVersion": 1,
-  "command": "context symbol",
-  "target": "ParseFile",
+  "command": "agent context",
+  "target": "HEAD",
   "data": {
-    "identity": {
-      "package": "./internal/sherpa",
-      "symbol": "ParseFile",
-      "kind": "function",
-      "definition": {
-        "file": "internal/sherpa/parse.go",
-        "line": 15
-      }
+    "purpose": "Agent diff context for HEAD",
+    "readiness": {
+      "confidence": "high"
     },
-    "confidence": "medium",
-    "sourceContext": {
-      "startLine": 12,
-      "endLine": 35
+    "snapshot": {
+      "requested": true,
+      "used": true
     },
-    "references": [
+    "changedFiles": [
       {
-        "file": "internal/sherpa/repository.go",
-        "line": 28
+        "path": "internal/sherpa/parse.go"
       }
     ],
-    "relatedTests": [
-      {
-        "name": "TestParseFile",
-        "file": "internal/sherpa/parse_test.go",
-        "line": 11
-      }
+    "targetRisk": {
+      "level": "medium"
+    },
+    "readingOrder": [
+      "internal/sherpa/parse.go",
+      "internal/sherpa/repository.go",
+      "internal/sherpa/parse_test.go"
+    ],
+    "testCommands": [
+      "go test ./internal/sherpa",
+      "go test ./cmd/gosherpa"
+    ],
+    "suggestedCommands": [
+      "gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --json",
+      "gosherpa tests affected --base HEAD --use-snapshot --json"
     ]
   }
 }`

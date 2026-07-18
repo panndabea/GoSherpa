@@ -25,10 +25,10 @@ The recommended agent habit is:
 
 ```bash
 gosherpa doctor --json
-gosherpa analyze . --json
-gosherpa context diff --base main --json --max-files 10 --max-symbols 20 --max-tests 10
+gosherpa snapshot --json
+gosherpa agent context --base main --use-snapshot --json --max-files 10 --max-symbols 20 --max-tests 10 --max-bytes 12000
 gosherpa context symbol <target> --json --max-references 20 --max-tests 10
-gosherpa tests affected --base main
+gosherpa tests affected --base main --use-snapshot --json
 ```
 
 Agents should prefer entry-count limits first. Use `--max-bytes` only as a hard
@@ -121,7 +121,7 @@ trust failure.
 ### 7. Diff Context Is Missing Or Review-Weak
 
 For review and repair tasks, agents need a compact diff map. A recommendation is
-blocked if `context diff` or an equivalent command cannot explain:
+blocked if `agent context` cannot explain:
 
 - changed files
 - changed packages
@@ -197,9 +197,9 @@ Agents should use GoSherpa output as a map, not as a replacement for reading the
 code. A good workflow is:
 
 1. Run `doctor` if repository readiness is unknown.
-2. Run `analyze` for the repository map.
-3. Run `context diff` for review or repair tasks.
-4. Run `context symbol`, `context file`, or `context package` before editing.
+2. Run `snapshot` when repeated queries or snapshot-backed relationships matter.
+3. Run `agent context` for review, repair, or edit tasks.
+4. Run `context symbol`, `context file`, or `context package` before focused editing.
 5. Open the source locations from `readingOrder`.
 6. Run the suggested focused tests.
 7. Broaden to `go test ./...` when confidence, risk, or changed surface area

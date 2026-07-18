@@ -1,8 +1,8 @@
 # GoSherpa Must-Use Readiness
 
 This document captures the current product judgment for what would make
-GoSherpa move from "useful sometimes" to "I should reach for this early in most
-Go repository tasks."
+GoSherpa move from "useful sometimes" to "a coding agent should reach for this
+early in most Go repository tasks."
 
 Use this as a decision lens for future planning and implementation steps. The
 feature roadmap and PRDs remain the broader source of truth; this file ranks the
@@ -25,9 +25,9 @@ GoSherpa already has real MVP substance:
 - stable JSON output for commands
 - ambiguity diagnostics and package-qualified target support
 
-The active remaining gap is daily-use reliability in ordinary repositories.
-GoSherpa now has the underlying context, impact, snapshot, possible-call,
-test-planning, and target-risk signals; the next must-use threshold depends on
+The active product direction is agent-first repository intelligence. GoSherpa
+now has the underlying context, impact, snapshot, possible-call, test-planning,
+entrypoint, and target-risk signals; the next must-use threshold depends on
 making the standard agent workflow obvious, bounded, and trustworthy across
 workspaces, nested modules, build tags, generated files, partial package-load
 failures, local replacements, and larger repositories.
@@ -36,7 +36,8 @@ Estimated readiness: roughly 86-88 percent of the must-use threshold.
 
 ## Must-Use Threshold
 
-GoSherpa becomes a must-use tool when this habit feels obvious:
+GoSherpa becomes a must-use tool when this habit feels obvious to coding
+agents and still reads well for humans:
 
 ```bash
 gosherpa doctor --json
@@ -142,8 +143,9 @@ wrong implementer, users and agents fall back to manual search.
 ### 3. Production-Ready Focused Context Export
 
 The existing `gosherpa context symbol|file|package|diff` commands are the
-focused drill-down layer beneath `gosherpa agent context`. Keep them compact,
-bounded, and trustworthy for symbol, file, package, and diff exploration.
+focused drill-down layer beneath the agent-first daily driver,
+`gosherpa agent context`. Keep them compact, bounded, and trustworthy for
+symbol, file, package, and diff exploration.
 
 Current status: priority implementation slice complete. Context schema docs,
 golden fixtures, and schema guard tests are aligned for symbol, file, package,
@@ -259,7 +261,7 @@ Command sketch:
 
 ```bash
 gosherpa snapshot
-gosherpa context diff --base main --use-snapshot
+gosherpa agent context --base main --use-snapshot --json
 ```
 
 Done when:

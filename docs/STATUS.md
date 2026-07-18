@@ -1,6 +1,10 @@
 # GoSherpa Status
 
-GoSherpa is an early MVP. The Impact Engine v0.1 track from [PRD_V01.md](product/PRD_V01.md) is complete; current work continues the Symbol Intelligence track from [PRD_V02.md](product/PRD_V02.md).
+GoSherpa is an early MVP. The Impact Engine v0.1 track from
+[PRD_V01.md](product/PRD_V01.md) is complete, Symbol Intelligence from
+[PRD_V02.md](product/PRD_V02.md) is part of the baseline, and current work
+focuses on the agent-first intelligence platform direction from
+[PRD_V03.md](product/PRD_V03.md).
 
 Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), or start from the [docs index](README.md).
 
@@ -8,7 +12,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 
 | Next | Goal |
 | --- | --- |
-| Agent Workflow Robustness | Harden `gosherpa agent context --base <base-ref>` across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
+| Agent-First Workflow Robustness | Make `gosherpa agent context --base <base-ref>` the obvious first command for coding agents across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
 
 ## Repository Shape Support
 

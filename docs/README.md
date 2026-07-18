@@ -11,8 +11,8 @@ keeps the main README, license, and agent guide easy to find.
   workflow, JSON usage, and limitations for coding agents.
 - [Implementation Status](STATUS.md) - implemented MVP capabilities, known
   limitations, and current roadmap focus.
-- [Feature Roadmap](product/FEATURE_ROADMAP.md) - current product direction and
-  implementation status.
+- [Feature Roadmap](product/FEATURE_ROADMAP.md) - current agent-first product
+  direction and implementation status.
 - [Must-Use Readiness](product/MUST_USE_READINESS.md) - near-term decision lens
   for making GoSherpa a default daily-use tool.
 - [Agent Recommendation Criteria](product/AGENT_RECOMMENDATION_CRITERIA.md) -

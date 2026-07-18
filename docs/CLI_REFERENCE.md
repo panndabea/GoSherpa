@@ -1,6 +1,8 @@
 # GoSherpa CLI Reference
 
-This page keeps the full command overview and machine-readable output notes outside the root README. Start with the [README](../README.md) if you want the shorter human introduction.
+This page keeps the full command overview and machine-readable output notes
+outside the root README. Start with the [README](../README.md) if you want the
+shorter agent-first product introduction.
 
 ## Build And Run
 
@@ -16,11 +18,13 @@ Prefer not to build a binary yet?
 ```bash
 go run ./cmd/gosherpa analyze .
 go run ./cmd/gosherpa version
+go run ./cmd/gosherpa doctor --json
+go run ./cmd/gosherpa snapshot --json
+go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --json
 go run ./cmd/gosherpa architecture
 go run ./cmd/gosherpa risk
 go run ./cmd/gosherpa symbols --kind function
 go run ./cmd/gosherpa context symbol ParseFile
-go run ./cmd/gosherpa agent context --base HEAD
 go run ./cmd/gosherpa context file internal/sherpa/impact.go
 go run ./cmd/gosherpa doctor
 go run ./cmd/gosherpa snapshot
@@ -152,7 +156,7 @@ symbol completion can come later.
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, target risk, architecture role, reading order, callers/callees, impact signals, and tests |
-| Agent workflow | `gosherpa agent context --base HEAD` | Composes readiness, snapshot status, diff context, target risk, affected tests, section modes, and next commands into one bounded daily-driver answer |
+| Agent workflow | `gosherpa agent context --base HEAD` | Composes readiness, snapshot status, diff context, target risk, affected tests, section modes, and next commands into one bounded daily-driver answer for coding agents |
 | Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, target risk, confidence, and limitations |
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |

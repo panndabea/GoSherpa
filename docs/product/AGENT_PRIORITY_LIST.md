@@ -114,8 +114,9 @@ The output should include:
 Why this helps:
 
 An agent usually needs enough context to make a safe edit, not every possible
-fact about the repository. A context command would reduce random file opening
-and make GoSherpa the first stop for symbol-level work.
+fact about the repository. `agent context` reduces random file opening for
+diff-oriented work, while focused `context` commands make GoSherpa the first
+stop for symbol-level drill-down.
 
 Done for the first slice:
 
@@ -251,7 +252,7 @@ Command sketches:
 
 ```bash
 gosherpa tests affected --base main --json
-gosherpa context diff --base main --tests
+gosherpa agent context --base main --use-snapshot --json
 ```
 
 Why this helps:
@@ -289,7 +290,7 @@ Command sketches:
 ```bash
 gosherpa analyze
 gosherpa snapshot
-gosherpa context diff --base main --use-snapshot
+gosherpa agent context --base main --use-snapshot --json
 ```
 
 The snapshot could live under `.gosherpa/` or a cache directory.
