@@ -60,8 +60,12 @@ analysis-mode fields, repository layout fields, and any truncation metadata
 before acting. `doctor.data.repository` and
 `agent context.data.readiness.repositoryLayout` report module/workspace
 boundaries, skipped nested modules, external workspace modules, and local
-replace directives. Treat GoSherpa output as grounded context that guides
-source reading; it does not replace inspecting the relevant files.
+replace directives. `doctor.data.packageLoad.diagnostics` and
+`agent context.data.readiness.packageLoad.diagnostics` distinguish
+`load-error`, `parse-error`, and `type-error` package-loading problems with
+package, file/position when known, reason, and affected analysis sections.
+Treat GoSherpa output as grounded context that guides source reading; it does
+not replace inspecting the relevant files.
 
 ## Main CLI Commands
 

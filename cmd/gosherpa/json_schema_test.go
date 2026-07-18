@@ -514,6 +514,7 @@ func TestMainAgentContextJSONSchemaContract(t *testing.T) {
 	}
 
 	for _, field := range []string{
+		"buildTags",
 		"changedFiles",
 		"changedPackages",
 		"affectedPackages",
@@ -536,6 +537,14 @@ func TestMainAgentContextJSONSchemaContract(t *testing.T) {
 		}
 	}
 	assertMainTestTestPlanContract(t, data, "testPlan")
+
+	readiness := assertMainTestJSONObject(t, data, "readiness")
+	packageLoad := assertMainTestJSONObject(t, readiness, "packageLoad")
+	for _, field := range []string{"buildTags", "affectedSections", "warnings", "diagnostics"} {
+		if _, ok := packageLoad[field].([]any); !ok {
+			t.Fatalf("expected data.readiness.packageLoad.%s to be an array, got %T", field, packageLoad[field])
+		}
+	}
 
 	snapshot := assertMainTestJSONObject(t, data, "snapshot")
 	if snapshot["requested"] != false || snapshot["used"] != false {

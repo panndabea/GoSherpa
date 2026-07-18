@@ -29,6 +29,7 @@ type Report struct {
 	Target                       string                       `json:"target"`
 	Base                         string                       `json:"base"`
 	Purpose                      string                       `json:"purpose"`
+	BuildTags                    []string                     `json:"buildTags"`
 	Readiness                    ReadinessSummary             `json:"readiness"`
 	Snapshot                     SnapshotSummary              `json:"snapshot"`
 	ChangedFiles                 []string                     `json:"changedFiles"`
@@ -68,12 +69,15 @@ type ReadinessSummary struct {
 }
 
 type PackageLoadSummary struct {
-	Status       string   `json:"status"`
-	AnalysisMode string   `json:"analysisMode"`
-	PackageCount int      `json:"packageCount"`
-	WarningCount int      `json:"warningCount"`
-	Warnings     []string `json:"warnings"`
-	Message      string   `json:"message,omitempty"`
+	Status           string                            `json:"status"`
+	AnalysisMode     string                            `json:"analysisMode"`
+	BuildTags        []string                          `json:"buildTags"`
+	AffectedSections []string                          `json:"affectedSections"`
+	PackageCount     int                               `json:"packageCount"`
+	WarningCount     int                               `json:"warningCount"`
+	Warnings         []string                          `json:"warnings"`
+	Diagnostics      []semantics.PackageLoadDiagnostic `json:"diagnostics"`
+	Message          string                            `json:"message,omitempty"`
 }
 
 type GoWorkSummary struct {
@@ -167,6 +171,7 @@ func AnalyzeContext(root string, base string, options AnalyzeOptions) (Report, e
 		Target:                       base,
 		Base:                         base,
 		Purpose:                      workflowPurpose(contextReport),
+		BuildTags:                    buildTags,
 		Readiness:                    readiness,
 		Snapshot:                     snapshotSummary,
 		ChangedFiles:                 contextReport.ChangedFiles,
@@ -230,11 +235,14 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 		readiness.Status = "limited"
 		readiness.AnalysisMode = "unavailable"
 		readiness.PackageLoad = PackageLoadSummary{
-			Status:       "failed",
-			AnalysisMode: "unavailable",
-			WarningCount: 1,
-			Warnings:     []string{message},
-			Message:      message,
+			Status:           "failed",
+			AnalysisMode:     "unavailable",
+			BuildTags:        buildTags,
+			AffectedSections: agentPackageLoadSections(),
+			WarningCount:     1,
+			Warnings:         []string{message},
+			Diagnostics:      packageLoadFailureDiagnostics(message, agentPackageLoadSections()),
+			Message:          message,
 		}
 	} else {
 		status := "ok"
@@ -243,11 +251,14 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 			readiness.Status = "warnings"
 		}
 		readiness.PackageLoad = PackageLoadSummary{
-			Status:       status,
-			AnalysisMode: "typechecked",
-			PackageCount: len(repo.Packages),
-			WarningCount: len(repo.Warnings),
-			Warnings:     uniqueStringsInOrder(repo.Warnings),
+			Status:           status,
+			AnalysisMode:     "typechecked",
+			BuildTags:        buildTags,
+			AffectedSections: agentPackageLoadSections(),
+			PackageCount:     len(repo.Packages),
+			WarningCount:     len(repo.Warnings),
+			Warnings:         uniqueStringsInOrder(repo.Warnings),
+			Diagnostics:      semantics.PackageLoadDiagnosticsWithSections(repo.Diagnostics, agentPackageLoadSections()),
 		}
 	}
 
@@ -259,6 +270,26 @@ func analyzeReadiness(root string, buildTags []string) ReadinessSummary {
 	}
 
 	return normalizeReadiness(readiness)
+}
+
+func agentPackageLoadSections() []string {
+	return []string{"readiness", "context", "impact", "interfaces", "tests"}
+}
+
+func packageLoadFailureDiagnostics(message string, affectedSections []string) []semantics.PackageLoadDiagnostic {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return nil
+	}
+
+	return semantics.PackageLoadDiagnosticsWithSections([]semantics.PackageLoadDiagnostic{
+		{
+			Package: "repository",
+			Kind:    semantics.PackageLoadDiagnosticKindLoadError,
+			Reason:  message,
+			Message: message,
+		},
+	}, affectedSections)
 }
 
 func repoShapeWarnings(readiness ReadinessSummary, layoutWarnings []string) []string {
@@ -522,6 +553,7 @@ func workflowConfidence(report Report, contextReport agentcontext.DiffReport) st
 }
 
 func normalizeReport(report Report) Report {
+	report.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(report.BuildTags))
 	report.ChangedFiles = nonNilSlice(report.ChangedFiles)
 	report.ChangedPackages = nonNilSlice(report.ChangedPackages)
 	report.AffectedPackages = nonNilSlice(report.AffectedPackages)
@@ -556,7 +588,10 @@ func normalizeReport(report Report) Report {
 
 func normalizeReadiness(readiness ReadinessSummary) ReadinessSummary {
 	readiness.RepositoryLayout = sherpa.NormalizeRepositoryLayout(readiness.RepositoryLayout)
+	readiness.PackageLoad.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(readiness.PackageLoad.BuildTags))
+	readiness.PackageLoad.AffectedSections = nonNilSlice(readiness.PackageLoad.AffectedSections)
 	readiness.PackageLoad.Warnings = nonNilSlice(uniqueStringsInOrder(readiness.PackageLoad.Warnings))
+	readiness.PackageLoad.Diagnostics = nonNilSlice(semantics.PackageLoadDiagnosticsWithSections(readiness.PackageLoad.Diagnostics, readiness.PackageLoad.AffectedSections))
 	readiness.NestedModules = nonNilSlice(readiness.NestedModules)
 	readiness.SkippedNestedModules = nonNilSlice(readiness.SkippedNestedModules)
 	readiness.RepoShapeWarnings = nonNilSlice(uniqueStringsInOrder(readiness.RepoShapeWarnings))

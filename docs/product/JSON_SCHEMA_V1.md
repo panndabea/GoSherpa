@@ -456,6 +456,7 @@ Data:
   "target": "HEAD",
   "base": "HEAD",
   "purpose": "Agent diff context for HEAD: ...",
+  "buildTags": [],
   "readiness": {},
   "snapshot": {},
   "changedFiles": [],
@@ -506,7 +507,10 @@ symbol/file/package positional targets, `--tests`, `--scope`,
   modules, repo-shape warnings, confidence, limitations, and
   `repositoryLayout`. `repositoryLayout` mirrors the doctor repository-layout
   shape so agents can see the selected module/workspace boundary without
-  running a second command.
+  running a second command. `readiness.packageLoad` includes normalized
+  `buildTags`, `affectedSections`, warning strings, and structured
+  `diagnostics` with package, file/position when known, `kind`, reason,
+  message, and affected analysis sections.
 - `snapshot`: requested/used status, freshness, path, message, relationship
   metadata, stale reasons, and refresh command when useful. The command never
   creates snapshots automatically.
@@ -791,9 +795,12 @@ Data:
   "packageLoad": {
     "status": "ok",
     "analysisMode": "typechecked",
+    "buildTags": [],
+    "affectedSections": [],
     "packageCount": 3,
     "packages": [],
-    "warningCount": 0
+    "warningCount": 0,
+    "diagnostics": []
   },
   "snapshot": {
     "supported": true,
@@ -835,7 +842,12 @@ Data:
   warnings when they affect the selected analysis boundary.
 - `buildTags`: normalized build tags supplied through `--tags`.
 - `packageLoad`: status of typechecked package loading. `status` is `ok`,
-  `warnings`, or `failed`.
+  `warnings`, or `failed`. It includes normalized `buildTags`,
+  `affectedSections`, package summaries, warning count, and structured
+  `diagnostics`. Each diagnostic includes package, optional `packageId`, file
+  and position when known, `kind` (`load-error`, `parse-error`, `type-error`,
+  or `unknown-error`), concise reason, stable message, and affected analysis
+  sections.
 - `snapshot`: current snapshot support and status. Status is `missing`,
   `valid`, `stale`, or `invalid`; valid and stale snapshots include version,
   creation, count, fingerprint, stale-reason metadata, and bounded

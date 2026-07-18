@@ -1202,6 +1202,11 @@ func TestMainRunsDoctorCommandJSON(t *testing.T) {
 	if packageLoad["packageCount"].(float64) <= 0 {
 		t.Fatalf("expected loaded packages, got %v", packageLoad["packageCount"])
 	}
+	assertMainTestJSONArrayHasLength(t, packageLoad, "buildTags", 0)
+	if sections := assertMainTestJSONArray(t, packageLoad, "affectedSections"); len(sections) == 0 {
+		t.Fatal("expected doctor package load affected sections")
+	}
+	assertMainTestJSONArrayHasLength(t, packageLoad, "diagnostics", 0)
 
 	snapshot := assertMainTestJSONObject(t, data, "snapshot")
 	if snapshot["status"] != "missing" {
@@ -1219,6 +1224,57 @@ func TestMainRunsDoctorCommandJSON(t *testing.T) {
 	}
 	if strings.Contains(result.Stdout, "DOCTOR") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainDoctorJSONReportsStructuredPackageLoadDiagnostics(t *testing.T) {
+	tmp := t.TempDir()
+	writeMainTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeMainTestFile(t, filepath.Join(tmp, "service.go"), `package app
+
+func Broken() {
+	Missing()
+}
+`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "doctor", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelopeWithWarnings(t, payload, tmp, "doctor", ".", "example.com/app")
+	warnings := assertMainTestJSONArray(t, payload, "warnings")
+	if len(warnings) == 0 {
+		t.Fatal("expected envelope warnings for package load diagnostics")
+	}
+
+	packageLoad := assertMainTestJSONObject(t, data, "packageLoad")
+	if packageLoad["status"] != "warnings" {
+		t.Fatalf("expected warning package load status, got %#v", packageLoad["status"])
+	}
+	diagnostics := assertMainTestJSONArray(t, packageLoad, "diagnostics")
+	if len(diagnostics) == 0 {
+		t.Fatal("expected structured package load diagnostics")
+	}
+	diagnostic, ok := diagnostics[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected diagnostic object, got %#v", diagnostics[0])
+	}
+	if diagnostic["kind"] != "type-error" {
+		t.Fatalf("expected type-error diagnostic, got %#v", diagnostic)
+	}
+	if diagnostic["file"] != "service.go" {
+		t.Fatalf("expected root-relative diagnostic file, got %#v", diagnostic)
+	}
+	if !strings.Contains(fmt.Sprint(diagnostic["reason"]), "Missing") {
+		t.Fatalf("expected diagnostic reason to mention Missing, got %#v", diagnostic)
+	}
+	if sections := assertMainTestJSONArray(t, diagnostic, "affectedSections"); len(sections) == 0 {
+		t.Fatalf("expected affected sections on diagnostic, got %#v", diagnostic)
 	}
 }
 
@@ -8295,6 +8351,16 @@ func assertMainTestJSONEnvelope(t *testing.T, payload map[string]any, root strin
 		t.Fatalf("expected data to be a JSON object, got %T", payload["data"])
 	}
 
+	return data
+}
+
+func assertMainTestJSONEnvelopeWithWarnings(t *testing.T, payload map[string]any, root string, command string, target string, modulePath string) map[string]any {
+	t.Helper()
+
+	warnings := assertMainTestJSONArray(t, payload, "warnings")
+	payload["warnings"] = []any{}
+	data := assertMainTestJSONEnvelope(t, payload, root, command, target, modulePath)
+	payload["warnings"] = warnings
 	return data
 }
 

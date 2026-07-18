@@ -155,6 +155,10 @@ Read these fields before acting:
 - `data.readiness.repositoryLayout` on `agent context`, and
   `data.repository` on `doctor`: selected module/workspace boundary, skipped
   nested modules, external workspace modules, and local replacements.
+- `data.readiness.packageLoad.diagnostics` on `agent context`, and
+  `data.packageLoad.diagnostics` on `doctor`: package-load diagnostics with
+  package, file/position when known, `load-error` vs `type-error`, reason, and
+  affected analysis sections.
 - `data.targetRisk`: deterministic impact-breadth evidence for the current
   target or diff; inspect its reasons, signals, and limitations before treating
   it as a planning input.
@@ -186,6 +190,10 @@ and package-qualified examples.
 - When `doctor` or `agent context` reports skipped nested modules, external
   workspace modules, or local replacements, inspect those roots separately with
   `--root` if the task touches that boundary.
+- When package-load diagnostics are present, treat `load-error` as an analysis
+  boundary problem and `type-error` as partial typechecked data with lower
+  confidence; inspect the affected sections before trusting references, calls,
+  interfaces, or test recommendations.
 - Do not claim complete call graph, runtime, security, or semantic certainty
   unless the output explicitly supports it.
 

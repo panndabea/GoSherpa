@@ -22,9 +22,10 @@ type LoadOptions struct {
 }
 
 type Repository struct {
-	Root     string
-	Packages []Package
-	Warnings []string
+	Root        string
+	Packages    []Package
+	Warnings    []string
+	Diagnostics []PackageLoadDiagnostic
 }
 
 type Package struct {
@@ -39,6 +40,34 @@ type Package struct {
 	Files           []*ast.File
 	Types           *types.Package
 	TypesInfo       *types.Info
+}
+
+const (
+	PackageLoadDiagnosticKindLoadError    = "load-error"
+	PackageLoadDiagnosticKindParseError   = "parse-error"
+	PackageLoadDiagnosticKindTypeError    = "type-error"
+	PackageLoadDiagnosticKindUnknownError = "unknown-error"
+)
+
+type PackageLoadDiagnostic struct {
+	Package          string   `json:"package"`
+	PackageID        string   `json:"packageId,omitempty"`
+	File             string   `json:"file,omitempty"`
+	Position         string   `json:"position,omitempty"`
+	Kind             string   `json:"kind"`
+	Reason           string   `json:"reason"`
+	Message          string   `json:"message"`
+	AffectedSections []string `json:"affectedSections"`
+}
+
+func PackageLoadDiagnosticsWithSections(diagnostics []PackageLoadDiagnostic, sections []string) []PackageLoadDiagnostic {
+	result := append([]PackageLoadDiagnostic{}, diagnostics...)
+	normalizedSections := uniqueSorted(sections)
+	for i := range result {
+		result[i].AffectedSections = append([]string{}, normalizedSections...)
+	}
+
+	return normalizePackageLoadDiagnostics(result)
 }
 
 var packageLoader = packages.Load
@@ -232,8 +261,10 @@ func repositoryFromLoaded(root string, patterns []string, loaded []*packages.Pac
 			continue
 		}
 
+		diagnostics := packageDiagnostics(root, pkg)
 		repo.Packages = append(repo.Packages, semanticPackage)
-		repo.Warnings = append(repo.Warnings, packageWarnings(root, pkg)...)
+		repo.Diagnostics = append(repo.Diagnostics, diagnostics...)
+		repo.Warnings = append(repo.Warnings, packageWarningsFromDiagnostics(diagnostics)...)
 	}
 
 	if len(repo.Packages) == 0 {
@@ -247,6 +278,7 @@ func repositoryFromLoaded(root string, patterns []string, loaded []*packages.Pac
 		return repo.Packages[i].ID < repo.Packages[j].ID
 	})
 	repo.Warnings = uniqueSorted(repo.Warnings)
+	repo.Diagnostics = normalizePackageLoadDiagnostics(repo.Diagnostics)
 
 	return repo, nil
 }
@@ -347,25 +379,215 @@ func packageDir(pkg *packages.Package) string {
 }
 
 func packageWarnings(root string, pkg *packages.Package) []string {
+	return packageWarningsFromDiagnostics(packageDiagnostics(root, pkg))
+}
+
+func packageDiagnostics(root string, pkg *packages.Package) []PackageLoadDiagnostic {
 	if pkg == nil {
 		return nil
 	}
-
 	label := packageLabel(pkg)
-	var warnings []string
+	var diagnostics []PackageLoadDiagnostic
 	for _, packageErr := range pkg.Errors {
 		message := packageErr.Error()
 		if !packageLoadWarningIsActionable(pkg, message) {
 			continue
 		}
+		if packageErrorCoveredByTypeErrors(pkg, packageErr) {
+			continue
+		}
 
-		warnings = append(warnings, fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, message)))
+		diagnostics = append(diagnostics, PackageLoadDiagnostic{
+			Package:          label,
+			PackageID:        pkg.ID,
+			File:             packageErrorFile(root, packageErr.Pos),
+			Position:         packageErrorPosition(root, packageErr.Pos),
+			Kind:             packageErrorKindName(packageErr.Kind),
+			Reason:           strings.TrimSpace(packageErr.Msg),
+			Message:          fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, message)),
+			AffectedSections: []string{"typechecked package loading"},
+		})
 	}
 	for _, typeErr := range pkg.TypeErrors {
-		warnings = append(warnings, fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, typeErr.Error())))
+		position := typeErrorPosition(root, typeErr)
+		diagnostics = append(diagnostics, PackageLoadDiagnostic{
+			Package:          label,
+			PackageID:        pkg.ID,
+			File:             typeErrorFile(root, typeErr),
+			Position:         position,
+			Kind:             PackageLoadDiagnosticKindTypeError,
+			Reason:           strings.TrimSpace(typeErr.Msg),
+			Message:          fmt.Sprintf("package load warning: %s: %s", label, relativePackageError(root, typeErr.Error())),
+			AffectedSections: []string{"typechecked package loading"},
+		})
+	}
+
+	return normalizePackageLoadDiagnostics(diagnostics)
+}
+
+func packageErrorCoveredByTypeErrors(pkg *packages.Package, packageErr packages.Error) bool {
+	if pkg == nil || len(pkg.TypeErrors) == 0 {
+		return false
+	}
+	message := strings.TrimSpace(packageErr.Msg)
+	if message == "" {
+		return false
+	}
+
+	for _, typeErr := range pkg.TypeErrors {
+		reason := strings.TrimSpace(typeErr.Msg)
+		if reason == "" {
+			continue
+		}
+		if strings.Contains(message, reason) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func packageWarningsFromDiagnostics(diagnostics []PackageLoadDiagnostic) []string {
+	warnings := make([]string, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		if strings.TrimSpace(diagnostic.Message) == "" {
+			continue
+		}
+
+		warnings = append(warnings, diagnostic.Message)
 	}
 
 	return warnings
+}
+
+func packageErrorKindName(kind packages.ErrorKind) string {
+	switch kind {
+	case packages.ListError:
+		return PackageLoadDiagnosticKindLoadError
+	case packages.ParseError:
+		return PackageLoadDiagnosticKindParseError
+	case packages.TypeError:
+		return PackageLoadDiagnosticKindTypeError
+	default:
+		return PackageLoadDiagnosticKindUnknownError
+	}
+}
+
+func packageErrorFile(root string, position string) string {
+	file, _ := splitPackageErrorPosition(root, position)
+	return file
+}
+
+func packageErrorPosition(root string, position string) string {
+	_, cleaned := splitPackageErrorPosition(root, position)
+	return cleaned
+}
+
+func splitPackageErrorPosition(root string, position string) (string, string) {
+	position = strings.TrimSpace(position)
+	if position == "" || position == "-" {
+		return "", ""
+	}
+
+	cleaned := relativePackageError(root, position)
+	file := cleaned
+	if index := strings.Index(cleaned, ":"); index >= 0 {
+		file = cleaned[:index]
+	}
+	if strings.TrimSpace(file) == "" || file == "-" {
+		file = ""
+	}
+
+	return filepath.ToSlash(file), filepath.ToSlash(cleaned)
+}
+
+func typeErrorFile(root string, typeErr types.Error) string {
+	if typeErr.Fset == nil || typeErr.Pos == token.NoPos {
+		return ""
+	}
+
+	position := typeErr.Fset.Position(typeErr.Pos)
+	if strings.TrimSpace(position.Filename) == "" {
+		return ""
+	}
+
+	return relativePackageError(root, position.Filename)
+}
+
+func typeErrorPosition(root string, typeErr types.Error) string {
+	if typeErr.Fset == nil || typeErr.Pos == token.NoPos {
+		return ""
+	}
+
+	position := typeErr.Fset.Position(typeErr.Pos)
+	if strings.TrimSpace(position.Filename) == "" {
+		return ""
+	}
+
+	return relativePackageError(root, position.String())
+}
+
+func normalizePackageLoadDiagnostics(diagnostics []PackageLoadDiagnostic) []PackageLoadDiagnostic {
+	if len(diagnostics) == 0 {
+		return nil
+	}
+
+	for i := range diagnostics {
+		diagnostics[i].Package = strings.TrimSpace(diagnostics[i].Package)
+		diagnostics[i].PackageID = strings.TrimSpace(diagnostics[i].PackageID)
+		diagnostics[i].File = filepath.ToSlash(strings.TrimSpace(diagnostics[i].File))
+		diagnostics[i].Position = filepath.ToSlash(strings.TrimSpace(diagnostics[i].Position))
+		diagnostics[i].Kind = strings.TrimSpace(diagnostics[i].Kind)
+		diagnostics[i].Reason = strings.TrimSpace(diagnostics[i].Reason)
+		diagnostics[i].Message = strings.TrimSpace(diagnostics[i].Message)
+		diagnostics[i].AffectedSections = uniqueSorted(diagnostics[i].AffectedSections)
+		if diagnostics[i].Kind == "" {
+			diagnostics[i].Kind = PackageLoadDiagnosticKindUnknownError
+		}
+	}
+
+	sort.SliceStable(diagnostics, func(i int, j int) bool {
+		left := diagnostics[i]
+		right := diagnostics[j]
+		if left.Package != right.Package {
+			return left.Package < right.Package
+		}
+		if left.Kind != right.Kind {
+			return left.Kind < right.Kind
+		}
+		if left.File != right.File {
+			return left.File < right.File
+		}
+		if left.Position != right.Position {
+			return left.Position < right.Position
+		}
+		if left.Reason != right.Reason {
+			return left.Reason < right.Reason
+		}
+		return left.Message < right.Message
+	})
+
+	result := diagnostics[:0]
+	seen := make(map[string]struct{}, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		key := strings.Join([]string{
+			diagnostic.Package,
+			diagnostic.PackageID,
+			diagnostic.File,
+			diagnostic.Position,
+			diagnostic.Kind,
+			diagnostic.Reason,
+			diagnostic.Message,
+			strings.Join(diagnostic.AffectedSections, "\x1f"),
+		}, "\x00")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, diagnostic)
+	}
+
+	return result
 }
 
 func packageLoadWarningIsActionable(pkg *packages.Package, message string) bool {

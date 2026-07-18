@@ -408,14 +408,18 @@ func writeRepositoryBuilderInt64(builder *strings.Builder, value int64) {
 
 func cloneRepository(repo Repository) Repository {
 	clone := Repository{
-		Root:     repo.Root,
-		Packages: append([]Package{}, repo.Packages...),
-		Warnings: append([]string{}, repo.Warnings...),
+		Root:        repo.Root,
+		Packages:    append([]Package{}, repo.Packages...),
+		Warnings:    append([]string{}, repo.Warnings...),
+		Diagnostics: append([]PackageLoadDiagnostic{}, repo.Diagnostics...),
 	}
 	for i := range clone.Packages {
 		clone.Packages[i].GoFiles = append([]string{}, clone.Packages[i].GoFiles...)
 		clone.Packages[i].CompiledGoFiles = append([]string{}, clone.Packages[i].CompiledGoFiles...)
 		clone.Packages[i].Files = append([]*ast.File{}, clone.Packages[i].Files...)
+	}
+	for i := range clone.Diagnostics {
+		clone.Diagnostics[i].AffectedSections = append([]string{}, clone.Diagnostics[i].AffectedSections...)
 	}
 
 	return clone

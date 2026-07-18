@@ -2,6 +2,7 @@ package semantics
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
@@ -200,6 +201,72 @@ func Broken() {
 	}
 	if !strings.Contains(strings.Join(repo.Warnings, "\n"), "Missing") {
 		t.Fatalf("expected warning to mention Missing, got %v", repo.Warnings)
+	}
+	if len(repo.Diagnostics) == 0 {
+		t.Fatal("expected package load diagnostics")
+	}
+	diagnostic := repo.Diagnostics[0]
+	if diagnostic.Kind != PackageLoadDiagnosticKindTypeError {
+		t.Fatalf("expected type-error diagnostic, got %#v", diagnostic)
+	}
+	if diagnostic.Package != "example.com/app" {
+		t.Fatalf("expected package label, got %#v", diagnostic)
+	}
+	if diagnostic.File != "service.go" || !strings.Contains(diagnostic.Position, "service.go") {
+		t.Fatalf("expected root-relative diagnostic location, got %#v", diagnostic)
+	}
+	if !strings.Contains(diagnostic.Reason, "Missing") || !strings.Contains(diagnostic.Message, "Missing") {
+		t.Fatalf("expected diagnostic reason/message to mention Missing, got %#v", diagnostic)
+	}
+	if len(diagnostic.AffectedSections) == 0 {
+		t.Fatalf("expected affected sections, got %#v", diagnostic)
+	}
+}
+
+func TestLoadRepositoryDistinguishesPackageListErrors(t *testing.T) {
+	tmp := t.TempDir()
+	serviceFile := filepath.Join(tmp, "service.go")
+	writeSemanticTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/app\n")
+	writeSemanticTestFile(t, serviceFile, "package app\n")
+
+	repositoryLoadCache.Clear()
+	original := packageLoader
+	t.Cleanup(func() {
+		packageLoader = original
+		repositoryLoadCache.Clear()
+	})
+
+	packageLoader = func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		return []*packages.Package{
+			{
+				ID:              "example.com/app",
+				Name:            "app",
+				PkgPath:         "example.com/app",
+				Dir:             tmp,
+				Errors:          []packages.Error{{Pos: serviceFile + ":3:2", Msg: "missing dependency", Kind: packages.ListError}},
+				GoFiles:         []string{serviceFile},
+				CompiledGoFiles: []string{serviceFile},
+				Fset:            token.NewFileSet(),
+				Syntax:          []*ast.File{{Name: ast.NewIdent("app")}},
+				Types:           types.NewPackage("example.com/app", "app"),
+				TypesInfo:       &types.Info{},
+			},
+		}, nil
+	}
+
+	repo, err := LoadRepository(tmp, LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.Diagnostics) != 1 {
+		t.Fatalf("expected one diagnostic, got %#v", repo.Diagnostics)
+	}
+	diagnostic := repo.Diagnostics[0]
+	if diagnostic.Kind != PackageLoadDiagnosticKindLoadError {
+		t.Fatalf("expected load-error diagnostic, got %#v", diagnostic)
+	}
+	if diagnostic.File != "service.go" || diagnostic.Position != "service.go:3:2" {
+		t.Fatalf("expected root-relative diagnostic position, got %#v", diagnostic)
 	}
 }
 

@@ -599,15 +599,15 @@ Goal: make build constraints and partial typechecking failures actionable.
 
 Tasks:
 
-- [ ] Ensure `--tags` compatibility is consistently represented in snapshot
+- [x] Ensure `--tags` compatibility is consistently represented in snapshot
       freshness, `doctor`, context, impact, tests, and the agent workflow.
-- [ ] Report package loading failures with package path, file when known,
+- [x] Report package loading failures with package path, file when known,
       concise reason, and affected analysis sections.
-- [ ] Distinguish "package failed to load" from "package loaded with type
+- [x] Distinguish "package failed to load" from "package loaded with type
       errors" where `go/packages` exposes that information.
-- [ ] Add build-tag fixtures with included and excluded files.
-- [ ] Add tests for stale snapshot behavior when tags differ.
-- [ ] Ensure confidence and limitations reflect partial loading.
+- [x] Add build-tag fixtures with included and excluded files.
+- [x] Add tests for stale snapshot behavior when tags differ.
+- [x] Ensure confidence and limitations reflect partial loading.
 
 Primary files:
 

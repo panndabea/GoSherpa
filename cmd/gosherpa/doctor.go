@@ -41,12 +41,15 @@ type doctorRepository = sherpa.RepositoryLayout
 type doctorGoWork = sherpa.GoWorkLayout
 
 type doctorPackageLoad struct {
-	Status       string                 `json:"status"`
-	AnalysisMode string                 `json:"analysisMode"`
-	PackageCount int                    `json:"packageCount"`
-	Packages     []doctorPackageSummary `json:"packages"`
-	WarningCount int                    `json:"warningCount"`
-	Message      string                 `json:"message,omitempty"`
+	Status           string                            `json:"status"`
+	AnalysisMode     string                            `json:"analysisMode"`
+	BuildTags        []string                          `json:"buildTags"`
+	AffectedSections []string                          `json:"affectedSections"`
+	PackageCount     int                               `json:"packageCount"`
+	Packages         []doctorPackageSummary            `json:"packages"`
+	WarningCount     int                               `json:"warningCount"`
+	Diagnostics      []semantics.PackageLoadDiagnostic `json:"diagnostics"`
+	Message          string                            `json:"message,omitempty"`
 }
 
 type doctorPackageSummary struct {
@@ -108,20 +111,26 @@ func analyzeDoctor(root string, buildTags []string) doctorReport {
 	if err != nil {
 		message := fmt.Sprintf("typechecked package loading failed: %v", err)
 		report.PackageLoad = doctorPackageLoad{
-			Status:       "failed",
-			AnalysisMode: doctorAnalysisModeUnavailable,
-			WarningCount: 1,
-			Message:      message,
+			Status:           "failed",
+			AnalysisMode:     doctorAnalysisModeUnavailable,
+			BuildTags:        normalizedTags,
+			AffectedSections: doctorPackageLoadSections(),
+			WarningCount:     1,
+			Diagnostics:      packageLoadFailureDiagnostics(message, doctorPackageLoadSections()),
+			Message:          message,
 		}
 		report.AnalysisMode = doctorAnalysisModeUnavailable
 		report.Warnings = append(report.Warnings, message)
 	} else {
 		report.PackageLoad = doctorPackageLoad{
-			Status:       doctorPackageLoadStatus(repo.Warnings),
-			AnalysisMode: doctorAnalysisModeTypechecked,
-			PackageCount: len(repo.Packages),
-			Packages:     doctorPackageSummaries(repo.Packages),
-			WarningCount: len(repo.Warnings),
+			Status:           doctorPackageLoadStatus(repo.Warnings),
+			AnalysisMode:     doctorAnalysisModeTypechecked,
+			BuildTags:        normalizedTags,
+			AffectedSections: doctorPackageLoadSections(),
+			PackageCount:     len(repo.Packages),
+			Packages:         doctorPackageSummaries(repo.Packages),
+			WarningCount:     len(repo.Warnings),
+			Diagnostics:      semantics.PackageLoadDiagnosticsWithSections(repo.Diagnostics, doctorPackageLoadSections()),
 		}
 		report.AnalysisMode = doctorAnalysisModeTypechecked
 		report.Warnings = append(report.Warnings, repo.Warnings...)
@@ -147,7 +156,10 @@ func normalizeDoctorReport(report doctorReport) doctorReport {
 	report.Repository.LocalReplacements = nonNilSlice(report.Repository.LocalReplacements)
 	report.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(report.BuildTags))
 	report.Snapshot.StaleReasons = nonNilSlice(report.Snapshot.StaleReasons)
+	report.PackageLoad.BuildTags = nonNilSlice(semantics.NormalizeBuildTags(report.PackageLoad.BuildTags))
+	report.PackageLoad.AffectedSections = nonNilSlice(report.PackageLoad.AffectedSections)
 	report.PackageLoad.Packages = nonNilSlice(report.PackageLoad.Packages)
+	report.PackageLoad.Diagnostics = nonNilSlice(semantics.PackageLoadDiagnosticsWithSections(report.PackageLoad.Diagnostics, report.PackageLoad.AffectedSections))
 	report.Limitations = nonNilSlice(report.Limitations)
 	report.Suggestions = nonNilSlice(report.Suggestions)
 	report.Warnings = nonNilSlice(uniqueStringsInOrder(report.Warnings))
@@ -167,6 +179,26 @@ func doctorPackageLoadStatus(warnings []string) string {
 	}
 
 	return "ok"
+}
+
+func doctorPackageLoadSections() []string {
+	return []string{"doctor", "references", "calls", "interfaces", "tests", "agent context"}
+}
+
+func packageLoadFailureDiagnostics(message string, affectedSections []string) []semantics.PackageLoadDiagnostic {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return nil
+	}
+
+	return semantics.PackageLoadDiagnosticsWithSections([]semantics.PackageLoadDiagnostic{
+		{
+			Package: "repository",
+			Kind:    semantics.PackageLoadDiagnosticKindLoadError,
+			Reason:  message,
+			Message: message,
+		},
+	}, affectedSections)
 }
 
 func doctorPackageSummaries(packages []semantics.Package) []doctorPackageSummary {
@@ -270,6 +302,7 @@ func formatDoctorReport(report doctorReport) string {
 	fmt.Fprintf(&builder, "  Analysis: %s\n", report.PackageLoad.AnalysisMode)
 	fmt.Fprintf(&builder, "  Packages: %d\n", report.PackageLoad.PackageCount)
 	fmt.Fprintf(&builder, "  Warnings: %d\n", report.PackageLoad.WarningCount)
+	writeDoctorPackageLoadDiagnostics(&builder, report.PackageLoad.Diagnostics)
 	if strings.TrimSpace(report.PackageLoad.Message) != "" {
 		fmt.Fprintf(&builder, "  Message: %s\n", report.PackageLoad.Message)
 	}
@@ -308,6 +341,22 @@ func formatDoctorReport(report doctorReport) string {
 	}
 
 	return builder.String()
+}
+
+func writeDoctorPackageLoadDiagnostics(builder *strings.Builder, diagnostics []semantics.PackageLoadDiagnostic) {
+	if len(diagnostics) == 0 {
+		builder.WriteString("  Diagnostics: none\n")
+		return
+	}
+
+	builder.WriteString("  Diagnostics:\n")
+	for _, diagnostic := range diagnostics {
+		location := valueOrNone(diagnostic.File)
+		if strings.TrimSpace(diagnostic.Position) != "" {
+			location = diagnostic.Position
+		}
+		fmt.Fprintf(builder, "    %s %s at %s: %s\n", diagnostic.Package, diagnostic.Kind, location, diagnostic.Reason)
+	}
 }
 
 func writeDoctorValues(builder *strings.Builder, label string, values []string) {

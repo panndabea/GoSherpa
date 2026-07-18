@@ -9,6 +9,7 @@
     "target": "HEAD",
     "base": "HEAD",
     "purpose": "Agent diff context for HEAD: Diff changes 1 file across 1 Go package. Impact analysis reaches 2 packages, 1 symbol, and 1 affected test.",
+    "buildTags": [],
     "readiness": {
       "status": "ready",
       "analysisMode": "typechecked",
@@ -16,9 +17,18 @@
       "packageLoad": {
         "status": "ok",
         "analysisMode": "typechecked",
+        "buildTags": [],
+        "affectedSections": [
+          "context",
+          "impact",
+          "interfaces",
+          "readiness",
+          "tests"
+        ],
         "packageCount": 2,
         "warningCount": 0,
-        "warnings": []
+        "warnings": [],
+        "diagnostics": []
       },
       "goWork": {
         "detected": false

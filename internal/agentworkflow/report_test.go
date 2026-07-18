@@ -285,6 +285,83 @@ func TestAnalyzeContextReportsRepositoryLayoutWarnings(t *testing.T) {
 	}
 }
 
+func TestAnalyzeContextReportsPackageLoadDiagnostics(t *testing.T) {
+	root := writeCommittedAgentWorkflowProject(t)
+	servicePath := filepath.Join(root, "service.go")
+	writeAgentWorkflowFile(t, servicePath, `package app
+
+func Entry() {
+	Target()
+}
+
+func Target() {}
+
+func Broken() {
+	Missing()
+}
+`)
+
+	report, err := AnalyzeContext(root, "HEAD", AnalyzeOptions{})
+	if err != nil {
+		t.Fatalf("AnalyzeContext returned error: %v", err)
+	}
+
+	if report.Confidence != agentcontext.ConfidenceLow {
+		t.Fatalf("expected low confidence from package load diagnostics, got %q", report.Confidence)
+	}
+	if report.Readiness.PackageLoad.Status != "warnings" {
+		t.Fatalf("expected package load warnings, got %#v", report.Readiness.PackageLoad)
+	}
+	if len(report.Readiness.PackageLoad.Diagnostics) == 0 {
+		t.Fatalf("expected package load diagnostics, got %#v", report.Readiness.PackageLoad)
+	}
+	diagnostic := report.Readiness.PackageLoad.Diagnostics[0]
+	if diagnostic.Kind != "type-error" {
+		t.Fatalf("expected type-error diagnostic, got %#v", diagnostic)
+	}
+	if diagnostic.File != "service.go" {
+		t.Fatalf("expected root-relative diagnostic file, got %#v", diagnostic)
+	}
+	if !strings.Contains(diagnostic.Reason, "Missing") {
+		t.Fatalf("expected diagnostic reason to mention Missing, got %#v", diagnostic)
+	}
+	if !agentWorkflowContains(diagnostic.AffectedSections, "context") || !agentWorkflowContains(diagnostic.AffectedSections, "tests") {
+		t.Fatalf("expected agent affected sections, got %#v", diagnostic.AffectedSections)
+	}
+}
+
+func TestAnalyzeContextReportsBuildTagSnapshotMismatch(t *testing.T) {
+	root := writeCommittedAgentWorkflowProject(t)
+	builtSnapshot, err := snapshotstore.Build(root, snapshotstore.BuildOptions{BuildTags: []string{"enterprise"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snapshotstore.Write(root, builtSnapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := AnalyzeContext(root, "HEAD", AnalyzeOptions{UseSnapshot: true})
+	if err != nil {
+		t.Fatalf("AnalyzeContext returned error: %v", err)
+	}
+
+	if report.Snapshot.Status != snapshotstore.StatusStale {
+		t.Fatalf("expected stale snapshot, got %#v", report.Snapshot)
+	}
+	if !agentWorkflowContains(report.Snapshot.StaleReasons, "build tags changed") {
+		t.Fatalf("expected build tag stale reason, got %#v", report.Snapshot.StaleReasons)
+	}
+	if report.Snapshot.Used {
+		t.Fatalf("expected tag-mismatched snapshot fallback, got %#v", report.Snapshot)
+	}
+	if report.BuildTags == nil || len(report.BuildTags) != 0 {
+		t.Fatalf("expected non-nil empty workflow build tags, got %#v", report.BuildTags)
+	}
+	if report.Readiness.PackageLoad.BuildTags == nil || len(report.Readiness.PackageLoad.BuildTags) != 0 {
+		t.Fatalf("expected non-nil empty package load build tags, got %#v", report.Readiness.PackageLoad.BuildTags)
+	}
+}
+
 func writeAgentWorkflowProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

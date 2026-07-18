@@ -49,9 +49,17 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 `gosherpa doctor` and `gosherpa agent context` report the selected repository
 layout: module or workspace boundary, visible `go.work`, workspace modules,
 skipped nested modules, workspace modules outside `--root`, local `replace`
-directives, and file counts. Nested modules and external workspace modules are
-separate analysis roots; inspect them with their own `--root` when they are
-part of the change.
+directives, file counts, build tags, and package-load diagnostics. Nested
+modules and external workspace modules are separate analysis roots; inspect
+them with their own `--root` when they are part of the change.
+
+Package-load warnings still live in the shared JSON envelope. For machine
+readable triage, `doctor.data.packageLoad.diagnostics` and
+`agent context.data.readiness.packageLoad.diagnostics` also report the package,
+file or position when known, diagnostic kind (`load-error`, `parse-error`,
+`type-error`, or `unknown-error`), concise reason, and affected analysis
+sections. `load-error` means package metadata or loading failed; `type-error`
+means GoSherpa received package data but typechecking reported errors.
 
 Generated Go files are included when they are repository-local and visible to
 the selected module or workspace. `gosherpa doctor` counts files with the
