@@ -44,6 +44,8 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ```bash
 ./gosherpa --root /path/to/GoSherpa symbols
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
+./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/json_project doctor --json
+./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/interface_project agent context --base HEAD --json
 ```
 
 `gosherpa doctor` and `gosherpa agent context` report the selected repository
@@ -55,6 +57,13 @@ skipped-module, package-warning, symbol, and relationship counts so large-repo
 outputs explain their analysis size without timing-sensitive heuristics.
 Nested modules and external workspace modules are separate analysis roots;
 inspect them with their own `--root` when they are part of the change.
+For example, if `doctor.data.repository.skippedNestedModules` contains
+`cmd/gosherpa/testdata/json_project`, inspect that fixture module directly:
+
+```bash
+./gosherpa --root cmd/gosherpa/testdata/json_project doctor --json
+./gosherpa --root cmd/gosherpa/testdata/json_project symbols --json
+```
 
 Package-load warnings still live in the shared JSON envelope. For machine
 readable triage, `doctor.data.packageLoad.diagnostics` and
@@ -63,6 +72,18 @@ file or position when known, diagnostic kind (`load-error`, `parse-error`,
 `type-error`, or `unknown-error`), concise reason, and affected analysis
 sections. `load-error` means package metadata or loading failed; `type-error`
 means GoSherpa received package data but typechecking reported errors.
+
+Use `--tags <list>` on commands that support semantic loading with build
+constraints. Tags are comma-separated, normalized for output, and included in
+snapshot freshness checks:
+
+```bash
+./gosherpa --tags enterprise,integration doctor --json
+./gosherpa --tags enterprise snapshot --json
+./gosherpa --tags enterprise agent context --base HEAD --use-snapshot --json
+./gosherpa --tags enterprise context diff --base HEAD --use-snapshot --json
+./gosherpa --tags enterprise tests affected --base HEAD --use-snapshot --json
+```
 
 Generated Go files are included when they are repository-local and visible to
 the selected module or workspace. `gosherpa doctor` and
@@ -86,6 +107,10 @@ repository analysis and report a warning. Refresh snapshots with
 `gosherpa snapshot --json` before repeated large-repo agent workflows, after
 changing build tags, or when `doctor`, `agent context`, or the envelope
 warnings report stale, missing, invalid, or relationship-limited snapshot data.
+Snapshot freshness compares repository files, `go.mod`, `go.sum`, `go.work`,
+selected build tags, git state, and relationship capability metadata. A stale
+or invalid snapshot is a performance and completeness warning, not a hard
+failure; commands continue with live analysis and include refresh guidance.
 
 ```bash
 ./gosherpa snapshot

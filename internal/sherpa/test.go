@@ -453,39 +453,12 @@ func relatedTestReasons(packageMatches bool, directReference bool, externalPacka
 }
 
 func collectTestFiles(root string) ([]testFileInfo, error) {
-	files, err := FindGoFiles(root)
+	inventory, err := BuildTestInventory(root)
 	if err != nil {
 		return nil, err
 	}
 
-	sort.Strings(files)
-
-	var testFiles []testFileInfo
-	for _, path := range files {
-		if !strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-
-		fileSet := token.NewFileSet()
-		file, err := parser.ParseFile(fileSet, path, nil, 0)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
-		}
-
-		packagePath, err := packagePathForFile(root, path)
-		if err != nil {
-			return nil, err
-		}
-
-		testFiles = append(testFiles, testFileInfo{
-			Package:     packagePath,
-			PackageName: file.Name.Name,
-			FileSet:     fileSet,
-			File:        file,
-		})
-	}
-
-	return testFiles, nil
+	return testFilesFromInventory(inventory), nil
 }
 
 func referenceTargetPackages(root string, target referenceTarget) (map[string]struct{}, error) {

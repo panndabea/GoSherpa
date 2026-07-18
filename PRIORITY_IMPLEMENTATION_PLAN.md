@@ -730,14 +730,14 @@ Goal: make the supported repository matrix clear.
 
 Tasks:
 
-- [ ] Update `docs/STATUS.md` with current support and limitations for
+- [x] Update `docs/STATUS.md` with current support and limitations for
       workspaces, nested modules, build tags, generated files, local replaces,
       partial package loads, and large repositories.
-- [ ] Update `AGENT_NOTES.md` and `llms.txt` with guidance for interpreting
+- [x] Update `AGENT_NOTES.md` and `llms.txt` with guidance for interpreting
       repo-shape warnings.
-- [ ] Add or update CLI reference examples for `--root`, `--tags`, snapshot
+- [x] Add or update CLI reference examples for `--root`, `--tags`, snapshot
       freshness, and nested-module inspection.
-- [ ] Ensure fixture names and tests make unsupported cases intentional.
+- [x] Ensure fixture names and tests make unsupported cases intentional.
 
 Primary files:
 
@@ -759,6 +759,16 @@ Verification:
 go test ./cmd/gosherpa
 go test ./...
 ```
+
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `e3d161ed15c284617dcf80190b2f78a4104e582f`.
+- Ran `go test ./cmd/gosherpa`.
+- Ran `go test ./...`.
+- This slice was documentation- and fixture-orientation-only; no snapshot was
+  refreshed, and no snapshot-reuse behavior changed.
 
 Phase 2 is done when:
 
@@ -784,20 +794,20 @@ Goal: centralize test discovery into a reusable model.
 
 Tasks:
 
-- [ ] Build or extend a test inventory that records packages, test files, test
+- [x] Build or extend a test inventory that records packages, test files, test
       functions, subtests when statically visible, suite-like patterns when
       conservative, and target references.
-- [ ] Preserve existing direct, related, contracts, caller-package, and fallback
+- [x] Preserve existing direct, related, contracts, caller-package, and fallback
       groups.
-- [ ] Include source ranges for test functions and target references when
+- [x] Include source ranges for test functions and target references when
       available.
-- [ ] Keep dynamic table-driven test names as limitations unless statically
+- [x] Keep dynamic table-driven test names as limitations unless statically
       visible.
-- [ ] Persist safe test-reference or test-inventory data in snapshots only when
+- [x] Persist safe test-reference or test-inventory data in snapshots only when
       compatibility inputs are sufficient; if persisted shape changes, update
       snapshot format/capability metadata, stale diagnostics, docs, and tests in
       the same slice.
-- [ ] Add fixtures for internal tests, external `_test` packages, subtests,
+- [x] Add fixtures for internal tests, external `_test` packages, subtests,
       table-driven literals, and suite-style helpers.
 
 Primary files:
@@ -822,6 +832,17 @@ Verification:
 ```bash
 go test ./internal/sherpa ./internal/snapshot ./internal/agentworkflow ./cmd/gosherpa
 ```
+
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `e3d161ed15c284617dcf80190b2f78a4104e582f`.
+- Ran `go test ./internal/sherpa ./internal/snapshot ./internal/agentworkflow ./cmd/gosherpa`.
+- Ran `go test ./...`.
+- No snapshot shape or persisted compatibility input changed in this slice; the
+  reusable test inventory remains in-memory and target references remain
+  target-specific `RelatedTestTargetReference` evidence.
 
 ### Slice 3.2: Stronger Affected-Test Planning
 

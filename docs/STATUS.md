@@ -10,6 +10,20 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 | --- | --- |
 | Agent Workflow Robustness | Harden `gosherpa agent context --base <base-ref>` across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
 
+## Repository Shape Support
+
+| Repository shape | Status | Notes |
+| --- | --- | --- |
+| Single module with `go.mod` | Supported | File walking, package loading, symbols, references, context, impact, tests, snapshots, and `agent context` share the selected module boundary. |
+| Workspace root with `go.work` | Supported | Workspace modules under `--root` are loaded as repository packages. Workspace modules outside `--root` are reported but not scanned as repository packages for that invocation. |
+| Module root with parent or local `go.work` | Supported with boundary reporting | `doctor` and `agent context` report the visible workspace and whether the selected boundary is a module, workspace, or module inside a parent workspace. |
+| Nested modules below the selected root | Intentionally separate | Nested modules are skipped by root-level analysis unless included by the selected `go.work`. Inspect them with `gosherpa --root <nested-module> ...`. |
+| Local `replace` directives | Reported boundary evidence | Local replacements are listed with owner module, replacement path, and whether the path is inside `--root`. Replacement roots are not silently folded into the selected module unless the selected workspace includes them. |
+| Build tags | Supported with explicit inputs | Use `--tags <list>` on supported commands. Build tags are normalized in readiness output and snapshot compatibility; tag changes make snapshots stale. |
+| Generated Go files | Supported and visible | Compiler-visible files with the standard `// Code generated ... DO NOT EDIT.` marker are included in analysis and counted in readiness. Large generated reading-order entries may be summarized after hand-written files in `agent context`. |
+| Partial package loading | Partially supported | Useful AST and available typechecked data are still returned. `load-error`, `parse-error`, and `type-error` diagnostics reduce confidence and list affected analysis sections. |
+| Large repositories and large diffs | Supported with guardrails | Use snapshots and `--max-*` or `--max-bytes` limits. `doctor` and `agent context` expose cost counts so output size and stale inventory risk are visible. |
+
 ## Implemented
 
 - Repository scanning and Go file discovery
@@ -73,6 +87,10 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Related test entries expose stable relationship `reasons` and concrete
   `targets` where the symbol or changed-symbol relationship is known; structured
   test plan items also expose concrete `tests` arrays and `targets`.
+- Reusable test inventory records test packages, `_test.go` files, top-level
+  test functions, statically visible literal subtests, conservative
+  suite-like `Test*` methods, source ranges, and inventory limitations; current
+  public test workflows use this inventory without changing snapshot format.
 - Direct related and affected tests expose `targetReferences` with target names,
   positions, and exact occurrence ranges when parser or typechecker positions
   identify the referenced symbol.

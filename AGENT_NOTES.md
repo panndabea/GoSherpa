@@ -200,6 +200,16 @@ and package-qualified examples.
 - When `doctor` or `agent context` reports skipped nested modules, external
   workspace modules, or local replacements, inspect those roots separately with
   `--root` if the task touches that boundary.
+- Treat workspace modules outside the selected `--root` as intentionally
+  unscanned for that invocation. They may influence typechecking, but they are
+  not repository packages until you run GoSherpa with a root that includes them.
+- When a local `replace` points inside the repository, check whether it is also
+  inside the selected module or workspace boundary before assuming its symbols,
+  tests, and packages were included.
+- Use the same `--tags` value for `doctor`, `snapshot`, `agent context`, and
+  focused follow-up commands. If tags differ from the snapshot inputs, refresh
+  the snapshot before relying on snapshot-backed inventory or relationship
+  counts.
 - When package-load diagnostics are present, treat `load-error` as an analysis
   boundary problem and `type-error` as partial typechecked data with lower
   confidence; inspect the affected sections before trusting references, calls,
