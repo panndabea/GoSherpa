@@ -14,6 +14,25 @@
       "status": "ready",
       "analysisMode": "typechecked",
       "confidence": "medium",
+      "repositoryLayout": {
+        "root": "<ROOT>",
+        "modulePath": "example.com/golden",
+        "manifest": "go.mod",
+        "goModPath": "go.mod",
+        "goWork": {
+          "detected": false
+        },
+        "analysisBoundary": "module",
+        "goFiles": 3,
+        "testFiles": 1,
+        "generatedFiles": 0,
+        "generatedPackages": [],
+        "nestedModules": [],
+        "skippedNestedModules": [],
+        "workspaceModules": [],
+        "skippedWorkspaceModules": [],
+        "localReplacements": []
+      },
       "packageLoad": {
         "status": "ok",
         "analysisMode": "typechecked",
@@ -36,27 +55,8 @@
       "generatedFiles": 0,
       "generatedPackages": [],
       "nestedModules": [],
-      "repoShapeWarnings": [],
-      "repositoryLayout": {
-        "root": "<ROOT>",
-        "modulePath": "example.com/golden",
-        "manifest": "go.mod",
-        "goModPath": "go.mod",
-        "goWork": {
-          "detected": false
-        },
-        "analysisBoundary": "module",
-        "goFiles": 3,
-        "testFiles": 1,
-        "generatedFiles": 0,
-        "generatedPackages": [],
-        "nestedModules": [],
-        "skippedNestedModules": [],
-        "workspaceModules": [],
-        "skippedWorkspaceModules": [],
-        "localReplacements": []
-      },
       "skippedNestedModules": [],
+      "repoShapeWarnings": [],
       "limitations": [
         "Readiness summarizes repository shape and package loading; it does not prove every downstream relationship is complete.",
         "Package loading follows the current Go environment and provided --tags values.",
@@ -350,6 +350,8 @@
         {
           "command": "go test .",
           "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
+          "category": "fast",
+          "confidence": "medium",
           "package": ".",
           "test": "TestTarget",
           "tests": [
@@ -366,11 +368,18 @@
         {
           "command": "go test ./cmd/app",
           "reason": "Run package tests for ./cmd/app to compile impacted code from changed symbols example.com/golden.Added and cover tests not matched directly.",
+          "category": "fast",
+          "confidence": "low",
           "package": "./cmd/app",
           "targets": [
             "example.com/golden.Added"
           ]
         }
+      ],
+      "confidence": "low",
+      "limitations": [
+        "Literal t.Run subtest names are recorded when statically visible; dynamic table-driven names remain limitations.",
+        "No direct test references were found; fallback commands compile impacted packages but may miss behavior-specific coverage."
       ]
     },
     "testCommands": [

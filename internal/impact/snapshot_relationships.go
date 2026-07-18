@@ -154,13 +154,14 @@ func (a Analyzer) analyzeSymbolFromSnapshot(target string, context *sherpa.Seman
 	report.Warnings = uniqueSortedStrings(report.Warnings)
 	report.TestAnalysisMode = normalizeSnapshotTestAnalysisMode(testMode)
 	plan := sherpa.PlanTests(report.AffectedTests, sherpa.TestPlanOptions{
-		Target:           snapshotSymbolTarget(symbol, impactModulePath(a.Root)),
-		Kind:             sherpa.TestTargetKindSymbol,
-		TargetPackages:   targetPackages,
-		ContractPackages: contractPackages,
-		CallerPackages:   packageDifference(report.AffectedPackages, targetPackages),
-		FallbackPackages: fallbackPackages,
-		Targets:          nonEmptyStrings(snapshotSymbolTarget(symbol, impactModulePath(a.Root))),
+		Target:            snapshotSymbolTarget(symbol, impactModulePath(a.Root)),
+		Kind:              sherpa.TestTargetKindSymbol,
+		TargetPackages:    targetPackages,
+		ContractPackages:  contractPackages,
+		CallerPackages:    packageDifference(report.AffectedPackages, targetPackages),
+		FallbackPackages:  fallbackPackages,
+		Targets:           nonEmptyStrings(snapshotSymbolTarget(symbol, impactModulePath(a.Root))),
+		RepositorySignals: sherpa.AnalyzeTestPlanRepositorySignals(a.Root, impactTestPlanPackages(targetPackages, report.AffectedPackages, fallbackPackages, contractPackages), report.Warnings),
 	})
 	report.TestPlan = plan
 	report.TestCommands = sherpa.TestPlanCommands(plan)

@@ -35,10 +35,12 @@ Every context result includes:
   `confidence`; it is not a defect prediction.
 - `testCommands`: suggested `go test` commands.
 - `testPlan`: grouped test plan with `direct`, `related`, `contracts`,
-  `callerPackages`, and `fallback` items. Plan items may include `test`,
-  `tests`, and `targets`. `targets` connects a recommendation to the symbol
-  target, changed symbols, or interface/implementation contract signals when
-  known.
+  `callerPackages`, and `fallback` items, plus plan-level `confidence` and
+  `limitations`. Plan items include `category` and `confidence` and may include
+  `test`, `tests`, and `targets`. `targets` connects a recommendation to the
+  symbol target, changed symbols, or interface/implementation contract signals
+  when known. Item categories are `focused`, `fast`, `contract`,
+  `caller-package`, `integration-like`, or `broad-fallback`.
 - `readingOrder`: ordered source locations to inspect next. Entries include
   `position` and may include `range` when backed by a symbol, call, or test
   source range.

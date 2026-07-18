@@ -233,15 +233,22 @@ Test plans:
   "related": [],
   "contracts": [],
   "callerPackages": [],
-  "fallback": []
+  "fallback": [],
+  "confidence": "medium",
+  "limitations": []
 }
 ```
 
-Each test plan item has `command` and `reason`, with optional `package`, `test`,
-`tests`, and `targets`. `test` is present for a single focused test name;
-`tests` is the structured list of all test functions or literal subtests that
-made the plan item relevant. `targets` connects a recommended test command to
-the symbol target or changed symbols when known.
+Each test plan item has `command`, `reason`, `category`, and `confidence`, with
+optional `package`, `test`, `tests`, and `targets`. `test` is present for a
+single focused test name; `tests` is the structured list of all test functions
+or literal subtests that made the plan item relevant. `targets` connects a
+recommended test command to the symbol target or changed symbols when known.
+Plan-level `confidence` is `medium` or `low`; `low` is used for fallback-only
+plans, broad fallbacks, package-load or repository-shape warnings, generated
+packages involved in the plan, or skipped module/package boundaries. Plan-level
+`limitations` are non-nil and include conservative test-inventory notes such as
+dynamic table-driven subtest names.
 
 Test plan group semantics:
 
@@ -253,6 +260,19 @@ Test plan group semantics:
   incomplete, or intentionally conservative. Package-level fallback uses
   `go test <package>`; whole-repository fallback uses `go test ./...` when a
   diff cannot be narrowed to repository-local Go packages.
+
+Test plan item `category` values are stable:
+
+- `focused`: direct package tests with direct target references.
+- `fast`: same-package or package-level commands that are still narrow enough
+  for quick feedback.
+- `contract`: commands selected from affected interface or implementation
+  contract evidence.
+- `caller-package`: commands selected because impacted caller packages have
+  relevant tests.
+- `integration-like`: external `_test` package evidence that may exercise the
+  package through public behavior rather than internal package access.
+- `broad-fallback`: whole-repository `go test ./...` fallback.
 
 Risk summaries use `{ "level": string, "reasons": [] }`. Architecture roles use
 `{ "role": string, "reasons": [] }`. Reading-order entries use
@@ -1085,12 +1105,18 @@ the corresponding subanalysis path.
 
 Test plans group commands into `direct`, `related`, `contracts`,
 `callerPackages`, and `fallback`, preserve a flat `testCommands`/`commands`
-list for compatibility, include structured `tests` on plan items when concrete
-test names are known, and attach symbol, changed-symbol, interface, or
-implementation `targets` plus relationship `reasons` to related tests when
-known. Related and affected tests may also include `targetReferences`, a list
-of concrete direct target occurrences with `target`, `position`, and optional
-`range`; `targets` remains the compact compatibility list for planning.
+list for compatibility, include plan-level `confidence` and `limitations`,
+include per-item `category` and `confidence`, include structured `tests` on
+plan items when concrete test names are known, and attach symbol,
+changed-symbol, interface, or implementation `targets` plus relationship
+`reasons` to related tests when known. Item categories are `focused`, `fast`,
+`contract`, `caller-package`, `integration-like`, or `broad-fallback`.
+Plan confidence drops to `low` for fallback-only plans, broad fallbacks,
+repository-shape or package-load warnings, generated packages involved in the
+plan, or skipped module/package boundaries. Related and affected tests may also
+include `targetReferences`, a list of concrete direct target occurrences with
+`target`, `position`, and optional `range`; `targets` remains the compact
+compatibility list for planning.
 
 Symbol impact data includes `referenceAnalysisMode` and `callAnalysisMode`
 when those subanalyses ran. Diff-oriented report data (`impact diff`,

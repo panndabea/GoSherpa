@@ -66,6 +66,8 @@ RELATED TESTS
   %-36s cmd/app/main_test.go:9 (direct, external)
 
 TEST PLAN
+  CONFIDENCE
+    medium
   DIRECT
     go test ./cmd/app
       reason: Direct tests in ./cmd/app reference ParseFile: TestUsesParser.
@@ -104,6 +106,8 @@ RELATED TESTS
   none
 
 TEST PLAN
+  CONFIDENCE
+    low
   DIRECT
     none
   RELATED

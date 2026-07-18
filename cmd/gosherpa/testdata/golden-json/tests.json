@@ -43,6 +43,9 @@
           "direct-reference",
           "same-package"
         ],
+        "targets": [
+          "Target"
+        ],
         "targetReferences": [
           {
             "target": "Target",
@@ -64,9 +67,6 @@
               }
             }
           }
-        ],
-        "targets": [
-          "Target"
         ]
       }
     ],
@@ -78,6 +78,8 @@
         {
           "command": "go test .",
           "reason": "Direct tests in . reference Target: TestTarget.",
+          "category": "focused",
+          "confidence": "medium",
           "package": ".",
           "test": "TestTarget",
           "tests": [
@@ -89,9 +91,13 @@
         }
       ],
       "related": [],
+      "contracts": [],
       "callerPackages": [],
       "fallback": [],
-      "contracts": []
+      "confidence": "medium",
+      "limitations": [
+        "Literal t.Run subtest names are recorded when statically visible; dynamic table-driven names remain limitations."
+      ]
     }
   }
 }

@@ -199,10 +199,11 @@ func findPackageTestsWithOptions(root string, target string, options TestOptions
 	relatedTests, _, _ := collectRelatedTests(root, testFiles, packages, referenceTarget{}, TestTargetKindPackage)
 	tests := filterTestsForScope(relatedTests, TestTargetKindPackage, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
-		Target:           normalizedTarget,
-		Kind:             TestTargetKindPackage,
-		TargetPackages:   []string{normalizedTarget},
-		FallbackPackages: []string{normalizedTarget},
+		Target:            normalizedTarget,
+		Kind:              TestTargetKindPackage,
+		TargetPackages:    []string{normalizedTarget},
+		FallbackPackages:  []string{normalizedTarget},
+		RepositorySignals: AnalyzeTestPlanRepositorySignals(root, []string{normalizedTarget}, nil),
 	})
 
 	return TestsResult{
@@ -254,11 +255,12 @@ func findFileTestsWithContext(context *SemanticContext, root string, target stri
 	relatedTests, analysisMode, warnings := collectRelatedTestsForTargetsWithContext(context, root, testFiles, packages, targets, TestTargetKindFile)
 	tests := filterTestsForScope(relatedTests, TestTargetKindFile, options.Scope)
 	plan := PlanTests(tests, TestPlanOptions{
-		Target:           relativeFile,
-		Kind:             TestTargetKindFile,
-		TargetPackages:   []string{packagePath},
-		FallbackPackages: []string{packagePath},
-		Targets:          targetNames,
+		Target:            relativeFile,
+		Kind:              TestTargetKindFile,
+		TargetPackages:    []string{packagePath},
+		FallbackPackages:  []string{packagePath},
+		Targets:           targetNames,
+		RepositorySignals: AnalyzeTestPlanRepositorySignals(root, []string{packagePath}, warnings),
 	})
 
 	return TestsResult{
@@ -302,10 +304,11 @@ func findSymbolTestsWithContext(context *SemanticContext, root string, target st
 	tests = annotateRelatedTestTargets(tests, normalizedTarget.String())
 	targetPackages := sortedMapKeys(packages)
 	plan := PlanTests(tests, TestPlanOptions{
-		Target:           normalizedTarget.String(),
-		Kind:             TestTargetKindSymbol,
-		TargetPackages:   targetPackages,
-		FallbackPackages: targetPackages,
+		Target:            normalizedTarget.String(),
+		Kind:              TestTargetKindSymbol,
+		TargetPackages:    targetPackages,
+		FallbackPackages:  targetPackages,
+		RepositorySignals: AnalyzeTestPlanRepositorySignals(root, targetPackages, warnings),
 	})
 
 	return TestsResult{

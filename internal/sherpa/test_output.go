@@ -91,6 +91,20 @@ func WriteTestPlan(builder *strings.Builder, plan TestPlan, fallbackCommands []s
 	}
 
 	builder.WriteString("TEST PLAN\n")
+	if plan.Confidence != "" {
+		builder.WriteString("  CONFIDENCE\n")
+		builder.WriteString("    ")
+		builder.WriteString(plan.Confidence)
+		builder.WriteString("\n")
+	}
+	if len(plan.Limitations) > 0 {
+		builder.WriteString("  LIMITATIONS\n")
+		for _, limitation := range plan.Limitations {
+			builder.WriteString("    ")
+			builder.WriteString(limitation)
+			builder.WriteString("\n")
+		}
+	}
 	writeTestPlanSection(builder, "DIRECT", plan.Direct)
 	writeTestPlanSection(builder, "RELATED", plan.Related)
 	writeTestPlanSection(builder, "CONTRACTS", plan.Contracts)
@@ -112,6 +126,20 @@ func writeTestPlanSection(builder *strings.Builder, title string, items []TestPl
 		builder.WriteString("    ")
 		builder.WriteString(item.Command)
 		builder.WriteString("\n")
+		if item.Category != "" || item.Confidence != "" {
+			builder.WriteString("      type: ")
+			if item.Category != "" {
+				builder.WriteString(item.Category)
+			} else {
+				builder.WriteString("unknown")
+			}
+			if item.Confidence != "" {
+				builder.WriteString(" (confidence: ")
+				builder.WriteString(item.Confidence)
+				builder.WriteString(")")
+			}
+			builder.WriteString("\n")
+		}
 		if item.Reason != "" {
 			builder.WriteString("      reason: ")
 			builder.WriteString(item.Reason)

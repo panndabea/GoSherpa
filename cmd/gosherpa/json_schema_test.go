@@ -949,9 +949,28 @@ func assertMainTestTestPlanContract(t *testing.T, data map[string]any, key strin
 	t.Helper()
 
 	testPlan := assertMainTestJSONObject(t, data, key)
+	if confidence, ok := testPlan["confidence"].(string); !ok || strings.TrimSpace(confidence) == "" {
+		t.Fatalf("expected data.%s.confidence to be a non-empty string, got %#v", key, testPlan["confidence"])
+	}
+	if _, ok := testPlan["limitations"].([]any); !ok {
+		t.Fatalf("expected data.%s.limitations to be a JSON array, got %T", key, testPlan["limitations"])
+	}
 	for _, field := range []string{"direct", "related", "contracts", "callerPackages", "fallback"} {
-		if _, ok := testPlan[field].([]any); !ok {
+		items, ok := testPlan[field].([]any)
+		if !ok {
 			t.Fatalf("expected data.%s.%s to be a JSON array, got %T", key, field, testPlan[field])
+		}
+		for _, item := range items {
+			itemObject, ok := item.(map[string]any)
+			if !ok {
+				t.Fatalf("expected data.%s.%s item to be an object, got %T", key, field, item)
+			}
+			if category, ok := itemObject["category"].(string); !ok || strings.TrimSpace(category) == "" {
+				t.Fatalf("expected data.%s.%s item category to be a non-empty string, got %#v", key, field, itemObject["category"])
+			}
+			if confidence, ok := itemObject["confidence"].(string); !ok || strings.TrimSpace(confidence) == "" {
+				t.Fatalf("expected data.%s.%s item confidence to be a non-empty string, got %#v", key, field, itemObject["confidence"])
+			}
 		}
 	}
 }

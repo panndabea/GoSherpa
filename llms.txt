@@ -78,6 +78,11 @@ Keep `--tags` consistent across `doctor`, `snapshot`, `agent context`, and
 follow-up commands. Snapshot warnings about missing, stale, invalid, or
 relationship-limited data mean refresh with `gosherpa snapshot --json` before
 trusting snapshot-backed counts or relationships.
+For `testPlan`, inspect plan-level `confidence` and `limitations` before
+choosing commands. Item `category` distinguishes `focused`, `fast`, `contract`,
+`caller-package`, `integration-like`, and `broad-fallback` recommendations;
+low confidence or broad fallback means inspect warnings, generated-code notes,
+and skipped module boundaries before trusting test completeness.
 Treat GoSherpa output as grounded context that guides source reading; it does
 not replace inspecting the relevant files.
 

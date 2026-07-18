@@ -332,9 +332,15 @@ file targets. It intentionally does not accept `--base`, `--tags`, or
 `--tags` and `--use-snapshot`, and intentionally does not accept `--scope`.
 Both commands expose grouped `testPlan` recommendations in JSON and grouped
 human output with `direct`, `related`, `contracts`, `callerPackages`, and
-`fallback` sections. Diff fallbacks are package-level when Go packages are
-known and whole-repository (`go test ./...`) when a change cannot be narrowed
-to repository-local Go packages.
+`fallback` sections. Test plans include plan-level `confidence` and
+`limitations`; each command item includes a stable `category` and item
+`confidence`. Categories distinguish `focused`, `fast`, `contract`,
+`caller-package`, `integration-like`, and `broad-fallback` recommendations.
+Diff fallbacks are package-level when Go packages are known and
+whole-repository (`go test ./...`) when a change cannot be narrowed to
+repository-local Go packages. Generated packages, skipped module/package
+boundaries, and package-load warnings lower test-plan confidence and appear in
+limitations.
 
 ## JSON Output
 

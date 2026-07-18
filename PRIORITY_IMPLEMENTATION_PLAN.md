@@ -851,15 +851,15 @@ workflow outputs.
 
 Tasks:
 
-- [ ] Feed the centralized test inventory into `tests`, `tests affected`,
+- [x] Feed the centralized test inventory into `tests`, `tests affected`,
       `context`, `impact`, `pr`, and the agent workflow.
-- [ ] Improve package fallback selection when direct references are absent.
-- [ ] Distinguish fast, focused, contract, caller-package, integration-like,
+- [x] Improve package fallback selection when direct references are absent.
+- [x] Distinguish fast, focused, contract, caller-package, integration-like,
       and broad fallback commands where evidence supports it.
-- [ ] Add reasons that explain why each command is recommended.
-- [ ] Ensure generated files and skipped packages affect test confidence and
+- [x] Add reasons that explain why each command is recommended.
+- [x] Ensure generated files and skipped packages affect test confidence and
       limitations.
-- [ ] Add golden JSON coverage for representative affected-test and agent
+- [x] Add golden JSON coverage for representative affected-test and agent
       workflow outputs.
 
 Primary files:
@@ -885,6 +885,26 @@ go test ./internal/sherpa ./internal/impact ./internal/agentworkflow ./internal/
 go run ./cmd/gosherpa tests affected --base <base-ref> --use-snapshot --json
 go run ./cmd/gosherpa agent context --base <base-ref> --use-snapshot --json
 ```
+
+Verification note, 2026-07-18:
+
+- Selected `<base-ref>`: `HEAD`, resolved with
+  `git rev-parse --verify HEAD` to
+  `aa8573f582f986cc28e97202fe74086b554e3a65`.
+- Ran
+  `go test ./internal/sherpa ./internal/impact ./internal/agentcontext ./internal/agentworkflow`.
+- Ran `go test ./cmd/gosherpa`.
+- Ran `go test ./...`.
+- Ran
+  `go run ./cmd/gosherpa tests affected --base HEAD --use-snapshot --json`.
+  The command completed and reported stale snapshot fallback because the local
+  snapshot predates the working tree changes.
+- Ran
+  `go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --json`.
+  The command completed with the same stale snapshot fallback; the default
+  agent workflow limits preserved compact `testCommands` and reported
+  `truncated.testPlanItems` for the large local diff.
+  No snapshot was refreshed during this slice.
 
 ### Slice 3.3: Entrypoint Inventory Model
 

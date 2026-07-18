@@ -100,6 +100,8 @@ SUGGESTED TESTS
   %-36s cmd/app/main_test.go:9 (direct)
 
 TEST PLAN
+  CONFIDENCE
+    medium
   DIRECT
     go test ./cmd/app
       reason: Direct tests in ./cmd/app reference ParseFile: TestUsesParser.
@@ -171,6 +173,8 @@ SUGGESTED TESTS
   %-36s internal/auth/service_test.go:5
 
 TEST PLAN
+  CONFIDENCE
+    medium
   DIRECT
     none
   RELATED
@@ -217,6 +221,8 @@ SUGGESTED TESTS
   none
 
 TEST PLAN
+  CONFIDENCE
+    low
   DIRECT
     none
   RELATED
@@ -263,6 +269,8 @@ SUGGESTED TESTS
   none
 
 TEST PLAN
+  CONFIDENCE
+    low
   DIRECT
     none
   RELATED

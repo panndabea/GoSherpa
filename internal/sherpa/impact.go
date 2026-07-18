@@ -213,11 +213,12 @@ func findPackageImpact(root string, target string) (ImpactResult, error) {
 	tests, warnings := impactTestsForPackages(root, packages)
 	tests = annotateCallerPackageTestReasons(tests, []string{deps.Package})
 	plan := PlanTests(tests, TestPlanOptions{
-		Target:           deps.Package,
-		Kind:             TestTargetKindPackage,
-		TargetPackages:   []string{deps.Package},
-		CallerPackages:   deps.UsedBy,
-		FallbackPackages: packages,
+		Target:            deps.Package,
+		Kind:              TestTargetKindPackage,
+		TargetPackages:    []string{deps.Package},
+		CallerPackages:    deps.UsedBy,
+		FallbackPackages:  packages,
+		RepositorySignals: AnalyzeTestPlanRepositorySignals(root, packages, warnings),
 	})
 
 	result := ImpactResult{
@@ -615,11 +616,12 @@ func impactSymbolTestsWithCache(root string, target string, packages []string, t
 	sortRelatedTests(mergedTests)
 	fallbackPackages := uniqueSorted(append(append([]string{}, targetPackages...), packages...))
 	plan := PlanTests(mergedTests, TestPlanOptions{
-		Target:           firstNonEmptyString(symbolTests.Target, target),
-		Kind:             TestTargetKindSymbol,
-		TargetPackages:   targetPackages,
-		CallerPackages:   packageDifference(packages, targetPackages),
-		FallbackPackages: fallbackPackages,
+		Target:            firstNonEmptyString(symbolTests.Target, target),
+		Kind:              TestTargetKindSymbol,
+		TargetPackages:    targetPackages,
+		CallerPackages:    packageDifference(packages, targetPackages),
+		FallbackPackages:  fallbackPackages,
+		RepositorySignals: AnalyzeTestPlanRepositorySignals(root, fallbackPackages, warnings),
 	})
 
 	return TestsResult{

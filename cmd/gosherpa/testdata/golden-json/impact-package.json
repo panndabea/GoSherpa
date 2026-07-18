@@ -99,6 +99,8 @@
         {
           "command": "go test .",
           "reason": "Tests in target package .: TestTarget.",
+          "category": "fast",
+          "confidence": "medium",
           "package": ".",
           "test": "TestTarget",
           "tests": [
@@ -112,8 +114,15 @@
         {
           "command": "go test ./cmd/app",
           "reason": "Run package tests for ./cmd/app to compile impacted code and cover tests not matched directly.",
+          "category": "fast",
+          "confidence": "low",
           "package": "./cmd/app"
         }
+      ],
+      "confidence": "low",
+      "limitations": [
+        "Literal t.Run subtest names are recorded when statically visible; dynamic table-driven names remain limitations.",
+        "No direct test references were found; fallback commands compile impacted packages but may miss behavior-specific coverage."
       ]
     }
   }

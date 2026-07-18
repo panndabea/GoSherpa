@@ -253,6 +253,8 @@
         {
           "command": "go test .",
           "reason": "Tests in target package . cover changed symbols example.com/golden.Added: TestTarget.",
+          "category": "fast",
+          "confidence": "medium",
           "package": ".",
           "test": "TestTarget",
           "tests": [
@@ -269,11 +271,18 @@
         {
           "command": "go test ./cmd/app",
           "reason": "Run package tests for ./cmd/app to compile impacted code from changed symbols example.com/golden.Added and cover tests not matched directly.",
+          "category": "fast",
+          "confidence": "low",
           "package": "./cmd/app",
           "targets": [
             "example.com/golden.Added"
           ]
         }
+      ],
+      "confidence": "low",
+      "limitations": [
+        "Literal t.Run subtest names are recorded when statically visible; dynamic table-driven names remain limitations.",
+        "No direct test references were found; fallback commands compile impacted packages but may miss behavior-specific coverage."
       ]
     },
     "readingOrder": [

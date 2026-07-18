@@ -131,6 +131,8 @@
         {
           "command": "go test .",
           "reason": "Direct tests in . reference Target: TestTarget.",
+          "category": "focused",
+          "confidence": "medium",
           "package": ".",
           "test": "TestTarget",
           "tests": [
@@ -148,11 +150,17 @@
         {
           "command": "go test ./cmd/app",
           "reason": "Run package tests for ./cmd/app to compile code related to Target and cover tests not matched directly.",
+          "category": "fast",
+          "confidence": "low",
           "package": "./cmd/app",
           "targets": [
             "Target"
           ]
         }
+      ],
+      "confidence": "medium",
+      "limitations": [
+        "Literal t.Run subtest names are recorded when statically visible; dynamic table-driven names remain limitations."
       ]
     }
   }

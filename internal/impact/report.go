@@ -697,13 +697,14 @@ func (a Analyzer) enrichSymbolContractTestsWithContext(context *sherpa.SemanticC
 	fallbackPackages := uniqueSortedStrings(append(append([]string{}, report.AffectedPackages...), targetPackages...))
 	targets := nonEmptyStrings(result.Target)
 	report.TestPlan = sherpa.PlanTests(report.AffectedTests, sherpa.TestPlanOptions{
-		Target:           firstNonEmptyImpactString(result.Target, "target"),
-		Kind:             sherpa.TestTargetKindSymbol,
-		TargetPackages:   targetPackages,
-		ContractPackages: contractPackages,
-		CallerPackages:   callerPackages,
-		FallbackPackages: fallbackPackages,
-		Targets:          targets,
+		Target:            firstNonEmptyImpactString(result.Target, "target"),
+		Kind:              sherpa.TestTargetKindSymbol,
+		TargetPackages:    targetPackages,
+		ContractPackages:  contractPackages,
+		CallerPackages:    callerPackages,
+		FallbackPackages:  fallbackPackages,
+		Targets:           targets,
+		RepositorySignals: sherpa.AnalyzeTestPlanRepositorySignals(a.Root, fallbackPackages, warnings),
 	})
 	report.TestCommands = sherpa.TestPlanCommands(report.TestPlan)
 	report.TestAnalysisMode = normalizeTestAnalysisMode(testAnalysisMode)
@@ -916,13 +917,14 @@ func affectedTestsForPackagesWithContext(context *sherpa.SemanticContext, root s
 		target = "changed symbols"
 	}
 	plan := sherpa.PlanTests(result, sherpa.TestPlanOptions{
-		Target:           target,
-		Kind:             sherpa.TestTargetKindPackage,
-		TargetPackages:   changedPackages,
-		ContractPackages: contractPackages,
-		CallerPackages:   packageDifference(packages, changedPackages),
-		FallbackPackages: fallbackPackages,
-		Targets:          changedTargets,
+		Target:            target,
+		Kind:              sherpa.TestTargetKindPackage,
+		TargetPackages:    changedPackages,
+		ContractPackages:  contractPackages,
+		CallerPackages:    packageDifference(packages, changedPackages),
+		FallbackPackages:  fallbackPackages,
+		Targets:           changedTargets,
+		RepositorySignals: sherpa.AnalyzeTestPlanRepositorySignals(root, impactTestPlanPackages(changedPackages, packages, fallbackPackages, contractPackages), warnings),
 	})
 
 	return result, plan, sherpa.TestPlanCommands(plan), normalizeTestAnalysisMode(testAnalysisMode), uniqueSortedStrings(warnings)
@@ -1274,6 +1276,14 @@ func packagesFromTestPlanItems(items []sherpa.TestPlanItem) []string {
 		packages = append(packages, item.Package)
 	}
 
+	return uniqueSortedStrings(packages)
+}
+
+func impactTestPlanPackages(groups ...[]string) []string {
+	var packages []string
+	for _, group := range groups {
+		packages = append(packages, group...)
+	}
 	return uniqueSortedStrings(packages)
 }
 

@@ -87,6 +87,10 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Related test entries expose stable relationship `reasons` and concrete
   `targets` where the symbol or changed-symbol relationship is known; structured
   test plan items also expose concrete `tests` arrays and `targets`.
+- Structured test plans expose plan-level `confidence` and `limitations` plus
+  per-command `category` and item `confidence`. Categories distinguish
+  focused, fast, contract, caller-package, integration-like, and broad-fallback
+  recommendations.
 - Reusable test inventory records test packages, `_test.go` files, top-level
   test functions, statically visible literal subtests, conservative
   suite-like `Test*` methods, source ranges, and inventory limitations; current
@@ -100,6 +104,9 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Diff test planning distinguishes package-level fallback from
   whole-repository fallback, using `go test ./...` when changed files cannot be
   narrowed to repository-local Go packages.
+- Generated packages, skipped module/package boundaries, and package-load or
+  repository-shape warnings lower test-plan confidence and are surfaced as
+  limitations in tests, impact, context, PR, and agent workflow JSON.
 - Agent-facing context, impact, PR, and affected-test JSON limitations include
   subanalysis notes for reference, call, interface, and test analysis modes
   where those modes are present.

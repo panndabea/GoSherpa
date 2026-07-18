@@ -123,6 +123,14 @@ Context output can include source excerpts, symbols, references, callers,
 callees, affected packages, affected tests, a test plan, reading order,
 confidence, analysis modes, and limitations.
 
+For `testPlan`, read the plan-level `confidence` and `limitations` before
+choosing commands. Item `category` distinguishes `focused`, `fast`, `contract`,
+`caller-package`, `integration-like`, and `broad-fallback` recommendations.
+Prefer focused and fast commands first, keep contract and caller-package
+commands when their evidence is relevant, and treat broad fallbacks or low
+confidence as a signal to inspect warnings, generated-code notes, and skipped
+module boundaries.
+
 Use size controls for large repositories or limited context windows:
 
 ```bash
