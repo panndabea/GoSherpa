@@ -534,10 +534,10 @@
     "analysisMode": "git-diff+typechecked+ast",
     "confidence": "medium",
     "limitations": [
-      "Agent context is diff-first and requires a base ref; symbol, file, and package drill-down remain separate context commands.",
+      "Agent context is diff-first and requires a base ref from --base or saved init config; symbol, file, and package drill-down remain separate context commands.",
       "The workflow composes bounded summaries and suggested follow-up commands instead of embedding full context, impact, tests, and pr reports.",
       "Affected-test planning is included by default; --tests is not part of this command contract.",
-      "Snapshot reuse is opt-in and never creates snapshots automatically.",
+      "Snapshot reuse comes from --use-snapshot or saved init config and never creates snapshots automatically.",
       "Diff context uses git diff plus typechecked symbol, reference, call, or interface signals where available.",
       "Changed symbols are hunk-based and limited to top-level functions, methods, structs, and interfaces.",
       "Statement-level semantic impact, dynamic dispatch, reflection, and complex function-value flows are not fully resolved.",

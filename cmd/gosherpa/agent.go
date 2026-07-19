@@ -15,12 +15,17 @@ func runAgentCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 
 	switch invocation.CommandArgs[0] {
 	case "context":
-		if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
+		if len(invocation.CommandArgs) != 1 {
 			printAgentContextUsage(stderr)
 			return exitUsage
 		}
+		if !hasBaseRef(invocation) {
+			printAgentContextUsage(stderr)
+			printConfigBaseUsageHint(stderr)
+			return exitUsage
+		}
 
-		root, ok := resolveRootPath(invocation.Root, stderr)
+		root, ok := resolveInvocationRootPath(invocation, stderr)
 		if !ok {
 			return exitFailure
 		}
@@ -33,6 +38,7 @@ func runAgentCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 		if err != nil {
 			return writeCommandError(invocation.JSON, root, "agent context", invocation.BaseRef, stderr, err)
 		}
+		report.Warnings = uniqueStringsInOrder(append(invocation.ConfigWarnings, report.Warnings...))
 
 		if invocation.JSON {
 			return writeJSON(stdout, stderr, newJSONResponse(

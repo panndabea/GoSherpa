@@ -1,5 +1,61 @@
 # Priority Implementation Audit
 
+## Priority 1 First-Run Defaults Update
+
+Date: 2026-07-19
+
+Selected `<base-ref>` for verification: `HEAD`.
+`git rev-parse --verify HEAD` resolved to
+`e8e28ba002532e384f81420ba8ed78cfb1a12f1f`.
+
+Priority 1 from `PRIORITY_IMPLEMENTATION_PLAN.md` is implemented as an
+init-first workflow. `gosherpa init` now verifies or detects a local base ref,
+writes `.gosherpa/config.json`, refreshes `.gosherpa/snapshot.json`, reports
+warnings through the standard JSON envelope, and prints next-command guidance.
+
+Behavior added:
+
+- `.gosherpa/config.json` stores `schemaVersion`, `baseRef`, `useSnapshot`,
+  normalized build tags, and `agentContext` limits.
+- `agent context`, `pr`, and `tests affected` load saved defaults when explicit
+  CLI flags are omitted.
+- Explicit CLI values still win field-by-field, including per-limit agent
+  context overrides.
+- `--no-use-snapshot` disables saved snapshot reuse for config-aware commands.
+- Missing-base errors now point users to `gosherpa init --base <ref>`.
+- Existing unknown config fields are preserved when the prior config is valid;
+  invalid config is replaced with normalized defaults and warnings.
+- The composite GitHub Action now runs `gosherpa init --base <ref> --json`,
+  uploads `init.json`, and then uses the shorter config-aware `agent context`,
+  `pr`, and `tests affected` commands.
+
+Verification commands:
+
+```bash
+go test ./internal/config ./internal/git
+go test . -run 'TestGitHubActionDefinesPRIntelligenceWorkflow|TestDogfoodWorkflowUsesLocalActionWithFullHistory' -count=1 -v
+go test ./cmd/gosherpa
+go test ./cmd/gosherpa -run 'TestParseCLIArgsAcceptsNoUseSnapshotFlag|TestParseCLIArgsRejectsConflictingSnapshotFlags|TestMainRunsInitCommandAsJSON|TestMainRejectsNoUseSnapshotFlagOutsideConfigAwareCommands|TestMainAgentContextUsesConfigDefaultsAndPerFieldOverrides|TestMainPRAndTestsAffectedUseConfigBase|TestMainConfigWarningsReachJSONEnvelope' -count=1 -v
+go test ./...
+go build ./cmd/gosherpa
+go run ./cmd/gosherpa --root /private/tmp/gosherpa-init-verify.xc71pu init --base HEAD --json
+go run ./cmd/gosherpa --root /private/tmp/gosherpa-init-verify.xc71pu agent context --json
+go run ./cmd/gosherpa --root /private/tmp/gosherpa-init-verify.xc71pu pr --json
+go run ./cmd/gosherpa --root /private/tmp/gosherpa-init-verify.xc71pu tests affected --json
+go run ./cmd/gosherpa --root /private/tmp/gosherpa-init-verify.xc71pu agent context --no-use-snapshot --json
+```
+
+Results:
+
+- Focused config and git base-detection tests passed.
+- Focused GitHub Action structure tests passed.
+- Focused command parser and config-aware command tests passed.
+- Full `go test ./...` passed.
+- `go build ./cmd/gosherpa` passed.
+- Manual smoke verification passed on a temporary Go module with an initialized
+  config, a refreshed snapshot, a changed Go file, config-derived base refs, and
+  explicit snapshot opt-out.
+
 ## Tests And Entrypoint Intelligence Slice 3.1 Update
 
 Date: 2026-07-18

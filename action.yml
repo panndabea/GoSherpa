@@ -1,0 +1,119 @@
+name: GoSherpa PR Intelligence
+description: Run GoSherpa repository intelligence for Go pull requests.
+
+branding:
+  icon: map
+  color: blue
+
+inputs:
+  version:
+    description: GoSherpa version or ref to install. Use "local" inside this repository.
+    required: false
+    default: latest
+  root:
+    description: Repository root to inspect.
+    required: false
+    default: .
+  base-ref:
+    description: Git base ref or SHA for diff-oriented analysis.
+    required: true
+  build-tags:
+    description: Comma-separated Go build tags.
+    required: false
+    default: ""
+  max-files:
+    description: Maximum files in agent context output.
+    required: false
+    default: "20"
+  max-symbols:
+    description: Maximum symbols in agent context output.
+    required: false
+    default: "40"
+  max-tests:
+    description: Maximum tests in agent context output.
+    required: false
+    default: "20"
+  max-bytes:
+    description: Maximum bytes in agent context output.
+    required: false
+    default: "12000"
+
+runs:
+  using: composite
+  steps:
+    - name: Install GoSherpa
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.version }}" = "local" ]; then
+          go install ./cmd/gosherpa
+        else
+          go install github.com/panndabea/GoSherpa/cmd/gosherpa@${{ inputs.version }}
+        fi
+
+    - name: Run GoSherpa intelligence
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        output_dir="${RUNNER_TEMP}/gosherpa"
+        mkdir -p "${output_dir}"
+
+        root="${{ inputs.root }}"
+        base_ref="${{ inputs.base-ref }}"
+        build_tags="${{ inputs.build-tags }}"
+
+        tag_args=()
+        if [ -n "${build_tags}" ]; then
+          tag_args=(--tags "${build_tags}")
+        fi
+
+        gosherpa --root "${root}" "${tag_args[@]}" init \
+          --base "${base_ref}" \
+          --max-files "${{ inputs.max-files }}" \
+          --max-symbols "${{ inputs.max-symbols }}" \
+          --max-tests "${{ inputs.max-tests }}" \
+          --max-bytes "${{ inputs.max-bytes }}" \
+          --json > "${output_dir}/init.json"
+        gosherpa --root "${root}" "${tag_args[@]}" doctor --json > "${output_dir}/doctor.json"
+        gosherpa --root "${root}" "${tag_args[@]}" agent context \
+          --json > "${output_dir}/agent-context.json"
+        gosherpa --root "${root}" "${tag_args[@]}" pr \
+          --json > "${output_dir}/pr.json"
+        gosherpa --root "${root}" "${tag_args[@]}" tests affected \
+          --json > "${output_dir}/tests-affected.json"
+
+        {
+          echo "## GoSherpa PR Intelligence"
+          echo
+          echo "**Root:** \`${root}\`"
+          echo
+          echo "**Base:** \`${base_ref}\`"
+          echo
+          echo "### Readiness"
+          echo
+          echo '```text'
+          gosherpa --root "${root}" "${tag_args[@]}" doctor
+          echo '```'
+          echo
+          echo "### PR Summary"
+          echo
+          echo '```text'
+          gosherpa --root "${root}" "${tag_args[@]}" pr
+          echo '```'
+          echo
+          echo "### Affected Tests"
+          echo
+          echo '```text'
+          gosherpa --root "${root}" "${tag_args[@]}" tests affected
+          echo '```'
+          echo
+          echo "JSON artifacts: \`init.json\`, \`doctor.json\`, \`agent-context.json\`, \`pr.json\`, \`tests-affected.json\`."
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+    - name: Upload GoSherpa artifacts
+      uses: actions/upload-artifact@v5
+      with:
+        name: gosherpa-pr-intelligence
+        path: ${{ runner.temp }}/gosherpa
+        if-no-files-found: error

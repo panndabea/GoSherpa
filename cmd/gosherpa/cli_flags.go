@@ -51,8 +51,24 @@ var cliFlagSpecs = []cliFlagSpec{
 	{
 		Name: "--use-snapshot",
 		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			if invocation.SnapshotOptionMode == snapshotOptionNoUse {
+				return fmt.Errorf("cannot pass --use-snapshot and --no-use-snapshot together")
+			}
 			invocation.UseSnapshot = true
 			invocation.HasSnapshotOption = true
+			invocation.SnapshotOptionMode = snapshotOptionUse
+			return nil
+		},
+	},
+	{
+		Name: "--no-use-snapshot",
+		Apply: func(invocation *cliInvocation, _ string, _ bool) error {
+			if invocation.SnapshotOptionMode == snapshotOptionUse {
+				return fmt.Errorf("cannot pass --use-snapshot and --no-use-snapshot together")
+			}
+			invocation.UseSnapshot = false
+			invocation.HasSnapshotOption = true
+			invocation.SnapshotOptionMode = snapshotOptionNoUse
 			return nil
 		},
 	},
@@ -92,7 +108,9 @@ var cliFlagSpecs = []cliFlagSpec{
 		TakesValue: true,
 		Apply: applyStringCLIFlag("--base", func(invocation *cliInvocation, value string) {
 			invocation.BaseRef = value
+			invocation.HasBaseRef = true
 			invocation.HasBaseOption = true
+			invocation.BaseRefSource = "cli"
 		}),
 	},
 	{
@@ -122,6 +140,7 @@ var cliFlagSpecs = []cliFlagSpec{
 		Apply: applyPositiveCLIFlag("--max-files", func(invocation *cliInvocation, value int) {
 			invocation.ContextLimits.MaxFiles = value
 			invocation.HasContextLimit = true
+			invocation.HasMaxFilesOption = true
 		}),
 	},
 	{
@@ -130,6 +149,7 @@ var cliFlagSpecs = []cliFlagSpec{
 		Apply: applyPositiveCLIFlag("--max-references", func(invocation *cliInvocation, value int) {
 			invocation.ContextLimits.MaxReferences = value
 			invocation.HasContextLimit = true
+			invocation.HasMaxRefsOption = true
 		}),
 	},
 	{
@@ -138,6 +158,7 @@ var cliFlagSpecs = []cliFlagSpec{
 		Apply: applyPositiveCLIFlag("--max-symbols", func(invocation *cliInvocation, value int) {
 			invocation.ContextLimits.MaxSymbols = value
 			invocation.HasContextLimit = true
+			invocation.HasMaxSymbolsOption = true
 		}),
 	},
 	{
@@ -146,6 +167,7 @@ var cliFlagSpecs = []cliFlagSpec{
 		Apply: applyPositiveCLIFlag("--max-tests", func(invocation *cliInvocation, value int) {
 			invocation.ContextLimits.MaxTests = value
 			invocation.HasContextLimit = true
+			invocation.HasMaxTestsOption = true
 		}),
 	},
 	{
@@ -154,6 +176,7 @@ var cliFlagSpecs = []cliFlagSpec{
 		Apply: applyPositiveCLIFlag("--max-bytes", func(invocation *cliInvocation, value int) {
 			invocation.ContextLimits.MaxBytes = value
 			invocation.HasContextLimit = true
+			invocation.HasMaxBytesOption = true
 		}),
 	},
 	{

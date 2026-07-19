@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	agentcontext "github.com/panndabea/GoSherpa/internal/agentcontext"
+	sherpaconfig "github.com/panndabea/GoSherpa/internal/config"
 	impactengine "github.com/panndabea/GoSherpa/internal/impact"
 	"github.com/panndabea/GoSherpa/internal/sherpa"
 )
@@ -17,7 +18,8 @@ const (
 	exitUsage         = 2
 	jsonSchemaVersion = 1
 
-	snapshotSupportMessage = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, pr, and agent context"
+	snapshotSupportMessage      = "--use-snapshot is only supported by analyze, symbols, symbol, search, packages, refs, callers, callees, implementers, interface, interfaces, context symbol, context diff, impact symbol, impact diff, tests affected, pr, and agent context"
+	noUseSnapshotSupportMessage = "--no-use-snapshot is only supported by agent context, pr, and tests affected"
 
 	analysisModeAST                     = agentcontext.AnalysisModeAST
 	analysisModeDiff                    = agentcontext.AnalysisModeDiff
@@ -28,41 +30,59 @@ const (
 	confidenceLow                       = agentcontext.ConfidenceLow
 )
 
+type snapshotOptionMode string
+
+const (
+	snapshotOptionUnset snapshotOptionMode = ""
+	snapshotOptionUse   snapshotOptionMode = "use"
+	snapshotOptionNoUse snapshotOptionMode = "no-use"
+)
+
 type cliInvocation struct {
-	Root               string
-	Command            string
-	CommandArgs        []string
-	JSON               bool
-	CallPathLimit      int
-	CallPathMaxDepth   int
-	HasCallPathOption  bool
-	HasLimitOption     bool
-	HasMaxDepthOption  bool
-	BaseRef            string
-	HasBaseOption      bool
-	IncludeTests       bool
-	HasTestsOption     bool
-	All                bool
-	HasAllOption       bool
-	ShowContext        bool
-	HasContextOption   bool
-	BuildTags          []string
-	HasTagsOption      bool
-	UseSnapshot        bool
-	HasSnapshotOption  bool
-	HasVersionOption   bool
-	HasHelpOption      bool
-	KindFilter         string
-	SearchKind         sherpa.SymbolKind
-	ReferenceKind      sherpa.ReferenceKind
-	HasKindOption      bool
-	TestScope          sherpa.TestScope
-	HasTestScopeOption bool
-	SearchPackage      string
-	HasPackageOption   bool
-	ContextLimits      agentcontext.LimitOptions
-	HasContextLimit    bool
-	HasSourceRadius    bool
+	Root                string
+	ResolvedRoot        string
+	Command             string
+	CommandArgs         []string
+	JSON                bool
+	CallPathLimit       int
+	CallPathMaxDepth    int
+	HasCallPathOption   bool
+	HasLimitOption      bool
+	HasMaxDepthOption   bool
+	BaseRef             string
+	HasBaseRef          bool
+	HasBaseOption       bool
+	BaseRefSource       string
+	IncludeTests        bool
+	HasTestsOption      bool
+	All                 bool
+	HasAllOption        bool
+	ShowContext         bool
+	HasContextOption    bool
+	BuildTags           []string
+	HasTagsOption       bool
+	UseSnapshot         bool
+	HasSnapshotOption   bool
+	SnapshotOptionMode  snapshotOptionMode
+	HasVersionOption    bool
+	HasHelpOption       bool
+	KindFilter          string
+	SearchKind          sherpa.SymbolKind
+	ReferenceKind       sherpa.ReferenceKind
+	HasKindOption       bool
+	TestScope           sherpa.TestScope
+	HasTestScopeOption  bool
+	SearchPackage       string
+	HasPackageOption    bool
+	ContextLimits       agentcontext.LimitOptions
+	HasContextLimit     bool
+	HasMaxFilesOption   bool
+	HasMaxRefsOption    bool
+	HasMaxSymbolsOption bool
+	HasMaxTestsOption   bool
+	HasMaxBytesOption   bool
+	HasSourceRadius     bool
+	ConfigWarnings      []string
 }
 
 func parseCLIArgs(args []string) (cliInvocation, error) {
@@ -89,6 +109,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
+	spec, ok := commandSpecFor(invocation.Command)
+	if !ok {
+		fmt.Fprintln(stderr, "unknown command:", invocation.Command)
+		printUsage(stderr)
+		return exitUsage
+	}
+	if invocation.Command == "completion" {
+		return runCompletionCommand(invocation, stdout, stderr)
+	}
+
 	if invocation.HasLimitOption && !supportsLimitOption(invocation.Command) {
 		fmt.Fprintln(stderr, "error: --limit is only supported by search and path commands")
 		return exitUsage
@@ -105,7 +135,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasContextLimit && !supportsContextLimitOption(invocation.Command) {
-		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context; --max-files, --max-symbols, --max-tests, and --max-bytes are also supported by agent context")
+		fmt.Fprintln(stderr, "error: --max-files, --max-references, --max-symbols, --max-tests, --max-bytes, and --source-radius are only supported by context; --max-files, --max-symbols, --max-tests, and --max-bytes are also supported by init and agent context")
 		return exitUsage
 	}
 
@@ -125,7 +155,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasBaseOption && !isBaseAwareInvocation(invocation) {
-		fmt.Fprintln(stderr, "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context")
+		fmt.Fprintln(stderr, "error: --base is only supported by init, context diff, impact diff, tests affected, pr, and agent context")
 		return exitUsage
 	}
 
@@ -150,11 +180,16 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if invocation.HasTagsOption && knownCommand(invocation.Command) && !supportsTagsOption(invocation) {
-		fmt.Fprintln(stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context")
+		fmt.Fprintln(stderr, "error: --tags is only supported by init, analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context")
 		return exitUsage
 	}
 
-	if invocation.HasSnapshotOption && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation) {
+	if invocation.SnapshotOptionMode == snapshotOptionNoUse && !supportsNoUseSnapshotOption(invocation) {
+		fmt.Fprintln(stderr, "error:", noUseSnapshotSupportMessage)
+		return exitUsage
+	}
+
+	if invocation.SnapshotOptionMode == snapshotOptionUse && knownCommand(invocation.Command) && !supportsSnapshotOption(invocation) {
 		fmt.Fprintln(stderr, "error:", snapshotSupportMessage)
 		return exitUsage
 	}
@@ -164,14 +199,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	spec, ok := commandSpecFor(invocation.Command)
-	if !ok {
-		fmt.Fprintln(stderr, "unknown command:", invocation.Command)
-		printUsage(stderr)
-		return exitUsage
-	}
-	if invocation.Command == "completion" {
-		return runCompletionCommand(invocation, stdout, stderr)
+	var okConfig bool
+	invocation, okConfig = applyConfigDefaults(invocation, stderr)
+	if !okConfig {
+		return exitFailure
 	}
 
 	return spec.Handler(invocation, stdout, stderr)
@@ -271,6 +302,10 @@ func supportsSnapshotOption(invocation cliInvocation) bool {
 	return false
 }
 
+func supportsNoUseSnapshotOption(invocation cliInvocation) bool {
+	return isConfigAwareInvocation(invocation)
+}
+
 func supportsTagsOption(invocation cliInvocation) bool {
 	spec, ok := commandSpecFor(invocation.Command)
 	if !ok {
@@ -290,7 +325,7 @@ func validateContextLimitOptions(invocation cliInvocation) error {
 	if !invocation.HasContextLimit {
 		return nil
 	}
-	if invocation.Command == "agent" {
+	if isAgentContextInvocation(invocation) || invocation.Command == "init" {
 		return validateAgentContextLimitOptions(invocation)
 	}
 	if invocation.Command != "context" || len(invocation.CommandArgs) == 0 {
@@ -334,12 +369,12 @@ func validateContextLimitOptions(invocation cliInvocation) error {
 }
 
 func validateAgentContextLimitOptions(invocation cliInvocation) error {
-	if !isAgentContextInvocation(invocation) {
+	if !isAgentContextInvocation(invocation) && invocation.Command != "init" {
 		return nil
 	}
 
 	var unsupported []string
-	if invocation.ContextLimits.MaxReferences > 0 {
+	if invocation.HasMaxRefsOption {
 		unsupported = append(unsupported, "--max-references")
 	}
 	if invocation.HasSourceRadius {
@@ -349,6 +384,9 @@ func validateAgentContextLimitOptions(invocation cliInvocation) error {
 		return nil
 	}
 
+	if invocation.Command == "init" {
+		return fmt.Errorf("unsupported init option: %s", strings.Join(unsupported, ", "))
+	}
 	return fmt.Errorf("unsupported agent context option: %s", strings.Join(unsupported, ", "))
 }
 
@@ -386,6 +424,79 @@ func isScopedTestsInvocation(invocation cliInvocation) bool {
 
 func isPRInvocation(invocation cliInvocation) bool {
 	return invocation.Command == "pr"
+}
+
+func isInitInvocation(invocation cliInvocation) bool {
+	return invocation.Command == "init"
+}
+
+func isConfigAwareInvocation(invocation cliInvocation) bool {
+	if isAgentContextInvocation(invocation) {
+		return len(invocation.CommandArgs) == 1
+	}
+	if isPRInvocation(invocation) {
+		return len(invocation.CommandArgs) == 0
+	}
+	if isTestsAffectedInvocation(invocation) {
+		return len(invocation.CommandArgs) == 1
+	}
+	return false
+}
+
+func hasBaseRef(invocation cliInvocation) bool {
+	return invocation.HasBaseRef && strings.TrimSpace(invocation.BaseRef) != ""
+}
+
+func applyConfigDefaults(invocation cliInvocation, stderr io.Writer) (cliInvocation, bool) {
+	if !isConfigAwareInvocation(invocation) {
+		return invocation, true
+	}
+
+	repositoryRoot, err := sherpa.ResolveRepositoryRoot(invocation.Root)
+	if err != nil {
+		if !hasBaseRef(invocation) {
+			return invocation, true
+		}
+		fmt.Fprintln(stderr, "error:", err)
+		return invocation, false
+	}
+	root := repositoryRoot.Path
+	invocation.ResolvedRoot = root
+
+	loaded := sherpaconfig.Load(root)
+	invocation.ConfigWarnings = append(invocation.ConfigWarnings, loaded.Warnings...)
+	if !loaded.Exists || !loaded.Valid {
+		return invocation, true
+	}
+
+	cfg := loaded.Config
+	if !invocation.HasBaseOption && strings.TrimSpace(cfg.BaseRef) != "" {
+		invocation.BaseRef = cfg.BaseRef
+		invocation.HasBaseRef = true
+		invocation.BaseRefSource = "config"
+	}
+	if !invocation.HasTagsOption {
+		invocation.BuildTags = append([]string{}, cfg.BuildTags...)
+	}
+	if invocation.SnapshotOptionMode == snapshotOptionUnset {
+		invocation.UseSnapshot = cfg.UseSnapshot
+	}
+	if isAgentContextInvocation(invocation) {
+		if !invocation.HasMaxFilesOption {
+			invocation.ContextLimits.MaxFiles = cfg.AgentContext.MaxFiles
+		}
+		if !invocation.HasMaxSymbolsOption {
+			invocation.ContextLimits.MaxSymbols = cfg.AgentContext.MaxSymbols
+		}
+		if !invocation.HasMaxTestsOption {
+			invocation.ContextLimits.MaxTests = cfg.AgentContext.MaxTests
+		}
+		if !invocation.HasMaxBytesOption {
+			invocation.ContextLimits.MaxBytes = cfg.AgentContext.MaxBytes
+		}
+	}
+
+	return invocation, true
 }
 
 func isImpactReportSubcommand(command string) bool {
@@ -478,6 +589,13 @@ func resolveRootPath(root string, stderr io.Writer) (string, bool) {
 	return repositoryRoot.Path, true
 }
 
+func resolveInvocationRootPath(invocation cliInvocation, stderr io.Writer) (string, bool) {
+	if strings.TrimSpace(invocation.ResolvedRoot) != "" {
+		return invocation.ResolvedRoot, true
+	}
+	return resolveRootPath(invocation.Root, stderr)
+}
+
 func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: gosherpa [--root <path>] <command> [args]")
 	fmt.Fprintln(writer)
@@ -510,6 +628,10 @@ func printUsageLines(writer io.Writer, usageLines []string) {
 
 func printCommandUsage(writer io.Writer, usage string) {
 	printUsageLines(writer, []string{usage})
+}
+
+func printConfigBaseUsageHint(writer io.Writer) {
+	fmt.Fprintln(writer, "hint: run gosherpa init --base <ref> to save a default base")
 }
 
 func printHelpForCommand(writer io.Writer, args []string) bool {

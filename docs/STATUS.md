@@ -12,7 +12,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 
 | Next | Goal |
 | --- | --- |
-| Agent-First Workflow Robustness | Make `gosherpa agent context --base <base-ref>` the obvious first command for coding agents across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
+| Agent-First Workflow Robustness | Make `gosherpa init --base <base-ref>` plus short daily commands the obvious first flow for coding agents across real Go repository shapes, size limits, snapshot ergonomics, tests, and entrypoint signals |
 
 ## Repository Shape Support
 
@@ -46,13 +46,14 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Initial `gosherpa context file <file>` export with file symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context package <package>` export with package files, symbols, source excerpts, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
 - Initial `gosherpa context diff --base <ref>` export with changed files, changed packages, changed symbols, affected packages, affected tests, target risk, reading order, confidence, limitations, and JSON output
-- Initial `gosherpa agent context --base <ref>` workflow with readiness, snapshot status, cost counts, changed targets, target risk, possible runtime relationship summary, interface summary, affected tests, section modes, suggested commands, short human output, JSON output, and composed `--max-bytes` budgeting with per-section truncation metadata
+- Initial `gosherpa agent context [--base <ref>]` workflow with readiness, snapshot status, cost counts, changed targets, target risk, possible runtime relationship summary, interface summary, affected tests, section modes, suggested commands, short human output, JSON output, and composed `--max-bytes` budgeting with per-section truncation metadata
 - Context export size controls with entry-count limits, source radius limits, and `--max-bytes` byte-budget truncation
 - Initial `gosherpa doctor` readiness report with module, Go environment, workspace, build tag, package loading, structured package-load diagnostics, snapshot status, bounded relationship snapshot metadata, confidence, limitations, warnings, and JSON output
 - Shared repository layout summary for `doctor` and `agent context` that reports the selected analysis boundary, root or parent `go.work`, workspace modules, skipped nested modules, skipped workspace modules outside `--root`, local replace directives, file counts, generated-file counts, and major generated packages
 - `doctor` and `agent context` expose normalized build tags plus structured package-load diagnostics that distinguish load, parse, and type errors with package, file/position when known, reason, message, and affected analysis sections; existing envelope warnings remain the compatibility surface for warning text
 - `doctor` and `agent context` expose a compact `cost` summary with package, Go file, test file, generated-file, skipped-module, local-replacement, package-load-warning, diff target, affected target, symbol, and relationship counts. Full symbol and relationship inventory counts come from readable snapshot metadata, with explicit limitations when snapshots are missing, stale, or invalid.
 - Initial `gosherpa snapshot` command that writes a versioned `.gosherpa/snapshot.json` repository inventory snapshot with file freshness metadata, package summaries, symbols, build tags, git state, and relationship-capability metadata
+- Initial `gosherpa init` command that writes `.gosherpa/config.json`, refreshes `.gosherpa/snapshot.json`, detects or verifies a local base ref without fetching, and lets `agent context`, `pr`, and `tests affected` omit repeated base, tags, snapshot, and agent-context limit flags
 - Static shell completion script generation with `gosherpa completion zsh|bash|fish`
 - Package-aware caller/callee signals for package-qualified `gosherpa explain` targets
 - Direct symbol and package impact analysis
@@ -80,8 +81,8 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
 - Changed-package mapping for git diffs via `internal/impact.ChangedPackages`
 - Diff impact report foundation via `internal/impact.AnalyzeDiff`
 - `gosherpa impact diff --base <ref>` with human and JSON output
-- `gosherpa tests affected --base <ref>` with human and JSON output
-- `gosherpa pr --base <ref>` with human and JSON output for PR-style changed files, packages, symbols, diff risk notes, target risk, structural repository risk, affected tests, and verification commands
+- `gosherpa tests affected [--base <ref>]` with human and JSON output
+- `gosherpa pr [--base <ref>]` with human and JSON output for PR-style changed files, packages, symbols, diff risk notes, target risk, structural repository risk, affected tests, and verification commands
 - Diff-oriented reports enrich changed top-level symbols with typechecked reference and call impact when package loading is available, exposing `git-diff+typechecked+ast`, `referenceAnalysisMode`, and `callAnalysisMode`
 - `gosherpa impact file|package|symbol` with human and JSON output
 - Interface and implementer impact signals based on local method sets with import-aware signature matching and embedded-interface expansion
@@ -124,7 +125,7 @@ Read the full product plan in [FEATURE_ROADMAP.md](product/FEATURE_ROADMAP.md), 
   including read/write classification for value and field references
 - Source ranges with columns for symbols, references, callers, callees, call paths, related tests, direct test target references, and range-backed reading-order entries in JSON output
 - Opt-in snapshot reuse for inventory commands through `--use-snapshot` on `analyze`, `symbols`, `symbol`, `search`, and test-inclusive `packages --tests`; standalone relationship commands `refs`, `callers`, `callees`, `implementers`, `interface`, and `interfaces`, plus `context symbol` and `impact symbol`, can reuse valid relationship records; diff-oriented commands `context diff`, `impact diff`, `tests affected`, and `pr` can reuse valid snapshot symbols for current changed-symbol inventory and selected relationship subanalyses. Missing, stale, invalid, or relationship-incompatible snapshots fall back to live analysis with warnings.
-- `agent context --base <ref> --use-snapshot` can reuse valid snapshot-backed diff context and relationship summaries while keeping focused symbol, file, and package drill-down in the existing `context` commands.
+- `agent context [--base <ref>] --use-snapshot` can reuse valid snapshot-backed diff context and relationship summaries while keeping focused symbol, file, and package drill-down in the existing `context` commands. Initialized repositories can use `--no-use-snapshot` on `agent context`, `pr`, and `tests affected` to bypass configured snapshot reuse for one run.
 
 ## Known Pre-1.0 Limitations
 

@@ -243,6 +243,37 @@ func TestParseCLIArgsAcceptsUseSnapshotFlag(t *testing.T) {
 	}
 }
 
+func TestParseCLIArgsAcceptsNoUseSnapshotFlag(t *testing.T) {
+	got, err := parseCLIArgs([]string{"agent", "context", "--no-use-snapshot"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.UseSnapshot {
+		t.Fatalf("expected snapshot reuse disabled, got %#v", got)
+	}
+	if !got.HasSnapshotOption || got.SnapshotOptionMode != snapshotOptionNoUse {
+		t.Fatalf("expected no-use snapshot option marker, got %#v", got)
+	}
+}
+
+func TestParseCLIArgsRejectsConflictingSnapshotFlags(t *testing.T) {
+	for _, args := range [][]string{
+		{"agent", "context", "--use-snapshot", "--no-use-snapshot"},
+		{"agent", "context", "--no-use-snapshot", "--use-snapshot"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			_, err := parseCLIArgs(args)
+			if err == nil {
+				t.Fatal("expected conflicting snapshot flag error")
+			}
+			if !strings.Contains(err.Error(), "cannot pass --use-snapshot and --no-use-snapshot together") {
+				t.Fatalf("expected conflict error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestParseCLIArgsAcceptsAllFlag(t *testing.T) {
 	got, err := parseCLIArgs([]string{"deps", "--all"})
 	if err != nil {
@@ -715,8 +746,17 @@ func TestPrintUsageIncludesAgent(t *testing.T) {
 	var output bytes.Buffer
 	printUsage(&output)
 
-	if !strings.Contains(output.String(), "agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]") {
+	if !strings.Contains(output.String(), "agent context [--base <ref>] [--use-snapshot] [--no-use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]") {
 		t.Fatalf("expected usage to contain agent context command, got:\n%s", output.String())
+	}
+}
+
+func TestPrintUsageIncludesInit(t *testing.T) {
+	var output bytes.Buffer
+	printUsage(&output)
+
+	if !strings.Contains(output.String(), "init [--base <ref>] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]") {
+		t.Fatalf("expected usage to contain init command, got:\n%s", output.String())
 	}
 }
 
@@ -745,7 +785,7 @@ func TestPrintUsageIncludesImpact(t *testing.T) {
 		"impact package <package>",
 		"impact symbol <symbol> [--use-snapshot]",
 		"impact diff --base <ref> [--use-snapshot]",
-		"pr --base <ref> [--use-snapshot]",
+		"pr [--base <ref>] [--use-snapshot] [--no-use-snapshot]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -815,7 +855,7 @@ func TestPrintUsageIncludesTests(t *testing.T) {
 
 	for _, want := range []string{
 		"tests <symbol-or-package-or-file> [--scope direct|related|all]",
-		"tests affected --base <ref> [--use-snapshot]",
+		"tests affected [--base <ref>] [--use-snapshot] [--no-use-snapshot]",
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("expected usage to contain %s, got:\n%s", want, output.String())
@@ -894,7 +934,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 
 	for _, want := range []string{
 		"usage: gosherpa [--root <path>] tests <symbol-or-package-or-file> [--scope direct|related|all]",
-		"gosherpa [--root <path>] tests affected --base <ref> [--use-snapshot]",
+		"gosherpa [--root <path>] tests affected [--base <ref>] [--use-snapshot] [--no-use-snapshot]",
 	} {
 		if !strings.Contains(result.Stderr, want) {
 			t.Fatalf("expected stderr to contain %s, got %q", want, result.Stderr)
@@ -909,7 +949,7 @@ func TestMainPrintsTestsUsageWhenArgumentIsMissing(t *testing.T) {
 func TestMainPrintsTestsAffectedUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "tests", "affected"})
 
-	want := "usage: gosherpa [--root <path>] tests affected --base <ref> [--use-snapshot]\n"
+	want := "usage: gosherpa [--root <path>] tests affected [--base <ref>] [--use-snapshot] [--no-use-snapshot]\nhint: run gosherpa init --base <ref> to save a default base\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -995,7 +1035,7 @@ func TestMainPrintsCommandHelp(t *testing.T) {
 		{
 			name: "agent subcommand help command",
 			args: []string{"gosherpa", "help", "agent", "context"},
-			want: "usage: gosherpa [--root <path>] agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n",
+			want: "usage: gosherpa [--root <path>] agent context [--base <ref>] [--use-snapshot] [--no-use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]\n",
 		},
 		{
 			name: "subcommand help command",
@@ -1466,6 +1506,62 @@ func TestMainRunsSnapshotCommandJSON(t *testing.T) {
 
 	if strings.Contains(result.Stdout, "SNAPSHOT\n") {
 		t.Fatalf("expected JSON-only stdout, got:\n%s", result.Stdout)
+	}
+}
+
+func TestMainRunsInitCommandAsJSON(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"init",
+		"--base", "HEAD",
+		"--tags", "enterprise,integration",
+		"--max-files", "7",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "init", ".", "example.com/app")
+	if data["configPath"] != ".gosherpa/config.json" {
+		t.Fatalf("expected config path, got %#v", data["configPath"])
+	}
+	if data["configWritten"] != true || data["snapshotWritten"] != true {
+		t.Fatalf("expected write markers, got %#v", data)
+	}
+	config := assertMainTestJSONObject(t, data, "config")
+	if config["baseRef"] != "HEAD" {
+		t.Fatalf("expected baseRef HEAD, got %#v", config["baseRef"])
+	}
+	assertMainTestStrings(t, mainTestStringSlice(t, config["buildTags"]), []string{"enterprise", "integration"})
+	agentContext := assertMainTestJSONObject(t, config, "agentContext")
+	if agentContext["maxFiles"] != float64(7) ||
+		agentContext["maxSymbols"] != float64(40) ||
+		agentContext["maxTests"] != float64(20) ||
+		agentContext["maxBytes"] != float64(12000) {
+		t.Fatalf("unexpected agent context config: %#v", agentContext)
+	}
+	baseDetection := assertMainTestJSONObject(t, data, "baseDetection")
+	if baseDetection["selected"] != "HEAD" || baseDetection["source"] != "explicit" {
+		t.Fatalf("unexpected base detection: %#v", baseDetection)
+	}
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["status"] != "valid" || snapshot["path"] != ".gosherpa/snapshot.json" {
+		t.Fatalf("unexpected snapshot data: %#v", snapshot)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, ".gosherpa", "config.json")); err != nil {
+		t.Fatalf("expected config file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, ".gosherpa", "snapshot.json")); err != nil {
+		t.Fatalf("expected snapshot file: %v", err)
 	}
 }
 
@@ -2630,7 +2726,7 @@ func TestMainRejectsBaseFlagForOtherCommands(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context") {
+	if !strings.Contains(result.Stderr, "error: --base is only supported by init, context diff, impact diff, tests affected, pr, and agent context") {
 		t.Fatalf("expected base flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2692,6 +2788,28 @@ func TestMainRejectsUseSnapshotFlagForOtherContextCommands(t *testing.T) {
 	}
 }
 
+func TestMainRejectsNoUseSnapshotFlagOutsideConfigAwareCommands(t *testing.T) {
+	for _, args := range [][]string{
+		{"gosherpa", "context", "diff", "--base", "HEAD", "--no-use-snapshot"},
+		{"gosherpa", "impact", "diff", "--base", "HEAD", "--no-use-snapshot"},
+		{"gosherpa", "init", "--base", "HEAD", "--no-use-snapshot"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			result := runMainTest(t, args)
+
+			if result.ExitCode != exitUsage {
+				t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
+			}
+			if !strings.Contains(result.Stderr, "error: "+noUseSnapshotSupportMessage) {
+				t.Fatalf("expected no-use snapshot flag error, got:\n%s", result.Stderr)
+			}
+			if result.Stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", result.Stdout)
+			}
+		})
+	}
+}
+
 func TestMainRejectsTagsFlagForPlainTestsCommand(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "tests", "Target", "--tags", "enterprise"})
 
@@ -2699,7 +2817,7 @@ func TestMainRejectsTagsFlagForPlainTestsCommand(t *testing.T) {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
 
-	if !strings.Contains(result.Stderr, "error: --tags is only supported by analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context") {
+	if !strings.Contains(result.Stderr, "error: --tags is only supported by init, analyze, refs, entrypoints, callers, callees, explain, context, impact, tests affected, implementers, interface, interfaces, pr, doctor, snapshot, and agent context") {
 		t.Fatalf("expected tags flag error, got:\n%s", result.Stderr)
 	}
 
@@ -2717,7 +2835,7 @@ func TestMainRejectsDiffOnlyFlagsForPlainTestsCommand(t *testing.T) {
 		{
 			name: "base",
 			args: []string{"gosherpa", "tests", "Target", "--base", "HEAD"},
-			want: "error: --base is only supported by context diff, impact diff, tests affected, pr, and agent context",
+			want: "error: --base is only supported by init, context diff, impact diff, tests affected, pr, and agent context",
 		},
 		{
 			name: "use snapshot",
@@ -3748,12 +3866,12 @@ func TestMainValidatesAgentContextShapeAndFlags(t *testing.T) {
 		{
 			name: "missing base",
 			args: []string{"agent", "context"},
-			want: "usage: gosherpa [--root <path>] agent context --base <ref>",
+			want: "hint: run gosherpa init --base <ref> to save a default base",
 		},
 		{
 			name: "reject positional target",
 			args: []string{"agent", "context", "Target", "--base", "HEAD"},
-			want: "usage: gosherpa [--root <path>] agent context --base <ref>",
+			want: "usage: gosherpa [--root <path>] agent context [--base <ref>]",
 		},
 		{
 			name: "reject tests",
@@ -3825,6 +3943,98 @@ func TestMainRunsAgentContextCommandWithMaxBytesAsJSON(t *testing.T) {
 	sectionTruncation := assertMainTestJSONArray(t, data, "sectionTruncation")
 	if len(sectionTruncation) == 0 {
 		t.Fatalf("expected section truncation metadata")
+	}
+}
+
+func TestMainAgentContextUsesConfigDefaultsAndPerFieldOverrides(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainConfig(t, tmp, `{
+  "schemaVersion": 1,
+  "baseRef": "HEAD",
+  "useSnapshot": true,
+  "buildTags": ["enterprise"],
+  "agentContext": {
+    "maxFiles": 2,
+    "maxSymbols": 3,
+    "maxTests": 4,
+    "maxBytes": 5000
+  }
+}`)
+
+	result := runMainTest(t, []string{
+		"gosherpa",
+		"--root", tmp,
+		"agent", "context",
+		"--max-files", "9",
+		"--no-use-snapshot",
+		"--json",
+	})
+
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected exit %d, got %d\nstderr:\n%s", exitSuccess, result.ExitCode, result.Stderr)
+	}
+	if result.Stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	data := assertMainTestJSONEnvelope(t, payload, tmp, "agent context", "HEAD", "example.com/app")
+	assertMainTestStrings(t, mainTestStringSlice(t, data["buildTags"]), []string{"enterprise"})
+	limits := assertMainTestJSONObject(t, data, "limits")
+	if limits["maxFiles"] != float64(9) ||
+		limits["maxSymbols"] != float64(3) ||
+		limits["maxTests"] != float64(4) ||
+		limits["maxBytes"] != float64(5000) {
+		t.Fatalf("expected CLI maxFiles with remaining config limits, got %#v", limits)
+	}
+	snapshot := assertMainTestJSONObject(t, data, "snapshot")
+	if snapshot["requested"] != false {
+		t.Fatalf("expected --no-use-snapshot to disable configured snapshot reuse, got %#v", snapshot)
+	}
+}
+
+func TestMainPRAndTestsAffectedUseConfigBase(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainConfig(t, tmp, `{
+  "schemaVersion": 1,
+  "baseRef": "HEAD",
+  "useSnapshot": false,
+  "buildTags": [],
+  "agentContext": {}
+}`)
+
+	prResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--json"})
+	if prResult.ExitCode != exitSuccess {
+		t.Fatalf("expected pr success, got %d\nstderr:\n%s", prResult.ExitCode, prResult.Stderr)
+	}
+	prPayload := decodeMainTestJSON(t, prResult.Stdout)
+	prData := assertMainTestJSONEnvelope(t, prPayload, tmp, "pr", "HEAD", "example.com/app")
+	if prData["base"] != "HEAD" {
+		t.Fatalf("expected pr base HEAD, got %#v", prData["base"])
+	}
+
+	testsResult := runMainTest(t, []string{"gosherpa", "--root", tmp, "tests", "affected", "--json"})
+	if testsResult.ExitCode != exitSuccess {
+		t.Fatalf("expected tests affected success, got %d\nstderr:\n%s", testsResult.ExitCode, testsResult.Stderr)
+	}
+	testsPayload := decodeMainTestJSON(t, testsResult.Stdout)
+	assertMainTestJSONEnvelope(t, testsPayload, tmp, "tests affected", "HEAD", "example.com/app")
+}
+
+func TestMainConfigWarningsReachJSONEnvelope(t *testing.T) {
+	tmp := writeMainPRDiffProject(t)
+	writeMainConfig(t, tmp, `{`)
+
+	result := runMainTest(t, []string{"gosherpa", "--root", tmp, "pr", "--base", "HEAD", "--json"})
+	if result.ExitCode != exitSuccess {
+		t.Fatalf("expected success with explicit base, got %d\nstderr:\n%s", result.ExitCode, result.Stderr)
+	}
+
+	payload := decodeMainTestJSON(t, result.Stdout)
+	assertMainTestJSONEnvelopeWithWarnings(t, payload, tmp, "pr", "HEAD", "example.com/app")
+	warnings := mainTestStringSlice(t, payload["warnings"])
+	if len(warnings) == 0 || !strings.Contains(strings.Join(warnings, "\n"), "config is invalid JSON") {
+		t.Fatalf("expected config warning in envelope, got %#v", warnings)
 	}
 }
 
@@ -4099,7 +4309,7 @@ func TestMainPrintsContextDiffUsageWhenBaseIsMissing(t *testing.T) {
 func TestMainPrintsPRUsageWhenBaseIsMissing(t *testing.T) {
 	result := runMainTest(t, []string{"gosherpa", "pr"})
 
-	want := "usage: gosherpa [--root <path>] pr --base <ref> [--use-snapshot]\n"
+	want := "usage: gosherpa [--root <path>] pr [--base <ref>] [--use-snapshot] [--no-use-snapshot]\nhint: run gosherpa init --base <ref> to save a default base\n"
 	if result.ExitCode != exitUsage {
 		t.Fatalf("expected exit %d, got %d", exitUsage, result.ExitCode)
 	}
@@ -7789,11 +7999,13 @@ func TestMainPrintsZshCompletion(t *testing.T) {
 
 	for _, want := range []string{
 		"#compdef gosherpa",
-		"'agent:agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"'agent:agent context [--base <ref>] [--use-snapshot] [--no-use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"'init:init [--base <ref>] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
 		"_describe -t agent-subcommands 'agent workflow' agent_subcommands",
 		"'completion:completion zsh|bash|fish'",
 		"_describe -t context-subcommands 'context target' context_subcommands",
 		"'--use-snapshot[reuse a valid repository snapshot]'",
+		"'--no-use-snapshot[disable configured snapshot reuse for this run]'",
 		"'--scope[filter test scope]:scope:(direct related all)'",
 	} {
 		if !strings.Contains(result.Stdout, want) {
@@ -7817,7 +8029,8 @@ func TestMainPrintsBashCompletion(t *testing.T) {
 		"_gosherpa()",
 		"complete -F _gosherpa gosherpa",
 		"agent)",
-		"printf '%s\\n' '--root --json --use-snapshot --tags --base --max-files --max-symbols --max-tests --max-bytes'",
+		"printf '%s\\n' '--root --json --use-snapshot --no-use-snapshot --tags --base --max-files --max-symbols --max-tests --max-bytes'",
+		"init)",
 		"completion)",
 		"COMPREPLY=( $(compgen -W \"zsh bash fish\" -- \"$cur\") )",
 		"printf '%s\\n' '--root --json --tests --use-snapshot --tags'",
@@ -7841,10 +8054,12 @@ func TestMainPrintsFishCompletion(t *testing.T) {
 
 	for _, want := range []string{
 		"function __fish_gosherpa_seen_command",
-		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'agent' -d 'agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'agent' -d 'agent context [--base <ref>] [--use-snapshot] [--no-use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
+		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'init' -d 'init [--base <ref>] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]'",
 		"complete -c gosherpa -f -n '__fish_seen_subcommand_from agent' -a 'context' -d 'diff-first agent workflow context'",
 		"complete -c gosherpa -f -n 'not __fish_gosherpa_seen_command' -a 'completion' -d 'completion zsh|bash|fish'",
 		"complete -c gosherpa -f -n '__fish_seen_subcommand_from completion' -a 'zsh' -d 'zsh completion script'",
+		"complete -c gosherpa -n '__fish_seen_subcommand_from agent' -l no-use-snapshot -d 'disable configured snapshot reuse for this run'",
 		"complete -c gosherpa -n '__fish_seen_subcommand_from symbols' -l kind -r -a 'struct interface alias function method definition call read write type_usage field_access usage'",
 	} {
 		if !strings.Contains(result.Stdout, want) {
@@ -7933,6 +8148,12 @@ func writeMainTestFile(t *testing.T, path string, contents string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeMainConfig(t *testing.T, root string, contents string) {
+	t.Helper()
+
+	writeMainTestFile(t, filepath.Join(root, ".gosherpa", "config.json"), contents)
 }
 
 func writeMainImpactReportProject(t *testing.T) string {
@@ -8492,6 +8713,25 @@ func assertMainTestJSONArrayHasLength(t *testing.T, payload map[string]any, key 
 		t.Fatalf("expected %s length %d, got %d", key, length, len(values))
 	}
 
+	return values
+}
+
+func mainTestStringSlice(t *testing.T, value any) []string {
+	t.Helper()
+
+	rawValues, ok := value.([]any)
+	if !ok {
+		t.Fatalf("expected JSON string array, got %T", value)
+	}
+
+	values := make([]string, 0, len(rawValues))
+	for _, rawValue := range rawValues {
+		text, ok := rawValue.(string)
+		if !ok {
+			t.Fatalf("expected JSON string array item, got %T", rawValue)
+		}
+		values = append(values, text)
+	}
 	return values
 }
 

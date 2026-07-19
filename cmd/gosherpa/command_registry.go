@@ -37,6 +37,15 @@ var commandSpecs = []commandSpec{
 		BaseWhen:           isAgentContextInvocation,
 	},
 	{
+		Name:               "init",
+		Usage:              []string{initUsageLine},
+		Handler:            runInitCommand,
+		JSON:               true,
+		AgentContextLimits: true,
+		Tags:               true,
+		BaseWhen:           isInitInvocation,
+	},
+	{
 		Name:     "analyze",
 		Usage:    []string{analyzeUsageLine},
 		Handler:  runAnalyzeCommand,
@@ -259,7 +268,8 @@ var commandSpecs = []commandSpec{
 var commandSpecIndex = indexCommandSpecs(commandSpecs)
 
 const (
-	agentContextUsageLine   = "agent context --base <ref> [--use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
+	agentContextUsageLine   = "agent context [--base <ref>] [--use-snapshot] [--no-use-snapshot] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
+	initUsageLine           = "init [--base <ref>] [--tags <list>] [--max-files <n>] [--max-symbols <n>] [--max-tests <n>] [--max-bytes <n>]"
 	analyzeUsageLine        = "analyze [path] [--tests] [--use-snapshot]"
 	architectureUsageLine   = "architecture [--tests]"
 	riskUsageLine           = "risk [--tests]"
@@ -282,9 +292,9 @@ const (
 	impactPackageUsageLine  = "impact package <package>"
 	impactSymbolUsageLine   = "impact symbol <symbol> [--use-snapshot]"
 	impactDiffUsageLine     = "impact diff --base <ref> [--use-snapshot]"
-	prUsageLine             = "pr --base <ref> [--use-snapshot]"
+	prUsageLine             = "pr [--base <ref>] [--use-snapshot] [--no-use-snapshot]"
 	testsDefaultUsageLine   = "tests <symbol-or-package-or-file> [--scope direct|related|all]"
-	testsAffectedUsageLine  = "tests affected --base <ref> [--use-snapshot]"
+	testsAffectedUsageLine  = "tests affected [--base <ref>] [--use-snapshot] [--no-use-snapshot]"
 	depsPackageUsageLine    = "deps <package>"
 	depsAllUsageLine        = "deps --all"
 	packagesUsageLine       = "packages [--tests] [--use-snapshot]"

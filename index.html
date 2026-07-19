@@ -128,9 +128,9 @@
             </button>
           </div>
           <pre data-copy-content>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+gosherpa init --base HEAD
 gosherpa doctor --json
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --json</pre>
+gosherpa agent context --json</pre>
         </div>
       </div>
 
@@ -210,7 +210,7 @@ gosherpa tests ParseFile</pre>
             <button class="demo-tab" id="demo-tab-context" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="context" tabindex="-1">
               <strong data-i18n="demo.context.title">Agent-Kontext holen</strong>
               <span data-i18n="demo.context.copy">Welche begrenzte Arbeitskarte sollte ein Coding Agent zuerst lesen?</span>
-              <code>gosherpa agent context --base HEAD --use-snapshot --json</code>
+              <code>gosherpa agent context --json</code>
             </button>
             <button class="demo-tab" id="demo-tab-impact" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="impact" tabindex="-1">
               <strong data-i18n="demo.impact.title">Diff-Impact prüfen</strong>
@@ -220,7 +220,7 @@ gosherpa tests ParseFile</pre>
             <button class="demo-tab" id="demo-tab-tests" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" data-demo-command="tests" tabindex="-1">
               <strong data-i18n="demo.tests.title">Tests planen</strong>
               <span data-i18n="demo.tests.copy">Welche Testbefehle sind nach diesem Diff sinnvoll statt einfach alles zu starten?</span>
-              <code>gosherpa tests affected --base HEAD</code>
+              <code>gosherpa tests affected</code>
             </button>
           </div>
 
@@ -268,12 +268,12 @@ gosherpa tests ParseFile</pre>
           <li>
             <strong data-i18n="agentGuide.step.readiness.title">Readiness prüfen</strong>
             <span data-i18n="agentGuide.step.readiness.copy">Go-Umgebung, Modul, Snapshot und Analyse-Vertrauen vor der Arbeit sichtbar machen.</span>
-            <code>gosherpa doctor --json</code>
+            <code>gosherpa init --base HEAD</code>
           </li>
           <li>
             <strong data-i18n="agentGuide.step.context.title">Kontext begrenzen</strong>
             <span data-i18n="agentGuide.step.context.copy">Mit agent context nur die Dateien, Symbole, Tests und Quell-Auszüge laden, die für den aktuellen Diff zählen.</span>
-            <code>gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json</code>
+            <code>gosherpa agent context --json</code>
           </li>
           <li>
             <strong data-i18n="agentGuide.step.impact.title">Impact lesen</strong>
@@ -283,7 +283,7 @@ gosherpa tests ParseFile</pre>
           <li>
             <strong data-i18n="agentGuide.step.tests.title">Tests planen</strong>
             <span data-i18n="agentGuide.step.tests.copy">Sinnvolle Testbefehle aus dem Diff ableiten, statt blind alles oder gar nichts zu starten.</span>
-            <code>gosherpa tests affected --base HEAD --json</code>
+            <code>gosherpa tests affected --json</code>
           </li>
         </ol>
 
@@ -292,10 +292,10 @@ gosherpa tests ParseFile</pre>
             <h3 data-i18n="agentGuide.kit.title">Copy-Paste-Startpaket für Agents</h3>
             <p data-i18n="agentGuide.kit.copy">Diese Sequenz reicht für viele Review-, Repair- und Edit-Aufgaben: erst Vertrauen prüfen, dann den agent-first Diff-Kontext laden.</p>
           </div>
-          <pre>gosherpa doctor --json
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
-gosherpa tests affected --base HEAD --json</pre>
+          <pre>gosherpa init --base HEAD
+gosherpa doctor --json
+gosherpa agent context --json
+gosherpa tests affected --json</pre>
           <div class="schema-links" aria-label="Agent Schema Links" data-i18n-label="agentGuide.schema.aria">
             <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/AGENT_NOTES.md" data-i18n="agentGuide.schema.notes">AGENT_NOTES.md</a>
             <a class="text-link" href="https://github.com/panndabea/GoSherpa/blob/main/llms.txt">llms.txt</a>
@@ -340,7 +340,7 @@ gosherpa tests affected --base HEAD --json</pre>
             <div class="comic-body">
               <h3 data-i18n="comics.agents.title">Kontext weitergeben</h3>
               <p data-i18n="comics.agents.copy">Agent-first, für Menschen lesbar: GoSherpa exportiert Source-Auszüge, Beziehungen, Tests, Grenzen und JSON in einer kompakten Form.</p>
-              <code class="command-pill">gosherpa agent context --base HEAD --use-snapshot --json</code>
+              <code class="command-pill">gosherpa agent context --json</code>
             </div>
           </article>
         </div>
@@ -377,12 +377,12 @@ gosherpa tests affected --base HEAD --json</pre>
           <div class="capability-row" role="row">
             <strong role="cell" data-i18n="features.pr.title">PR-Intelligenz</strong>
             <span role="cell" data-i18n="features.pr.copy">Fasst Diffs zusammen und nennt Risiko, betroffene Bereiche und Verifikation.</span>
-            <code role="cell">gosherpa pr --base HEAD</code>
+            <code role="cell">gosherpa pr</code>
           </div>
           <div class="capability-row" role="row">
             <strong role="cell" data-i18n="features.context.title">Agent-Kontext</strong>
             <span role="cell" data-i18n="features.context.copy">Exportiert deterministische Kontextpakete mit Limits für Codex, Claude Code, Cursor und CI.</span>
-            <code role="cell">gosherpa agent context --base HEAD --use-snapshot --json</code>
+            <code role="cell">gosherpa agent context --json</code>
           </div>
         </div>
       </div>
@@ -528,14 +528,15 @@ gosherpa tests affected --base HEAD --json</pre>
             <span class="terminal-dot"></span>
           </div>
           <pre><span class="comment" data-i18n="terminal.symbol"># Analyse-Vertrauen prüfen</span>
+<span class="accent">gosherpa init --base HEAD</span>
 <span class="accent">gosherpa doctor --json</span>
 
 <span class="comment" data-i18n="terminal.tests"># Agent-Workflow-Kontext</span>
-<span class="accent">gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json</span>
+<span class="accent">gosherpa agent context --json</span>
 
 <span class="comment" data-i18n="terminal.context"># Impact und Testplanung</span>
 <span class="accent">gosherpa impact diff --base HEAD --json</span>
-<span class="accent">gosherpa tests affected --base HEAD --json</span></pre>
+<span class="accent">gosherpa tests affected --json</span></pre>
         </div>
       </div>
     </section>
@@ -563,9 +564,9 @@ gosherpa tests affected --base HEAD --json</pre>
             </button>
           </div>
           <pre data-copy-content>go install github.com/panndabea/GoSherpa/cmd/gosherpa@latest
+gosherpa init --base HEAD
 gosherpa doctor --json
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --json</pre>
+gosherpa agent context --json</pre>
         </div>
       </div>
     </section>

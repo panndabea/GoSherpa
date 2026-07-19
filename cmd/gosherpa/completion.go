@@ -57,6 +57,10 @@ var completionFlagDefinitions = map[string]completionFlag{
 		Name:        "--use-snapshot",
 		Description: "reuse a valid repository snapshot",
 	},
+	"--no-use-snapshot": {
+		Name:        "--no-use-snapshot",
+		Description: "disable configured snapshot reuse for this run",
+	},
 	"--base": {
 		Name:        "--base",
 		Description: "git base reference",
@@ -511,6 +515,10 @@ func completionFlagsForSpec(spec commandSpec) []completionFlag {
 	}
 	if spec.Snapshot || spec.SnapshotWhen != nil {
 		names = append(names, "--use-snapshot")
+	}
+	switch spec.Name {
+	case "agent", "pr", "tests":
+		names = append(names, "--no-use-snapshot")
 	}
 	if spec.Tags || spec.TagsWhen != nil {
 		names = append(names, "--tags")

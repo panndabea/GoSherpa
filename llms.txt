@@ -30,9 +30,9 @@ For review, repair, or edit tasks in a Go repository, start with readiness and
 the agent-first diff context:
 
 ```bash
+gosherpa init --base HEAD
 gosherpa doctor
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
+gosherpa agent context --json
 ```
 
 For focused work, use package-qualified targets when names are ambiguous, for
@@ -48,7 +48,7 @@ gosherpa callers <symbol> --json
 gosherpa callees <symbol> --json
 gosherpa deps <package> --json
 gosherpa tests <symbol-or-package-or-file> --json
-gosherpa tests affected --base HEAD --json
+gosherpa tests affected --json
 ```
 
 Prefer JSON for automation. Every command supports `--json` and emits a shared
@@ -92,8 +92,9 @@ not replace inspecting the relevant files.
 - `gosherpa architecture --json`
 - `gosherpa risk --json`
 - `gosherpa doctor --json`
+- `gosherpa init --base HEAD --json`
 - `gosherpa snapshot --json`
-- `gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json`
+- `gosherpa agent context --json`
 - `gosherpa symbols --json`
 - `gosherpa symbol <target> --json`
 - `gosherpa search <terms> --json`
@@ -106,7 +107,7 @@ not replace inspecting the relevant files.
 - `gosherpa impact file <file> --json`
 - `gosherpa impact package <package> --json`
 - `gosherpa impact symbol <symbol> --use-snapshot --json`
-- `gosherpa pr --base HEAD --json`
+- `gosherpa pr --json`
 - `gosherpa refs <symbol> --json`
 - `gosherpa refs <symbol> --use-snapshot --json`
 - `gosherpa callers <symbol> --json`
@@ -125,7 +126,7 @@ not replace inspecting the relevant files.
 - `gosherpa interfaces <type> --json`
 - `gosherpa interfaces <type> --use-snapshot --json`
 - `gosherpa tests <symbol-or-package-or-file> --json`
-- `gosherpa tests affected --base HEAD --json`
+- `gosherpa tests affected --json`
 
 ## Context Commands
 
@@ -133,12 +134,17 @@ not replace inspecting the relevant files.
 commands are the drill-down layer for known symbols, files, packages, or diffs:
 
 ```bash
-gosherpa agent context --base HEAD --use-snapshot --max-bytes 12000 --json
+gosherpa agent context --json
 gosherpa context symbol ParseFile --use-snapshot --json
 gosherpa context file internal/sherpa/impact.go --json
 gosherpa context package ./internal/sherpa --json
 gosherpa context diff --base HEAD --use-snapshot --json
 ```
+
+`gosherpa init` writes `.gosherpa/config.json` and refreshes
+`.gosherpa/snapshot.json`. After init, `agent context`, `pr`, and
+`tests affected` can omit `--base`; use `--no-use-snapshot` on those commands
+to bypass configured snapshot reuse for a single run.
 
 Supported size controls include `--max-files`, `--max-references`,
 `--max-symbols`, `--max-tests`, `--source-radius`, and `--max-bytes` depending

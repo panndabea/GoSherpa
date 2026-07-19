@@ -19,8 +19,8 @@ Prefer not to build a binary yet?
 go run ./cmd/gosherpa analyze .
 go run ./cmd/gosherpa version
 go run ./cmd/gosherpa doctor --json
-go run ./cmd/gosherpa snapshot --json
-go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --json
+go run ./cmd/gosherpa init --base HEAD --json
+go run ./cmd/gosherpa agent context --json
 go run ./cmd/gosherpa architecture
 go run ./cmd/gosherpa risk
 go run ./cmd/gosherpa symbols --kind function
@@ -34,10 +34,10 @@ go run ./cmd/gosherpa callers ParseFile
 go run ./cmd/gosherpa impact ParseFile
 go run ./cmd/gosherpa impact file internal/sherpa/impact.go
 go run ./cmd/gosherpa impact diff --base HEAD
-go run ./cmd/gosherpa pr --base HEAD
+go run ./cmd/gosherpa pr
 go run ./cmd/gosherpa tests ParseFile
 go run ./cmd/gosherpa tests internal/sherpa/impact.go
-go run ./cmd/gosherpa tests affected --base HEAD
+go run ./cmd/gosherpa tests affected
 go run ./cmd/gosherpa packages
 go run ./cmd/gosherpa entrypoints ParseFile
 go run ./cmd/gosherpa path main FindCallers
@@ -49,7 +49,8 @@ Use `--root` to run GoSherpa from another working directory. The path must point
 ./gosherpa --root /path/to/GoSherpa symbols
 ./gosherpa refs ParseFile --root /path/to/GoSherpa
 ./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/json_project doctor --json
-./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/interface_project agent context --base HEAD --json
+./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/interface_project init --base HEAD
+./gosherpa --root /path/to/GoSherpa/cmd/gosherpa/testdata/interface_project agent context --json
 ```
 
 `gosherpa doctor` and `gosherpa agent context` report the selected repository
@@ -89,6 +90,24 @@ snapshot freshness checks:
 ./gosherpa --tags enterprise tests affected --base HEAD --use-snapshot --json
 ```
 
+Use `gosherpa init` once per repository to write first-run defaults:
+
+```bash
+./gosherpa init --base HEAD
+./gosherpa agent context --json
+./gosherpa pr --json
+./gosherpa tests affected --json
+```
+
+`init` writes `.gosherpa/config.json` and refreshes
+`.gosherpa/snapshot.json`. The config stores `baseRef`, `useSnapshot`,
+normalized `buildTags`, and `agentContext` limits (`maxFiles`, `maxSymbols`,
+`maxTests`, `maxBytes`). Only `agent context`, `pr`, and `tests affected` read
+these defaults in this release. Explicit CLI flags win for the current run:
+`--base`, `--tags`, per-field agent-context limits, `--use-snapshot`, and
+`--no-use-snapshot` override config without editing the file. Without config,
+those diff-first commands keep requiring `--base <ref>`.
+
 Generated Go files are included when they are repository-local and visible to
 the selected module or workspace. `gosherpa doctor` and
 `gosherpa agent context` count files with the standard
@@ -105,9 +124,11 @@ snapshot file. A valid snapshot can currently be reused by `analyze`,
 `callees`, `implementers`, `interface`, `interfaces`, `context symbol`,
 `impact symbol`, and by diff-oriented current changed-symbol inventory plus
 selected relationship subanalysis in `context diff`, `impact diff`,
-`tests affected`, `pr`, and `agent context` with `--use-snapshot`. Missing,
-stale, invalid, or relationship-incompatible snapshots fall back to live
-repository analysis and report a warning. Refresh snapshots with
+`tests affected`, `pr`, and `agent context` with `--use-snapshot`, or by
+config after `gosherpa init`. Missing, stale, invalid, or
+relationship-incompatible snapshots fall back to live repository analysis and
+report a warning. Use `--no-use-snapshot` on `agent context`, `pr`, or
+`tests affected` to disable configured snapshot reuse for one run. Refresh snapshots with
 `gosherpa snapshot --json` before repeated large-repo agent workflows, after
 changing build tags, or when `doctor`, `agent context`, or the envelope
 warnings report stale, missing, invalid, or relationship-limited snapshot data.
@@ -126,11 +147,11 @@ failure; commands continue with live analysis and include refresh guidance.
 ./gosherpa callers ParseFile --use-snapshot --json
 ./gosherpa callees ParseFile --use-snapshot --json
 ./gosherpa context symbol ParseFile --use-snapshot --json
-./gosherpa agent context --base HEAD --use-snapshot --json
+./gosherpa agent context --json
 ./gosherpa impact symbol ParseFile --use-snapshot --json
 ./gosherpa context diff --base HEAD --use-snapshot --json
 ./gosherpa impact diff --base HEAD --use-snapshot --json
-./gosherpa pr --base HEAD --use-snapshot --json
+./gosherpa pr --json
 ```
 
 Enable shell completion by evaluating the script for your shell. The generated
@@ -149,6 +170,7 @@ symbol completion can come later.
 | --- | --- | --- |
 | Version | `gosherpa version` | Prints GoSherpa and Go runtime version information |
 | Help | `gosherpa help callers` | Prints global or command-specific usage without running analysis |
+| First run | `gosherpa init --base HEAD` | Writes `.gosherpa/config.json`, refreshes `.gosherpa/snapshot.json`, and enables shorter diff-first commands |
 | Repository overview | `gosherpa analyze .` | Summarizes packages, symbols, entrypoint candidates, structural risk, hotspots, tests, readiness, limitations, and suggested next commands |
 | Architecture overview | `gosherpa architecture` | Reports dependency cycles, most coupled packages, high fan-in/fan-out packages, largest packages, and leaf packages |
 | Risk overview | `gosherpa risk` | Summarizes structural repository risk from cycles, fan-in/fan-out, public API surface, interfaces, and tests |
@@ -156,7 +178,7 @@ symbol completion can come later.
 | Symbol lookup | `gosherpa symbol ParseFile` | Shows package, signature, docs, fields/methods, and source location |
 | Symbol search | `gosherpa search parse file --kind function --limit 5` | Finds symbols by ranked, partial, case-insensitive matches with optional filters |
 | Symbol explanation | `gosherpa explain ParseFile` | Combines purpose, risk, target risk, architecture role, reading order, callers/callees, impact signals, and tests |
-| Agent workflow | `gosherpa agent context --base HEAD` | Composes readiness, snapshot status, diff context, target risk, affected tests, section modes, and next commands into one bounded daily-driver answer for coding agents |
+| Agent workflow | `gosherpa agent context` | Composes readiness, snapshot status, diff context, target risk, affected tests, section modes, and next commands into one bounded daily-driver answer for initialized repositories |
 | Agent context | `gosherpa context symbol ParseFile` | Exports a compact pre-edit context with identity, source excerpt, relationships, tests, target risk, confidence, and limitations |
 | File context | `gosherpa context file internal/sherpa/impact.go` | Exports file symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
 | Package context | `gosherpa context package ./internal/sherpa` | Exports package files, symbols, source excerpts, affected packages/tests, target risk, reading order, confidence, and limitations |
@@ -170,9 +192,9 @@ symbol completion can come later.
 | Impact analysis | `gosherpa impact ParseFile` | Summarizes references, caller-chain impact, affected packages, and suggested tests |
 | Structured impact | `gosherpa impact file service.go` | Reports file, package, symbol, and diff impact through a shared report model |
 | Diff impact | `gosherpa impact diff --base HEAD` | Reports changed files, changed packages, changed-symbol impact, affected packages, and affected tests |
-| PR review | `gosherpa pr --base HEAD` | Summarizes changed files, packages, symbols, diff risk, target risk, repository risk, affected tests, and verification commands |
+| PR review | `gosherpa pr` | Summarizes changed files, packages, symbols, diff risk, target risk, repository risk, affected tests, and verification commands for initialized repositories |
 | Test discovery | `gosherpa tests ParseFile --scope direct` | Lists related tests for a symbol, package, or file and suggested `go test` commands with optional direct/related/all scope |
-| Affected tests | `gosherpa tests affected --base HEAD` | Prints suggested test commands for a git diff |
+| Affected tests | `gosherpa tests affected` | Prints suggested test commands for a git diff in initialized repositories |
 | Machine-readable output | `gosherpa symbols --json` | Emits JSON for all commands with a stable response envelope |
 | Package inventory | `gosherpa packages --tests` | Lists local packages with file, symbol, import, reverse-dependency, and test indicators |
 | Package dependencies | `gosherpa deps ./internal/sherpa` | Shows imports and local dependents |
@@ -205,6 +227,8 @@ Found 4 references
 ```bash
 ./gosherpa analyze .
 ./gosherpa version
+./gosherpa init --base HEAD
+./gosherpa init --base HEAD --json
 ./gosherpa analyze . --tests
 ./gosherpa analyze --use-snapshot
 ./gosherpa analyze . --json
@@ -235,8 +259,9 @@ Found 4 references
 ./gosherpa context symbol ParseFile --use-snapshot --json
 ./gosherpa context symbol ParseFile --json
 ./gosherpa context symbol ParseFile --max-bytes 12000 --json
-./gosherpa agent context --base HEAD
+./gosherpa agent context
 ./gosherpa agent context --base HEAD --use-snapshot --json
+./gosherpa agent context --no-use-snapshot --json
 ./gosherpa agent context --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
 ./gosherpa context file internal/sherpa/impact.go
 ./gosherpa context file internal/sherpa/impact.go --json
@@ -271,6 +296,7 @@ Found 4 references
 ./gosherpa impact diff --base HEAD --json
 ./gosherpa pr --base HEAD
 ./gosherpa pr --base HEAD --use-snapshot
+./gosherpa pr --no-use-snapshot --json
 ./gosherpa pr --base HEAD --json
 ./gosherpa tests ParseFile
 ./gosherpa tests ParseFile --scope direct
@@ -280,6 +306,7 @@ Found 4 references
 ./gosherpa tests internal/sherpa/impact.go
 ./gosherpa tests affected --base HEAD
 ./gosherpa tests affected --base HEAD --use-snapshot
+./gosherpa tests affected --no-use-snapshot --json
 ./gosherpa tests affected --base HEAD --json
 ./gosherpa packages
 ./gosherpa packages --tests
@@ -342,8 +369,10 @@ remain conservative.
 
 `tests <target>` supports `--scope direct|related|all` for symbol, package, or
 file targets. It intentionally does not accept `--base`, `--tags`, or
-`--use-snapshot`. `tests affected --base <ref>` is diff-oriented, supports
-`--tags` and `--use-snapshot`, and intentionally does not accept `--scope`.
+`--use-snapshot`. `tests affected [--base <ref>]` is diff-oriented, supports
+`--tags`, `--use-snapshot`, and `--no-use-snapshot`, and intentionally does
+not accept `--scope`. It can omit `--base` after `gosherpa init` writes
+`config.baseRef`.
 Both commands expose grouped `testPlan` recommendations in JSON and grouped
 human output with `direct`, `related`, `contracts`, `callerPackages`, and
 `fallback` sections. Test plans include plan-level `confidence` and
@@ -378,7 +407,8 @@ Context commands support command-specific size controls for agent workflows:
 
 | Command | Supported limits |
 | --- | --- |
-| `agent context` | `--use-snapshot`, `--tags`, `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
+| `init` | `--base`, `--tags`, `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
+| `agent context` | `--base`, `--use-snapshot`, `--no-use-snapshot`, `--tags`, `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes` |
 | `context symbol` | `--use-snapshot`, `--max-references`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context file` | `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |
 | `context package` | `--max-files`, `--max-symbols`, `--max-tests`, `--max-bytes`, `--source-radius` |

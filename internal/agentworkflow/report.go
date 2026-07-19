@@ -584,10 +584,10 @@ func suggestedCommands(base string, snapshot SnapshotSummary, changedSymbols []i
 
 func workflowLimitations(report Report, contextReport agentcontext.DiffReport) []string {
 	limitations := []string{
-		"Agent context is diff-first and requires a base ref; symbol, file, and package drill-down remain separate context commands.",
+		"Agent context is diff-first and requires a base ref from --base or saved init config; symbol, file, and package drill-down remain separate context commands.",
 		"The workflow composes bounded summaries and suggested follow-up commands instead of embedding full context, impact, tests, and pr reports.",
 		"Affected-test planning is included by default; --tests is not part of this command contract.",
-		"Snapshot reuse is opt-in and never creates snapshots automatically.",
+		"Snapshot reuse comes from --use-snapshot or saved init config and never creates snapshots automatically.",
 	}
 	limitations = append(limitations, report.Limitations...)
 	limitations = append(limitations, contextReport.Limitations...)

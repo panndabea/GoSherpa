@@ -540,11 +540,17 @@ Data:
 }
 ```
 
-The first `agent context` contract is diff-first and requires `--base <ref>`.
-It supports `--use-snapshot`, `--tags`, `--max-files`, `--max-symbols`,
-`--max-tests`, `--max-bytes`, and `--json`, plus global `--root`. It intentionally rejects
-symbol/file/package positional targets, `--tests`, `--scope`,
-`--max-references`, and `--source-radius`.
+The first `agent context` contract is diff-first. It requires a base ref from
+`--base <ref>` or from `.gosherpa/config.json` written by `gosherpa init`. It
+supports `--use-snapshot`, `--no-use-snapshot`, `--tags`, `--max-files`,
+`--max-symbols`, `--max-tests`, `--max-bytes`, and `--json`, plus global
+`--root`. It intentionally rejects symbol/file/package positional targets,
+`--tests`, `--scope`, `--max-references`, and `--source-radius`.
+
+`gosherpa init --base <ref> --json` uses the same envelope with
+`command: "init"` and `target: "."`. Its `data` records the relative
+`configPath`, `configWritten`, `snapshotWritten`, normalized config values,
+local base detection evidence, snapshot summary, and next commands.
 
 - `readiness`: bounded repository-readiness summary with package-load status,
   go.work detection, generated-file count, major generated packages, nested

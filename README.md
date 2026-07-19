@@ -32,14 +32,14 @@ tables, and stable JSON envelopes for automation.
 
 | Question | Start with |
 | --- | --- |
-| What should an agent read before editing? | `gosherpa agent context --base <ref> --use-snapshot --json` |
+| What should an agent read before editing? | `gosherpa init --base <ref>`, then `gosherpa agent context --json` |
 | What shape is this repository in? | `gosherpa doctor`, `gosherpa analyze .` |
 | Where is this symbol defined? | `gosherpa search <terms>`, `gosherpa symbol <target>` |
 | Who uses this function or type? | `gosherpa refs <target>`, `gosherpa callers <target>` |
 | What does this function call? | `gosherpa callees <target>`, `gosherpa path <from> <to>` |
 | Which interfaces and implementers are involved? | `gosherpa interface <interface>`, `gosherpa implementers <interface>` |
 | Which tests are related? | `gosherpa tests <target>`, `gosherpa tests affected --base <ref>` |
-| What might this change affect? | `gosherpa agent context --base <ref>`, `gosherpa impact diff --base <ref>` |
+| What might this change affect? | `gosherpa agent context` after init, `gosherpa impact diff --base <ref>` |
 
 ## Quickstart
 
@@ -47,9 +47,10 @@ tables, and stable JSON envelopes for automation.
 git clone https://github.com/panndabea/GoSherpa.git
 cd GoSherpa
 go run ./cmd/gosherpa version
+go run ./cmd/gosherpa init --base HEAD --json
 go run ./cmd/gosherpa doctor --json
-go run ./cmd/gosherpa snapshot --json
-go run ./cmd/gosherpa agent context --base HEAD --use-snapshot --json
+go run ./cmd/gosherpa agent context --json
+go run ./cmd/gosherpa pr --json
 ```
 
 Try a few focused questions:
@@ -66,12 +67,12 @@ Build a local binary when you want repeated use:
 
 ```bash
 go build -o gosherpa ./cmd/gosherpa
-./gosherpa snapshot
+./gosherpa init --base HEAD
 ./gosherpa analyze --use-snapshot
 ./gosherpa context symbol ParseFile --use-snapshot --json
-./gosherpa agent context --base HEAD --use-snapshot --json
+./gosherpa agent context --json
 ./gosherpa impact diff --base HEAD --use-snapshot
-./gosherpa pr --base HEAD --use-snapshot --json
+./gosherpa pr --json
 ```
 
 When contributing to GoSherpa itself, run:
@@ -85,7 +86,8 @@ directory:
 
 ```bash
 ./gosherpa --root /path/to/project analyze .
-./gosherpa --root /path/to/project agent context --base HEAD --json
+./gosherpa --root /path/to/project init --base HEAD
+./gosherpa --root /path/to/project agent context --json
 ```
 
 ## Common Workflows
@@ -93,10 +95,17 @@ directory:
 For the default agent-first pre-edit flow:
 
 ```bash
+gosherpa init --base HEAD
 gosherpa doctor --json
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa agent context --json
+gosherpa pr --json
 ```
+
+`init` writes `.gosherpa/config.json` and refreshes
+`.gosherpa/snapshot.json`. Initialized repositories can omit `--base`,
+snapshot reuse, build tags, and standard agent-context limits for
+`agent context`, `pr`, and `tests affected`. Use `--no-use-snapshot` on those
+commands when you want live analysis for a single run.
 
 For repository orientation:
 
@@ -120,21 +129,34 @@ gosherpa callees ./internal/sherpa.ParseFile --json
 For a change or pull request:
 
 ```bash
-gosherpa agent context --base HEAD --max-files 20 --max-symbols 40 --max-tests 20 --json
+gosherpa agent context --json
 gosherpa impact diff --base HEAD --json
-gosherpa tests affected --base HEAD --json
-gosherpa pr --base HEAD --json
+gosherpa tests affected --json
+gosherpa pr --json
 ```
+
+For GitHub pull requests, GoSherpa can also run as a composite Action. The
+Action runs `gosherpa init`, writes a step summary, and uploads JSON artifacts
+for `init`, `doctor`, `agent context`, `pr`, and `tests affected`:
+
+```yaml
+- uses: panndabea/GoSherpa@main
+  with:
+    base-ref: ${{ github.event.pull_request.base.sha }}
+```
+
+Use `actions/checkout` with `fetch-depth: 0` before running the Action so
+GoSherpa can compare the pull request with its base.
 
 For faster repeated queries, create a snapshot and opt into reuse:
 
 ```bash
-gosherpa snapshot
+gosherpa init --base HEAD
 gosherpa symbols --use-snapshot
 gosherpa refs ParseFile --use-snapshot --json
 gosherpa callers ParseFile --use-snapshot --json
 gosherpa interface ./internal/auth.Authenticator --use-snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --json
+gosherpa agent context --json
 ```
 
 ## Command Map
@@ -178,10 +200,11 @@ warning.
 Agents should prefer bounded, task-specific context over broad inventory dumps:
 
 ```bash
+gosherpa init --base HEAD
 gosherpa doctor --json
-gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa agent context --json
 gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
-gosherpa tests affected --base HEAD --use-snapshot --json
+gosherpa tests affected --json
 ```
 
 Start with [GoSherpa for AI Agents](AGENT_NOTES.md) for workflow guidance, and

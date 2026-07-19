@@ -294,12 +294,17 @@ func runContextCommand(invocation cliInvocation, stdout io.Writer, stderr io.Wri
 }
 
 func runPRCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) int {
-	if len(invocation.CommandArgs) != 0 || !invocation.HasBaseOption {
+	if len(invocation.CommandArgs) != 0 {
 		printPRUsage(stderr)
 		return exitUsage
 	}
+	if !hasBaseRef(invocation) {
+		printPRUsage(stderr)
+		printConfigBaseUsageHint(stderr)
+		return exitUsage
+	}
 
-	root, ok := resolveRootPath(invocation.Root, stderr)
+	root, ok := resolveInvocationRootPath(invocation, stderr)
 	if !ok {
 		return exitFailure
 	}
@@ -311,6 +316,7 @@ func runPRCommand(invocation cliInvocation, stdout io.Writer, stderr io.Writer) 
 	if err != nil {
 		return writeCommandError(invocation.JSON, root, "pr", invocation.BaseRef, stderr, err)
 	}
+	report.Warnings = uniqueStringsInOrder(append(invocation.ConfigWarnings, report.Warnings...))
 
 	if invocation.JSON {
 		normalizedReport := normalizePRReport(report)
@@ -643,12 +649,17 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 	}
 
 	if invocation.CommandArgs[0] == "affected" {
-		if len(invocation.CommandArgs) != 1 || !invocation.HasBaseOption {
+		if len(invocation.CommandArgs) != 1 {
 			printTestsAffectedUsage(stderr)
 			return exitUsage
 		}
+		if !hasBaseRef(invocation) {
+			printTestsAffectedUsage(stderr)
+			printConfigBaseUsageHint(stderr)
+			return exitUsage
+		}
 
-		root, ok := resolveRootPath(invocation.Root, stderr)
+		root, ok := resolveInvocationRootPath(invocation, stderr)
 		if !ok {
 			return exitFailure
 		}
@@ -668,15 +679,17 @@ func runTestsCommand(invocation cliInvocation, stdout io.Writer, stderr io.Write
 
 		if invocation.JSON {
 			normalizedReport := impactDiffJSONResult(report)
+			envelopeWarnings := uniqueStringsInOrder(append(invocation.ConfigWarnings, normalizedReport.Warnings...))
 			return writeJSON(stdout, stderr, newJSONResponse(
 				root,
 				"tests affected",
 				invocation.BaseRef,
-				normalizedReport.Warnings,
+				envelopeWarnings,
 				testsAffectedJSONDataFromReport(normalizedReport, diffAnalysisModeFallback(snapshotUsed)),
 			))
 		}
 
+		report.Warnings = uniqueStringsInOrder(append(invocation.ConfigWarnings, report.Warnings...))
 		fmt.Fprint(stdout, impactengine.FormatAffectedTestsReport(report))
 		return exitSuccess
 	}

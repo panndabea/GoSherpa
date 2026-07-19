@@ -44,18 +44,25 @@ For review, repair, or edit tasks in a Go repository, start with readiness and
 the diff-first agent workflow:
 
 ```bash
+gosherpa init --base HEAD
 gosherpa doctor --json
-gosherpa snapshot --json
-gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa agent context --json
 ```
 
 Use focused commands when the agent workflow points at a symbol or package:
 
 ```bash
 gosherpa context symbol ./internal/sherpa.ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
-gosherpa tests affected --base HEAD --use-snapshot --json
-gosherpa pr --base HEAD --use-snapshot --json
+gosherpa tests affected --json
+gosherpa pr --json
 ```
+
+`gosherpa init` writes `.gosherpa/config.json` and refreshes
+`.gosherpa/snapshot.json`. After init, `agent context`, `pr`, and
+`tests affected` can omit `--base`, build tags, snapshot reuse, and standard
+agent-context limits. Add `--no-use-snapshot` to those commands when you need
+live analysis for one run. In uninitialized repositories or scripts that should
+avoid local writes, pass `--base <ref>` and other flags explicitly.
 
 When the target is unclear, start with a limited search:
 
@@ -88,22 +95,23 @@ before broad inventory commands like unfiltered `symbols`.
 | Task | Start with |
 | --- | --- |
 | Check analysis readiness | `gosherpa doctor --json` |
+| Initialize defaults | `gosherpa init --base HEAD --json` |
 | Create or refresh reusable snapshot data | `gosherpa snapshot --json` |
 | Get a repository overview | `gosherpa analyze . --json` |
 | Inspect architecture and coupling | `gosherpa architecture --json` |
 | Inspect structural risk | `gosherpa risk --json` |
 | Find symbols by name or kind | `gosherpa search <terms> --limit <n> --json`; use `gosherpa symbols --json` only for broad inventory |
 | Inspect one symbol | `gosherpa symbol <target> --json` |
-| Get daily diff context | `gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json` |
+| Get daily diff context | `gosherpa agent context --json` after `gosherpa init --base HEAD`; otherwise pass `--base HEAD --use-snapshot --max-*` explicitly |
 | Get focused pre-edit context | `gosherpa context symbol <target> --use-snapshot --max-* --json` when a fresh snapshot exists; otherwise `gosherpa context symbol|file|package|diff ... --max-* ... --json` |
 | Find references | `gosherpa refs <target> --json` |
 | Find direct callers or callees | `gosherpa callers <target> --json` and `gosherpa callees <target> --json` |
 | Explore call reachability | `gosherpa entrypoints <target> --json`, `gosherpa path <from> <to> --json`, or `gosherpa paths <from> <to> --json`; `context symbol`, `context diff`, `impact symbol`, `impact diff`, `pr`, and `agent context` may include `entrypointSummary` |
 | Inspect package relationships | `gosherpa packages --json`, `gosherpa deps <package> --json`, or `gosherpa deps --all --json` |
 | Inspect interface relationships | `gosherpa interface <interface> --json`; add `--use-snapshot` when a fresh snapshot exists. Use `gosherpa implementers <interface> --json` or `gosherpa interfaces <type> --json` for focused lists |
-| Analyze changed files | `gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json`; use focused `context diff`, `impact diff`, and `pr` commands for drill-down |
+| Analyze changed files | `gosherpa agent context --json` after init; use focused `context diff`, `impact diff`, and `pr` commands for drill-down |
 | Plan tests for a symbol, package, or file | `gosherpa tests <target> --json`; for files use `gosherpa tests internal/service/service.go --json` |
-| Plan tests for a change | `gosherpa tests affected --base HEAD --json` |
+| Plan tests for a change | `gosherpa tests affected --json` after init; otherwise `gosherpa tests affected --base HEAD --json` |
 
 ## Context Commands
 
@@ -114,7 +122,7 @@ diff question. Add size controls whenever the repository or target may be
 large:
 
 ```bash
-gosherpa agent context --base HEAD --use-snapshot --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
+gosherpa agent context --json
 gosherpa context symbol ParseFile --use-snapshot --max-references 20 --max-tests 10 --max-bytes 12000 --json
 gosherpa context file internal/sherpa/impact.go --max-symbols 20 --max-tests 10 --max-bytes 12000 --source-radius 1 --json
 gosherpa context package ./internal/sherpa --max-files 20 --max-symbols 40 --max-tests 20 --max-bytes 12000 --json
@@ -197,6 +205,9 @@ and package-qualified examples.
   callees, tests, and impact output before editing.
 - Limit broad outputs with `--max-*` or `--limit` flags before feeding them into
   an agent context window.
+- Prefer running `gosherpa init --base <ref>` once in writable local
+  repositories so diff-first commands can use the same base, tags, snapshot
+  setting, and context limits consistently.
 - Refresh snapshots with `gosherpa snapshot --json` before repeated large-repo
   `agent context --use-snapshot` runs, after changing `--tags`, or when
   snapshot warnings say data is missing, stale, invalid, or relationship-limited.
